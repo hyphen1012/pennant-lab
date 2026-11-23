@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.8\.3 · WATCH/);
+assert.match(html,/VERSION 0\.8\.4 · SCORING/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(t,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -146,7 +146,7 @@ assert.match(html,/data-action="\$\{history\?'monthly-history-close':'finish-mon
 assert.match(html,/waitForDailyDisplay\(mode==='fast'\?720:1900\)/);
 assert.match(html,/waitForDailyDisplay\(mode==='fast'\?840:2300\)/);
 assert.doesNotMatch(html,/\$\{step\}\/\$\{frames\.length\} 半イニング/);
-assert.match(html,/const progress=Math\.min\(100,Math\.round\(step<=18\?step\/18\*95:95\+\(step-18\)\/6\*5\)\)/);
+assert.match(html,/const finishedHalves=revealed\.length;/);
 function partialWatch(omitNinthBottom){
   const g={year:2031,day:20,home:2,away:1,
     inningsA:Array(9).fill(0),inningsH:Array(9).fill(0),events:[]};
@@ -166,3 +166,54 @@ assert.equal(gaugeWidth(withNinth),gaugeWidth(withoutNinth),
   'Progress must not reveal whether the bottom of the ninth will be played');
 assert(!/\d+\/(?:17|18) 半イニング/.test(withNinth));
 assert(!/\d+\/(?:17|18) 半イニング/.test(withoutNinth));
+
+
+
+// v0.8.4: only real logged scoring appearances can become named player
+// moments; multiple scoring appearances in a half-inning are revealed in order.
+assert.match(html,/result\.scoringPlays=scoringPlays/);
+assert.match(html,/scoringPlays\.push\(\{inning,teamId:batTeam\.id/);
+assert.match(html,/watchReplaySteps\(g\)/);
+assert.match(html,/watchScoringTitle\(play\)/);
+assert.match(html,/scoring\?\(mode==='fast'\?900:1700\):interval/);
+const baseballTeams=[
+  {id:1,name:'東京フェニックス',short:'東京',league:'E'},
+  {id:2,name:'長野アルパインズ',short:'長野',league:'W'}
+];
+function scoringSample(step,withLogs=true){
+  const g={year:2031,day:20,home:2,away:1,
+    inningsA:[3,...Array(8).fill(0)],
+    inningsH:Array(9).fill(0),events:[],
+    ...(withLogs?{scoringPlays:[
+      {inning:1,teamId:1,batterId:101,batterName:'田中 健',kind:'single',runs:1,rbi:1},
+      {inning:1,teamId:1,batterId:102,batterName:'鈴木 翔',kind:'hr',runs:2,rbi:2}
+    ]}:{})};
+  const game={year:2031,selectedId:1,games:[g]};
+  const ui={watchGame:{year:2031,day:20,step},autoPaused:false};
+  const getTeam=id=>baseballTeams.find(t=>t.id===id);
+  const context={game,ui,getTeam,getPlayer:()=>null,leagueClass:()=>'',h:s=>String(s),
+    teamBadge:t=>t.short,formatCalendarDate:()=> '5月16日'};
+  return vm.runInNewContext(watchSource+'\nwatchGameScreen({gameNo:20,date:"2031-05-16"});',context);
+}
+const oneRun=scoringSample(1),twoRun=scoringSample(2),endOfHalf=scoringSample(3);
+assert.match(oneRun,/田中 健/);
+assert.match(oneRun,/1点タイムリーヒット/);
+assert.match(oneRun,/＋1点 · 0 → 1/);
+assert.doesNotMatch(oneRun,/鈴木 翔/,'No future scoring batter can leak');
+assert.match(twoRun,/鈴木 翔/);
+assert.match(twoRun,/2ランホームラン/);
+assert.match(twoRun,/＋2点 · 1 → 3/);
+assert.match(endOfHalf,/攻撃終了/);
+assert.doesNotMatch(endOfHalf,/class="watch-scoring-flash/);
+const oldFormat=scoringSample(1,false);
+assert.doesNotMatch(oldFormat,/タイムリーヒット/,'Legacy saves must not invent scoring players');
+assert.doesNotMatch(oldFormat,/class="watch-scoring-flash/);
+const hrNames=vm.runInNewContext(watchSource+
+  "\n[watchScoringTitle({kind:'hr',rbi:1}),"+
+  "watchScoringTitle({kind:'hr',rbi:3}),"+
+  "watchScoringTitle({kind:'hr',rbi:4})];",{
+  game:{year:2031,games:[],selectedId:1},ui:{watchGame:{step:0}}
+});
+assert.equal(hrNames[0],'ソロホームラン');
+assert.equal(hrNames[1],'3ランホームラン');
+assert.equal(hrNames[2],'満塁ホームラン');
