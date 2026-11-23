@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.8\.2 · GM BRIEFING/);
+assert.match(html,/VERSION 0\.8\.3 · WATCH/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(t,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -139,3 +139,30 @@ assert.match(html,/球団運営スタッフ/);
 assert.match(html,/チーム医療スタッフ/);
 assert.match(html,/data-action="injury-ack"/);
 assert.match(html,/data-action="\$\{history\?'monthly-history-close':'finish-month'\}"/);
+
+
+// v0.8.3: Avoid revealing a 17-half-inning game before the final out.
+// The progress width is computed against the public 9-inning/12-inning rules.
+assert.match(html,/waitForDailyDisplay\(mode==='fast'\?720:1900\)/);
+assert.match(html,/waitForDailyDisplay\(mode==='fast'\?840:2300\)/);
+assert.doesNotMatch(html,/\$\{step\}\/\$\{frames\.length\} 半イニング/);
+assert.match(html,/const progress=Math\.min\(100,Math\.round\(step<=18\?step\/18\*95:95\+\(step-18\)\/6\*5\)\)/);
+function partialWatch(omitNinthBottom){
+  const g={year:2031,day:20,home:2,away:1,
+    inningsA:Array(9).fill(0),inningsH:Array(9).fill(0),events:[]};
+  if(omitNinthBottom)g.inningsH[8]=null;
+  const game={year:2031,selectedId:1,games:[g]};
+  const ui={watchGame:{year:2031,day:20,step:7},autoPaused:false};
+  const teams=[{id:1,name:'東京',short:'東京',league:'E'},
+    {id:2,name:'仙台',short:'仙台',league:'E'}];
+  const getTeam=id=>teams.find(x=>x.id===id);
+  const env={game,ui,getTeam,leagueClass:()=>'',h:x=>String(x),
+    teamBadge:t=>t.short,formatCalendarDate:()=> '4月23日'};
+  return vm.runInNewContext(watchSource+'\nwatchGameScreen({gameNo:20,date:"2031-04-23"});',env);
+}
+const withNinth=partialWatch(false),withoutNinth=partialWatch(true);
+const gaugeWidth=markup=>markup.match(/class="watch-progress"><i style="width:(\d+)%"/)?.[1];
+assert.equal(gaugeWidth(withNinth),gaugeWidth(withoutNinth),
+  'Progress must not reveal whether the bottom of the ninth will be played');
+assert(!/\d+\/(?:17|18) 半イニング/.test(withNinth));
+assert(!/\d+\/(?:17|18) 半イニング/.test(withoutNinth));
