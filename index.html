@@ -341,7 +341,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .app-shell.auto-tappable{touch-action:manipulation;cursor:pointer}
 .app-shell.auto-tappable .daily-playback button{cursor:pointer}
 .news-gesture-hint{display:block;flex-basis:100%;font-size:11px;letter-spacing:.2px;color:#f0d58d}
-.paper-touch-hint{font-size:10px;color:#b9d9d2;background:#123347b8;border:1px solid #466977;border-radius:6px;padding:7px 9px;margin:-6px 0 12px;text-align:center;line-height:1.5}
+/* Muted violet distinguishes playback instructions from news and club badges. */
+.paper-touch-hint{font-size:11px;font-weight:700;letter-spacing:.15px;color:#f2eaff;background:#372b4f;border:1px solid #9f8bc7;border-left:4px solid #b8a1e5;border-radius:7px;padding:9px 10px;margin:-6px 0 12px;text-align:center;line-height:1.55;box-shadow:0 2px 8px #050a1933}
 .game-touch-hint{font-size:11px;color:#c9ddb9;text-align:center;background:#1a3b3b;border:1px solid #4f7567;border-radius:8px;padding:7px 9px;margin:3px auto 13px;max-width:550px}
 .daily-playback:has(.news-gesture-hint){gap:6px}
 </style>
