@@ -690,6 +690,97 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }
     game.monthStart=null;
   }
+
+  // Newspaper articles use only simulated game outcomes and recorded player stats.
+  function buildDailyNews(entry){
+    const articles=[],mine=myTeam();
+    const last=game.games.filter(g=>g.year===game.year&&(g.home===mine.id||g.away===mine.id)).slice(-1)[0];
+    if(last){
+      const home=getTeam(last.home),away=getTeam(last.away);
+      const winner=last.homeScore===last.awayScore?null:last.homeScore>last.awayScore?home:away;
+      articles.push({tag:'前節の熱戦',type:'game',
+        headline:winner?`${winner.short}が白星、接戦を制す`:'譲らぬ一戦、両軍引き分け',
+        body:`${away.short} ${last.awayScore}―${last.homeScore} ${home.short}。第${last.day}戦の試合結果を振り返る。`,
+        stat:`${away.short} ${last.awayScore} – ${last.homeScore} ${home.short}`});
+    }
+    for(const league of ['E','W']){
+      const first=rankings(league)[0];if(!first)continue;
+      articles.push({tag:league==='E'?'東リーグ':'西リーグ',type:'standing',
+        headline:`${first.short}、${league==='E'?'東':'西'}リーグ首位を走る`,
+        body:`${first.wins}勝${first.losses}敗${first.ties}分。各球団のペナント争いが続いている。`,
+        stat:`${first.wins}勝 ${first.losses}敗`});
+    }
+    const top=game.players.filter(p=>p.teamId!=null&&p.teamId>=0&&!isPitch(p)&&p.stats?.hr>0)
+      .sort((a,b)=>b.stats.hr-a.stats.hr||b.stats.rbi-a.stats.rbi||a.id-b.id)[0];
+    if(top)articles.push({tag:'注目の打者',type:'player',
+      headline:`${top.name}、今季${top.stats.hr}本塁打`,
+      body:`${getTeam(top.teamId).short}の${top.name}が本塁打${top.stats.hr}本、${top.stats.rbi}打点を記録。`,
+      stat:`${top.stats.hr} HR`});
+    const seed=Number(entry.date.slice(-2))+Number(entry.date.slice(5,7))*7;
+    const index=seed%articles.length;
+    const selected=[articles[index],...articles.filter((_,i)=>i!==index).slice(0,2)];
+    const next=game.calendar.days.slice(game.calendarIndex+1).find(d=>d.type==='game');
+    const fixture=next&&game.schedule[next.gameNo-1]?.find(m=>m.home===mine.id||m.away===mine.id);
+    const opp=fixture?getTeam(fixture.home===mine.id?fixture.away:fixture.home):null;
+    return {year:game.year,date:entry.date,kind:entry.type,reason:entry.reason,
+      layout:['feature','columns','accent'][seed%3],articles:selected,
+      nextDate:next?.date||null,nextOpponent:opp?.short||null};
+  }
+  function dailyBulletin(entry){
+    if(!Array.isArray(game.dailyBulletins))game.dailyBulletins=[];
+    let edition=game.dailyBulletins.find(x=>x.year===game.year&&x.date===entry.date);
+    if(!edition){
+      edition=buildDailyNews(entry);
+      game.dailyBulletins.push(edition);
+      if(edition.articles[0])pushNews(`【本日の球界ニュース】${edition.articles[0].headline}`,entry.date);
+    }
+    return edition;
+  }
+  function dailyPlaybackControls(){
+    const running=!!ui.busy;
+    return `<div class="daily-playback">
+      <span>${running?'● 自動進行中':'日程を一時停止中'}</span>
+      <button class="btn outline sm" data-action="${running?'pause-calendar':'auto-day-close'}">${running?'一時停止':'本部に戻る'}</button>
+      ${!running&&game.advanceTarget?.goal>game.day?'<button class="btn primary sm" data-action="resume-calendar">▶ 続きから</button>':''}
+    </div>`;
+  }
+  function dailyNewsScreen(entry){
+    const paper=game.dailyBulletins?.find(x=>x.year===game.year&&x.date===entry.date)||dailyBulletin(entry);
+    const [main,...rest]=paper.articles;
+    const label=entry.type==='midseason'?'中盤休止日':entry.reason==='移動・調整日'?'移動・調整日':'休養日';
+    return `<section class="daily-newspaper ${paper.layout}">
+      <div class="paper-dateline"><span>PENNANT LAB SPORTS EDITION</span><span>${entry.date.replaceAll('-','.')} · NO.${String(game.calendarIndex).padStart(3,'0')}</span></div>
+      <div class="paper-masthead"><span class="paper-icon">⚾</span><div><small>BASEBALL JOURNAL</small><h1>本日の球界ニュース</h1></div></div>
+      <div class="paper-dateband"><strong>${formatCalendarDate(entry.date,true)}</strong><span>${label}</span></div>
+      <div class="paper-stories">
+        <article class="paper-lead"><div class="paper-kicker">TOP STORY / ${h(main.tag)}</div>
+          <h2>${h(main.headline)}</h2><p>${h(main.body)}</p>
+          <div class="paper-highlight">${h(main.stat||'球界の最新情報')}</div></article>
+        <div class="paper-briefs">${rest.map((a,i)=>`<article class="paper-brief">
+          <div class="paper-kicker">0${i+2} / ${h(a.tag)}</div><h3>${h(a.headline)}</h3>
+          <p>${h(a.body)}</p><b>${h(a.stat||'')}</b>
+        </article>`).join('')}</div>
+      </div>
+      <div class="paper-next"><strong>NEXT GAME</strong><span>${paper.nextDate?`${formatCalendarDate(paper.nextDate)}　vs ${h(paper.nextOpponent||'未定')}`:'全日程終了'}</span></div>
+      ${entry.type==='midseason'?'<p class="paper-note">大会の実試合は今後実装予定です。</p>':''}
+      ${dailyPlaybackControls()}</section>`;
+  }
+  function dailyGameScreen(entry){
+    const g=game.games.find(x=>x.year===game.year&&x.day===entry.gameNo&&(x.home===game.selectedId||x.away===game.selectedId));
+    if(!g)return `<section class="panel"><h3>${formatCalendarDate(entry.date)}</h3><p>試合結果がありません。</p>${dailyPlaybackControls()}</section>`;
+    const me=myTeam(),opp=getTeam(g.home===me.id?g.away:g.home);
+    const scored=g.home===me.id?g.homeScore:g.awayScore,allowed=g.home===me.id?g.awayScore:g.homeScore;
+    return `<div class="review-screen daily-game-screen">
+      <div class="review-kicker">${game.year} SEASON · MATCH REPORT</div>
+      <div class="review-score"><h2>第${g.day}戦 · 試合結果</h2>
+        <span class="match-outcome">${scored>allowed?'勝利':scored<allowed?'敗戦':'引き分け'}</span>
+        <div class="score-pair"><div>${teamBadge(me)}<small>${h(me.short)}</small><b>${scored}</b></div>
+        <span class="mid-score">–</span><div>${teamBadge(opp)}<small>${h(opp.short)}</small><b>${allowed}</b></div></div>
+        <div class="review-games-count">${formatCalendarDate(entry.date)}　日次試合レポート</div>
+      </div>
+      ${matchReportBody(g)}
+      ${dailyPlaybackControls()}</div>`;
+  }
   function processCalendarDay(){
     const entry=calendarNextDay();
     if(!entry)return null;
@@ -698,6 +789,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       processDay();
       for(const g of game.games.slice(-6))if(g.day===game.day&&g.year===game.year)g.date=entry.date;
     }
+    if(entry.type!=='game')dailyBulletin(entry);
     game.calendarIndex++;
     const next=calendarNextDay();
     const endOfMonth=!next||monthKey(next.date)!==monthKey(entry.date);
@@ -718,7 +810,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     });
     ['C','1B','2B','3B','SS','OF','OF','OF','OF','SP','SP','SP','RP','RP','CP','SP','OF','SS','2B','1B','RP','C'].forEach(pos=>addPlayer(null,pos));
     game.schedule=scheduleForSeason();game.calendar=calendarForSeason(game.year);
-    game.calendarIndex=0;game.monthlyArchive=[];game.pendingMonth=null;game.playbackMode='normal';game.advanceTarget=null;
+    game.calendarIndex=0;game.monthlyArchive=[];game.dailyBulletins=[];game.pendingMonth=null;game.playbackMode='normal';game.advanceTarget=null;
     game.monthStart=monthlySnapshot(game.calendar.days[0].date);
     game.news=['新リーグが開幕！ 12球団による143試合制のペナントが始まります。'];
     save();
@@ -1028,6 +1120,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     game.teams.forEach(syncLineupFielding);
     if(!Array.isArray(game.seasonArchive))game.seasonArchive=[];
     if(!Array.isArray(game.newsArchive))game.newsArchive=[];
+    if(!Array.isArray(game.dailyBulletins))game.dailyBulletins=[];
     if(!game.calendar||game.calendar.year!==game.year||!Array.isArray(game.calendar.days))
       game.calendar=calendarForSeason(game.year);
     if(!Number.isInteger(game.calendarIndex)||game.calendarIndex<0||game.calendarIndex>game.calendar.days.length){
