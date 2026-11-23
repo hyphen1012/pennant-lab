@@ -1050,8 +1050,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const last=revealed[revealed.length-1],current=last?getTeam(last.teamId):null;
     const inningLabel=last?`${last.inning}回${last.side} · ${h(current.short)}の攻撃終了`:'プレーボール';
     const event=last?g.events.find(x=>x.startsWith(`${last.inning}回 ${current.short} `)):null;
-    const note=last?(event||`${h(current.name)}はこの回${last.runs}点を記録`):
-      `${h(away.name)} 対 ${h(home.name)} · まもなく試合開始`;
+    const note=last?(event||`${current.name}はこの回${last.runs}点を記録`):
+      `${away.name} 対 ${home.name} · まもなく試合開始`;
     const progress=frames.length?Math.round(step/frames.length*100):0;
     return `<div class="watch-game-screen">
       <div class="review-kicker">PENNANT LAB · INNING WATCH</div>
@@ -1066,7 +1066,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         <div class="watch-progress"><i style="width:${progress}%"></i></div>
       </section>
       <section class="panel watch-scoreboard"><h3 class="panel-title">イニング別スコア</h3><div class="table-wrap"><table class="watch-table"><thead><tr><th>球団</th>${Array.from({length:inningCount},(_,i)=>`<th>${i+1}</th>`).join('')}<th>計</th></tr></thead><tbody>${rows}</tbody></table></div></section>
-      <section class="panel watch-commentary"><small>INNING REPORT</small><h3>${inningLabel}</h3><p>${note}</p></section>
+      <section class="panel watch-commentary"><small>INNING REPORT</small><h3>${inningLabel}</h3><p>${h(note)}</p></section>
       <div class="watch-controls">
         <button class="btn outline" data-action="pause-calendar">${ui.autoPaused?'▶ 再開':'⏸ 一時停止'}</button>
         <button class="btn primary" data-action="watch-skip">試合結果へ ›</button>
