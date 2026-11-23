@@ -85,7 +85,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.8\.0 · GAME FEEL/);
+  assert.match(app.innerHTML,/VERSION 0\.8\.1 · GAME FEEL/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -94,7 +94,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert.match(app.innerHTML,/class="desk-task" data-action="mgr-open"/);
   assert(!app.innerHTML.includes('class="panel manager-home"'),'Manager must appear in GM desk, not a separate panel');
   dispatch('click',{action:'mgr-open'});
-  assert.match(app.innerHTML,/現監督・GM方針/);
+  assert.match(app.innerHTML,/監督・GM方針/);
   assert.match(app.innerHTML,/data-action="mgr-offer"/);
   const oldCash=window.PennantLab.getSnapshot().teams.find(t=>t.id===2).cash;
   dispatch('click',{action:'mgr-offer',slot:'1'});
@@ -102,8 +102,18 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   dispatch('click',{action:'confirm'});
   const cash=window.PennantLab.getSnapshot().teams.find(t=>t.id===2).cash;
   assert(cash<oldCash,'Manager hiring spends the disclosed signing fee');
-  dispatch('change',{change:'manager-order',key:'bullpen',value:'attack'});
-  assert.match(app.innerHTML,/value="attack" selected/);
+  assert.match(app.innerHTML,/manager-portrait/);
+  assert.match(app.innerHTML,/manager-grade-strip/);
+  assert.match(app.innerHTML,/野手起用/);
+  assert.match(app.innerHTML,/投手起用/);
+  assert.match(app.innerHTML,/采配的中/);
+  assert.match(app.innerHTML,/育成力/);
+  assert.match(app.innerHTML,/現在の采配/);
+  assert.match(app.innerHTML,/積極的/);
+  assert.match(app.innerHTML,/消極的/);
+  assert(!app.innerHTML.includes('data-change="manager-order"'),'Native select must be replaced by in-game buttons');
+  dispatch('click',{action:'mgr-order',key:'bullpen',choice:'attack'});
+  assert.match(app.innerHTML,/data-action="mgr-order" data-key="bullpen" data-choice="attack"\s+aria-pressed="true"/);
   await window.PennantLab.advance('day');
   // The day action must show the simulated inning-by-inning watch before the final score.
   for(let tries=0;tries<12&&watchRenders.length===0;tries++){
@@ -157,5 +167,5 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   for(const team of full.teams)assert.equal(team.w+team.l+team.t,143,'Every club plays 143 games');
   console.log('PASS: full 143-game season, 858 games, all 12 clubs, monthly and injury interruptions');
 
-  console.log('PASS: cold boot, manager, PLAY BALL, inning replay, GAME SET, result, save, and full season');
+  console.log('PASS: cinematic v0.8.1 manager portraits/ratings, custom GM orders, game flow and season');
 })().catch(e=>{console.error(e);process.exitCode=1;});
