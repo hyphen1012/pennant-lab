@@ -746,6 +746,51 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   border-radius:50%;overflow:hidden;background:#27394E}
 @media(max-width:390px){.special-name-tag{font-size:8px}.face-label .special-name-tag{font-size:7px}}
 
+
+/* v0.8.6 — close-up player artwork and a shared rank-ring + overall-badge mini portrait. */
+.face-mini.has-overall{position:relative;overflow:visible;isolation:isolate;align-self:center;margin-bottom:9px;
+  background:#20334B;box-shadow:0 3px 9px #02081466}
+.face-mini.has-overall>.face-mini-artwork{display:block;width:100%;height:100%;border-radius:50%;
+  overflow:hidden;background:#20334B;flex:1;min-width:0}
+.face-mini.has-overall .face-artwork{display:block;width:100%;height:100%;border-radius:50%}
+.face-mini.has-overall .portrait-overall{
+  position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
+  z-index:2;min-width:29px;padding:1px 4px;line-height:15px;height:19px;
+  border-radius:12px;border:1px solid #15253C;color:#162139;
+  background:var(--avatar-color);box-shadow:0 2px 4px #0009;
+  font-weight:950;font-size:11px;text-align:center;font-variant-numeric:tabular-nums}
+.player-pick-btn.roster-pick-btn{min-height:77px}
+.roster-pick-btn .face-label .face-mini.has-overall{margin-bottom:9px}
+.swap-candidate .face-mini.has-overall{margin-bottom:10px}
+.recruit-market{padding:14px 12px;border-color:#435C79}
+.recruit-list{display:flex;flex-direction:column;gap:9px}
+.recruit-candidate{padding:12px;background:linear-gradient(125deg,#203651,#162A42);
+  border:1px solid #435A75;border-radius:12px;min-width:0;box-shadow:0 3px 10px #0309183a}
+.recruit-player{display:flex;gap:11px;align-items:center;min-width:0}
+.recruit-player .face-mini{width:49px;height:49px;flex:0 0 49px}
+.recruit-player .face-mini.has-overall{margin-bottom:8px}
+.recruit-identity{min-width:0;flex:1;display:flex;flex-direction:column;gap:4px}
+.recruit-identity>strong{font-size:15px;font-weight:900;line-height:1.3;color:#F5F8FC;min-width:0;
+  overflow-wrap:anywhere}
+.recruit-identity>small{font-size:11px;color:#ACBDD1;line-height:1.45}
+.recruit-overall{font-size:22px;font-weight:950;line-height:1;flex:0 0 25px;text-align:center}
+.recruit-contract{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 67px;
+  align-items:center;gap:8px;margin-top:10px;padding-top:9px;border-top:1px solid #3B506A;min-width:0}
+.recruit-contract>div{display:flex;flex-direction:column;min-width:0;gap:2px}
+.recruit-contract>div>small{font-size:10px;color:#9EB3C9}
+.recruit-contract>div>b{font-size:clamp(11px,3vw,14px);color:#ECF2FC;font-weight:850;white-space:nowrap}
+.recruit-contract>.btn{min-height:36px;width:100%;font-size:12px;padding:6px 4px}
+@media(max-width:390px){
+  .recruit-market{padding:12px 9px}
+  .recruit-candidate{padding:10px 9px}
+  .recruit-player{gap:8px}
+  .recruit-player .face-mini{width:43px;height:43px;flex-basis:43px}
+  .recruit-identity>strong{font-size:14px}
+  .recruit-contract{gap:5px;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 58px}
+  .recruit-contract>.btn{font-size:11px}
+  .recruit-contract>div>b{font-size:11px}
+}
+
 </style>
 </head>
 <body><div id="app"></div><script>
