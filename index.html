@@ -430,6 +430,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .condition-note{font-size:9px;white-space:nowrap;min-width:42px;text-align:right}
 .player-card>.condition-status{padding:4px 12px 7px}
 @media(max-width:380px){.condition-status{gap:5px}.condition-status .condition-name{font-size:9px}.condition-note{font-size:8px}}
+
+.injury-alert-screen{display:flex;flex-direction:column;gap:15px;max-width:680px;margin:14px auto;background:linear-gradient(145deg,#2f3043,#152339);border:1px solid #bf808a;border-top:5px solid #c58490;border-radius:15px;padding:20px;box-shadow:0 12px 36px #0006}
+.injury-alert-screen>.eyebrow{color:#e4a2b0;letter-spacing:1.5px}
+.injury-alert-screen h2{font-size:clamp(20px,5vw,27px);margin:0;color:#f6c7cb}
+.injury-alert-date{color:#b8c8db;font-size:11px}
+.injury-alert-name{font-size:19px;font-weight:900;color:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.injury-alert-level{background:#6b3542;border:1px solid #b7737c;border-radius:7px;padding:5px 9px;font-size:12px}
+.injury-alert-copy{color:#e6e0e8;line-height:1.7;font-size:14px;margin:0}
+.injury-alert-copy strong{color:#f4aeb7;font-size:17px}
+.condition-status .condition-note{max-width:75px}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -1527,6 +1537,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <section class="panel"><div class="panel-head"><h3 class="panel-title">日程を進める</h3><span class="pill">${getDayText()}</span></div>${progressButtons()}</section><section class="panel"><div class="panel-head"><h3 class="panel-title">直近の試合結果</h3></div>${lastGamePanel()}</section><section class="panel"><div class="panel-head"><h3 class="panel-title">リーグ順位</h3><button class="btn sm outline" data-action="tab" data-tab="records">順位表を見る</button></div>${standingTable(t.league,true)}</section><section class="panel"><h3 class="panel-title">クラブニュース</h3>${game.news.slice(0,6).map(n=>`<div class="event">${h(n)}</div>`).join('')}</section>`;
   }
   function businessScreen(){return `<div class="screen-top"><div class="eyebrow">BUSINESS & FINANCE</div><h2>球団経営</h2></div><div class="subtabs">${[['finance','収支・予算'],['market','補強市場']].map(([key,label])=>`<button class="subtab ${ui.businessSub===key?'active':''}" data-action="business-sub" data-sub="${key}">${label}</button>`).join('')}</div>${ui.businessSub==='market'?marketScreen():financeScreen()}`}
+  function injuryAlertScreen(){
+    const e=game.pendingEvent,p=e&&getPlayer(e.playerId),club=e&&getTeam(e.teamId);
+    if(!e)return '';
+    return `<div class="injury-alert-screen">
+      <div class="eyebrow">CLUB MEDICAL REPORT · IMPORTANT</div>
+      <h2>⚕ ${e.level==='serious'?'長期離脱の速報':'選手負傷のお知らせ'}</h2>
+      <div class="injury-alert-date">${formatCalendarDate(e.date,true)} · ${club?h(club.name):''}</div>
+      <div class="injury-alert-name">${p?h(p.name):'選手'} <span class="injury-alert-level">${h(e.label)}</span></div>
+      <p class="injury-alert-copy">試合後のコンディション確認で負傷が判明。復帰の目安は約<strong>${e.days}日</strong>です。回復まで試合に出場できません。</p>
+      <p class="small">代替の健康な選手をスタメン候補へ自動補充します。必要なら打順・ローテーションを編成画面で見直してください。</p>
+      <button class="btn primary full" data-action="injury-ack">報告を確認して本部へ</button>
+    </div>`;
+  }
   function monthlyReviewScreen(history=false){
     const requested=history?ui.monthHistory:game.pendingMonth;
     const r=game.monthlyArchive?.find(v=>v.year===requested?.year&&v.id===requested?.id);
@@ -1761,7 +1784,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(ui.page==='title'){app.innerHTML=titleScreen();return}
     if(ui.page==='setup'){app.innerHTML=setupScreen();return}
     const screens={hq:frontOfficeScreen,team:teamScreen,roster:rosterScreen,business:businessScreen,records:recordScreen,home:frontOfficeScreen,standings:standingsScreen,stats:statScreen,market:marketScreen,finance:financeScreen};
-    app.innerHTML=`<div class="app-shell ${ui.busy&&ui.autoDay?'auto-tappable':''}">${header()}<main class="main">${game.pendingReview?matchReviewScreen():ui.autoDay?(ui.autoDay.type==='game'?dailyGameScreen(ui.autoDay):dailyNewsScreen(ui.autoDay)):game.pendingMonth?monthlyReviewScreen():ui.monthHistory?monthlyReviewScreen(true):(ui.playerDetail!=null?playerDetails():(screens[ui.tab]||frontOfficeScreen)())}</main>${game.pendingReview||game.pendingMonth||ui.autoDay||ui.monthHistory?'':navbar()}</div>${ui.confirm?.type==='switch'?teamSwitchModal():confirmModal()}${game.pendingReview?'':resultModal()}${ui.busy&&!ui.autoDay?`<div class="calendar-running"><strong>${getDayText()}</strong><small>${game.day}/143試合</small><button class="btn outline" data-action="pause-calendar">一時停止</button></div>`:''}${ui.busy&&ui.autoDay&&ui.autoPaused?'<div class="auto-paused-toolbar" role="group" aria-label="一時停止中の操作"><span>⏸ 一時停止中</span><div class="auto-paused-actions"><button class="btn primary sm" data-action="pause-calendar">▶ 再開</button><button class="btn outline sm" data-action="auto-return-hq">⌂ 本部に戻る</button></div></div>':''}<input id="import-save-file" type="file" accept=".json,application/json" hidden>`;
+    app.innerHTML=`<div class="app-shell ${ui.busy&&ui.autoDay?'auto-tappable':''}">${header()}<main class="main">${game.pendingEvent?injuryAlertScreen():game.pendingReview?matchReviewScreen():ui.autoDay?(ui.autoDay.type==='game'?dailyGameScreen(ui.autoDay):dailyNewsScreen(ui.autoDay)):game.pendingMonth?monthlyReviewScreen():ui.monthHistory?monthlyReviewScreen(true):(ui.playerDetail!=null?playerDetails():(screens[ui.tab]||frontOfficeScreen)())}</main>${game.pendingEvent||game.pendingReview||game.pendingMonth||ui.autoDay||ui.monthHistory?'':navbar()}</div>${ui.confirm?.type==='switch'?teamSwitchModal():confirmModal()}${game.pendingReview?'':resultModal()}${ui.busy&&!ui.autoDay?`<div class="calendar-running"><strong>${getDayText()}</strong><small>${game.day}/143試合</small><button class="btn outline" data-action="pause-calendar">一時停止</button></div>`:''}${ui.busy&&ui.autoDay&&ui.autoPaused?'<div class="auto-paused-toolbar" role="group" aria-label="一時停止中の操作"><span>⏸ 一時停止中</span><div class="auto-paused-actions"><button class="btn primary sm" data-action="pause-calendar">▶ 再開</button><button class="btn outline sm" data-action="auto-return-hq">⌂ 本部に戻る</button></div></div>':''}<input id="import-save-file" type="file" accept=".json,application/json" hidden>`;
   }
   function showToast(message,error=false){
     document.querySelector('.message')?.remove();
@@ -2134,7 +2157,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const oldAdvance03=advance;
   advance=async function(days){
     if(storageFailure){showToast('保存に失敗しています。データをバックアップしてください。',true);return;}
-    if(ui.busy||game.pendingReview||game.pendingMonth||ui.monthHistory)return;
+    if(ui.busy||game.pendingReview||game.pendingEvent||game.pendingMonth||ui.monthHistory)return;
     if(game.day>=SEASON_GAMES)return;
     const resume=days==='resume'&&game.advanceTarget?.year===game.year;
     const oneDay=days==='day'||(resume&&game.advanceTarget?.kind==='date');
@@ -2153,11 +2176,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     clearPendingNewsTap();render();save();
     await new Promise(resolve=>setTimeout(resolve,35));
     let lastDay=null;
-    while(hasMore()&&!ui.pauseRequested&&!game.pendingMonth){
+    while(hasMore()&&!ui.pauseRequested&&!game.pendingMonth&&!game.pendingEvent){
       if(storageFailure||document.hidden)break;
       const entry=processCalendarDay();
       if(!entry)break;
       lastDay=entry;
+      if(game.pendingEvent)break; // Major injury pauses even fast skip.
       if(!skip){
         ui.autoDay=entry;
         ui.autoPaused=false;
@@ -2180,14 +2204,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const completedSeason=game.day===SEASON_GAMES&&!oneDay;
     // Fast skip keeps the legacy batch report. Continuous playback has
     // already shown the daily report, so don't duplicate the final match.
-    const showReview=!!last&&(skip||completedSeason);
+    const showReview=!!last&&!game.pendingEvent&&(skip||completedSeason);
     if(showReview)game.pendingReview={year:game.year,day:last.day,gameId:last.id,
       count:game.day-startGame,gameIds:games.map(g=>g.id),
       mode:completedSeason?'season':game.day-startGame>=30?'30':game.day-startGame>=7?'7':'single'};
     if(!hasMore())game.advanceTarget=null;
     // Single-day results stay on screen until dismissed; the same applies to
     // the final visible result of a timed batch outside monthly boundaries.
-    if(showReview||(!oneDay&&game.pendingMonth)||skip||returnToHQ)ui.autoDay=null;
+    if(game.pendingEvent||showReview||(!oneDay&&game.pendingMonth)||skip||returnToHQ)ui.autoDay=null;
     if(returnToHQ)ui.tab='hq';
     save();render();window.scrollTo({top:0,behavior:'instant'});
     if(interrupted&&!returnToHQ&&!game.pendingReview&&!game.pendingMonth)
@@ -2203,7 +2227,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   document.addEventListener('click',e=>{
     const el=e.target.closest('[data-action]');if(!el)return;
     const action=el.dataset.action;
-    if(!['playback-mode','pause-calendar','auto-return-hq','auto-day-close','resume-calendar','finish-month','monthly-history-open','monthly-history-close','fielding-open','fielding-close','fielding-set','swap-open','swap-close','swap-select','batch-expand','ceremony-start','ceremony-next'].includes(action))return;
+    if(!['playback-mode','pause-calendar','auto-return-hq','auto-day-close','resume-calendar','injury-ack','finish-month','monthly-history-open','monthly-history-close','fielding-open','fielding-close','fielding-set','swap-open','swap-close','swap-select','batch-expand','ceremony-start','ceremony-next'].includes(action))return;
     e.preventDefault();e.stopPropagation();
     if(action==='pause-calendar'){toggleAutoPause();return;}
     if(action==='auto-return-hq'){
@@ -2230,6 +2254,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(action==='resume-calendar'){
       if(ui.busy||game.pendingMonth||game.pendingReview||!advanceTargetRemaining())return;
       ui.autoDay=null;void advance('resume');return;
+    }
+    if(action==='injury-ack'){
+      if(ui.busy||!game.pendingEvent)return;
+      game.pendingEvent=null;ui.autoDay=null;ui.tab='hq';save();render();
+      window.scrollTo({top:0,behavior:'instant'});return;
     }
     if(action==='finish-month'){
       if(ui.busy||!game.pendingMonth)return;
