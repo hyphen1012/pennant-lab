@@ -336,6 +336,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .daily-playback .btn{padding:8px 12px;font-size:12px}
 .daily-game-screen>.daily-playback{margin:15px 3px 30px}
 @media(max-width:390px){.daily-newspaper{padding:13px 12px}.daily-newspaper.columns .paper-briefs{grid-template-columns:1fr}.paper-dateline{font-size:8px;letter-spacing:0}.paper-icon{flex-basis:42px;height:42px;font-size:21px}.paper-brief{padding:9px 10px}}
+
+/* Touch anywhere on the active daily report to pause, then tap to resume. */
+.app-shell.auto-tappable{touch-action:manipulation;cursor:pointer}
+.app-shell.auto-tappable .daily-playback button{cursor:pointer}
+.news-gesture-hint{display:block;flex-basis:100%;font-size:11px;letter-spacing:.2px;color:#f0d58d}
+.daily-playback:has(.news-gesture-hint){gap:6px}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -773,12 +779,68 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }
     return edition;
   }
+  // Tapping anywhere on a visible day pauses/resumes. Double-tapping a
+  // newspaper edition skips its five-second reading interval. The 260ms
+  // distinction avoids interpreting the first tap of a double tap as pause.
+  const NEWS_DOUBLE_TAP_MS=260;
+  let pendingNewsTap=null;
+  function clearPendingNewsTap(){
+    if(pendingNewsTap!==null){clearTimeout(pendingNewsTap);pendingNewsTap=null;}
+  }
+  function waitForDailyDisplay(duration){
+    return new Promise(resolve=>{
+      let remaining=duration,timer=null,started=0,settled=false;
+      const stop=()=>{
+        if(timer!==null){
+          clearTimeout(timer);timer=null;
+          remaining=Math.max(0,remaining-(Date.now()-started));
+        }
+      };
+      const finish=()=>{
+        if(settled)return;
+        stop();settled=true;clearPendingNewsTap();ui.autoWait=null;resolve();
+      };
+      const play=()=>{
+        if(settled)return;
+        started=Date.now();
+        timer=setTimeout(finish,remaining);
+      };
+      ui.autoWait={
+        pause(){
+          if(settled||ui.autoPaused)return;
+          stop();ui.autoPaused=true;render();
+        },
+        resume(){
+          if(settled||!ui.autoPaused)return;
+          ui.autoPaused=false;render();play();
+        },
+        skip(){
+          if(settled)return;
+          ui.autoPaused=false;finish();
+        }
+      };
+      play();
+    });
+  }
+  function toggleAutoPause(){
+    if(!ui.busy)return;
+    if(ui.autoWait){
+      if(ui.autoPaused)ui.autoWait.resume();
+      else ui.autoWait.pause();
+    }else ui.pauseRequested=true;
+  }
+  function advanceTargetRemaining(){
+    const t=game.advanceTarget;
+    return !!(t&&t.year===game.year&&(t.kind==='date'?
+      game.calendarIndex<(t.calendarGoal||0):game.day<t.goal));
+  }
   function dailyPlaybackControls(){
-    const running=!!ui.busy;
+    const running=!!ui.busy,paused=running&&!!ui.autoPaused;
     return `<div class="daily-playback">
-      <span>${running?'● 自動進行中':'日程を一時停止中'}</span>
-      <button class="btn outline sm" data-action="${running?'pause-calendar':'auto-day-close'}">${running?'一時停止':'本部に戻る'}</button>
-      ${!running&&game.advanceTarget?.goal>game.day?'<button class="btn primary sm" data-action="resume-calendar">▶ 続きから</button>':''}
+      <span>${running?(paused?'⏸ 一時停止中 · タップで再開':'● 自動進行中 · 画面タップで一時停止'):'この日の記録'}</span>
+      <button class="btn outline sm" data-action="${running?'pause-calendar':'auto-day-close'}">${running?(paused?'▶ 再開':'一時停止'):'本部に戻る'}</button>
+      ${!running&&advanceTargetRemaining()?'<button class="btn primary sm" data-action="resume-calendar">▶ 続きから</button>':''}
+      ${running&&ui.autoDay?.type!=='game'?'<small class="news-gesture-hint">新聞はダブルタップで次の日へ</small>':''}
     </div>`;
   }
   function dailyNewsScreen(entry){
@@ -1254,7 +1316,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const t=myTeam(),last=gameByTeam(t.id),next=game.day<143?game.schedule[game.day].find(m=>m.home===t.id||m.away===t.id):null;
     const opp=next?getTeam(next.home===t.id?next.away:next.home):null;
     return `<section class="hero-stadium"><div class="eyebrow">HOME BALLPARK · ${game.year}</div><div class="hero-team">${teamBadge(t,'logo')}<div><h2>${h(t.name)}</h2><small>GM ${h(game.gmName||'GM')}</small></div></div><div class="hero-row"><span>東西ペナント</span><b>${game.day}/143 試合</b></div><div class="hero-record"><strong>${t.wins} <small>勝</small></strong><strong>${t.losses} <small>敗</small></strong><strong>${t.ties} <small>分</small></strong></div><div class="hero-progress"><span style="width:${game.day/143*100}%"></span></div><div class="calendar-current-date">🗓 ${getDayText()}</div><div class="hero-foot"><span>球団資金 <strong>${fmtMoney(t.cash)}</strong></span><span>次の相手 <strong>${opp?h(opp.short):'シーズン終了'}</strong></span></div></section>
-    <section class="panel desk-panel"><div class="desk-heading"><div><div class="eyebrow">GM DESK</div><h3>業務一覧</h3><small>判断と決断が球団の未来を変える</small></div><button class="btn primary" data-action="advance" data-days="1" ${game.day>=143?'disabled':''}>▶ 1試合進める</button></div><button class="desk-task" data-action="tab" data-tab="roster" data-roster="lineup"><span>⚾</span><span><b>スタメン・先発の確認</b><small>打順とローテーションを組む</small></span><em> › </em></button><button class="desk-task" data-action="tab" data-tab="market"><span>✦</span><span><b>自由契約選手の獲得</b><small>${freeAgents().length}名が所属先を探しています</small></span><em> › </em></button><button class="desk-task" data-action="tab" data-tab="business"><span>¥</span><span><b>予算・年俸をチェック</b><small>今季の支払予定を確認する</small></span><em> › </em></button></section>
+    <section class="panel desk-panel"><div class="desk-heading"><div><div class="eyebrow">GM DESK</div><h3>業務一覧</h3><small>判断と決断が球団の未来を変える</small></div><button class="btn primary" data-action="advance-day" ${game.day>=143?'disabled':''}>▶ 1日進める</button></div><button class="desk-task" data-action="tab" data-tab="roster" data-roster="lineup"><span>⚾</span><span><b>スタメン・先発の確認</b><small>打順とローテーションを組む</small></span><em> › </em></button><button class="desk-task" data-action="tab" data-tab="market"><span>✦</span><span><b>自由契約選手の獲得</b><small>${freeAgents().length}名が所属先を探しています</small></span><em> › </em></button><button class="desk-task" data-action="tab" data-tab="business"><span>¥</span><span><b>予算・年俸をチェック</b><small>今季の支払予定を確認する</small></span><em> › </em></button></section>
     <section class="panel"><div class="panel-head"><h3 class="panel-title">日程を進める</h3><span class="pill">${getDayText()}</span></div>${progressButtons()}</section><section class="panel"><div class="panel-head"><h3 class="panel-title">直近の試合結果</h3></div>${lastGamePanel()}</section><section class="panel"><div class="panel-head"><h3 class="panel-title">リーグ順位</h3><button class="btn sm outline" data-action="tab" data-tab="records">順位表を見る</button></div>${standingTable(t.league,true)}</section><section class="panel"><h3 class="panel-title">クラブニュース</h3>${game.news.slice(0,6).map(n=>`<div class="event">${h(n)}</div>`).join('')}</section>`;
   }
   function businessScreen(){return `<div class="screen-top"><div class="eyebrow">BUSINESS & FINANCE</div><h2>球団経営</h2></div><div class="subtabs">${[['finance','収支・予算'],['market','補強市場']].map(([key,label])=>`<button class="subtab ${ui.businessSub===key?'active':''}" data-action="business-sub" data-sub="${key}">${label}</button>`).join('')}</div>${ui.businessSub==='market'?marketScreen():financeScreen()}`}
@@ -1351,8 +1413,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <div class="small">日程の進行速度（休養日も日付が進みます）</div>
       <div class="calendar-speed">${options.map(([v,text])=>`<button class="chip ${mode===v?'active':''}" data-action="playback-mode" data-mode="${v}" aria-pressed="${mode===v}">${text}</button>`).join('')}</div>
       </div>
-      ${game.advanceTarget?.goal>game.day?`<button class="btn primary full" data-action="resume-calendar">▶ 前回の続きから（第${game.advanceTarget.goal}戦まで）</button>`:''}
-      <div class="actions" style="margin-top:9px"><button class="btn primary" data-action="advance" data-days="1">▶ 1試合</button><button class="btn soft" data-action="advance" data-days="7">7試合</button><button class="btn soft" data-action="advance" data-days="30">30試合</button></div>
+      ${advanceTargetRemaining()?`<button class="btn primary full" data-action="resume-calendar">▶ 前回の続きから</button>`:''}
+      <div class="actions" style="margin-top:9px"><button class="btn primary" data-action="advance-day">▶ 1日進める</button><button class="btn soft" data-action="advance" data-days="7">7試合</button><button class="btn soft" data-action="advance" data-days="30">30試合</button></div>
       <button class="btn outline full" style="margin-top:9px" data-action="advance" data-days="143">シーズン終了まで進行</button>`;
   }
   function lastGamePanel(){
@@ -1397,7 +1459,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const next=t.rotation.length?getPlayer(t.rotation[t.starterIndex%t.rotation.length]):null;
     return next?`<div class="next-start-alert"><strong>⚾ 次の先発予定：${h(next.name)}（${gradeBrief(rating(next))}）</strong>${currentSeasonLine(next)}<small>ローテーション順を変更すると、次の先発にも反映されます。</small></div>`:'';
   }
-  function rosterActions(){return `<div class="roster-fast-actions"><button class="btn outline" data-action="back-to-hq">‹ 本部に戻る</button><button class="btn primary" data-action="advance" data-days="1" ${game.day>=143?'disabled':''}>▶ この編成で試合へ</button></div>`}
+  function rosterActions(){return `<div class="roster-fast-actions"><button class="btn outline" data-action="back-to-hq">‹ 本部に戻る</button><button class="btn primary" data-action="advance-day" ${game.day>=143?'disabled':''}>▶ この編成で次の日へ</button></div>`}
   function rosterScreen(){
     const t=myTeam();
     const menus=[['lineup','打順'],['rotation','先発'],['players','全選手']];
@@ -1492,7 +1554,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(ui.page==='title'){app.innerHTML=titleScreen();return}
     if(ui.page==='setup'){app.innerHTML=setupScreen();return}
     const screens={hq:frontOfficeScreen,team:teamScreen,roster:rosterScreen,business:businessScreen,records:recordScreen,home:frontOfficeScreen,standings:standingsScreen,stats:statScreen,market:marketScreen,finance:financeScreen};
-    app.innerHTML=`<div class="app-shell">${header()}<main class="main">${game.pendingReview?matchReviewScreen():ui.autoDay?(ui.autoDay.type==='game'?dailyGameScreen(ui.autoDay):dailyNewsScreen(ui.autoDay)):game.pendingMonth?monthlyReviewScreen():ui.monthHistory?monthlyReviewScreen(true):(ui.playerDetail!=null?playerDetails():(screens[ui.tab]||frontOfficeScreen)())}</main>${game.pendingReview||game.pendingMonth||ui.autoDay||ui.monthHistory?'':navbar()}</div>${ui.confirm?.type==='switch'?teamSwitchModal():confirmModal()}${game.pendingReview?'':resultModal()}${ui.busy&&!ui.autoDay?`<div class="calendar-running"><strong>${getDayText()}</strong><small>${game.day}/143試合</small><button class="btn outline" data-action="pause-calendar">一時停止</button></div>`:''}<input id="import-save-file" type="file" accept=".json,application/json" hidden>`;
+    app.innerHTML=`<div class="app-shell ${ui.busy&&ui.autoDay?'auto-tappable':''}">${header()}<main class="main">${game.pendingReview?matchReviewScreen():ui.autoDay?(ui.autoDay.type==='game'?dailyGameScreen(ui.autoDay):dailyNewsScreen(ui.autoDay)):game.pendingMonth?monthlyReviewScreen():ui.monthHistory?monthlyReviewScreen(true):(ui.playerDetail!=null?playerDetails():(screens[ui.tab]||frontOfficeScreen)())}</main>${game.pendingReview||game.pendingMonth||ui.autoDay||ui.monthHistory?'':navbar()}</div>${ui.confirm?.type==='switch'?teamSwitchModal():confirmModal()}${game.pendingReview?'':resultModal()}${ui.busy&&!ui.autoDay?`<div class="calendar-running"><strong>${getDayText()}</strong><small>${game.day}/143試合</small><button class="btn outline" data-action="pause-calendar">一時停止</button></div>`:''}<input id="import-save-file" type="file" accept=".json,application/json" hidden>`;
   }
   function showToast(message,error=false){
     document.querySelector('.message')?.remove();
@@ -1554,6 +1616,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(act==='league'){ui.league=b.dataset.league;render();return}
     if(act==='stats-mode'){ui.statsMode=b.dataset.mode;render();return}
     if(act==='advance'){void advance(b.dataset.days);return}
+    if(act==='advance-day'){void advance('day');return}
     if(act==='next-season'){
       if(game.day!==143)return;
       ui.confirm={type:'next',title:`${game.year+1}年へ進みますか？`,body:'選手の成長・衰退・引退、新人補充、年俸精算を実行します。このシーズンの個人成績はリセットされます。',danger:false};render();return;
@@ -1917,7 +1980,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const action=el.dataset.action;
     if(!['playback-mode','pause-calendar','auto-day-close','resume-calendar','finish-month','monthly-history-open','monthly-history-close','fielding-open','fielding-close','fielding-set','swap-open','swap-close','swap-select','batch-expand','ceremony-start','ceremony-next'].includes(action))return;
     e.preventDefault();e.stopPropagation();
-    if(action==='pause-calendar'){ui.pauseRequested=true;return;}
+    if(action==='pause-calendar'){toggleAutoPause();return;}
     if(action==='auto-day-close'){
       if(ui.busy||!ui.autoDay)return;
       ui.autoDay=null;ui.tab='hq';render();window.scrollTo({top:0,behavior:'instant'});return;
@@ -1930,7 +1993,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       return;
     }
     if(action==='resume-calendar'){
-      if(ui.busy||game.pendingMonth||game.pendingReview||!game.advanceTarget)return;
+      if(ui.busy||game.pendingMonth||game.pendingReview||!advanceTargetRemaining())return;
       ui.autoDay=null;void advance('resume');return;
     }
     if(action==='finish-month'){
@@ -1994,7 +2057,34 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(e.target.dataset.change==='training-focus'){const p=getPlayer(e.target.dataset.id);if(p&&p.teamId===game.selectedId){p.trainFocus=e.target.value;save();showToast('育成方針を保存しました');}}
   },true);
 
-  document.addEventListener('visibilitychange',()=>{if(document.hidden&&ui.busy)ui.pauseRequested=true;});
+  // In the background, abort the active timer and retain the progress target
+  // for an explicit resume when the user returns to the tab.
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden&&ui.busy){
+      ui.pauseRequested=true;
+      ui.autoWait?.skip();
+    }
+  });
+  document.addEventListener('click',e=>{
+    if(!ui.busy||!ui.autoDay||!ui.autoWait||game.playbackMode==='skip')return;
+    if(!e.target.closest('.app-shell'))return;
+    if(e.target.closest('[data-action],button,a,input,select,textarea,[role="button"]'))return;
+    if(ui.autoDay.type==='game'){
+      clearPendingNewsTap();
+      toggleAutoPause();
+      return;
+    }
+    if(pendingNewsTap!==null){
+      clearPendingNewsTap();
+      ui.autoWait?.skip();
+      return;
+    }
+    const date=ui.autoDay.date;
+    pendingNewsTap=setTimeout(()=>{
+      pendingNewsTap=null;
+      if(ui.busy&&ui.autoDay?.date===date)toggleAutoPause();
+    },NEWS_DOUBLE_TAP_MS);
+  });
   const appRoot=document.querySelector('#app');
   if(appRoot)appRoot.innerHTML='<div class="title-screen"><h2>セーブデータを読み込んでいます…</h2></div>';
   (async()=>{
