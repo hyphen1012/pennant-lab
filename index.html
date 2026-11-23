@@ -245,6 +245,18 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 /* Japanese currency amounts need space to fit in narrow mobile finance cards. */
 .grid2 .metric .val.finance-money-value{font-size:clamp(13px,3.7vw,22px);line-height:1.35;overflow-wrap:anywhere}
 .grid3 .metric .val.finance-market-money{font-size:clamp(12px,3.3vw,18px);line-height:1.4;overflow-wrap:anywhere}
+
+/* Keep position + handedness visible inside the same swap control on narrow phones. */
+.lineup-wrap .lineup-item{grid-template-columns:38px minmax(0,1fr) auto;column-gap:5px}
+.lineup-wrap .lineup-n{width:38px;height:30px;display:flex;justify-content:center;align-items:center;gap:2px;white-space:nowrap;font-size:11px}
+.lineup-wrap .lineup-n em{font-size:10px;font-style:normal;color:#f1d995}
+.player-pick-btn.roster-pick-btn{min-height:57px;align-items:center}
+.roster-pick-btn .roster-pick-content{display:flex;flex:1;flex-direction:column;min-width:0;gap:3px}
+.roster-pick-btn .face-label{display:inline-flex;min-width:0;max-width:100%;font-size:12px}
+.roster-pick-btn .roster-pick-meta{display:flex;flex-wrap:wrap;column-gap:7px;row-gap:2px;color:#aebed3;font-size:10px;line-height:1.3}
+.roster-pick-btn .roster-pick-meta>span{white-space:nowrap}
+.roster-pick-btn .roster-pick-hand{color:#d5deeb;font-weight:700}
+@media(max-width:390px){.roster-pick-btn .roster-pick-meta{font-size:9px;column-gap:5px}.roster-pick-btn .face-label{font-size:11px}}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -338,7 +350,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const pct=(w,l)=> (w+l ? (w/(w+l)).toFixed(3).replace(/^0/, '') : '.000');
   const avg=p=>p.stats.ab ? (p.stats.h/p.stats.ab).toFixed(3).replace(/^0/,''):'---';
   const era=p=>p.stats.outs ? (p.stats.er*27/p.stats.outs).toFixed(2) : '--.--';
-  const namePos=pos=>({'C':'捕','1B':'一','2B':'二','3B':'三','SS':'遊','OF':'外','SP':'先','RP':'中','CP':'抑'}[pos]||pos);
+  const namePos=pos=>({'C':'捕','1B':'一','2B':'二','3B':'三','SS':'遊','OF':'外','LF':'左','CF':'中','RF':'右','DH':'DH','SP':'先','RP':'中','CP':'抑'}[pos]||pos);
+  const positionFull=pos=>({'C':'捕手','1B':'一塁手','2B':'二塁手','3B':'三塁手','SS':'遊撃手','OF':'外野手','LF':'左翼手','CF':'中堅手','RF':'右翼手','DH':'指名打者','SP':'先発投手','RP':'中継ぎ投手','CP':'抑え投手'}[pos]||pos);
+  // Stable fictional attributes: existing v0.4 players get the same profile on every load.
+  function derivedBatHand(p){
+    const seed=((Number(p.id)||0)*47+19)%100;
+    if(seed<5)return '両';
+    if(p.hand==='左')return seed<86?'左':'右';
+    return seed<27?'左':'右';
+  }
+  function derivedSubPos(p){
+    const options={'C':['1B'],'1B':['3B','OF'],'2B':['SS','3B'],'3B':['1B','2B'],'SS':['2B','3B'],'OF':['1B'],'SP':['RP'],'RP':['SP','CP'],'CP':['RP']};
+    const id=Number(p.id)||0;
+    if((id*41+17)%100>=28)return null;
+    const list=options[p.pos]||[];
+    return list.length?list[(id*13+7)%list.length]:null;
+  }
+  const throwBat=p=>`${p.hand||'右'}投${p.batHand||derivedBatHand(p)}打`;
   let game;
   let pendingImport=null;
   let ui={page:'title',tab:'hq',teamSub:'players',businessSub:'finance',recordSub:'standings',rosterMode:'lineup',league:'E',statsMode:'bat',statsScope:'all',detail:null,playerDetail:null,playerDetailTab:'abilities',selectedTeam:2,setupLeague:'E',confirm:null,toast:null,busy:false};
@@ -361,6 +389,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
   function createPlayer(teamId,pos,rookie=false){
     const p={id:nextId(),teamId,pos,age:rookie?ri(18,23):ri(20,36),name:`${pick(SURNAMES)} ${pick(GIVEN)}`,talent:ri(43,96),hand:pick(['右','右','右','左']),salary:0};
+    p.batHand=derivedBatHand(p);p.subPos=derivedSubPos(p);
     const caliber=ri(-12,18);
     if(isPitch(p)){
       p.stuff=roll(57+caliber,25);p.control=roll(55+caliber,24);p.stamina=roll(pos==='SP'?72:pos==='CP'?48:52,21);
@@ -397,6 +426,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }
     p.filter(x=>!used.has(x.id)).sort((a,b)=>btrRating(b)-btrRating(a)).forEach(x=>{if(result.length<9)result.push(x.id)});
     team.lineup=result;
+    syncLineupFielding(team);
   }
   function repairTeam(team){
     const allHit=hitters(team).sort((a,b)=>btrRating(b)-btrRating(a));
@@ -408,6 +438,35 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     let rotation=[...new Set((team.rotation||[]).filter(id=>validSP.has(id)))];
     for(const p of allSP){if(rotation.length>=5)break;if(!rotation.includes(p.id))rotation.push(p.id)}
     team.lineup=l.slice(0,9);team.rotation=rotation.slice(0,5);
+    syncLineupFielding(team);
+  }
+  // Display-level fielding assignment, kept on each player ID rather than batting slot.
+  // Batting-order changes keep fielding roles. Full position suitability logic comes later.
+  function syncLineupFielding(team){
+    const roles=['C','1B','2B','3B','SS','CF','LF','RF','DH'];
+    const ids=[...new Set((team.lineup||[]).filter(id=>!!getPlayer(id)))].slice(0,9);
+    const old=team.fieldingRoles&&typeof team.fieldingRoles==='object'?team.fieldingRoles:{};
+    const result={},used=new Set();
+    for(const id of ids){
+      const role=old[id];
+      if(roles.includes(role)&&!used.has(role)){result[id]=role;used.add(role);}
+    }
+    const needs=ids.filter(id=>!result[id]);
+    for(const role of roles){
+      if(used.has(role)||role==='DH')continue;
+      const pos=['CF','LF','RF'].includes(role)?'OF':role;
+      const choice=needs.find(id=>getPlayer(id).pos===pos)
+        ??needs.find(id=>getPlayer(id).subPos===pos);
+      if(choice===undefined)continue;
+      result[choice]=role;used.add(role);needs.splice(needs.indexOf(choice),1);
+    }
+    for(const id of needs){
+      const role=roles.find(r=>!used.has(r));
+      if(!role)break;
+      result[id]=role;used.add(role);
+    }
+    team.fieldingRoles=result;
+    return result;
   }
   function addPlayer(teamId,pos,rookie=false){const p=createPlayer(teamId,pos,rookie);game.players.push(p);return p;}
   function scheduleForSeason(){
@@ -763,11 +822,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function ensurePlayerExtras(p){
     if(!Array.isArray(p.overallHistory)) p.overallHistory=[{year:game.year,overall:rating(p)}];
     if(!Array.isArray(p.seasonHistory)) p.seasonHistory=[];
+    if(!['右','左','両'].includes(p.batHand))p.batHand=derivedBatHand(p);
+    if(!Object.prototype.hasOwnProperty.call(p,'subPos'))p.subPos=derivedSubPos(p);
     if(typeof p.memo!=='string')p.memo='';
     if(typeof p.affinity!=='number')p.affinity=clamp(Math.round((p.talent||60)*.62),15,99);
   }
   function ensureGameExtras(){
     game.players.forEach(ensurePlayerExtras);
+    game.teams.forEach(syncLineupFielding);
     if(!Array.isArray(game.seasonArchive))game.seasonArchive=[];
     if(!Array.isArray(game.newsArchive))game.newsArchive=[];
     if(!game.calendar||game.calendar.year!==game.year)game.calendar=calendarForSeason(game.year);
@@ -839,7 +901,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const stats=isPitch(p)?[['球威',p.stuff],['制球',p.control],['変化',Math.round((p.stuff+p.control)/2)],['体力',p.stamina],['精神',p.talent]]:[['巧打',p.contact],['長打',p.power],['走力',p.speed],['守備',p.defense],['精神',p.talent]];
     const rosterGrading=ui.tab==='roster';
     const abilityCards=stats.map(([label,num])=>rosterGrading?`<div class="ability-cell"><small>${label}</small><strong style="color:${gradeBriefColor(num)}">${gradeBrief(num)}</strong></div>`:statBadge(num,label)).join('');
-    return `<div class="player-card"><button class="player-row" data-action="player-detail" data-id="${p.id}">${portrait(p)}<span class="player-main"><span class="player-name">${h(p.name)} <small>(${p.age})</small></span><span class="player-caption">${namePos(p.pos)} · ${p.hand}投　${fmtSalary(p.salary)}</span></span><span class="player-affinity">♥ ${p.affinity}</span><span class="chev">›</span></button><button class="abilities" data-action="player-detail" data-id="${p.id}">${abilityCards}</button>${actions?`<div class="player-card-action"><button class="btn sm outline" data-action="player-detail" data-id="${p.id}">詳細・成績</button><button class="btn sm danger" data-action="ask-release" data-id="${p.id}">戦力外</button></div>`:''}</div>`;
+    return `<div class="player-card"><button class="player-row" data-action="player-detail" data-id="${p.id}">${portrait(p)}<span class="player-main"><span class="player-name">${h(p.name)} <small>(${p.age})</small></span><span class="player-caption">${positionFull(p.pos)} · ${throwBat(p)}　${fmtSalary(p.salary)}</span></span><span class="player-affinity">♥ ${p.affinity}</span><span class="chev">›</span></button><button class="abilities" data-action="player-detail" data-id="${p.id}">${abilityCards}</button>${actions?`<div class="player-card-action"><button class="btn sm outline" data-action="player-detail" data-id="${p.id}">詳細・成績</button><button class="btn sm danger" data-action="ask-release" data-id="${p.id}">戦力外</button></div>`:''}</div>`;
   }
   function teamScreen(){
     const t=myTeam(),position=rankings(t.league).findIndex(x=>x.id===t.id)+1;
@@ -915,7 +977,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       body=`<section class="panel"><h3 class="panel-title">年度別成績</h3><div class="table-wrap"><table class="data-table"><thead><tr><th>年度</th><th>球団</th>${pitch?'<th>登板</th><th>投球回</th><th>防御率</th><th>勝</th><th>敗</th><th>奪三振</th>':'<th>試合</th><th>打率</th><th>安打</th><th>本塁打</th><th>打点</th><th>盗塁</th>'}</tr></thead><tbody>${rows.map(s=>{const st=s.stats,tm=getTeam(s.teamId);return `<tr><td>${s.year}</td><td>${tm?h(tm.short):'FA'}</td>${pitch?`<td>${st.g}</td><td>${Math.floor(st.outs/3)}.${st.outs%3}</td><td>${st.outs?(st.er*27/st.outs).toFixed(2):'--.--'}</td><td>${st.w}</td><td>${st.l}</td><td>${st.k}</td>`:`<td>${st.g}</td><td>${st.ab?(st.h/st.ab).toFixed(3).replace(/^0/,''):'---'}</td><td>${st.h}</td><td>${st.hr}</td><td>${st.rbi}</td><td>${st.sb}</td>`}</tr>`}).join('')}</tbody></table></div><p class="tiny">v0.1以前に終了した年度の成績は保存されていないため、復元できません。</p></section>`;
     }
     if(ui.playerDetailTab==='memo')body=`<section class="panel"><h3 class="panel-title">GMメモ</h3><p class="small">この選手について残したメモはセーブデータに保存されます。</p><textarea class="player-memo" data-change="player-memo" data-id="${p.id}" placeholder="来季の構想・育成方針・補強候補などを記録">${h(p.memo)}</textarea><div class="tiny">入力欄から離れると保存されます。</div></section>`;
-    return `<div class="detail-back"><button class="ghost-btn" data-action="close-player">‹ 戻る</button></div><div class="player-profile"><div class="player-club">${t?h(t.name):'自由契約選手'} <span>${namePos(p.pos)}</span></div><div class="profile-row">${portrait(p)}<div><h2>${h(p.name)} <small>(${p.age})</small></h2><div class="profile-meta">${namePos(p.pos)} · ${p.hand}投 · ${fmtSalary(p.salary)}</div><div class="profile-meta">総合 ${rating(p)} · 愛着 ♥${p.affinity}</div></div></div></div><div class="subtabs detail-tabs">${[['abilities','能力'],['growth','能力推移'],['stats','成績'],['memo','メモ']].map(([key,label])=>`<button class="subtab ${ui.playerDetailTab===key?'active':''}" data-action="detail-tab" data-sub="${key}">${label}</button>`).join('')}</div>${body}`;
+    return `<div class="detail-back"><button class="ghost-btn" data-action="close-player">‹ 戻る</button></div><div class="player-profile"><div class="player-club">${t?h(t.name):'自由契約選手'} <span>${namePos(p.pos)}</span></div><div class="profile-row">${portrait(p)}<div><h2>${h(p.name)} <small>(${p.age})</small></h2><div class="profile-meta">${positionFull(p.pos)} · ${throwBat(p)} · ${fmtSalary(p.salary)}</div><div class="profile-meta">総合 ${rating(p)} · 愛着 ♥${p.affinity}</div></div></div></div><div class="subtabs detail-tabs">${[['abilities','能力'],['growth','能力推移'],['stats','成績'],['memo','メモ']].map(([key,label])=>`<button class="subtab ${ui.playerDetailTab===key?'active':''}" data-action="detail-tab" data-sub="${key}">${label}</button>`).join('')}</div>${body}`;
   }
 
   function navbar(){return gameNav()}
@@ -976,19 +1038,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function lineupScreen(t){
     const arr=hitters(t).sort((a,b)=>rating(b)-rating(a));
+    const fielding=syncLineupFielding(t);
     return `<section class="panel lineup-wrap"><div class="panel-head"><h3 class="panel-title">スターティングメンバー</h3><span class="small">DH制・9人</span></div><p class="small">名前を押して選手を入れ替え、▲ ▼で打順変更。能力はS〜Fの一文字、数字は選手詳細で確認できます。</p>${t.lineup.map((id,i)=>{
       const p=getPlayer(id);
       if(!p)return '';
       const options=arr.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${h(x.name)}（${namePos(x.pos)}）総合${gradeBrief(rating(x))}</option>`).join('');
-      return `<div class="lineup-item"><span class="lineup-n">${i+1}</span><div class="lineup-info"><select class="select" aria-label="${i+1}番打者" data-change="lineup" data-slot="${i}">${options}</select><div class="quick-abilities">${abilityShort('総合',rating(p))}${abilityShort('巧打',p.contact)}${abilityShort('長打',p.power)}${abilityShort('走力',p.speed)}${abilityShort('守備',p.defense)}</div></div><div class="lineup-buttons"><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="-1" ${i===0?'disabled':''} aria-label="打順を上げる">▲</button><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="1" ${i===8?'disabled':''} aria-label="打順を下げる">▼</button></div>${currentSeasonLine(p)}</div>`;
-    }).join('')}<p class="tiny" style="margin:13px 0 0">※守備位置の適性ペナルティは今後実装予定です。</p></section>`;
+      return `<div class="lineup-item"><span class="lineup-n" title="守備位置 ${positionFull(fielding[id]||p.pos)}">${i+1}<em>${namePos(fielding[id]||p.pos)}</em></span><div class="lineup-info"><select class="select" aria-label="${i+1}番打者" data-change="lineup" data-slot="${i}">${options}</select><div class="quick-abilities">${abilityShort('総合',rating(p))}${abilityShort('巧打',p.contact)}${abilityShort('長打',p.power)}${abilityShort('走力',p.speed)}${abilityShort('守備',p.defense)}</div></div><div class="lineup-buttons"><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="-1" ${i===0?'disabled':''} aria-label="打順を上げる">▲</button><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="1" ${i===8?'disabled':''} aria-label="打順を下げる">▼</button></div>${currentSeasonLine(p)}</div>`;
+    }).join('')}<p class="tiny" style="margin:13px 0 0">※現在の守備位置は暫定割当です。適性ペナルティと守備位置の個別変更は今後実装予定です。</p></section>`;
   }
   function rotationScreen(t){
     const all=pitchers(t).filter(p=>p.pos==='SP').sort((a,b)=>rating(b)-rating(a));
     return `${nextStarterInfo(t)}<section class="panel lineup-wrap"><div class="panel-head"><h3 class="panel-title">先発ローテーション</h3><span class="pill">5人制</span></div><p class="small">投手ごとの今季防御率・登板・勝敗を確認しながら、登板順を変更できます。</p>${t.rotation.map((id,i)=>{
       const p=getPlayer(id);if(!p)return '';
       const active=i===t.starterIndex%t.rotation.length;
-      return `<div class="lineup-item"><span class="lineup-n">${i+1}</span><div class="lineup-info"><select class="select" data-change="rotation" data-slot="${i}" aria-label="先発${i+1}番手">${all.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${h(x.name)}（${gradeBrief(rating(x))}）</option>`).join('')}</select><div class="quick-abilities">${abilityShort('総合',rating(p))}${abilityShort('球威',p.stuff)}${abilityShort('制球',p.control)}${abilityShort('体力',p.stamina)}${active?'<span class="tag green">次戦登板</span>':''}</div></div><div class="lineup-buttons"><button class="btn icon sm outline" data-action="rotation-move" data-slot="${i}" data-direction="-1" ${i===0?'disabled':''} aria-label="登板順を上げる">▲</button><button class="btn icon sm outline" data-action="rotation-move" data-slot="${i}" data-direction="1" ${i===t.rotation.length-1?'disabled':''} aria-label="登板順を下げる">▼</button></div>${currentSeasonLine(p)}</div>`;
+      return `<div class="lineup-item"><span class="lineup-n" title="先発投手">${i+1}<em>先</em></span><div class="lineup-info"><select class="select" data-change="rotation" data-slot="${i}" aria-label="先発${i+1}番手">${all.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${h(x.name)}（${gradeBrief(rating(x))}）</option>`).join('')}</select><div class="quick-abilities">${abilityShort('総合',rating(p))}${abilityShort('球威',p.stuff)}${abilityShort('制球',p.control)}${abilityShort('体力',p.stamina)}${active?'<span class="tag green">次戦登板</span>':''}</div></div><div class="lineup-buttons"><button class="btn icon sm outline" data-action="rotation-move" data-slot="${i}" data-direction="-1" ${i===0?'disabled':''} aria-label="登板順を上げる">▲</button><button class="btn icon sm outline" data-action="rotation-move" data-slot="${i}" data-direction="1" ${i===t.rotation.length-1?'disabled':''} aria-label="登板順を下げる">▼</button></div>${currentSeasonLine(p)}</div>`;
     }).join('')}</section>`;
   }
   function playersScreen(t){
@@ -1334,13 +1397,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(game.ceremonyStage)return '';
     return '';
   }
+  function rosterPickButton(p,kind,slot){
+    ensurePlayerExtras(p);
+    const main=positionFull(p.pos),sub=p.subPos?positionFull(p.subPos):null;
+    const meta=`<span class="roster-pick-meta"><span>メイン ${main}</span>${sub?`<span>サブ ${sub}</span>`:''}<span class="roster-pick-hand">${throwBat(p)}</span></span>`;
+    return `<button class="player-pick-btn roster-pick-btn" data-action="swap-open" data-kind="${kind}" data-slot="${slot}" aria-label="${h(p.name)} ${main} ${throwBat(p)} を入れ替える"><span class="roster-pick-content">${faceLabel(p)}${meta}</span><span class="pick-grade">${gradeBrief(rating(p))} ▾</span></button>`;
+  }
   const oldLineup03=lineupScreen;
   lineupScreen=function(t){return oldLineup03(t).replace(/<select class="select" aria-label="\d+番打者" data-change="lineup" data-slot="(\d+)">[\s\S]*?<\/select>/g,(m,slot)=>{
-    const p=getPlayer(t.lineup[Number(slot)]);return `<button class="player-pick-btn" data-action="swap-open" data-kind="lineup" data-slot="${slot}">${faceLabel(p)} <span class="pick-grade">${gradeBrief(rating(p))} ▾</span></button>`;
+    const p=getPlayer(t.lineup[Number(slot)]);return rosterPickButton(p,'lineup',slot);
   });};
   const oldRotation03=rotationScreen;
   rotationScreen=function(t){return oldRotation03(t).replace(/<select class="select" data-change="rotation" data-slot="(\d+)"[^>]*>[\s\S]*?<\/select>/g,(m,slot)=>{
-    const p=getPlayer(t.rotation[Number(slot)]);return `<button class="player-pick-btn" data-action="swap-open" data-kind="rotation" data-slot="${slot}">${faceLabel(p)} <span class="pick-grade">${gradeBrief(rating(p))} ▾</span></button>`;
+    const p=getPlayer(t.rotation[Number(slot)]);return rosterPickButton(p,'rotation',slot);
   });};
   const oldPlayerDetails03=playerDetails;
   playerDetails=function(){
@@ -1379,7 +1448,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   render=function(){document.querySelectorAll('.overlay:has(.swap-dialog)').forEach(e=>e.remove());oldRender03();if(ui.swap&&ui.page==='game'&&!game.pendingReview){
     const t=myTeam(),kind=ui.swap.kind,players=kind==='lineup'?hitters(t):pitchers(t).filter(p=>p.pos==='SP');
     players.sort((a,b)=>rating(b)-rating(a));
-    const box=`<div class="overlay" data-action="swap-close"><div class="swap-dialog" role="dialog" aria-modal="true" data-stop="true"><div class="swap-head"><h3>選手を入れ替える</h3><button class="btn sm outline" data-action="swap-close">閉じる ✕</button></div><p class="small">能力と今季成績を見比べて選択してください。</p><div class="swap-list">${players.map(p=>`<button class="swap-candidate" data-action="swap-select" data-id="${p.id}">${faceMini(p)}<span class="swap-data"><b>${h(p.name)} <small>(${namePos(p.pos)})</small></b><span>${isPitch(p)?`防御率 ${era(p)} · ${p.stats.w}勝 · K${p.stats.k}`:`打率 ${avg(p)} · ${p.stats.hr}本 · ${p.stats.rbi}点`}</span></span><span class="swap-ability" style="color:${gradeBriefColor(rating(p))}">${gradeBrief(rating(p))}</span></button>`).join('')}</div></div></div>`;
+    const box=`<div class="overlay" data-action="swap-close"><div class="swap-dialog" role="dialog" aria-modal="true" data-stop="true"><div class="swap-head"><h3>選手を入れ替える</h3><button class="btn sm outline" data-action="swap-close">閉じる ✕</button></div><p class="small">能力と今季成績を見比べて選択してください。</p><div class="swap-list">${players.map(p=>`<button class="swap-candidate" data-action="swap-select" data-id="${p.id}">${faceMini(p)}<span class="swap-data"><b>${h(p.name)} <small>(${namePos(p.pos)}・${throwBat(p)})</small></b><span>${isPitch(p)?`防御率 ${era(p)} · ${p.stats.w}勝 · K${p.stats.k}`:`打率 ${avg(p)} · ${p.stats.hr}本 · ${p.stats.rbi}点`}</span></span><span class="swap-ability" style="color:${gradeBriefColor(rating(p))}">${gradeBrief(rating(p))}</span></button>`).join('')}</div></div></div>`;
     document.body.insertAdjacentHTML('beforeend',box);
   }};
   const oldAdvance03=advance;
@@ -1412,7 +1481,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       if(!ui.swap)return;
       const arr=ui.swap.kind==='lineup'?myTeam().lineup:myTeam().rotation,slot=ui.swap.slot,id=Number(el.dataset.id),old=arr[slot],other=arr.indexOf(id);
       if(other>=0)arr[other]=old;
-      arr[slot]=id;ui.swap=null;save();render();return;
+      arr[slot]=id;if(ui.swap.kind==='lineup')syncLineupFielding(myTeam());ui.swap=null;save();render();return;
     }
     if(action==='batch-expand'){ui.batchExpanded=!ui.batchExpanded;render();return;}
     if(action==='ceremony-start'){if(game.day!==143)return;game.ceremonyStage='awards-all';ui.tab='hq';save();render();window.scrollTo(0,0);return;}
