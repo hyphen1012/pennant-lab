@@ -1731,7 +1731,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(context.managerMoves)context.managerMoves.push({
       inning,side:team.id===context.awayId?'表':'裏',teamId:team.id,
       outId:current.id,outName:current.name,inId:chosen.id,inName:chosen.name,
-      slot,role:team.fieldingRoles[team.lineup[slot]],
+      type:'pinch',slot,role:team.fieldingRoles[team.lineup[slot]],
       managerId:team.manager?.id||null,managerName:team.manager?.name||'監督'
     });
     return chosen;
@@ -1928,7 +1928,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const startOutsH=spHome.stats.outs,startOutsA=spAway.stats.outs;
     const outsBefore=new Map([...pitchers(home),...pitchers(away)].map(p=>[p.id,p.stats.outs]));
     spHome.stats.gs++;spAway.stats.gs++;
-    const appear={bat:new Set(),pitch:new Set()};
+    const appear={bat:new Set(),pitch:new Set(),run:new Set()};
     const indexes={[home.id]:0,[away.id]:0};
     const inningsH=[],inningsA=[],events=[];
     const scoringPlays=watchBox?[]:null;
@@ -1940,23 +1940,33 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         [away.id]:hitters(away).filter(p=>availableForGame(p)&&!away.lineup.includes(p.id))
       },
       changed:{[home.id]:new Set(),[away.id]:new Set()},
-      pinchUsed:{[home.id]:0,[away.id]:0},scoreDiff:0,managerMoves
+      pinchUsed:{[home.id]:0,[away.id]:0},
+      runnerUsed:{[home.id]:0,[away.id]:0},
+      defenseUsed:{[home.id]:0,[away.id]:0},
+      outsBefore,
+      pitching:{
+        [home.id]:{current:spHome,used:new Set([spHome.id])},
+        [away.id]:{current:spAway,used:new Set([spAway.id])}
+      },
+      scoreDiff:0,managerMoves
     };
     let homeScore=0,awayScore=0;
     let closerH=null,closerA=null;
     for(let i=1;i<=12;i++){
-      const awayPitcher=choosePitcher(home,i,spHome,homeScore-awayScore);
+      const awayPitcher=managerPitcherChoice(home,i,homeScore-awayScore,context);
       context.scoreDiff=awayScore-homeScore;
       const top=halfInning(away,home,awayPitcher,lineupA,indexes,i,null,appear,events,scoringPlays,context);
       inningsA.push(top.run);awayScore+=top.run;
       if(awayPitcher.pos==='CP')closerH=awayPitcher;
       if(i>=9&&homeScore>awayScore){inningsH.push(null);break}
-      const homePitcher=choosePitcher(away,i,spAway,awayScore-homeScore);
+      managerDefenseUpgrade(away,i,awayScore-homeScore,context);
+      const homePitcher=managerPitcherChoice(away,i,awayScore-homeScore,context);
       context.scoreDiff=homeScore-awayScore;
       const bot=halfInning(home,away,homePitcher,lineupH,indexes,i,{current:homeScore,away:awayScore},appear,events,scoringPlays,context);
       inningsH.push(bot.run);homeScore+=bot.run;
       if(homePitcher.pos==='CP')closerA=homePitcher;
       if(i>=9&&(homeScore!==awayScore||bot.walkOff))break;
+      managerDefenseUpgrade(home,i,homeScore-awayScore,context);
     }
     home.rs+=homeScore;home.ra+=awayScore;away.rs+=awayScore;away.ra+=homeScore;
     let outcome='draw';
@@ -1979,7 +1989,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       result.managerMoves=managerMoves;
       const delta=(p,k)=>Number(p.stats[k]||0)-Number(preStats.get(p.id)?.[k]||0);
       result.box={
-        bat:watchPlayers.filter(p=>!isPitch(p)&&delta(p,'pa')>0).map(p=>({id:p.id,teamId:p.teamId,pa:delta(p,'pa'),ab:delta(p,'ab'),h:delta(p,'h'),hr:delta(p,'hr'),rbi:delta(p,'rbi'),bb:delta(p,'bb'),k:delta(p,'k'),sb:delta(p,'sb')})),
+        bat:watchPlayers.filter(p=>!isPitch(p)&&(delta(p,'pa')>0||appear.run.has(p.id))).map(p=>({id:p.id,teamId:p.teamId,pa:delta(p,'pa'),ab:delta(p,'ab'),h:delta(p,'h'),hr:delta(p,'hr'),rbi:delta(p,'rbi'),r:delta(p,'r'),bb:delta(p,'bb'),k:delta(p,'k'),sb:delta(p,'sb')})),
         pitch:watchPlayers.filter(p=>isPitch(p)&&delta(p,'g')>0).map(p=>({id:p.id,teamId:p.teamId,outs:delta(p,'outs'),er:delta(p,'er'),h:delta(p,'h'),k:delta(p,'k'),bb:delta(p,'bb'),w:delta(p,'w'),l:delta(p,'l'),sv:delta(p,'sv')}))
       };
     }
@@ -2227,11 +2237,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const unique=new Map(players.map(p=>[p.id,p]));
     for(const p of unique.values()){
       initCondition(p);
-      const batted=appear.bat.has(p.id),pitched=appear.pitch.has(p.id);
-      if(!batted&&!pitched)continue;
+      const batted=appear.bat.has(p.id),pitched=appear.pitch.has(p.id),ran=appear.run.has(p.id);
+      if(!batted&&!pitched&&!ran)continue;
       const thrown=pitched?Math.max(0,p.stats.outs-(outsBefore.get(p.id)||0)):0;
       // A future two-way starter accumulates both batting and pitching load.
-      const battingLoad=batted?10+((p.id*13)%6):0;
+      const battingLoad=batted?10+((p.id*13)%6):ran?7:0;
       const pitchLoad=pitched?(p.pos==='SP'?Math.min(84,46+Math.round(thrown*.9)):Math.min(39,15+Math.round(thrown*.8))):0;
       p.energy=clamp(p.energy-battingLoad-pitchLoad,0,100);
       p.lastAppearanceDay=game.calendarIndex;
