@@ -845,6 +845,22 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         body:`${away.short} ${last.awayScore}―${last.homeScore} ${home.short}。第${last.day}戦の試合結果を振り返る。`,
         stat:`${away.short} ${last.awayScore} – ${last.homeScore} ${home.short}`});
     }
+    // Only published, actual injuries qualify for the injury news column.
+    const recentInjury=(game.injuryArchive||[]).slice().reverse().find(x=>{
+      const ago=(Date.parse(entry.date)-Date.parse(x.date))/86400000;
+      return x.year===game.year&&Number.isFinite(ago)&&ago>=0&&ago<=2;
+    });
+    let injuryStory=null;
+    if(recentInjury){
+      const p=getPlayer(recentInjury.playerId),t=getTeam(recentInjury.teamId);
+      if(p&&t){
+        injuryStory={tag:'負傷情報',type:'injury',league:t.league,
+          headline:`${p.name}、${recentInjury.label}で戦線離脱`,
+          body:`${t.short}の${p.name}が負傷。診断時点の復帰見込みは約${recentInjury.days}日と発表された。`,
+          stat:`復帰見込み ${recentInjury.days}日`};
+        articles.push(injuryStory);
+      }
+    }
     for(const league of ['E','W']){
       const first=rankings(league)[0];if(!first)continue;
       articles.push({tag:leagueName(league),league,type:'standing',
@@ -861,6 +877,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const seed=Number(entry.date.slice(-2))+Number(entry.date.slice(5,7))*7;
     const index=seed%articles.length;
     const selected=[articles[index],...articles.filter((_,i)=>i!==index).slice(0,2)];
+    if(injuryStory&&!selected.includes(injuryStory))selected[selected.length-1]=injuryStory;
     const next=game.calendar.days.slice(game.calendarIndex+1).find(d=>d.type==='game');
     const fixture=next&&game.schedule[next.gameNo-1]?.find(m=>m.home===mine.id||m.away===mine.id);
     const opp=fixture?getTeam(fixture.home===mine.id?fixture.away:fixture.home):null;
@@ -870,8 +887,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function dailyBulletin(entry){
     if(!Array.isArray(game.dailyBulletins))game.dailyBulletins=[];
-    if(!Array.isArray(game.conditionArchive))game.conditionArchive=[];
-    if(!Array.isArray(game.injuryArchive))game.injuryArchive=[];
     let edition=game.dailyBulletins.find(x=>x.year===game.year&&x.date===entry.date);
     if(!edition){
       edition=buildDailyNews(entry);
@@ -1494,7 +1509,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function appLogo(){return `<div class="app-brand"><span class="brand-mark">⚾</span><span><b>PENNANT<span class="brand-gold"> LAB</span></b><small>BASEBALL GENERAL MANAGER</small></span></div>`}
   function slotData(i){try{const raw=localStorage.getItem(SLOT_PREFIX+i);if(!raw)return null;const d=JSON.parse(raw);return d&&Array.isArray(d.teams)&&d.teams.length===12?d:null}catch(e){return null}}
   function titleScreen(){
-    return `<div class="title-screen"><div class="title-hero"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.5.3 · LEAGUE COLORS</span></div><div class="title-slot-title">セーブデータを選択</div><div class="title-slots">${[1,2,3].map(i=>{
+    return `<div class="title-screen"><div class="title-hero"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.6.0 · CONDITION</span></div><div class="title-slot-title">セーブデータを選択</div><div class="title-slots">${[1,2,3].map(i=>{
       const d=slotData(i),t=d?.teams?.find(t=>t.id===d.selectedId);
       return `<button class="save-slot ${d?.started?'has-game':'empty-slot'} ${t?leagueClass(t.league):''}" data-action="${d?.started?'continue-slot':'new-slot'}" data-slot="${i}"><span class="slot-emblem">${d?.started?h(t.letter):'＋'}</span><span class="slot-label">${d?.started?`<strong>${h(t.name)}</strong><small>${leagueTag(t.league)}　${d.year}年 · ${d.day}/143試合 · ${h(d.gmName||'GM')}</small><small>${d.teams.find(t=>t.id===d.selectedId)?.wins||0}勝　${fmtMoney(t.cash)}</small>`:`<strong>新しい球団で始める</strong><small>空きデータ ${i}</small>`}</span><span class="slot-index">DATA ${i} ›</span></button>`;
     }).join('')}</div><div class="title-info">本体データは端末内データベースに保存されます。バックアップは「経営」からJSON形式で書き出せます。<br>v0.3以前のテストセーブは引き継がれません。</div></div>`;
