@@ -1656,7 +1656,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const tiring=incumbent.pos==='SP'?outs>=18:outs>=6;
     const overworked=incumbent.pos==='SP'?outs>=24:outs>=9;
     const exhausted=incumbent.energy<26;
-    const change=overworked||exhausted||(inning>desired&&(tiring||latePressure))
+    const change=overworked||exhausted||(inning>desired&&(tiring||(outs>=3&&latePressure)))
       ||(incumbent.pos==='SP'&&inning>=desired&&tiring);
     if(!change)return incumbent;
     const available=pitchers(team).filter(p=>p.id!==incumbent.id
