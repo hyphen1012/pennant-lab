@@ -94,7 +94,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   await window.PennantLab.advance('day');
   const after=window.PennantLab.getSnapshot();
   assert(after.day>=0&&after.day<=1);
-  assert(after.games.length>=0);
+  assert(after.games>=0);
   await flush();
   assert(store.get(1)?.data,'Game save should be persisted');
   console.log('PASS: cold boot, 12 teams, manager room, hiring, GM policy, day progression and save');
