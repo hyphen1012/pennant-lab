@@ -206,13 +206,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .quick-abilities{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0 5px}
 .quick-ability{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#9aabc2;white-space:nowrap}
 .quick-ability b{font-size:16px;font-weight:950;line-height:1.2}
-/* A two-line stat ledger on the same background as the abilities above. */
-.player-season-line{background:none;border:0;border-radius:0;padding:0;margin:8px 0 0;display:flex;flex-direction:column;align-items:stretch;gap:5px;min-width:0}
-.player-season-line .season-stats-row{display:flex;align-items:baseline;flex-wrap:nowrap;gap:clamp(5px,1.4vw,15px);min-width:0}
-.player-season-line .season-stats-row span{font-size:10px;color:#abbed1;white-space:nowrap}
-.player-season-line .season-stats-row strong{font-size:12px;color:#edf2fa;font-variant-numeric:tabular-nums}
-.player-season-line .season-title{color:#dfb74d!important;font-size:10px;font-weight:850;letter-spacing:.3px}
-@media(max-width:380px){.player-season-line .season-stats-row{gap:5px}.player-season-line .season-stats-row span{font-size:9px}.player-season-line .season-stats-row strong{font-size:11px}}
+/* A single unboxed season-stat line with the full roster-row width on phones. */
+.player-season-line{background:none;border:0;border-radius:0;padding:0;margin:8px 0 0;display:flex;flex-wrap:nowrap;align-items:baseline;justify-content:space-between;gap:3px;min-width:0;white-space:nowrap}
+.lineup-wrap .lineup-item>.player-season-line{grid-column:1/-1;grid-row:2;max-width:100%;margin:2px 0 0}
+.player-season-line span{font-size:clamp(8px,2.25vw,10px);color:#abbed1;white-space:nowrap;line-height:1.5}
+.player-season-line strong{font-size:clamp(9px,2.65vw,12px);color:#edf2fa;font-variant-numeric:tabular-nums}
+.player-season-line .season-title{color:#dfb74d!important;font-weight:850;letter-spacing:0}
+.player-season-line.is-pitcher span{font-size:clamp(7px,2vw,9px)}
+.player-season-line.is-pitcher strong{font-size:clamp(8px,2.3vw,10px)}
+@media(max-width:370px){.player-season-line{gap:2px}.lineup-wrap .lineup-item{column-gap:5px}}
 .next-start-alert{border-radius:11px;padding:12px 13px;background:linear-gradient(90deg,#183b43,#192b3e);border:1px solid #32675f;margin-bottom:13px}
 .next-start-alert strong{color:#edd074}.next-start-alert small{display:block;color:#b8cadb;margin-top:4px}
 .lineup-wrap .lineup-buttons{align-self:start;margin-top:5px}
@@ -953,13 +955,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function currentSeasonLine(p){
     const st=p.stats;
-    return isPitch(p)?`<div class="player-season-line" aria-label="今季投手成績">
-      <div class="season-stats-row"><span class="season-title">今季成績</span><span>登板 <strong>${st.g}</strong></span><span>防御率 <strong>${era(p)}</strong></span><span>勝敗 <strong>${st.w}-${st.l}</strong></span></div>
-      <div class="season-stats-row"><span>投球回 <strong>${Math.floor(st.outs/3)}.${st.outs%3}</strong></span><span>K <strong>${st.k}</strong></span></div>
+    return isPitch(p)?`<div class="player-season-line is-pitcher" aria-label="今季投手成績">
+      <span class="season-title">今季成績</span><span>登板 <strong>${st.g}</strong></span><span>防御率 <strong>${era(p)}</strong></span><span>勝敗 <strong>${st.w}-${st.l}</strong></span><span>投球回 <strong>${Math.floor(st.outs/3)}.${st.outs%3}</strong></span><span>K <strong>${st.k}</strong></span>
     </div>`:
-      `<div class="player-season-line" aria-label="今季野手成績">
-      <div class="season-stats-row"><span class="season-title">今季成績</span><span>試合 <strong>${st.g}</strong></span><span>打率 <strong>${avg(p)}</strong></span></div>
-      <div class="season-stats-row"><span>本塁打 <strong>${st.hr}</strong></span><span>打点 <strong>${st.rbi}</strong></span><span>盗塁 <strong>${st.sb}</strong></span></div>
+      `<div class="player-season-line is-batter" aria-label="今季野手成績">
+      <span class="season-title">今季成績</span><span>試合 <strong>${st.g}</strong></span><span>打率 <strong>${avg(p)}</strong></span><span>本塁打 <strong>${st.hr}</strong></span><span>打点 <strong>${st.rbi}</strong></span><span>盗塁 <strong>${st.sb}</strong></span>
     </div>`;
   }
   function abilityShort(label,value){return `<span class="quick-ability">${label} <b style="color:${gradeBriefColor(value)}">${gradeBrief(value)}</b></span>`}
@@ -980,7 +980,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const p=getPlayer(id);
       if(!p)return '';
       const options=arr.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${h(x.name)}（${namePos(x.pos)}）総合${gradeBrief(rating(x))}</option>`).join('');
-      return `<div class="lineup-item"><span class="lineup-n">${i+1}</span><div class="lineup-info"><select class="select" aria-label="${i+1}番打者" data-change="lineup" data-slot="${i}">${options}</select><div class="quick-abilities">${abilityShort('総合',rating(p))}${abilityShort('巧打',p.contact)}${abilityShort('長打',p.power)}${abilityShort('走力',p.speed)}${abilityShort('守備',p.defense)}</div>${currentSeasonLine(p)}</div><div class="lineup-buttons"><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="-1" ${i===0?'disabled':''} aria-label="打順を上げる">▲</button><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="1" ${i===8?'disabled':''} aria-label="打順を下げる">▼</button></div></div>`;
+      return `<div class="lineup-item"><span class="lineup-n">${i+1}</span><div class="lineup-info"><select class="select" aria-label="${i+1}番打者" data-change="lineup" data-slot="${i}">${options}</select><div class="quick-abilities">${abilityShort('総合',rating(p))}${abilityShort('巧打',p.contact)}${abilityShort('長打',p.power)}${abilityShort('走力',p.speed)}${abilityShort('守備',p.defense)}</div></div><div class="lineup-buttons"><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="-1" ${i===0?'disabled':''} aria-label="打順を上げる">▲</button><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="1" ${i===8?'disabled':''} aria-label="打順を下げる">▼</button></div>${currentSeasonLine(p)}</div>`;
     }).join('')}<p class="tiny" style="margin:13px 0 0">※守備位置の適性ペナルティは今後実装予定です。</p></section>`;
   }
   function rotationScreen(t){
@@ -988,7 +988,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     return `${nextStarterInfo(t)}<section class="panel lineup-wrap"><div class="panel-head"><h3 class="panel-title">先発ローテーション</h3><span class="pill">5人制</span></div><p class="small">投手ごとの今季防御率・登板・勝敗を確認しながら、登板順を変更できます。</p>${t.rotation.map((id,i)=>{
       const p=getPlayer(id);if(!p)return '';
       const active=i===t.starterIndex%t.rotation.length;
-      return `<div class="lineup-item"><span class="lineup-n">${i+1}</span><div class="lineup-info"><select class="select" data-change="rotation" data-slot="${i}" aria-label="先発${i+1}番手">${all.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${h(x.name)}（${gradeBrief(rating(x))}）</option>`).join('')}</select><div class="quick-abilities">${abilityShort('総合',rating(p))}${abilityShort('球威',p.stuff)}${abilityShort('制球',p.control)}${abilityShort('体力',p.stamina)}${active?'<span class="tag green">次戦登板</span>':''}</div>${currentSeasonLine(p)}</div><div class="lineup-buttons"><button class="btn icon sm outline" data-action="rotation-move" data-slot="${i}" data-direction="-1" ${i===0?'disabled':''} aria-label="登板順を上げる">▲</button><button class="btn icon sm outline" data-action="rotation-move" data-slot="${i}" data-direction="1" ${i===t.rotation.length-1?'disabled':''} aria-label="登板順を下げる">▼</button></div></div>`;
+      return `<div class="lineup-item"><span class="lineup-n">${i+1}</span><div class="lineup-info"><select class="select" data-change="rotation" data-slot="${i}" aria-label="先発${i+1}番手">${all.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${h(x.name)}（${gradeBrief(rating(x))}）</option>`).join('')}</select><div class="quick-abilities">${abilityShort('総合',rating(p))}${abilityShort('球威',p.stuff)}${abilityShort('制球',p.control)}${abilityShort('体力',p.stamina)}${active?'<span class="tag green">次戦登板</span>':''}</div></div><div class="lineup-buttons"><button class="btn icon sm outline" data-action="rotation-move" data-slot="${i}" data-direction="-1" ${i===0?'disabled':''} aria-label="登板順を上げる">▲</button><button class="btn icon sm outline" data-action="rotation-move" data-slot="${i}" data-direction="1" ${i===t.rotation.length-1?'disabled':''} aria-label="登板順を下げる">▼</button></div>${currentSeasonLine(p)}</div>`;
     }).join('')}</section>`;
   }
   function playersScreen(t){
