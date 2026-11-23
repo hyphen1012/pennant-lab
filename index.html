@@ -256,6 +256,27 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .roster-pick-btn .roster-pick-meta>span{white-space:nowrap}
 .roster-pick-btn .roster-pick-hand{color:#d5deeb;font-weight:700}
 @media(max-width:390px){.roster-pick-btn .roster-pick-meta{font-size:9.4px;column-gap:5px}.roster-pick-btn .face-label{font-size:11.4px}}
+
+/* Editable defensive roles: a compact role chip opens the positional suitability matrix. */
+.lineup-wrap .fielding-trigger{position:relative;border:1px solid #59647d;cursor:pointer;min-height:36px;padding:2px 3px}
+.lineup-wrap .fielding-trigger:focus-visible{outline:2px solid #efc35a;outline-offset:2px}
+.lineup-wrap .fielding-trigger::after{content:'⌄';position:absolute;bottom:0;right:2px;font-size:9px;color:#91b9dd}
+.lineup-wrap .fielding-trigger.tier-sub{border-color:#d8aa4c;background:#49402a}
+.lineup-wrap .fielding-trigger.tier-off{border-color:#af656a;background:#502f38;color:#ffb5b9}
+.fielding-dialog{width:min(95vw,540px);max-height:88dvh;background:linear-gradient(130deg,#1a3049,#111e31);border:1px solid #8e7137;border-radius:18px;padding:16px;color:#f7f8fb;display:flex;flex-direction:column;box-shadow:0 25px 60px #000b}
+.fielding-dialog .swap-head h3{margin:0;color:#e9bf57}
+.fielding-dialog .small{margin:8px 0 3px;font-size:12px;line-height:1.5}
+.fielding-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;overflow-y:auto;min-height:0;margin-top:9px}
+.fielding-choice{display:flex;flex-direction:column;gap:5px;background:#1d344d;border:1px solid #51647c;color:#f3f6fa;border-radius:10px;padding:9px;min-width:0;text-align:left;cursor:pointer}
+.fielding-choice:hover:not(:disabled){border-color:#e6c06b;background:#2a405a}
+.fielding-choice.chosen{border-color:#d8b04e;background:#454128}
+.fielding-choice.sub{border-color:#856f42}
+.fielding-choice.off{border-color:#7b4950}
+.fielding-choice:disabled{opacity:.8;cursor:default}
+.fielding-choice-heading{display:flex;align-items:center;justify-content:space-between;gap:7px}
+.fielding-choice-heading strong{font-size:13px}
+.fielding-choice-heading em{font-style:normal;color:#dbbb68;font-size:10px}
+.fielding-choice small{font-size:10px;color:#b9c9da;line-height:1.45;overflow-wrap:anywhere}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -439,10 +460,33 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     team.lineup=l.slice(0,9);team.rotation=rotation.slice(0,5);
     syncLineupFielding(team);
   }
-  // Display-level fielding assignment, kept on each player ID rather than batting slot.
-  // Batting-order changes keep fielding roles. Full position suitability logic comes later.
+  // Fielding assignments belong to player IDs, not batting-order slots.
+  // Position reassignment swaps roles; lineup reordering does not change defense.
+  const FIELD_POSITIONS=['C','1B','2B','3B','SS','LF','CF','RF','DH'];
+  const FIELD_WEIGHTS={C:1.15,'1B':.85,'2B':1.1,'3B':1,SS:1.25,LF:.9,CF:1.2,RF:.95};
+  const fieldBasePosition=role=>['LF','CF','RF'].includes(role)?'OF':role;
+  function fieldingTier(player,role){
+    if(role==='DH')return 'dh';
+    if(!player)return 'off';
+    const pos=fieldBasePosition(role);
+    if(player.pos===pos)return 'main';
+    if(player.subPos===pos)return 'sub';
+    return 'off';
+  }
+  function fieldingFactor(player,role){
+    const tier=fieldingTier(player,role);
+    return tier==='main'?1:tier==='sub'?.82:tier==='dh'?0:.55;
+  }
+  function effectiveFielding(player,role){
+    if(!player||role==='DH')return 0;
+    return Math.round((player.defense*.85+player.arm*.15)*fieldingFactor(player,role));
+  }
+  function fieldingLabel(player,role){
+    const tier=fieldingTier(player,role);
+    return tier==='main'?'メイン':tier==='sub'?'サブ':tier==='dh'?'守備なし':'適性外';
+  }
   function syncLineupFielding(team){
-    const roles=['C','1B','2B','3B','SS','CF','LF','RF','DH'];
+    const roles=FIELD_POSITIONS;
     const ids=[...new Set((team.lineup||[]).filter(id=>!!getPlayer(id)))].slice(0,9);
     const old=team.fieldingRoles&&typeof team.fieldingRoles==='object'?team.fieldingRoles:{};
     const result={},used=new Set();
@@ -466,6 +510,30 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }
     team.fieldingRoles=result;
     return result;
+  }
+  function teamDefenseScore(team){
+    const roles=syncLineupFielding(team);
+    const lineupByPosition=Object.fromEntries(Object.entries(roles).map(([id,pos])=>[pos,getPlayer(id)]));
+    let points=0,weight=0;
+    for(const [role,w] of Object.entries(FIELD_WEIGHTS)){
+      const p=lineupByPosition[role];
+      points+=w*(p?effectiveFielding(p,role):20);
+      weight+=w;
+    }
+    return weight?points/weight:60;
+  }
+  // A selected position that already has a defender swaps their two roles.
+  function assignFieldingRole(team,id,role){
+    id=Number(id);
+    if(!team||!FIELD_POSITIONS.includes(role)||!team.lineup.includes(id))return false;
+    syncLineupFielding(team);
+    const oldRole=team.fieldingRoles[id];
+    if(!oldRole||oldRole===role)return false;
+    const other=team.lineup.find(otherId=>otherId!==id&&team.fieldingRoles[otherId]===role);
+    if(other!==undefined)team.fieldingRoles[other]=oldRole;
+    team.fieldingRoles[id]=role;
+    syncLineupFielding(team);
+    return true;
   }
   function addPlayer(teamId,pos,rookie=false){const p=createPlayer(teamId,pos,rookie);game.players.push(p);return p;}
   function scheduleForSeason(){
@@ -610,7 +678,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       st.pa++;
       const pWalk=clamp(.078+(batter.contact-55)*.00035-(pitcher.control-55)*.0008,.035,.15);
       const pStrike=clamp(.213-(batter.contact-55)*.0010+(pitcher.stuff-55)*.0014,.085,.34);
-      const pHit=clamp(.245+(batter.contact-55)*.00175-(pitcher.stuff-55)*.0010,.135,.38);
+      // Defense is part of batted-ball outcomes, not the batter's base skill.
+      // Excellent defenders suppress hits; unsuitable positions reduce efficiency.
+      const defense=teamDefenseScore(fieldTeam);
+      const pHit=clamp(.245+(batter.contact-55)*.00175-(pitcher.stuff-55)*.0010
+        +(60-defense)*.00135,.115,.42);
       let r=rand(),rbi=0;
       if(r<pWalk){
         st.bb++;pstat.bb++;
@@ -1038,12 +1110,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function lineupScreen(t){
     const arr=hitters(t).sort((a,b)=>rating(b)-rating(a));
     const fielding=syncLineupFielding(t);
-    return `<section class="panel lineup-wrap"><div class="panel-head"><h3 class="panel-title">スターティングメンバー</h3><span class="small">DH制・9人</span></div><p class="small">名前を押して選手を入れ替え、▲ ▼で打順変更。能力はS〜Fの一文字、数字は選手詳細で確認できます。</p>${t.lineup.map((id,i)=>{
+    return `<section class="panel lineup-wrap"><div class="panel-head"><h3 class="panel-title">スターティングメンバー</h3><span class="small">DH制・9人</span></div><p class="small">名前を押すと選手入れ替え、番号横の守備位置を押すと守備変更、▲ ▼で打順変更。能力はS〜F表示。</p>${t.lineup.map((id,i)=>{
       const p=getPlayer(id);
       if(!p)return '';
       const options=arr.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${h(x.name)}（${namePos(x.pos)}）総合${gradeBrief(rating(x))}</option>`).join('');
-      return `<div class="lineup-item"><span class="lineup-n" title="守備位置 ${positionFull(fielding[id]||p.pos)}">${i+1}<em>${namePos(fielding[id]||p.pos)}</em></span><div class="lineup-info"><select class="select" aria-label="${i+1}番打者" data-change="lineup" data-slot="${i}">${options}</select><div class="quick-abilities">${abilityShort('総合',rating(p))}${abilityShort('巧打',p.contact)}${abilityShort('長打',p.power)}${abilityShort('走力',p.speed)}${abilityShort('守備',p.defense)}</div></div><div class="lineup-buttons"><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="-1" ${i===0?'disabled':''} aria-label="打順を上げる">▲</button><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="1" ${i===8?'disabled':''} aria-label="打順を下げる">▼</button></div>${currentSeasonLine(p)}</div>`;
-    }).join('')}<p class="tiny" style="margin:13px 0 0">※現在の守備位置は暫定割当です。適性ペナルティと守備位置の個別変更は今後実装予定です。</p></section>`;
+      return `<div class="lineup-item"><button type="button" class="lineup-n fielding-trigger tier-${fieldingTier(p,fielding[id])}" data-action="fielding-open" data-id="${id}" title="守備位置を変更：${positionFull(fielding[id]||p.pos)}" aria-label="${i+1}番 ${h(p.name)} の守備位置を変更">${i+1}<em>${namePos(fielding[id]||p.pos)}</em></button><div class="lineup-info"><select class="select" aria-label="${i+1}番打者" data-change="lineup" data-slot="${i}">${options}</select><div class="quick-abilities">${abilityShort('総合',rating(p))}${abilityShort('巧打',p.contact)}${abilityShort('長打',p.power)}${abilityShort('走力',p.speed)}${abilityShort('守備',p.defense)}</div></div><div class="lineup-buttons"><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="-1" ${i===0?'disabled':''} aria-label="打順を上げる">▲</button><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="1" ${i===8?'disabled':''} aria-label="打順を下げる">▼</button></div>${currentSeasonLine(p)}</div>`;
+    }).join('')}<p class="tiny" style="margin:13px 0 0">※守備適性はメイン100%・サブ82%・適性外55%。DHは守備しません。守備力は相手の安打確率に影響します。</p></section>`;
   }
   function rotationScreen(t){
     const all=pitchers(t).filter(p=>p.pos==='SP').sort((a,b)=>rating(b)-rating(a));
@@ -1348,7 +1420,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function playoffStrength(t){
     const h=hitters(t).sort((a,b)=>btrRating(b)-btrRating(a)).slice(0,9);
     const p=pitchers(t).filter(x=>x.pos==='SP').sort((a,b)=>rating(b)-rating(a)).slice(0,5);
-    return (h.reduce((s,x)=>s+btrRating(x),0)/Math.max(1,h.length))*.54+(p.reduce((s,x)=>s+rating(x),0)/Math.max(1,p.length))*.46;
+    const offense=h.reduce((s,x)=>s+btrRating(x),0)/Math.max(1,h.length);
+    const pitching=p.reduce((s,x)=>s+rating(x),0)/Math.max(1,p.length);
+    return offense*.54+pitching*.46+(teamDefenseScore(t)-60)*.22;
   }
   function playPostseason(){
     const east=rankings('E')[0],west=rankings('W')[0];if(!east||!west)return null;
@@ -1443,8 +1517,43 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const action=`<section class="panel season-action"><h3 class="panel-title">🏆 シーズン全日程終了</h3><p class="small">最終順位・表彰・球団収支を確認して、来季への準備を始めましょう。</p><button class="btn primary full" data-action="ceremony-start">表彰・精算へ進む ›</button></section>`;
     return original.replace('<section class="panel desk-panel">',action+'<section class="panel desk-panel">').replace('<button class="btn primary full" data-action="next-season">', '<button class="btn primary full" data-action="ceremony-start">');
   };
+  function fieldingDialog(team,id){
+    syncLineupFielding(team);
+    const p=getPlayer(id);
+    if(!p||!team.lineup.includes(id))return '';
+    const current=team.fieldingRoles[id];
+    const list=FIELD_POSITIONS.map(role=>{
+      const otherId=team.lineup.find(otherId=>otherId!==id&&team.fieldingRoles[otherId]===role);
+      const other=otherId===undefined?null:getPlayer(otherId);
+      const tier=fieldingTier(p,role);
+      const effect=role==='DH'?'守備なし':`${fieldingLabel(p,role)}／実効守備力 ${effectiveFielding(p,role)}`;
+      const exchange=other?`・${h(other.name)}と交換`:'';
+      const warning=other&&current&&current!=='DH'
+        ?`　相手は${positionFull(current)}：${effectiveFielding(other,current)}`:'';
+      return `<button type="button" class="fielding-choice ${tier==='off'?'off':tier==='sub'?'sub':''} ${current===role?'chosen':''}"
+        data-action="fielding-set" data-id="${id}" data-role="${role}" ${current===role?'disabled':''}>
+        <span class="fielding-choice-heading"><strong>${positionFull(role)}</strong><em>${current===role?'現在':role==='DH'?'DH':fieldingLabel(p,role)}</em></span>
+        <small>${effect}${exchange}${warning}</small>
+      </button>`;
+    }).join('');
+    return `<div class="overlay fielding-overlay" data-action="fielding-close">
+      <div class="fielding-dialog" role="dialog" aria-modal="true" aria-label="守備位置を変更" data-stop="true">
+        <div class="swap-head"><h3>守備位置の変更</h3><button type="button" class="btn sm outline" data-action="fielding-close">閉じる ✕</button></div>
+        <p class="small"><strong>${h(p.name)}</strong>　メイン：${positionFull(p.pos)}${p.subPos?'／サブ：'+positionFull(p.subPos):''}</p>
+        <p class="small">配置済みの位置を選ぶと、2選手の守備位置を交換します。打順は変わりません。</p>
+        <div class="fielding-choices">${list}</div>
+      </div></div>`;
+  }
   const oldRender03=render;
-  render=function(){document.querySelectorAll('.overlay:has(.swap-dialog)').forEach(e=>e.remove());oldRender03();if(ui.swap&&ui.page==='game'&&!game.pendingReview){
+  render=function(){
+    document.querySelectorAll('.overlay:has(.swap-dialog),.fielding-overlay').forEach(e=>e.remove());
+    oldRender03();
+    if(ui.fielding && (ui.page!=='game'||ui.tab!=='roster'||ui.rosterMode!=='lineup'||game.pendingReview))ui.fielding=null;
+    if(ui.fielding&&ui.page==='game'&&!game.pendingReview){
+      const html=fieldingDialog(myTeam(),ui.fielding.id);
+      if(html)document.body.insertAdjacentHTML('beforeend',html);
+    }
+    if(ui.swap&&ui.page==='game'&&!game.pendingReview){
     const t=myTeam(),kind=ui.swap.kind,players=kind==='lineup'?hitters(t):pitchers(t).filter(p=>p.pos==='SP');
     players.sort((a,b)=>rating(b)-rating(a));
     const box=`<div class="overlay" data-action="swap-close"><div class="swap-dialog" role="dialog" aria-modal="true" data-stop="true"><div class="swap-head"><h3>選手を入れ替える</h3><button class="btn sm outline" data-action="swap-close">閉じる ✕</button></div><p class="small">能力と今季成績を見比べて選択してください。</p><div class="swap-list">${players.map(p=>`<button class="swap-candidate" data-action="swap-select" data-id="${p.id}">${faceMini(p)}<span class="swap-data"><b>${h(p.name)} <small>(${namePos(p.pos)}・${throwBat(p)})</small></b><span>${isPitch(p)?`防御率 ${era(p)} · ${p.stats.w}勝 · K${p.stats.k}`:`打率 ${avg(p)} · ${p.stats.hr}本 · ${p.stats.rbi}点`}</span></span><span class="swap-ability" style="color:${gradeBriefColor(rating(p))}">${gradeBrief(rating(p))}</span></button>`).join('')}</div></div></div>`;
@@ -1472,9 +1581,27 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   document.addEventListener('click',e=>{
     const el=e.target.closest('[data-action]');if(!el)return;
     const action=el.dataset.action;
-    if(!['swap-open','swap-close','swap-select','batch-expand','ceremony-start','ceremony-next'].includes(action))return;
+    if(!['fielding-open','fielding-close','fielding-set','swap-open','swap-close','swap-select','batch-expand','ceremony-start','ceremony-next'].includes(action))return;
     e.preventDefault();e.stopPropagation();
-    if(action==='swap-open'){ui.swap={kind:el.dataset.kind,slot:Number(el.dataset.slot)};render();return;}
+    if(action==='fielding-open'){
+      if(game.pendingReview||ui.busy)return;
+      const id=Number(el.dataset.id);
+      if(!myTeam().lineup.includes(id))return;
+      ui.swap=null;ui.fielding={id};render();return;
+    }
+    if(action==='fielding-close'){ui.fielding=null;render();return;}
+    if(action==='fielding-set'){
+      if(!ui.fielding||game.pendingReview||ui.busy)return;
+      const id=Number(el.dataset.id),role=el.dataset.role;
+      if(id!==ui.fielding.id)return;
+      const changed=assignFieldingRole(myTeam(),id,role);
+      ui.fielding=null;
+      if(changed)save();
+      render();
+      if(changed)showToast('守備位置を変更しました');
+      return;
+    }
+    if(action==='swap-open'){ui.fielding=null;ui.swap={kind:el.dataset.kind,slot:Number(el.dataset.slot)};render();return;}
     if(action==='swap-close'){ui.swap=null;document.querySelector('.overlay:has(.swap-dialog)')?.remove();return;}
     if(action==='swap-select'){
       if(!ui.swap)return;
