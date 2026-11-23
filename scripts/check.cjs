@@ -8,7 +8,7 @@ assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
 assert.match(html,/VERSION 0\.8\.8 · MANAGER AI/);
 assert.match(html,/const VERSION = 2;/);
-assert.match(html,/managerDecision\(t,'bullpen'\)/);
+assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
 assert.match(html,/data-action="mgr-offer"/);
 assert.match(html,/auto-paused-toolbar/);
