@@ -288,6 +288,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .monthly-skill-row{display:grid;grid-template-columns:minmax(0,1fr) .7fr .95fr .3fr;gap:5px;padding:9px 1px;border-bottom:1px solid #3c4b62;font-size:11px}
 .monthly-skill-row .up{color:#60dbbc}.monthly-skill-row .down{color:#ff9b9b}
 .calendar-running{position:fixed;z-index:100;left:50%;transform:translateX(-50%);bottom:calc(80px + env(safe-area-inset-bottom));width:min(94vw,540px);border:1px solid #b99a50;background:#132840;color:#f8f3e9;padding:14px;border-radius:14px;box-shadow:0 8px 35px #0009;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+
+.calendar-playback{display:flex;flex-direction:column;gap:6px}
+.calendar-speed{display:flex;flex-wrap:wrap;gap:6px;margin:7px 0}
+.calendar-speed .chip{font-size:11px;padding:7px 10px;border:1px solid #4c5c76;background:#23334b;color:#d7e1ef}
+.calendar-speed .chip.active{background:#dfb444;border-color:#e2be65;color:#202a3b}
+.calendar-running .btn{padding:8px 13px}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -1200,7 +1206,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function teamChoice(t){return `<button class="team-card" data-action="select-team" data-id="${t.id}">${teamBadge(t)}<div style="min-width:0"><strong>${h(t.name)}</strong><br><span>${t.league==='E'?'東':'西'}リーグ</span></div></button>`}
   function progressButtons(){
     if(game.day>=143)return `<button class="btn primary full" data-action="next-season">🏆 表彰・精算して${game.year+1}年へ進む</button>`;
-    return `<div class="actions"><button class="btn primary" data-action="advance" data-days="1">▶ 1試合</button><button class="btn soft" data-action="advance" data-days="7">7試合</button><button class="btn soft" data-action="advance" data-days="30">30試合</button></div><button class="btn outline full" style="margin-top:9px" data-action="advance" data-days="143">シーズン終了まで一括進行</button>`;
+    const mode=game.playbackMode||'normal',options=[['normal','通常 2秒/日'],['fast','倍速 1秒/日'],['skip','日程スキップ']];
+    return `<div class="calendar-playback">
+      <div class="small">日程の進行速度（休養日も日付が進みます）</div>
+      <div class="calendar-speed">${options.map(([v,text])=>`<button class="chip ${mode===v?'active':''}" data-action="playback-mode" data-mode="${v}" aria-pressed="${mode===v}">${text}</button>`).join('')}</div>
+      </div>
+      ${game.advanceTarget?.goal>game.day?`<button class="btn primary full" data-action="resume-calendar">▶ 前回の続きから（第${game.advanceTarget.goal}戦まで）</button>`:''}
+      <div class="actions" style="margin-top:9px"><button class="btn primary" data-action="advance" data-days="1">▶ 1試合</button><button class="btn soft" data-action="advance" data-days="7">7試合</button><button class="btn soft" data-action="advance" data-days="30">30試合</button></div>
+      <button class="btn outline full" style="margin-top:9px" data-action="advance" data-days="143">シーズン終了まで進行</button>`;
   }
   function lastGamePanel(){
     const t=myTeam(),g=gameByTeam(t.id);
@@ -1704,15 +1717,41 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }};
   const oldAdvance03=advance;
   advance=async function(days){
-    if(storageFailure){showToast('保存エラーのため進行を停止しています。バックアップを書き出してください。',true);return;}
-    if(ui.busy||game.pendingReview||game.day>=143)return oldAdvance03(days);
-    ui.busy=true;render();await new Promise(resolve=>setTimeout(resolve,35));
-    const count=Math.min(Math.max(1,Number(days)||1),143-game.day),start=game.day;
-    for(let i=0;i<count;i++)processDay();
-    const games=game.games.filter(g=>g.year===game.year&&g.day>start&&g.day<=game.day&&(g.home===game.selectedId||g.away===game.selectedId));
-    const g=games[games.length-1];
-    if(g)game.pendingReview={year:game.year,day:g.day,gameId:g.id,count,gameIds:games.map(x=>x.id),mode:Number(days)>=143?'season':Number(days)>=30?'30':Number(days)>=7?'7':'single'};
-    ui.batchExpanded=false;ui.busy=false;ui.detail=null;ui.playerDetail=null;save();render();window.scrollTo({top:0,behavior:'instant'});
+    if(storageFailure){showToast('保存に失敗しています。データをバックアップしてください。',true);return;}
+    if(ui.busy||game.pendingReview||game.pendingMonth)return;
+    if(game.day>=SEASON_GAMES)return;
+    // A pause or month-end report retains the original target until resumed.
+    const resume=days==='resume'&&game.advanceTarget?.year===game.year;
+    const requested=Math.max(1,Number(days)||1);
+    const goal=resume?game.advanceTarget.goal:Math.min(SEASON_GAMES,game.day+requested);
+    if(!resume)game.advanceTarget={year:game.year,goal};
+    const mode=game.playbackMode||'normal',delay=mode==='normal'?2000:mode==='fast'?1000:0;
+    const startGame=game.day,startId=game.games.length;
+    ui.busy=true;ui.pauseRequested=false;render();save();
+    // Yield before fast iteration so the user can see/cancel the action.
+    await new Promise(resolve=>setTimeout(resolve,35));
+    while(game.day<goal&&!ui.pauseRequested&&!game.pendingMonth){
+      if(storageFailure)break;
+      if(delay){
+        await new Promise(resolve=>setTimeout(resolve,delay));
+        if(ui.pauseRequested||document.hidden)break;
+      }
+      const day=processCalendarDay();
+      if(!day)break;
+      if(delay){save();render();}
+      // Always halt at the month boundary, including in skip mode.
+      if(game.pendingMonth)break;
+    }
+    const paused=ui.pauseRequested||!!document.hidden;
+    ui.busy=false;ui.pauseRequested=false;
+    const games=game.games.slice(startId).filter(g=>g.year===game.year&&(g.home===game.selectedId||g.away===game.selectedId));
+    const last=games[games.length-1];
+    if(last)game.pendingReview={year:game.year,day:last.day,gameId:last.id,
+      count:game.day-startGame,gameIds:games.map(g=>g.id),
+      mode:goal===SEASON_GAMES?'season':goal-startGame>=30?'30':goal-startGame>=7?'7':'single'};
+    if(game.day>=goal)game.advanceTarget=null;
+    save();render();window.scrollTo({top:0,behavior:'instant'});
+    if(paused&&!game.pendingReview&&!game.pendingMonth)showToast('日程の進行を一時停止しました');
   };
   function offseasonExperience(phase){
     const value=phase==='winter'?25:phase==='self'?22:30;
@@ -1724,8 +1763,24 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   document.addEventListener('click',e=>{
     const el=e.target.closest('[data-action]');if(!el)return;
     const action=el.dataset.action;
-    if(!['fielding-open','fielding-close','fielding-set','swap-open','swap-close','swap-select','batch-expand','ceremony-start','ceremony-next'].includes(action))return;
+    if(!['playback-mode','pause-calendar','resume-calendar','finish-month','fielding-open','fielding-close','fielding-set','swap-open','swap-close','swap-select','batch-expand','ceremony-start','ceremony-next'].includes(action))return;
     e.preventDefault();e.stopPropagation();
+    if(action==='pause-calendar'){ui.pauseRequested=true;return;}
+    if(action==='playback-mode'){
+      if(ui.busy||game.pendingMonth||game.pendingReview)return;
+      if(['normal','fast','skip'].includes(el.dataset.mode)){
+        game.playbackMode=el.dataset.mode;save();render();
+      }
+      return;
+    }
+    if(action==='resume-calendar'){
+      if(ui.busy||game.pendingMonth||game.pendingReview||!game.advanceTarget)return;
+      void advance('resume');return;
+    }
+    if(action==='finish-month'){
+      if(ui.busy||!game.pendingMonth)return;
+      game.pendingMonth=null;ui.tab='hq';save();render();window.scrollTo({top:0,behavior:'instant'});return;
+    }
     if(action==='fielding-open'){
       if(game.pendingReview||ui.busy)return;
       const id=Number(el.dataset.id);
@@ -1776,6 +1831,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(e.target.dataset.change==='training-focus'){const p=getPlayer(e.target.dataset.id);if(p&&p.teamId===game.selectedId){p.trainFocus=e.target.value;save();showToast('育成方針を保存しました');}}
   },true);
 
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&ui.busy)ui.pauseRequested=true;});
   const appRoot=document.querySelector('#app');
   if(appRoot)appRoot.innerHTML='<div class="title-screen"><h2>セーブデータを読み込んでいます…</h2></div>';
   (async()=>{
