@@ -63,7 +63,7 @@ function dispatch(type,data={}){
     classList:{contains:()=>false},
     closest:selector=>selector==='[data-action]'&&data.action?el:null
   };
-  const event={target:el,preventDefault(){},stopImmediatePropagation(){this.stopped=true;},stopped:false};
+  const event={target:el,preventDefault(){},stopPropagation(){},stopImmediatePropagation(){this.stopped=true;},stopped:false};
   const acts=listeners.filter(l=>l.type===type);
   for(const l of [...acts.filter(x=>x.capture),...acts.filter(x=>!x.capture)]){
     if(event.stopped)break;
