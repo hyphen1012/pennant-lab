@@ -2505,13 +2505,118 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   });
   /* v0.3: consolidated UI and management systems. Keep original save format. */
   const PL03={};
+
+  // Deterministic fictional sports-card illustrations: each appearanceSeed/ID
+  // fixes facial proportions, hair, eyes, nose, expression and accessories.
+  // The raw SVG contains NO circular ring: its parent is the only ring.
+  function renderFaceArtwork(p,options={}){
+    if(!p)return '<svg class="face-artwork" viewBox="0 0 120 120" aria-hidden="true"><rect width="120" height="120" fill="#26364D"/><path d="M27 108Q60 75 93 108" fill="#617188"/><circle cx="60" cy="45" r="19" fill="#94A6B8"/></svg>';
+    let seed=(Number.isFinite(Number(p.appearanceSeed))?Number(p.appearanceSeed):Number(p.id)||1)>>>0;
+    seed=(seed^0x9E3779B9)>>>0;
+    const rand=n=>{
+      seed^=(seed<<13);seed^=(seed>>>17);seed^=(seed<<5);
+      return (seed>>>0)%n;
+    };
+    const skins=[
+      ['#F3D0AF','#DEA985','#C48663'],['#F0C19D','#DCA27D','#AE6C51'],
+      ['#EDC9AA','#DAAF8F','#A8755B'],['#DFA77E','#C48262','#945C48'],
+      ['#C88964','#AC674B','#824A39'],['#AB7155','#925840','#63382F'],
+      ['#825239','#6C402E','#4B2A24'],['#E9C29D','#CCA07C','#A36E4E'],
+      ['#BA8060','#A06C50','#6C4537'],['#E6B796','#C68B70','#925F50']
+    ];
+    const hairs=['#1B1C26','#42312D','#242C34','#654A3A','#36272A','#6F6157','#171820','#433F41'];
+    const eyes=['#252B32','#4A302B','#3D3932','#23384A'];
+    const jerseyPalette=['#346B82','#317A70','#3E5C8F','#886049','#475E67'];
+    const skin=skins[rand(skins.length)],hair=hairs[rand(hairs.length)],iris=eyes[rand(eyes.length)];
+    const faceType=rand(6),hairStyle=rand(9),browType=rand(5),eyeType=rand(5),noseType=rand(5);
+    const mouthType=rand(5),beardStyle=rand(6),glasses=rand(9)===0,freckles=rand(7)===0;
+    const part=rand(2)?1:-1,side=rand(7)-3;
+    const halfWidth=[27,29,31,26,29,28][faceType],jaw=[21,20,18,23,18,22][faceType];
+    const chin=90+(faceType%3)*2,cheekY=62+(faceType%2)*2,eyeY=57+(eyeType%3);
+    const age=Number(p.age)||27,older=age>=34,veryOld=age>=42;
+    const manager=options.role==='manager',silhouette=options.hidden===true;
+    const jersey=manager?'#2F435C':isPitch(p)?'#A34E61':jerseyPalette[rand(jerseyPalette.length)];
+    const bg=manager?'#304359':'#263D52';
+    const headLeft=60-halfWidth,headRight=60+halfWidth;
+    const hairShapes=[
+      `M27 51Q23 24 42 22Q57 14 77 23Q98 27 92 53L86 43Q76 38 66 37Q50 43 32 43Z`,
+      `M29 50Q22 28 41 20Q61 12 80 26Q94 33 91 49Q69 33 48 34Q34 37 29 50Z`,
+      `M26 52Q23 29 35 23Q47 12 66 18Q85 12 94 39L88 49Q77 43 69 34Q47 37 27 50Z`,
+      `M29 47Q32 25 48 24Q61 20 77 25Q87 29 90 49L83 40Q60 38 34 43Z`,
+      `M30 46Q28 34 36 27Q51 21 70 25Q85 25 88 44L77 37Q59 33 41 38Z`,
+      `M27 54Q21 38 32 24Q40 17 57 18Q72 12 84 24Q96 31 92 55L83 42Q76 33 65 35Q39 30 32 51Z`,
+      `M31 48Q29 27 46 23Q60 17 75 23Q89 31 87 47Q73 34 58 36Q42 35 31 48Z`,
+      `M29 47Q23 35 34 25Q50 17 67 22Q83 20 88 39L86 47Q79 37 68 35Q49 35 35 43Z`,
+      `M28 52Q20 33 33 25Q43 12 59 17Q76 14 88 25Q99 39 90 54L83 42Q68 44 60 33Q43 43 30 44Z`
+    ];
+    if(silhouette){
+      return `<svg class="face-artwork" viewBox="0 0 120 120" role="img" aria-label="未公開の選手シルエット">
+        <rect width="120" height="120" fill="#1C2638"/>
+        <path d="M0 120Q11 92 40 89L80 89Q109 92 120 120Z" fill="#374358"/>
+        <path d="M34 42Q35 25 60 23Q87 25 86 45L83 75Q76 91 60 92Q44 91 36 75Z" fill="#5A6274"/>
+        <path d="${hairShapes[hairStyle]}" fill="#252B39"/></svg>`;
+    }
+    // Reusable outlines are proportioned at 120px for readable 36–88px rendering.
+    const facePath=`M${headLeft} 46Q${headLeft-3} 27 60 26Q${headRight+3} 27 ${headRight} 46
+      L${headRight-2} ${cheekY}Q${headRight-4} 82 60 ${chin}
+      Q${headLeft+4} 82 ${headLeft+2} ${cheekY}Z`;
+    const browLeft=browType%2?-2:1,browRight=browType>=3?2:0;
+    const eyeWidth=eyeType===0?8:eyeType===1?10:9;
+    const mouthY=76+(mouthType%3);
+    const beard=beardStyle===0||beardStyle===4
+      ?`<path d="M40 73Q47 94 60 ${chin}Q73 94 80 73Q75 87 60 87Q46 86 40 73Z" fill="${hair}" opacity=".38"/>`
+      :beardStyle===2
+      ?`<path d="M51 73Q60 68 69 73L69 77Q63 75 60 77Q56 75 51 77Z" fill="${hair}" opacity=".85"/>`:'';
+    const glassesMarkup=glasses?`<path d="M35 54H52V65H35Z M68 54H85V65H68Z M52 57H68" fill="none" stroke="#A4B8CE" stroke-width="2.3" rx="3"/>`:'';
+    const leftEyeX=46+side*.5,rightEyeX=74+side*.5;
+    const eyeShape=x=>`<path d="M${x-eyeWidth/2} ${eyeY}Q${x} ${eyeY-3} ${x+eyeWidth/2} ${eyeY}" fill="none" stroke="#3B302D" stroke-width="1.6"/>
+      <ellipse cx="${x}" cy="${eyeY+.7}" rx="2.6" ry="3" fill="#E6E0D5"/>
+      <ellipse cx="${x+part*.7}" cy="${eyeY+.7}" rx="1.7" ry="2.5" fill="${iris}"/>
+      <circle cx="${x+part*.7-.5}" cy="${eyeY-.2}" r=".75" fill="#F8F8F8"/>`;
+    const brow=x=>`<path d="M${x-7} ${eyeY-8+browLeft}Q${x} ${eyeY-11+browRight} ${x+7} ${eyeY-8}" fill="none" stroke="${hair}" stroke-width="${3+browType%2}" stroke-linecap="round"/>`;
+    const nose=[`M60 58L57 69Q60 72 64 69`,`M59 58Q55 66 58 69L63 69`,
+      `M60 58Q61 65 58 69Q61 71 64 68`,`M59 60L57 68Q60 70 63 69`,`M61 58L59 68Q61 71 65 69`][noseType];
+    const mouth=[`M52 ${mouthY}Q60 ${mouthY+3} 68 ${mouthY}`,
+      `M51 ${mouthY}Q60 ${mouthY+1} 69 ${mouthY}`,
+      `M53 ${mouthY}Q60 ${mouthY-1} 67 ${mouthY}`,
+      `M52 ${mouthY}Q60 ${mouthY+4} 68 ${mouthY}`,
+      `M52 ${mouthY}Q60 ${mouthY-2} 68 ${mouthY}`][mouthType];
+    return `<svg class="face-artwork" viewBox="0 0 120 120" aria-hidden="true">
+      <rect width="120" height="120" fill="${bg}"/>
+      <path d="M0 120Q7 99 33 93Q46 89 60 90Q75 89 87 93Q113 99 120 120Z" fill="${jersey}"/>
+      <path d="M40 95Q48 100 60 109Q72 100 80 95" fill="none" stroke="#D1D7DA" stroke-width="3.1" opacity=".88"/>
+      <path d="M47 84L46 95Q60 110 74 95L73 83Z" fill="${skin[1]}"/>
+      <path d="M44 87Q60 94 76 85L73 92Q59 101 48 92Z" fill="${skin[2]}" opacity=".4"/>
+      <ellipse cx="${headLeft+1}" cy="61" rx="6" ry="11" fill="${skin[1]}"/>
+      <ellipse cx="${headRight-1}" cy="61" rx="6" ry="11" fill="${skin[1]}"/>
+      <path d="${facePath}" fill="${skin[0]}"/>
+      <path d="M${headRight-8} 40Q${headRight+3} 62 ${headRight-3} 76Q${headRight-14} 88 60 ${chin}Q${headRight-8} 74 ${headRight-8} 40Z" fill="${skin[2]}" opacity=".24"/>
+      <path d="M${headLeft+8} 45Q${headLeft+5} 68 48 78" fill="none" stroke="${skin[1]}" opacity=".35" stroke-width="4"/>
+      <path d="${hairShapes[hairStyle]}" fill="${hair}"/>
+      ${hairStyle%3===0?`<path d="M35 31Q51 20 64 26" fill="none" stroke="#FFFFFF" stroke-width="2" opacity=".14"/>`:''}
+      ${brow(leftEyeX)}${brow(rightEyeX)}
+      ${eyeShape(leftEyeX)}${eyeShape(rightEyeX)}
+      <path d="${nose}" fill="none" stroke="${skin[2]}" stroke-width="1.7" stroke-linecap="round"/>
+      <path d="M55 70Q60 72 66 70" fill="none" stroke="${skin[2]}" stroke-width=".9" opacity=".5"/>
+      ${beard}
+      <path d="${mouth}" fill="none" stroke="#8E554C" stroke-width="1.7" stroke-linecap="round"/>
+      ${freckles?'<circle cx="41" cy="68" r="1.3" fill="#996B58" opacity=".45"/><circle cx="79" cy="68" r="1.3" fill="#996B58" opacity=".45"/>':''}
+      ${older?`<path d="M36 67Q40 70 46 69M74 69Q79 70 84 67" stroke="${skin[2]}" stroke-width="1" opacity=".37" fill="none"/>`:''}
+      ${veryOld?`<path d="M46 40Q60 35 74 40" stroke="${skin[2]}" stroke-width="1.2" opacity=".45" fill="none"/>`:''}
+      ${glassesMarkup}
+      <path d="M0 113Q26 102 35 103M85 103Q101 104 120 113" stroke="#FFFFFF" stroke-width="1.2" opacity=".09" fill="none"/>
+    </svg>`;
+  }
   function faceMini(p){
     if(!p)return '<span class="face-mini unknown">?</span>';
-    const id=Number(p.id)||1,skin=['#f5c6a4','#e4a57e','#d68e67','#f0d2b4'][id%4],hair=['#222330','#623b30','#2b1a1c','#83604a','#262d35'][id%5];
-    const shirt=isPitch(p)?'#c56891':'#3e91bd',eye=(id%3===0)?'#3c3840':'#212431';
-    return `<span class="face-mini" title="${h(p.name)}"><svg viewBox="0 0 44 44" aria-hidden="true"><rect width="44" height="44" rx="20" fill="#263b52"/><path d="M4 44 Q7 29 22 30 Q38 29 40 44" fill="${shirt}"/><ellipse cx="22" cy="21" rx="13" ry="15" fill="${skin}"/><path d="M8 21 Q6 6 20 7 Q38 3 36 22 L32 17 Q19 20 13 14Z" fill="${hair}"/><path d="M9 18 Q6 7 17 6 L22 7 Q11 12 12 25Z" fill="${hair}"/><circle cx="17" cy="22" r="1.5" fill="${eye}"/><circle cx="27" cy="22" r="1.5" fill="${eye}"/><path d="M18 29 Q22 ${id%2?32:27} 26 29" fill="none" stroke="#8d5750" stroke-width="1.3" stroke-linecap="round"/>${id%7===0?'<rect x="13" y="18" width="18" height="9" rx="3" fill="none" stroke="#374b5d" stroke-width="1.2"/>':''}</svg></span>`;
+    const theme=playerVisualTheme(p);
+    return `<span class="face-mini ${theme.category?'special-portrait':''}"
+      style="--avatar-color:${theme.ring};--avatar-accent:${theme.accent}"
+      title="${h(p.name)}">${renderFaceArtwork(p,{hidden:theme.hidden})}</span>`;
   }
-  function faceLabel(p){return `<span class="face-label">${faceMini(p)}<span>${h(p.name)}</span></span>`;}
+  function faceLabel(p){
+    return `<span class="face-label">${faceMini(p)}<span>${themedPlayerName(p)}</span></span>`;
+  }
   // Existing player portraits receive a stable, purely fictional illustration, keyed by ID.
   const oldPortrait=portrait;
   // original const portrait cannot be rebound: add face images to each card in render and detail.
@@ -3039,7 +3144,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   /* A stable fictional portrait and familiar S–F scout grades for every manager. */
   function managerPortrait(manager,teamId){
     const id=String(manager.id||manager.name).split('').reduce((n,ch)=>((n*31+ch.charCodeAt(0))>>>0),17);
-    return `<span class="manager-portrait">${faceMini({id:id||1,name:manager.name,teamId,pos:'OF'})}</span>`;
+    return `<span class="manager-portrait">${renderFaceArtwork({
+      id:id||1,name:manager.name,age:manager.age||48,pos:'OF',teamId
+    },{role:'manager'})}</span>`;
   }
   function managerRatings(m){
     const lead=Number(m.leadership)||60,t=m.tendency||{};
