@@ -1043,36 +1043,36 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const total=teamId=>revealed.filter(x=>x.teamId===teamId).reduce((n,x)=>n+x.runs,0);
     const inningCount=Math.max(9,g.inningsA.length,g.inningsH.length);
     const rows=[[away,g.away],[home,g.home]].map(([t,teamId])=>
-      \`<tr><th class="watch-team \${leagueClass(t.league)}">\${h(t.short)}</th>\${Array.from({length:inningCount},(_,i)=>{
+      `<tr><th class="watch-team ${leagueClass(t.league)}">${h(t.short)}</th>${Array.from({length:inningCount},(_,i)=>{
         const frame=revealed.find(x=>x.inning===i+1&&x.teamId===teamId);
-        return \`<td class="\${frame?'played':''}">\${frame?frame.runs:'·'}</td>\`;
-      }).join('')}<td class="watch-total">\${total(teamId)}</td></tr>\`).join('');
+        return `<td class="${frame?'played':''}">${frame?frame.runs:'·'}</td>`;
+      }).join('')}<td class="watch-total">${total(teamId)}</td></tr>`).join('');
     const last=revealed[revealed.length-1],current=last?getTeam(last.teamId):null;
-    const inningLabel=last?\`\${last.inning}回\${last.side} · \${h(current.short)}の攻撃終了\`:'プレーボール';
-    const event=last?g.events.find(x=>x.startsWith(\`\${last.inning}回 \${current.short} \`)):null;
-    const note=last?(event||\`\${h(current.name)}はこの回\${last.runs}点を記録\`):
-      \`\${h(away.name)} 対 \${h(home.name)} · まもなく試合開始\`;
+    const inningLabel=last?`${last.inning}回${last.side} · ${h(current.short)}の攻撃終了`:'プレーボール';
+    const event=last?g.events.find(x=>x.startsWith(`${last.inning}回 ${current.short} `)):null;
+    const note=last?(event||`${h(current.name)}はこの回${last.runs}点を記録`):
+      `${h(away.name)} 対 ${h(home.name)} · まもなく試合開始`;
     const progress=frames.length?Math.round(step/frames.length*100):0;
-    return \`<div class="watch-game-screen">
+    return `<div class="watch-game-screen">
       <div class="review-kicker">PENNANT LAB · INNING WATCH</div>
       <section class="panel watch-hero">
-        <div class="watch-overline"><span class="watch-live-dot"></span> 試合観戦モード <span>\${formatCalendarDate(entry.date)}</span></div>
+        <div class="watch-overline"><span class="watch-live-dot"></span> 試合観戦モード <span>${formatCalendarDate(entry.date)}</span></div>
         <div class="watch-score">
-          <div>\${teamBadge(away)}<span class="watch-club \${leagueClass(away.league)}">\${h(away.short)}</span><strong>\${total(g.away)}</strong></div>
+          <div>${teamBadge(away)}<span class="watch-club ${leagueClass(away.league)}">${h(away.short)}</span><strong>${total(g.away)}</strong></div>
           <span class="watch-separator">–</span>
-          <div>\${teamBadge(home)}<span class="watch-club \${leagueClass(home.league)}">\${h(home.short)}</span><strong>\${total(g.home)}</strong></div>
+          <div>${teamBadge(home)}<span class="watch-club ${leagueClass(home.league)}">${h(home.short)}</span><strong>${total(g.home)}</strong></div>
         </div>
-        <div class="watch-inning-info"><strong>\${inningLabel}</strong><small>\${step}/\${frames.length} 半イニング</small></div>
-        <div class="watch-progress"><i style="width:\${progress}%"></i></div>
+        <div class="watch-inning-info"><strong>${inningLabel}</strong><small>${step}/${frames.length} 半イニング</small></div>
+        <div class="watch-progress"><i style="width:${progress}%"></i></div>
       </section>
-      <section class="panel watch-scoreboard"><h3 class="panel-title">イニング別スコア</h3><div class="table-wrap"><table class="watch-table"><thead><tr><th>球団</th>\${Array.from({length:inningCount},(_,i)=>\`<th>\${i+1}</th>\`).join('')}<th>計</th></tr></thead><tbody>\${rows}</tbody></table></div></section>
-      <section class="panel watch-commentary"><small>INNING REPORT</small><h3>\${inningLabel}</h3><p>\${note}</p></section>
+      <section class="panel watch-scoreboard"><h3 class="panel-title">イニング別スコア</h3><div class="table-wrap"><table class="watch-table"><thead><tr><th>球団</th>${Array.from({length:inningCount},(_,i)=>`<th>${i+1}</th>`).join('')}<th>計</th></tr></thead><tbody>${rows}</tbody></table></div></section>
+      <section class="panel watch-commentary"><small>INNING REPORT</small><h3>${inningLabel}</h3><p>${note}</p></section>
       <div class="watch-controls">
-        <button class="btn outline" data-action="pause-calendar">\${ui.autoPaused?'▶ 再開':'⏸ 一時停止'}</button>
+        <button class="btn outline" data-action="pause-calendar">${ui.autoPaused?'▶ 再開':'⏸ 一時停止'}</button>
         <button class="btn primary" data-action="watch-skip">試合結果へ ›</button>
       </div>
       <p class="tiny watch-hint">記録された試合をイニングごとに再生中。画面タップで一時停止できます。<br>休養日は従来どおり球界新聞を表示します。</p>
-      </div>\`;
+      </div>`;
   }
 
   function dailyGameScreen(entry){
