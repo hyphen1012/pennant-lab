@@ -644,6 +644,59 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 }
 @media(prefers-reduced-motion:reduce){.manager-option{transition:none;transform:none}}
 
+
+/* v0.8.2 — readable, personalized GM desk briefings; amounts and injuries are the real saved data. */
+.gm-briefing-screen{max-width:670px;margin:3px auto 22px;padding:0;display:flex;flex-direction:column;gap:15px;background:transparent;border:0}
+.gm-briefing-top{display:flex;justify-content:space-between;align-items:center;gap:8px;
+  padding:12px 14px;border:1px solid #4c617e;border-radius:12px;
+  background:linear-gradient(110deg,#253f62,#172b46);font-size:10px;font-weight:950;letter-spacing:1.2px;color:#bbd9ee}
+.gm-briefing-priority{color:#ffe9dc;background:#983b42;border:1px solid #d87d80;border-radius:99px;padding:4px 9px;letter-spacing:0}
+.gm-briefing-normal{color:#85e3c4;background:#1d4c47;border:1px solid #327c6f;border-radius:99px;padding:4px 9px;letter-spacing:0}
+.gm-briefing-paper,.gm-month-head{border:1px solid #52718e;border-radius:17px;overflow:hidden;background:#1b2d44;box-shadow:0 12px 33px #030b1c4d}
+.gm-briefing-sender{display:flex;align-items:center;gap:10px;min-width:0;padding:13px 15px;background:#223a55;border-bottom:1px solid #405d77}
+.gm-briefing-sender .face-mini{width:42px;height:42px;flex:0 0 42px;border-color:#f0be59}
+.gm-briefing-sender>div{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.gm-briefing-sender b{font-size:13px;color:#fff;line-height:1.35}
+.gm-briefing-sender small{font-size:10px;color:#a8c0d7}
+.gm-briefing-sender time{font-size:10px;color:#b3c8d8;white-space:nowrap}
+.gm-briefing-body{padding:22px 17px}
+.gm-briefing-body .eyebrow{font-size:10px;color:#f0bf6a;letter-spacing:1.4px;margin-bottom:9px}
+.gm-briefing-body h2{font-size:clamp(20px,5.4vw,27px);font-weight:950;line-height:1.25;color:#fff;margin:0 0 12px}
+.gm-briefing-lead{font-size:12px;line-height:1.9;color:#c4d4e6;margin:12px 0}
+.gm-medical-player{display:flex;align-items:center;gap:9px;background:#24374f;border:1px solid #52647a;
+  padding:13px 10px;border-radius:12px;margin:19px 0 15px}
+.gm-medical-player .face-mini{width:41px;height:41px;flex:0 0 41px}
+.gm-medical-player>div{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
+.gm-medical-player strong{font-size:16px;color:#fff}.gm-medical-player span{font-size:10px;color:#a8bdcf}
+.gm-medical-player>b{padding:4px 8px;border-radius:7px;white-space:nowrap;background:#653846;color:#ffd1d1;font-size:11px}
+.gm-medical-days{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:12px 14px;
+  border-top:1px solid #40536e;border-bottom:1px solid #40536e}
+.gm-medical-days small{font-size:12px;color:#c1d3e3}
+.gm-medical-days strong{font-weight:950;font-size:31px;line-height:1.1;color:#f4b9b4}
+.gm-medical-days em{font-size:13px;font-style:normal;margin-left:4px;color:#cbd6e5}
+.gm-briefing-confirm{min-height:53px;letter-spacing:.4px;font-size:15px;box-shadow:0 4px 20px #dbb34822}
+.gm-month-report{max-width:760px;margin:0 auto;padding-bottom:25px}
+.gm-month-report .gm-briefing-top{margin-bottom:12px}
+.gm-month-head{padding-bottom:16px;margin-bottom:15px}
+.gm-month-head>.eyebrow,.gm-month-head>h2,.gm-month-head>p{margin-left:17px;margin-right:17px}
+.gm-month-head>.eyebrow{margin-top:17px;font-size:11px;color:#f0c96c}
+.gm-month-head h2{font-size:clamp(18px,5vw,27px);color:#f4f8fd;margin-top:5px;margin-bottom:8px}
+.gm-month-head p{font-size:12px;color:#bad0e2;line-height:1.7;margin-top:0}
+.gm-month-head p strong{color:#f4d074}
+.gm-month-report .grid3{margin:11px 0 15px}
+.gm-month-report .metric{background:#1b3452;border-color:#416480}
+.gm-month-report .metric .lab{color:#b7c5d7}.gm-month-report .metric .val{color:#f4d27b}
+.gm-month-report .panel{border-color:#405675}
+.gm-month-report .panel-title{color:#f3d28a}
+.gm-month-report .monthly-skill-row{line-height:1.6}
+@media(prefers-reduced-motion:reduce){.gm-briefing-screen,.gm-month-report{animation:none}}
+@media(max-width:365px){
+ .gm-briefing-sender{padding:10px 9px;gap:7px}.gm-briefing-sender time{font-size:9px}
+ .gm-briefing-sender .face-mini{width:35px;height:35px;flex-basis:35px}
+ .gm-briefing-body{padding:17px 12px}
+ .gm-briefing-top{padding:10px 9px;font-size:9px}
+}
+
 </style>
 </head>
 <body><div id="app"></div><script>
