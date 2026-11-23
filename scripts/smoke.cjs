@@ -87,7 +87,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.8\.6 · PORTRAITS/);
+  assert.match(app.innerHTML,/VERSION 0\.8\.7 · MANAGER AI/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -168,6 +168,10 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(!app.innerHTML.includes('data-change="manager-order"'),'Native select must be replaced by in-game buttons');
   dispatch('click',{action:'mgr-order',key:'bullpen',choice:'attack'});
   assert.match(app.innerHTML,/data-action="mgr-order" data-key="bullpen" data-choice="attack"\s+aria-pressed="true"/);
+  // Manager must actually use the bench according to pregame GM strategy.
+  dispatch('click',{action:'mgr-order',key:'pinch',choice:'attack'});
+  dispatch('click',{action:'mgr-order',key:'youth',choice:'attack'});
+  assert.match(app.innerHTML,/最近の監督采配/);
   await window.PennantLab.advance('day');
   // The day action must show the simulated inning-by-inning watch before the final score.
   for(let tries=0;tries<12&&watchRenders.length===0;tries++){
@@ -222,6 +226,27 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   const full=window.PennantLab.getSnapshot();
   assert(done||full.day===143,'The full 143-game schedule must complete');
   assert.equal(full.games,858,'12 teams × 143 games should result in 858 games');
+
+  const archivedMatches=store.get(1)?.data?.games||[];
+  const gmOwned=full.selectedId;
+  const watchedMatches=archivedMatches.filter(g=>g.home===gmOwned||g.away===gmOwned);
+  assert.equal(watchedMatches.length,143,'Manager AI must preserve the full 143 game schedule');
+  const substituted=watchedMatches.flatMap(g=>(g.managerMoves||[]).map(m=>({...m,match:g})));
+  const myMoves=substituted.filter(m=>m.teamId===gmOwned);
+  assert(myMoves.length>0,'Aggressive GM pinch policy should cause real bench appearances');
+  for(const move of substituted){
+    assert(move.inId!==move.outId,'A pinch hit changes the actual batter');
+    assert(move.inning>=7&&move.inning<=12,'Only late-game pinch hitting is currently enabled');
+    assert(typeof move.managerName==='string'&&move.managerName.length>0);
+    const batter=store.get(1).data.players.find(p=>p.id===move.inId);
+    assert(batter&&batter.teamId===move.teamId,'A pinch hitter must belong to his team');
+    assert(move.match.box?.bat.some(p=>p.id===move.inId&&p.pa>0),
+      'The substitute must record at least one real plate appearance');
+  }
+  assert(watchedMatches.some(g=>Array.isArray(g.managerMoves)),
+    'Watched game reports must persist substitution logs');
+  console.log('PASS: '+myMoves.length+' user-team pinch-hit decisions, all recorded with real batting stats');
+
   assert(monthlyRenders.length>0,'Month-end reports must show the GM inbox');
   assert(monthlyRenders.some(v=>v.includes('球団運営スタッフ')));
   if(medicalRenders.length)assert(medicalRenders.every(v=>v.includes('チーム医療スタッフ')));
