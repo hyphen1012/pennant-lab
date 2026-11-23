@@ -419,6 +419,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .review-score .score-pair .league-club-name{color:var(--league-tone)}
 .calendar-day .league-club-name{color:var(--league-tone)}
 @media(max-width:380px){.league-tag{font-size:9px;padding:2px 5px}.league-table{padding-left:3px}}
+
+/* Condition is a separate slim meter below the ONE-LINE season stat ledger. */
+.lineup-wrap .lineup-item>.condition-status{grid-column:1/-1;grid-row:3;margin:0 0 4px}
+.condition-status{display:flex;align-items:center;gap:7px;width:100%;min-width:0;padding:3px 2px;font-size:10px;color:#aebfd3}
+.condition-status .condition-name{white-space:nowrap;font-size:10px;font-weight:750}
+.condition-track{display:block;flex:1;height:6px;border-radius:6px;background:#354458;overflow:hidden;min-width:20px}
+.condition-track i{display:block;height:100%;border-radius:6px;transition:width .16s}
+.condition-status strong{font-size:11px;white-space:nowrap;min-width:32px;text-align:right}
+.condition-note{font-size:9px;white-space:nowrap;min-width:42px;text-align:right}
+.player-card>.condition-status{padding:4px 12px 7px}
+@media(max-width:380px){.condition-status{gap:5px}.condition-status .condition-name{font-size:9px}.condition-note{font-size:8px}}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -562,6 +573,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }
     p.salary=r2(clamp(Math.pow(rating(p)/70,3)*.31+(p.age>31?.07:0)+rand()*.16,.06,1.75));
     p.stats=newStats(isPitch(p));
+    initCondition(p);
     p.affinity=ri(25,90);p.memo='';p.seasonHistory=[];p.overallHistory=[{year:game.year,overall:rating(p)}];
     return p;
   }
@@ -848,6 +860,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function dailyBulletin(entry){
     if(!Array.isArray(game.dailyBulletins))game.dailyBulletins=[];
+    if(!Array.isArray(game.conditionArchive))game.conditionArchive=[];
     let edition=game.dailyBulletins.find(x=>x.year===game.year&&x.date===entry.date);
     if(!edition){
       edition=buildDailyNews(entry);
@@ -963,6 +976,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function processCalendarDay(){
     const entry=calendarNextDay();
     if(!entry)return null;
+    // Recovery is applied on every calendar day, including rest days.
+    restoreDailyCondition();
     if(entry.type==='game'){
       if(entry.gameNo!==game.day+1)throw Error('Calendar game count out of sync');
       processDay();
@@ -989,7 +1004,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     });
     ['C','1B','2B','3B','SS','OF','OF','OF','OF','SP','SP','SP','RP','RP','CP','SP','OF','SS','2B','1B','RP','C'].forEach(pos=>addPlayer(null,pos));
     game.schedule=scheduleForSeason();game.calendar=calendarForSeason(game.year);
-    game.calendarIndex=0;game.monthlyArchive=[];game.dailyBulletins=[];game.pendingMonth=null;game.playbackMode='normal';game.advanceTarget=null;
+    game.calendarIndex=0;game.monthlyArchive=[];game.dailyBulletins=[];game.conditionArchive=[];game.pendingMonth=null;game.playbackMode='normal';game.advanceTarget=null;
     game.monthStart=monthlySnapshot(game.calendar.days[0].date);
     game.news=['新リーグが開幕！ 12球団による143試合制のペナントが始まります。'];
     save();
@@ -1146,6 +1161,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const watchPlayers=watchBox?[...new Map([...lineupH,...lineupA,...pitchers(home),...pitchers(away)].map(p=>[p.id,p])).values()]:[];
     const preStats=watchBox?new Map(watchPlayers.map(p=>[p.id,{...p.stats}])):null;
     const startOutsH=spHome.stats.outs,startOutsA=spAway.stats.outs;
+    const outsBefore=new Map([...pitchers(home),...pitchers(away)].map(p=>[p.id,p.stats.outs]));
     spHome.stats.gs++;spAway.stats.gs++;
     const appear={bat:new Set(),pitch:new Set()};
     const indexes={[home.id]:0,[away.id]:0};
@@ -1187,6 +1203,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         pitch:watchPlayers.filter(p=>isPitch(p)&&delta(p,'g')>0).map(p=>({id:p.id,teamId:p.teamId,outs:delta(p,'outs'),er:delta(p,'er'),h:delta(p,'h'),k:delta(p,'k'),bb:delta(p,'bb'),w:delta(p,'w'),l:delta(p,'l'),sv:delta(p,'sv')}))
       };
     }
+    consumeGameCondition([...lineupH,...lineupA,...pitchers(home),...pitchers(away)],appear,outsBefore);
     game.games.push(result);
     return result;
   }
@@ -1234,6 +1251,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       });
       p.salary=r2(clamp(p.salary*.72+Math.pow(rating(p)/70,3)*.095,.05,2.5));
       p.stats=newStats(isPitch(p));
+      initCondition(p);p.energy=100;p.lastAppearanceDay=null;
     }
     const finalRank = Object.fromEntries(game.teams.map(t=>[t.id,rankings(t.league).findIndex(x=>x.id===t.id)]));
     const finalWins = Object.fromEntries(game.teams.map(t=>[t.id,t.wins]));
@@ -1290,11 +1308,52 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const gradeBriefColor=v=>v>=85?'#f7d04f':v>=75?'#ee8cc5':v>=65?'#f17670':v>=55?'#48c1e9':v>=45?'#50d5aa':v>=35?'#d0aa70':'#8c96aa';
   const rankColor=v=>v>=88?'#f8c845':v>=74?'#ef82b5':v>=60?'#ee655f':v>=46?'#36c6a5':'#5eb4ee';
   const portrait=p=>`<span class="avatar" style="--avatar-color:${isPitch(p)?'#e979aa':'#51b7d8'}">${faceMini(p)}<b>${rating(p)}</b></span>`;
+  // Physical condition is separate from the existing pitch-stamina ability.
+  const recoverySpan=p=>clamp(Math.round(Number.isFinite(p.recoveryDays)?p.recoveryDays:5),4,6);
+  function initCondition(p){
+    p.energy=clamp(Math.round(Number.isFinite(p.energy)?p.energy:100),0,100);
+    p.recoveryDays=Number.isFinite(p.recoveryDays)?recoverySpan(p):4+((Number(p.id)||0)*53+7)%3;
+    if(!Number.isInteger(p.lastAppearanceDay))p.lastAppearanceDay=null;
+    return p;
+  }
+  const conditionColor=p=>p.energy>=75?'#60c99e':p.energy>=45?'#eac675':'#e88b8e';
+  const conditionLabel=p=>p.energy>=85?'良好':p.energy>=60?'やや疲労':p.energy>=35?'疲労':'要休養';
+  function conditionBar(p){
+    initCondition(p);
+    return `<div class="condition-status" aria-label="${h(p.name)}のコンディション ${p.energy}%">
+      <span class="condition-name">コンディション</span><span class="condition-track"><i style="width:${p.energy}%;background:${conditionColor(p)}"></i></span>
+      <strong style="color:${conditionColor(p)}">${p.energy}%</strong><span class="condition-note">${conditionLabel(p)}</span>
+    </div>`;
+  }
+  function restoreDailyCondition(){
+    for(const p of game.players){
+      if(p.teamId==null||p.teamId<0)continue;
+      initCondition(p);
+      // Starting-pitcher recovery spans 4–6 days; hitters recover every day.
+      const gain=isPitch(p)?Math.ceil(82/p.recoveryDays):8+((p.id*11)%4);
+      p.energy=clamp(p.energy+gain,0,100);
+    }
+  }
+  function consumeGameCondition(players,appear,outsBefore){
+    const unique=new Map(players.map(p=>[p.id,p]));
+    for(const p of unique.values()){
+      initCondition(p);
+      const batted=appear.bat.has(p.id),pitched=appear.pitch.has(p.id);
+      if(!batted&&!pitched)continue;
+      const thrown=pitched?Math.max(0,p.stats.outs-(outsBefore.get(p.id)||0)):0;
+      // A future two-way starter accumulates both batting and pitching load.
+      const battingLoad=batted?10+((p.id*13)%6):0;
+      const pitchLoad=pitched?(p.pos==='SP'?Math.min(84,46+Math.round(thrown*.9)):Math.min(39,15+Math.round(thrown*.8))):0;
+      p.energy=clamp(p.energy-battingLoad-pitchLoad,0,100);
+      p.lastAppearanceDay=game.calendarIndex;
+    }
+  }
   function ensurePlayerExtras(p){
     if(!Array.isArray(p.overallHistory)) p.overallHistory=[{year:game.year,overall:rating(p)}];
     if(!Array.isArray(p.seasonHistory)) p.seasonHistory=[];
     if(!['右','左','両'].includes(p.batHand))p.batHand=derivedBatHand(p);
     if(!Object.prototype.hasOwnProperty.call(p,'subPos'))p.subPos=derivedSubPos(p);
+    initCondition(p);
     if(typeof p.memo!=='string')p.memo='';
     if(typeof p.affinity!=='number')p.affinity=clamp(Math.round((p.talent||60)*.62),15,99);
   }
@@ -1304,6 +1363,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(!Array.isArray(game.seasonArchive))game.seasonArchive=[];
     if(!Array.isArray(game.newsArchive))game.newsArchive=[];
     if(!Array.isArray(game.dailyBulletins))game.dailyBulletins=[];
+    if(!Array.isArray(game.conditionArchive))game.conditionArchive=[];
     if(!game.calendar||game.calendar.year!==game.year||!Array.isArray(game.calendar.days))
       game.calendar=calendarForSeason(game.year);
     if(!Number.isInteger(game.calendarIndex)||game.calendarIndex<0||game.calendarIndex>game.calendar.days.length){
@@ -1384,7 +1444,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const stats=isPitch(p)?[['球威',p.stuff],['制球',p.control],['変化',Math.round((p.stuff+p.control)/2)],['体力',p.stamina],['精神',p.talent]]:[['巧打',p.contact],['長打',p.power],['走力',p.speed],['守備',p.defense],['精神',p.talent]];
     const rosterGrading=ui.tab==='roster';
     const abilityCards=stats.map(([label,num])=>rosterGrading?`<div class="ability-cell"><small>${label}</small><strong style="color:${gradeBriefColor(num)}">${gradeBrief(num)}</strong></div>`:statBadge(num,label)).join('');
-    return `<div class="player-card"><button class="player-row" data-action="player-detail" data-id="${p.id}">${portrait(p)}<span class="player-main"><span class="player-name">${h(p.name)} <small>(${p.age})</small></span><span class="player-caption">${positionFull(p.pos)} · ${throwBat(p)}　${fmtSalary(p.salary)}</span></span><span class="player-affinity">♥ ${p.affinity}</span><span class="chev">›</span></button><button class="abilities" data-action="player-detail" data-id="${p.id}">${abilityCards}</button>${actions?`<div class="player-card-action"><button class="btn sm outline" data-action="player-detail" data-id="${p.id}">詳細・成績</button><button class="btn sm danger" data-action="ask-release" data-id="${p.id}">戦力外</button></div>`:''}</div>`;
+    return `<div class="player-card"><button class="player-row" data-action="player-detail" data-id="${p.id}">${portrait(p)}<span class="player-main"><span class="player-name">${h(p.name)} <small>(${p.age})</small></span><span class="player-caption">${positionFull(p.pos)} · ${throwBat(p)}　${fmtSalary(p.salary)}</span></span><span class="player-affinity">♥ ${p.affinity}</span><span class="chev">›</span></button>${conditionBar(p)}<button class="abilities" data-action="player-detail" data-id="${p.id}">${abilityCards}</button>${actions?`<div class="player-card-action"><button class="btn sm outline" data-action="player-detail" data-id="${p.id}">詳細・成績</button><button class="btn sm danger" data-action="ask-release" data-id="${p.id}">戦力外</button></div>`:''}</div>`;
   }
   function teamScreen(){
     const t=myTeam(),position=rankings(t.league).findIndex(x=>x.id===t.id)+1;
@@ -1556,7 +1616,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const p=getPlayer(id);
       if(!p)return '';
       const options=arr.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${h(x.name)}（${namePos(x.pos)}）総合${gradeBrief(rating(x))}</option>`).join('');
-      return `<div class="lineup-item"><button type="button" class="lineup-n fielding-trigger tier-${fieldingTier(p,fielding[id])}" data-action="fielding-open" data-id="${id}" title="守備位置を変更：${positionFull(fielding[id]||p.pos)}" aria-label="${i+1}番 ${h(p.name)} の守備位置を変更">${i+1}<em>${namePos(fielding[id]||p.pos)}</em></button><div class="lineup-info"><select class="select" aria-label="${i+1}番打者" data-change="lineup" data-slot="${i}">${options}</select><div class="quick-abilities">${abilityShort('総合',rating(p))}${abilityShort('巧打',p.contact)}${abilityShort('長打',p.power)}${abilityShort('走力',p.speed)}${abilityShort('守備',p.defense)}</div></div><div class="lineup-buttons"><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="-1" ${i===0?'disabled':''} aria-label="打順を上げる">▲</button><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="1" ${i===8?'disabled':''} aria-label="打順を下げる">▼</button></div>${currentSeasonLine(p)}</div>`;
+      return `<div class="lineup-item"><button type="button" class="lineup-n fielding-trigger tier-${fieldingTier(p,fielding[id])}" data-action="fielding-open" data-id="${id}" title="守備位置を変更：${positionFull(fielding[id]||p.pos)}" aria-label="${i+1}番 ${h(p.name)} の守備位置を変更">${i+1}<em>${namePos(fielding[id]||p.pos)}</em></button><div class="lineup-info"><select class="select" aria-label="${i+1}番打者" data-change="lineup" data-slot="${i}">${options}</select><div class="quick-abilities">${abilityShort('総合',rating(p))}${abilityShort('巧打',p.contact)}${abilityShort('長打',p.power)}${abilityShort('走力',p.speed)}${abilityShort('守備',p.defense)}</div></div><div class="lineup-buttons"><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="-1" ${i===0?'disabled':''} aria-label="打順を上げる">▲</button><button class="btn icon sm outline" data-action="lineup-move" data-slot="${i}" data-direction="1" ${i===8?'disabled':''} aria-label="打順を下げる">▼</button></div>${currentSeasonLine(p)}${conditionBar(p)}</div>`;
     }).join('')}<p class="tiny" style="margin:13px 0 0">※守備適性はメイン100%・サブ82%・適性外55%。DHは守備しません。守備力は相手の安打確率に影響します。</p></section>`;
   }
   function rotationScreen(t){
@@ -1564,7 +1624,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     return `${nextStarterInfo(t)}<section class="panel lineup-wrap"><div class="panel-head"><h3 class="panel-title">先発ローテーション</h3><span class="pill">5人制</span></div><p class="small">投手ごとの今季防御率・登板・勝敗を確認しながら、登板順を変更できます。</p>${t.rotation.map((id,i)=>{
       const p=getPlayer(id);if(!p)return '';
       const active=i===t.starterIndex%t.rotation.length;
-      return `<div class="lineup-item"><span class="lineup-n" title="先発投手">${i+1}<em>先</em></span><div class="lineup-info"><select class="select" data-change="rotation" data-slot="${i}" aria-label="先発${i+1}番手">${all.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${h(x.name)}（${gradeBrief(rating(x))}）</option>`).join('')}</select><div class="quick-abilities">${abilityShort('総合',rating(p))}${abilityShort('球威',p.stuff)}${abilityShort('制球',p.control)}${abilityShort('体力',p.stamina)}${active?'<span class="tag green">次戦登板</span>':''}</div></div><div class="lineup-buttons"><button class="btn icon sm outline" data-action="rotation-move" data-slot="${i}" data-direction="-1" ${i===0?'disabled':''} aria-label="登板順を上げる">▲</button><button class="btn icon sm outline" data-action="rotation-move" data-slot="${i}" data-direction="1" ${i===t.rotation.length-1?'disabled':''} aria-label="登板順を下げる">▼</button></div>${currentSeasonLine(p)}</div>`;
+      return `<div class="lineup-item"><span class="lineup-n" title="先発投手">${i+1}<em>先</em></span><div class="lineup-info"><select class="select" data-change="rotation" data-slot="${i}" aria-label="先発${i+1}番手">${all.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${h(x.name)}（${gradeBrief(rating(x))}）</option>`).join('')}</select><div class="quick-abilities">${abilityShort('総合',rating(p))}${abilityShort('球威',p.stuff)}${abilityShort('制球',p.control)}${abilityShort('体力',p.stamina)}${active?'<span class="tag green">次戦登板</span>':''}</div></div><div class="lineup-buttons"><button class="btn icon sm outline" data-action="rotation-move" data-slot="${i}" data-direction="-1" ${i===0?'disabled':''} aria-label="登板順を上げる">▲</button><button class="btn icon sm outline" data-action="rotation-move" data-slot="${i}" data-direction="1" ${i===t.rotation.length-1?'disabled':''} aria-label="登板順を下げる">▼</button></div>${currentSeasonLine(p)}${conditionBar(p)}</div>`;
     }).join('')}</section>`;
   }
   function playersScreen(t){
