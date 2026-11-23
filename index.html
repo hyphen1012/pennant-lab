@@ -442,7 +442,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const cycle=((year-2027)%4+4)%4;
     const midseason=cycle===1?'world':cycle===3?'international':'allstar';
     return {year,regularGames:SEASON_GAMES,leagueGames:125,interleagueGames:INTERLEAGUE_GAMES,
-      interleagueStart:56,interleagueEnd:73,midseasonAfter:72,midseason};
+      interleagueStart:56,interleagueEnd:73,midseasonAfter:73,midseason};
   }
   function buildFresh(){
     game={v:VERSION,seed:((Date.now()^0x53e719f1)>>>0)||1937,nextId:1,year:2027,day:0,
@@ -674,6 +674,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   const payroll=t=>r2(own(t).reduce((sum,p)=>sum+p.salary,0));
   function nextSeason(){
+    if(storageFailure){showToast('保存エラーが解決するまでシーズンを進められません。バックアップを保存してください。',true);return;}
     if(game.day!==143)return;
     captureSeason();
     archiveSeason();
@@ -1043,6 +1044,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     setTimeout(()=>e.remove(),3000);
   }
   async function advance(days){
+    if(storageFailure){showToast('保存エラーのため進行を停止しています。バックアップを書き出してください。',true);return;}
     if(ui.busy||game.pendingReview)return;
     if(game.day>=143){showToast('今季は終了しています');return}
     ui.busy=true;render();
@@ -1362,6 +1364,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }};
   const oldAdvance03=advance;
   advance=async function(days){
+    if(storageFailure){showToast('保存エラーのため進行を停止しています。バックアップを書き出してください。',true);return;}
     if(ui.busy||game.pendingReview||game.day>=143)return oldAdvance03(days);
     ui.busy=true;render();await new Promise(resolve=>setTimeout(resolve,35));
     const count=Math.min(Math.max(1,Number(days)||1),143-game.day),start=game.day;
