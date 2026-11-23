@@ -137,7 +137,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(watchRenders.some(x=>x.includes('イニング別スコア')));
   assert(watchRenders.some(x=>x.includes('data-action="watch-skip"')));
   assert(watchRenders.some(x=>x.includes('data-action="pause-calendar"')));
-  assert(watchRenders.every(x=>!/\\d+\\/\\d+ 半イニング/.test(x)),
+  assert(watchRenders.every(x=>!new RegExp('[0-9]+/[0-9]+ 半イニング').test(x)),
     'Do not disclose the total number of half-innings before the match ends');
   assert(watchRenders.every(x=>x.includes('class="watch-progress"')),
     'Keep the progress gauge visible without a match-length counter');
