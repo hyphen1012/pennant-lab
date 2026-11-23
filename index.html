@@ -2743,12 +2743,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       return sum+Math.max(0,Math.abs((order==='attack'?88:12)-Number(m.tendency[key]))-32);
     },0);
   }
-  function managerDailyRelations(){
+  function managerDailyRelations(date){
     for(const team of game.teams){
       const m=team.manager;if(!m)continue;
       const strain=managerDisagreement(team);
       m.discontent=clamp(Math.round((m.discontent+(strain?Math.min(.7,strain*.004):-.12))*100)/100,0,100);
       m.trust=clamp(Math.round((70-m.discontent*.6)*10)/10,10,95);
+      if(m.discontent>=60&&m.resignationNoticeYear!==game.year){
+        m.resignationNoticeYear=game.year;
+        if(team.id===game.selectedId)pushNews(`【監督報告】${m.name}監督がGM方針への不満から辞任の意向を伝えました。`,date);
+      }
     }
   }
 
@@ -2871,8 +2875,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       b.team.cash=r2(b.team.cash-b.salary);
       const m=b.team.manager;if(!m)continue;
       m.contractYears=Math.max(0,m.contractYears-1);
-      if(m.contractYears===0){m.contractYears=1;
-        game.managerHistory.push({year:game.year,teamId:b.team.id,text:`${m.name}監督と1年間の契約を更新`});
+      if(m.contractYears===0){
+        if(m.discontent>=75){
+          const previous=m.name;
+          const acting=makeManager(b.team.id,game.year,9);
+          acting.contractYears=1;
+          b.team.manager=acting;
+          game.managerHistory.push({year:game.year,teamId:b.team.id,
+            text:`${previous}監督が不満を理由に契約更改を拒否。${acting.name}が暫定監督に就任`});
+          pushNews(`${b.team.short}の${previous}監督が契約更改を拒否し辞任。${acting.name}が後任に就任。`);
+        }else{
+          m.contractYears=1;
+          game.managerHistory.push({year:game.year,teamId:b.team.id,text:`${m.name}監督と1年間の契約を更新`});
+        }
       }
     }
     save();
@@ -2881,7 +2896,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   processCalendarDay=function(){
     const before=game.calendarIndex;
     const out=prevCalendar07();
-    if(out&&game.calendarIndex!==before&&out.type==='game')managerDailyRelations();
+    if(out&&game.calendarIndex!==before&&out.type==='game')managerDailyRelations(out.date);
     return out;
   };
   document.addEventListener('click',e=>{
@@ -2891,6 +2906,22 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       e.stopImmediatePropagation();if(ui.busy||game.pendingEvent||game.pendingMonth||game.pendingReview)return;
       ui.tab='business';ui.businessSub='manager';ui.playerDetail=null;render();window.scrollTo({top:0,behavior:'instant'});return;
     }
+    if(act==='mgr-order'){
+      e.stopImmediatePropagation();
+      if(ui.busy||game.pendingEvent||game.pendingMonth||game.pendingReview)return;
+      const key=el.dataset.key,order=el.dataset.choice;
+      if(!MANAGER_TACTICS.some(v=>v[0]===key)||!['auto','attack','safe'].includes(order))return;
+      myTeam().gmOrders[key]=order;save();render();showToast('GM方針を保存しました');return;
+    }
+    if(act==='mgr-renew'){
+      e.stopImmediatePropagation();
+      if(ui.busy||game.pendingEvent||game.pendingMonth||game.pendingReview)return;
+      const m=myTeam().manager;
+      if(!m||m.contractYears!==1||game.day<98||m.renewedYear===game.year)return;
+      ui.confirm={type:'mgr-renew',title:'監督との契約更改',
+        body:`${m.name}監督に来季の続投を打診します。不満が大きい場合は拒否されることがあります。契約金 ${fmtMoney(r2(m.salary*.2))}。`,danger:false};
+      render();return;
+    }
     if(act==='mgr-offer'){
       e.stopImmediatePropagation();if(ui.busy||game.pendingEvent||game.pendingMonth||game.pendingReview)return;
       const slot=Number(el.dataset.slot),c=makeManager(myTeam().id,game.year,slot);
@@ -2898,6 +2929,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       ui.confirm={type:'mgr-hire',slot,title:'監督の雇用契約',
         body:`${c.name}監督と${c.contractYears}年契約を結びますか？ 契約金 ${fmtMoney(r2(c.salary*.3))}を支払います。`,danger:false};
       render();return;
+    }
+    if(act==='confirm'&&ui.confirm?.type==='mgr-renew'){
+      e.stopImmediatePropagation();const t=myTeam(),m=t.manager,fee=r2(Number(m.salary||0)*.2);
+      ui.confirm=null;
+      if(m.contractYears!==1||game.day<98||m.renewedYear===game.year){render();return;}
+      if(m.discontent>=75){
+        m.resignationNoticeYear=game.year;
+        pushNews(`【契約更改】${m.name}監督が続投要請を拒否。不満を理由に来季の契約を保留。`);
+        save();render();showToast('監督が契約更改に応じませんでした',true);return;
+      }
+      if(t.cash<fee){render();showToast('契約金が不足しています',true);return;}
+      t.cash=r2(t.cash-fee);m.contractYears+=1;m.renewedYear=game.year;
+      m.discontent=clamp(m.discontent-12,0,100);
+      m.trust=clamp(70-m.discontent*.6,10,95);
+      game.managerHistory.push({year:game.year,teamId:t.id,text:`${m.name}監督と来季の契約更改に合意`});
+      pushNews(`【契約更改】${t.short}が${m.name}監督の来季続投を発表。`);
+      save();render();showToast('監督と契約を更新しました');return;
     }
     if(act==='confirm'&&ui.confirm?.type==='mgr-hire'){
       e.stopImmediatePropagation();
