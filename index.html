@@ -271,7 +271,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .fielding-choice:hover:not(:disabled){border-color:#e6c06b;background:#2a405a}
 .fielding-choice.chosen{border-color:#d8b04e;background:#454128}
 .fielding-choice.sub{border-color:#856f42}
-.fielding-choice.off{border-color:#7b4950}
+
 .fielding-choice:disabled{opacity:.8;cursor:default}
 .fielding-choice-heading{display:flex;align-items:center;justify-content:space-between;gap:7px}
 .fielding-choice-heading strong{font-size:13px}
@@ -522,13 +522,22 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }
     return weight?points/weight:60;
   }
-  // A selected position that already has a defender swaps their two roles.
-  function assignFieldingRole(team,id,role){
+  // Never offer an out-of-position move. Also check the exchange partner;
+  // a valid destination must not force somebody else out of position.
+  function canAssignFieldingRole(team,id,role){
     id=Number(id);
     if(!team||!FIELD_POSITIONS.includes(role)||!team.lineup.includes(id))return false;
     syncLineupFielding(team);
+    const oldRole=team.fieldingRoles[id],player=getPlayer(id);
+    if(!oldRole||oldRole===role||fieldingTier(player,role)==='off')return false;
+    const otherId=team.lineup.find(otherId=>otherId!==id&&team.fieldingRoles[otherId]===role);
+    if(otherId!==undefined&&fieldingTier(getPlayer(otherId),oldRole)==='off')return false;
+    return true;
+  }
+  function assignFieldingRole(team,id,role){
+    id=Number(id);
+    if(!canAssignFieldingRole(team,id,role))return false;
     const oldRole=team.fieldingRoles[id];
-    if(!oldRole||oldRole===role)return false;
     const other=team.lineup.find(otherId=>otherId!==id&&team.fieldingRoles[otherId]===role);
     if(other!==undefined)team.fieldingRoles[other]=oldRole;
     team.fieldingRoles[id]=role;
@@ -1522,26 +1531,26 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const p=getPlayer(id);
     if(!p||!team.lineup.includes(id))return '';
     const current=team.fieldingRoles[id];
-    const list=FIELD_POSITIONS.map(role=>{
+    const allowed=FIELD_POSITIONS.filter(role=>role===current||canAssignFieldingRole(team,id,role));
+    const list=allowed.map(role=>{
       const otherId=team.lineup.find(otherId=>otherId!==id&&team.fieldingRoles[otherId]===role);
       const other=otherId===undefined?null:getPlayer(otherId);
       const tier=fieldingTier(p,role);
       const effect=role==='DH'?'守備なし':`${fieldingLabel(p,role)}／実効守備力 ${effectiveFielding(p,role)}`;
       const exchange=other?`・${h(other.name)}と交換`:'';
-      const warning=other&&current&&current!=='DH'
-        ?`　相手は${positionFull(current)}：${effectiveFielding(other,current)}`:'';
-      return `<button type="button" class="fielding-choice ${tier==='off'?'off':tier==='sub'?'sub':''} ${current===role?'chosen':''}"
+      return `<button type="button" class="fielding-choice ${tier==='sub'?'sub':''} ${current===role?'chosen':''}"
         data-action="fielding-set" data-id="${id}" data-role="${role}" ${current===role?'disabled':''}>
         <span class="fielding-choice-heading"><strong>${positionFull(role)}</strong><em>${current===role?'現在':role==='DH'?'DH':fieldingLabel(p,role)}</em></span>
-        <small>${effect}${exchange}${warning}</small>
+        <small>${effect}${exchange}</small>
       </button>`;
     }).join('');
     return `<div class="overlay fielding-overlay" data-action="fielding-close">
       <div class="fielding-dialog" role="dialog" aria-modal="true" aria-label="守備位置を変更" data-stop="true">
         <div class="swap-head"><h3>守備位置の変更</h3><button type="button" class="btn sm outline" data-action="fielding-close">閉じる ✕</button></div>
         <p class="small"><strong>${h(p.name)}</strong>　メイン：${positionFull(p.pos)}${p.subPos?'／サブ：'+positionFull(p.subPos):''}</p>
-        <p class="small">配置済みの位置を選ぶと、2選手の守備位置を交換します。打順は変わりません。</p>
+        <p class="small">メイン・サブの適性がある位置とDHのみ表示。交換相手も適性内で守れる場合に変更できます。打順は変わりません。</p>
         <div class="fielding-choices">${list}</div>
+        ${allowed.length===1?'<p class="small">現在、交換可能な守備位置はありません。選手の入れ替えで編成を調整してください。</p>':''}
       </div></div>`;
   }
   const oldRender03=render;
