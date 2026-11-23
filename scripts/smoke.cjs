@@ -255,7 +255,8 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     }
     const mid=(g.managerMoves||[]).filter(m=>m.type==='pitch'&&m.midInning);
     for(const m of mid){
-      assert(Number.isInteger(m.pitchCount)&&m.pitchCount>=22);
+      assert(Number.isInteger(m.pitchCount)&&m.pitchCount>=12,
+        'Pressure-relief changes can occur before the normal 29-pitch closer limit');
       assert(['球数による継投','走者を背負った場面での継投'].includes(m.reason));
       assert(g.box.pitch.some(p=>p.id===m.inId&&p.bf>0));
     }
