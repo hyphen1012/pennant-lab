@@ -87,7 +87,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.8\.8 · MANAGER AI/);
+  assert.match(app.innerHTML,/VERSION 0\.8\.9 · BENCH REPORT/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -188,6 +188,8 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(resultRenders.some(x=>x.includes('result-verdict')),'The result must use a cinematic result card');
   assert(resultRenders.some(x=>x.includes('result-score-row')),'The final score is in the result card');
   assert(resultRenders.some(x=>x.includes('result-table')),'The detailed result fits the no-scroll scoreboard');
+  assert(resultRenders.some(x=>x.includes('BENCH REPORT · 監督の采配記録')),
+    'Daily result must retain the manager bench report');
   assert(watchRenders.length>1,'One-day action should replay half innings before the final score');
   assert(watchRenders.some(x=>x.includes('試合観戦モード')));
   assert(watchRenders.some(x=>x.includes('イニング別スコア')));
