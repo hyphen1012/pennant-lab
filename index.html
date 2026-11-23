@@ -299,6 +299,43 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .month-history-button strong{color:#f0c765;font-size:14px}.month-history-button span{flex:1}.month-history-button b{color:#efcd79;white-space:nowrap}
 .month-history-year{border:1px solid #334a63;padding:8px 10px;border-radius:9px;margin-top:8px}
 .month-history-year>summary{cursor:pointer;font-weight:800;color:#e6c36e;font-size:13px}
+
+/* Rest-day PENNANT TIMES: an editorial design, not a plain stack of messages. */
+.daily-newspaper{max-width:720px;margin:0 auto 18px;border:1px solid #ac8c50;border-radius:13px;background:repeating-linear-gradient(0deg,transparent,transparent 30px,#ffffff03 31px),linear-gradient(165deg,#203754 0%,#142238 55%,#102033 100%);padding:18px 17px 15px;color:#f4f1e9;box-shadow:0 16px 35px #0004}
+.paper-dateline{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid #ad965e;padding:0 0 9px;color:#b6c8df;font-size:9px;font-weight:800;letter-spacing:1px}
+.paper-masthead{display:flex;align-items:center;gap:12px;padding:19px 0 14px;border-bottom:3px double #baa16b}
+.paper-icon{flex:0 0 52px;height:52px;border:2px solid #cba962;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:27px;color:#e0bf74;background:#e0b9631c}
+.paper-masthead small{display:block;color:#c9af72;font-size:10px;font-weight:850;letter-spacing:2px}
+.paper-masthead h1{font-size:clamp(20px,5.5vw,30px);font-weight:900;line-height:1.25;letter-spacing:.6px;margin:3px 0 0}
+.paper-dateband{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:11px 1px 17px}
+.paper-dateband strong{font-size:clamp(16px,4vw,21px);color:#f6d58a}
+.paper-dateband span{border:1px solid #74a8a5;color:#a5ded0;border-radius:5px;padding:5px 9px;white-space:nowrap;font-weight:800;font-size:11px}
+.paper-stories{display:flex;flex-direction:column;gap:11px}
+.paper-lead{background:linear-gradient(155deg,#2a4360,#182d48);border-top:4px solid #d7af5c;border-bottom:1px solid #58708c;padding:15px 14px 14px}
+.paper-kicker{font-size:10px;letter-spacing:1.2px;color:#f2cc77;font-weight:900;margin-bottom:8px}
+.paper-lead h2{font-size:clamp(19px,5.2vw,27px);font-weight:900;line-height:1.42;margin:0 0 11px;color:#fff}
+.paper-lead p{margin:0;color:#c6d4e7;font-size:12px;line-height:1.6}
+.paper-highlight{margin-top:13px;background:#091a2b9c;border-top:1px solid #60748c;padding:9px 6px;text-align:center;color:#f6d27b;font-size:clamp(12px,3vw,16px);font-weight:900;letter-spacing:.3px}
+.paper-briefs{display:grid;grid-template-columns:1fr;gap:8px}
+.paper-brief{border-left:3px solid #6ca7ac;padding:11px 12px;background:#1d324a}
+.paper-brief:nth-child(2){border-left-color:#d2a857}
+.paper-brief h3{font-size:15px;line-height:1.45;margin:0 0 5px;color:#f3f3f4;font-weight:850}
+.paper-brief p{font-size:11px;color:#bbcbdf;margin:0;line-height:1.55}
+.paper-brief b{display:block;margin-top:7px;font-size:11px;color:#a3d3d0}
+.daily-newspaper.columns .paper-briefs{grid-template-columns:repeat(2,minmax(0,1fr))}
+.daily-newspaper.columns .paper-brief{padding:10px}
+.daily-newspaper.columns .paper-brief h3{font-size:13px}
+.daily-newspaper.accent .paper-lead{border-top:0;border-left:6px solid #d5a756;background:linear-gradient(130deg,#243c4e,#153649)}
+.daily-newspaper.accent .paper-masthead{border-bottom-color:#74a5a0}
+.daily-newspaper.feature .paper-lead h2{font-size:clamp(22px,5.8vw,30px)}
+.paper-next{display:flex;gap:10px;align-items:center;border-top:1px solid #ab8b50;border-bottom:1px solid #4c5d70;margin-top:14px;padding:12px 0;color:#dde6f1;font-size:11px}
+.paper-next strong{color:#dfbc67;font-size:10px;letter-spacing:1px}
+.paper-next span{flex:1;text-align:right}
+.paper-note{font-size:11px;color:#bed2e5;margin:8px 0 0}
+.daily-playback{display:flex;gap:9px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-top:15px;padding-top:11px;border-top:1px solid #52647a;font-size:11px;color:#d9c18b}
+.daily-playback .btn{padding:8px 12px;font-size:12px}
+.daily-game-screen>.daily-playback{margin:15px 3px 30px}
+@media(max-width:390px){.daily-newspaper{padding:13px 12px}.daily-newspaper.columns .paper-briefs{grid-template-columns:1fr}.paper-dateline{font-size:8px;letter-spacing:0}.paper-icon{flex-basis:42px;height:42px;font-size:21px}.paper-brief{padding:9px 10px}}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -1455,7 +1492,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(ui.page==='title'){app.innerHTML=titleScreen();return}
     if(ui.page==='setup'){app.innerHTML=setupScreen();return}
     const screens={hq:frontOfficeScreen,team:teamScreen,roster:rosterScreen,business:businessScreen,records:recordScreen,home:frontOfficeScreen,standings:standingsScreen,stats:statScreen,market:marketScreen,finance:financeScreen};
-    app.innerHTML=`<div class="app-shell">${header()}<main class="main">${game.pendingReview?matchReviewScreen():game.pendingMonth?monthlyReviewScreen():ui.monthHistory?monthlyReviewScreen(true):(ui.playerDetail!=null?playerDetails():(screens[ui.tab]||frontOfficeScreen)())}</main>${game.pendingReview||game.pendingMonth||ui.monthHistory?'':navbar()}</div>${ui.confirm?.type==='switch'?teamSwitchModal():confirmModal()}${game.pendingReview?'':resultModal()}${ui.busy?`<div class="calendar-running"><strong>${getDayText()}</strong><small>${game.day}/143試合</small><button class="btn outline" data-action="pause-calendar">一時停止</button></div>`:''}<input id="import-save-file" type="file" accept=".json,application/json" hidden>`;
+    app.innerHTML=`<div class="app-shell">${header()}<main class="main">${game.pendingReview?matchReviewScreen():game.pendingMonth?monthlyReviewScreen():ui.autoDay?(ui.autoDay.type==='game'?dailyGameScreen(ui.autoDay):dailyNewsScreen(ui.autoDay)):ui.monthHistory?monthlyReviewScreen(true):(ui.playerDetail!=null?playerDetails():(screens[ui.tab]||frontOfficeScreen)())}</main>${game.pendingReview||game.pendingMonth||ui.autoDay||ui.monthHistory?'':navbar()}</div>${ui.confirm?.type==='switch'?teamSwitchModal():confirmModal()}${game.pendingReview?'':resultModal()}${ui.busy&&!ui.autoDay?`<div class="calendar-running"><strong>${getDayText()}</strong><small>${game.day}/143試合</small><button class="btn outline" data-action="pause-calendar">一時停止</button></div>`:''}<input id="import-save-file" type="file" accept=".json,application/json" hidden>`;
   }
   function showToast(message,error=false){
     document.querySelector('.message')?.remove();
@@ -1827,38 +1864,44 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const oldAdvance03=advance;
   advance=async function(days){
     if(storageFailure){showToast('保存に失敗しています。データをバックアップしてください。',true);return;}
-    if(ui.busy||game.pendingReview||game.pendingMonth)return;
+    if(ui.busy||game.pendingReview||game.pendingMonth||ui.monthHistory)return;
     if(game.day>=SEASON_GAMES)return;
-    // A pause or month-end report retains the original target until resumed.
     const resume=days==='resume'&&game.advanceTarget?.year===game.year;
     const requested=Math.max(1,Number(days)||1);
     const goal=resume?game.advanceTarget.goal:Math.min(SEASON_GAMES,game.day+requested);
     if(!resume)game.advanceTarget={year:game.year,goal};
     const mode=game.playbackMode||'normal',delay=mode==='normal'?2000:mode==='fast'?1000:0;
     const startGame=game.day,startId=game.games.length;
-    ui.busy=true;ui.pauseRequested=false;render();save();
-    // Yield before fast iteration so the user can see/cancel the action.
+    ui.busy=true;ui.pauseRequested=false;ui.autoDay=null;render();save();
     await new Promise(resolve=>setTimeout(resolve,35));
+    let lastDay=null;
     while(game.day<goal&&!ui.pauseRequested&&!game.pendingMonth){
-      if(storageFailure)break;
+      if(storageFailure||document.hidden)break;
+      const entry=processCalendarDay();
+      if(!entry)break;
+      lastDay=entry;
       if(delay){
+        // Put a complete match report or a baseball newspaper on screen.
+        // The delay is spent reading this day's page, not watching a date bar.
+        ui.autoDay=entry;
+        save();render();window.scrollTo({top:0,behavior:'instant'});
         await new Promise(resolve=>setTimeout(resolve,delay));
         if(ui.pauseRequested||document.hidden)break;
       }
-      const day=processCalendarDay();
-      if(!day)break;
-      if(delay){save();render();}
-      // Always halt at the month boundary, including in skip mode.
       if(game.pendingMonth)break;
     }
     const paused=ui.pauseRequested||!!document.hidden;
     ui.busy=false;ui.pauseRequested=false;
     const games=game.games.slice(startId).filter(g=>g.year===game.year&&(g.home===game.selectedId||g.away===game.selectedId));
     const last=games[games.length-1];
-    if(last)game.pendingReview={year:game.year,day:last.day,gameId:last.id,
+    // Skip retains its batch report; visible playback has already shown every
+    // day, so never replay an older match after a rest day.
+    const review=mode==='skip'?!!last:lastDay?.type==='game'&&!!last;
+    if(review)game.pendingReview={year:game.year,day:last.day,gameId:last.id,
       count:game.day-startGame,gameIds:games.map(g=>g.id),
       mode:game.day===SEASON_GAMES?'season':game.day-startGame>=30?'30':game.day-startGame>=7?'7':'single'};
     if(game.day>=goal)game.advanceTarget=null;
+    if(!paused||game.pendingReview||game.pendingMonth)ui.autoDay=null;
     save();render();window.scrollTo({top:0,behavior:'instant'});
     if(paused&&!game.pendingReview&&!game.pendingMonth)showToast('日程の進行を一時停止しました');
   };
@@ -1872,9 +1915,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   document.addEventListener('click',e=>{
     const el=e.target.closest('[data-action]');if(!el)return;
     const action=el.dataset.action;
-    if(!['playback-mode','pause-calendar','resume-calendar','finish-month','monthly-history-open','monthly-history-close','fielding-open','fielding-close','fielding-set','swap-open','swap-close','swap-select','batch-expand','ceremony-start','ceremony-next'].includes(action))return;
+    if(!['playback-mode','pause-calendar','auto-day-close','resume-calendar','finish-month','monthly-history-open','monthly-history-close','fielding-open','fielding-close','fielding-set','swap-open','swap-close','swap-select','batch-expand','ceremony-start','ceremony-next'].includes(action))return;
     e.preventDefault();e.stopPropagation();
     if(action==='pause-calendar'){ui.pauseRequested=true;return;}
+    if(action==='auto-day-close'){
+      if(ui.busy||!ui.autoDay)return;
+      ui.autoDay=null;ui.tab='hq';render();window.scrollTo({top:0,behavior:'instant'});return;
+    }
     if(action==='playback-mode'){
       if(ui.busy||game.pendingMonth||game.pendingReview)return;
       if(['normal','fast','skip'].includes(el.dataset.mode)){
@@ -1884,7 +1931,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }
     if(action==='resume-calendar'){
       if(ui.busy||game.pendingMonth||game.pendingReview||!game.advanceTarget)return;
-      void advance('resume');return;
+      ui.autoDay=null;void advance('resume');return;
     }
     if(action==='finish-month'){
       if(ui.busy||!game.pendingMonth)return;
