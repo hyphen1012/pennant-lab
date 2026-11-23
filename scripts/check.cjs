@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.8\.8 · MANAGER AI/);
+assert.match(html,/VERSION 0\.8\.9 · BENCH REPORT/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -468,3 +468,47 @@ const passiveCtx={...defContext,changed:{3:new Set()},defenseUsed:{3:0},
   activeLineups:{3:[slow]},bench:{3:[defender]},managerMoves:[]};
 assert.equal(benchV088.managerDefenseUpgrade(benchTeam,8,2,passiveCtx,apear),undefined);
 console.log('PASS: manager-controlled bullpen, runner, defensive specialist and no re-entry');
+
+
+
+// v0.8.9: Native <details> keeps the first two actual bench moves visible,
+// opens/closes the remainder, and never adds a toggle for 0–2 moves.
+const reportStart=inline[1].indexOf('  function managerMoveLabel(move){');
+const reportEnd=inline[1].indexOf('  function matchReportBody(g){',reportStart);
+assert(reportStart>=0&&reportEnd>reportStart);
+const reportApi=vm.runInNewContext('(function(){'+inline[1].slice(reportStart,reportEnd)+
+  '\nreturn {managerMoveReport,managerMoveLabel};})()',{
+  getPlayer:id=>({id,name:'控え'+id}),
+  getTeam:id=>({id,short:'東京'}),
+  faceMini:p=>'<i class="fake-face">'+p.id+'</i>',
+  h:v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+});
+const reportMove=n=>({type:['pinch','runner','defense','pitch'][n%4],inning:n+6,
+  side:'表',teamId:2,inId:100+n,inName:'選手'+n,outName:'旧選手'+n,role:'2B'});
+for(const count of [0,1,2,3,4,12]){
+  const markup=reportApi.managerMoveReport({managerMoves:Array.from({length:count},(_,n)=>reportMove(n))});
+  assert.match(markup,/BENCH REPORT/);
+  assert.match(markup,new RegExp(count+'件'));
+  const chunks=markup.split('<details class="manager-move-details">');
+  const shown=(chunks[0].match(/class="manager-move-row"/g)||[]).length;
+  assert.equal(shown,Math.min(count,2),'Only first two changes visible initially');
+  if(count>2){
+    assert.equal(chunks.length,2,'Exactly one collapsible region');
+    assert.doesNotMatch(markup,/<details class="manager-move-details" open/);
+    assert.match(chunks[1],/詳細を開く（残り\d+件）/);
+    assert.match(chunks[1],/詳細を閉じる/);
+    assert.equal((chunks[1].match(/class="manager-move-row"/g)||[]).length,count-2);
+    assert.equal((markup.match(/class="manager-move-row"/g)||[]).length,count,
+      'All real bench events remain accessible');
+  }else{
+    assert.equal(chunks.length,1,'No toggle for zero, one or two changes');
+    assert.doesNotMatch(markup,/詳細を開く|詳細を閉じる/);
+  }
+}
+assert.equal(reportApi.managerMoveReport({}), '',
+  'Old saves without managerMoves should not show a fabricated report');
+assert.match(html,/\.manager-move-details\[open\] \.manager-details-open\{display:inline\}/);
+assert.match(html,/\.manager-move-details\[open\] \.manager-details-closed\{display:none\}/);
+assert.match(html,/\.manager-move-details>summary:focus-visible/);
+assert.match(html,/managerMoveReport\(g\)/);
+console.log('PASS: BENCH REPORT defaults to two items and expands/collapses native details for 3+');
