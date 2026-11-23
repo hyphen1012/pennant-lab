@@ -248,6 +248,51 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   let activeSlot=Number(localStorage.getItem('pennant_lab_v02_active')||1);
   if(![1,2,3].includes(activeSlot))activeSlot=1;
   const KEY=()=>SLOT_PREFIX+activeSlot;
+  // Local storage stores small slot summaries only; full saves live in IndexedDB.
+  const DB_NAME='pennant_lab_v04_saves',DB_STORE='slots';
+  let dbPromise=null,saveQueue=Promise.resolve(),storageFailure=false;
+  function openDatabase(){
+    if(!dbPromise)dbPromise=new Promise((resolve,reject)=>{
+      if(!window.indexedDB){reject(new Error('This browser does not support IndexedDB'));return;}
+      const req=window.indexedDB.open(DB_NAME,1);
+      req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(DB_STORE))db.createObjectStore(DB_STORE,{keyPath:'slot'});};
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error||new Error('Cannot open database'));
+      req.onblocked=()=>reject(new Error('Database upgrade is blocked'));
+    }).catch(err=>{dbPromise=null;throw err});
+    return dbPromise;
+  }
+  async function readDatabaseSlot(slot){
+    const db=await openDatabase();
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction(DB_STORE,'readonly'),req=tx.objectStore(DB_STORE).get(Number(slot));
+      req.onsuccess=()=>resolve(req.result?.data??null);
+      req.onerror=()=>reject(req.error||new Error('Failed to read save'));
+      tx.onabort=()=>reject(tx.error||new Error('Read transaction aborted'));
+    });
+  }
+  async function writeDatabaseSlot(slot,data){
+    const db=await openDatabase();
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction(DB_STORE,'readwrite');
+      tx.objectStore(DB_STORE).put({slot:Number(slot),data});
+      tx.oncomplete=()=>resolve();
+      tx.onerror=()=>reject(tx.error||new Error('Failed to save'));
+      tx.onabort=()=>reject(tx.error||new Error('Save transaction aborted'));
+    });
+  }
+  function validateSave(data){
+    return !!(data&&data.v===VERSION&&Array.isArray(data.teams)&&data.teams.length===12
+      &&Array.isArray(data.players)&&Array.isArray(data.schedule)
+      &&data.schedule.length===SEASON_GAMES&&Number.isInteger(data.day)
+      &&data.day>=0&&data.day<=SEASON_GAMES);
+  }
+  function slotPreview(data){
+    return {v:data.v,started:data.started,year:data.year,day:data.day,gmName:data.gmName,
+      selectedId:data.selectedId,teams:data.teams.map(t=>({
+        id:t.id,name:t.name,short:t.short,letter:t.letter,wins:t.wins,cash:t.cash
+      }))};
+  }
   const VERSION = 2;
   const SEASON_GAMES = 143;
   const INTERLEAGUE_GAMES = 18;
@@ -415,20 +460,54 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     save();
   }
   function save(){
-    try{localStorage.setItem(KEY(),JSON.stringify(game));return true;}
-    catch(e){console.warn('Save failed:',e);return false;}
+    if(!game)return false;
+    let data;
+    try{data=JSON.parse(JSON.stringify(game));}
+    catch(e){storageFailure=true;console.warn('Save serialization failed:',e);showToast('セーブデータの作成に失敗しました。バックアップを書き出してください。',true);return false;}
+    const slot=activeSlot;
+    // Serialize writes in slot order. The summary is published only after the
+    // IndexedDB transaction succeeds, so a failed write cannot look saved.
+    saveQueue=saveQueue.catch(()=>{}).then(async()=>{
+      await writeDatabaseSlot(slot,data);
+      localStorage.setItem(SLOT_PREFIX+slot,JSON.stringify(slotPreview(data)));
+      storageFailure=false;
+    }).catch(e=>{
+      storageFailure=true;
+      console.warn('Save failed:',e);
+      showToast('自動保存に失敗しました。進行を止め、JSONバックアップを書き出してください。',true);
+    });
+    return true;
   }
-  function load(){
-    try{
-      const raw=localStorage.getItem(KEY()) || (activeSlot===1?localStorage.getItem(LEGACY_KEY):null);
-      if(raw){const data=JSON.parse(raw);if(data&&data.v===VERSION&&Array.isArray(data.teams)&&data.teams.length===12&&Array.isArray(data.players)&&Array.isArray(data.schedule)&&data.schedule.length===143){game=data;ensureGameExtras();save();return;}}
-    }catch(e){console.warn('Corrupt save:',e)}
+  async function load(){
+    const data=await readDatabaseSlot(activeSlot);
+    if(data){
+      if(!validateSave(data))throw new Error('Incompatible saved data in slot '+activeSlot);
+      game=data;ensureGameExtras();return;
+    }
     buildFresh();ensureGameExtras();
   }
-  function openSlot(i,create){
-    activeSlot=Number(i);localStorage.setItem('pennant_lab_v02_active',String(activeSlot));
-    if(create){buildFresh();ensureGameExtras();ui.selectedTeam=2;ui.setupLeague='E';ui.page='setup';}
-    else{const raw=localStorage.getItem(KEY());if(!raw)return;try{const d=JSON.parse(raw);if(!Array.isArray(d.teams)||d.teams.length!==12)throw Error('Invalid save');game=d;ensureGameExtras();ui.page=game.started?'game':'setup';}catch(e){showToast('セーブを読み込めません',true);return;}}
+  async function openSlot(i,create){
+    if(storageFailure){showToast('保存エラーのためスロット変更を停止中です。先にバックアップしてください。',true);return;}
+    await saveQueue.catch(()=>{});
+    const slot=Number(i);if(![1,2,3].includes(slot))return;
+    let data;
+    try{data=await readDatabaseSlot(slot);}
+    catch(e){console.warn('Save read failed:',e);showToast('セーブデータを開けません',true);return;}
+    // If the preview was cleared but IndexedDB still has the save, protect it.
+    if(data){
+      if(!validateSave(data)){showToast('保存形式が一致しません。データを上書きしません。',true);return;}
+      game=data;ensureGameExtras();
+    }else if(create){
+      activeSlot=slot;
+      localStorage.setItem('pennant_lab_v02_active',String(slot));
+      buildFresh();ensureGameExtras();
+      ui.selectedTeam=2;ui.setupLeague='E';ui.page='setup';
+      ui.playerDetail=null;ui.tab='hq';render();window.scrollTo(0,0);return;
+    }else{showToast('このスロットにデータがありません',true);return;}
+    activeSlot=slot;
+    localStorage.setItem('pennant_lab_v02_active',String(slot));
+    ui.page=game.started?'game':'setup';
+    ui.selectedTeam=game.selectedId??2;
     ui.playerDetail=null;ui.tab='hq';render();window.scrollTo(0,0);
   }
   function pushNews(message){game.news.unshift(message);game.news=game.news.slice(0,65);(game.newsArchive||(game.newsArchive=[])).push({year:game.year,day:game.day,text:message});}
@@ -722,7 +801,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     return `<div class="title-screen"><div class="title-hero"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.4.0 · FOUNDATION</span></div><div class="title-slot-title">セーブデータを選択</div><div class="title-slots">${[1,2,3].map(i=>{
       const d=slotData(i),t=d?.teams?.find(t=>t.id===d.selectedId);
       return `<button class="save-slot ${d?.started?'has-game':'empty-slot'}" data-action="${d?.started?'continue-slot':'new-slot'}" data-slot="${i}"><span class="slot-emblem">${d?.started?h(t.letter):'＋'}</span><span class="slot-label">${d?.started?`<strong>${h(t.name)}</strong><small>${d.year}年 · ${d.day}/143試合 · ${h(d.gmName||'GM')}</small><small>${d.teams.find(t=>t.id===d.selectedId)?.wins||0}勝　${r2(t.cash).toFixed(2)}億円</small>`:`<strong>新しい球団で始める</strong><small>空きデータ ${i}</small>`}</span><span class="slot-index">DATA ${i} ›</span></button>`;
-    }).join('')}</div><div class="title-info">全データはこのブラウザ内に保存。バックアップは「経営」から書き出せます。<br>v0.3以前のテストセーブは引き継がれません。</div></div>`;
+    }).join('')}</div><div class="title-info">本体データは端末内データベースに保存されます。バックアップは「経営」からJSON形式で書き出せます。<br>v0.3以前のテストセーブは引き継がれません。</div></div>`;
   }
   function setupScreen(){
     const t=getTeam(ui.selectedTeam??2);
@@ -1066,7 +1145,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       reader.onload=()=>{
         try{
           const d=JSON.parse(reader.result);
-          if(d?.v!==VERSION||!Array.isArray(d.teams)||d.teams.length!==12||!Array.isArray(d.players)||!Array.isArray(d.schedule)||d.schedule.length!==143||!(d.day>=0&&d.day<=143))throw new Error('invalid save');
+          if(!validateSave(d))throw new Error('invalid save');
           pendingImport=d;
           ui.confirm={type:'import',title:'バックアップを読み込みますか？',body:`${d.year}年・第${d.day}戦の状態に復元します。現在のセーブデータは上書きされます。`,danger:true};render();
         }catch(e){pendingImport=null;showToast('読み込めないセーブファイルです',true)}
@@ -1331,7 +1410,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(e.target.dataset.change==='training-focus'){const p=getPlayer(e.target.dataset.id);if(p&&p.teamId===game.selectedId){p.trainFocus=e.target.value;save();showToast('育成方針を保存しました');}}
   },true);
 
-  load();ensureGameExtras();ui.page='title';render();
+  const appRoot=document.querySelector('#app');
+  if(appRoot)appRoot.innerHTML='<div class="title-screen"><h2>セーブデータを読み込んでいます…</h2></div>';
+  (async()=>{
+    try{await load();ensureGameExtras();ui.page='title';render();}
+    catch(e){
+      console.warn('Unable to initialize saved data:',e);
+      if(appRoot)appRoot.innerHTML='<div class="title-screen"><h2>セーブを読み込めません</h2><p>ブラウザの保存領域にアクセスできないか、データ形式が一致しません。データは自動削除されていません。</p></div>';
+    }
+  })();
   // Small read-only inspection surface for automated tests in development.
   window.PennantLab={getSnapshot:()=>({year:game.year,day:game.day,selectedId:game.selectedId,teams:game.teams.map(t=>({id:t.id,name:t.name,league:t.league,w:t.wins,l:t.losses,t:t.ties,cash:t.cash,lineup:[...t.lineup],rotation:[...t.rotation]})),playerCount:game.players.length,games:game.games.length,history:[...game.history],schedule:game.schedule.map(day=>day.map(m=>({...m})))}),advance,reset:()=>{localStorage.removeItem(KEY());buildFresh();ui.page='title';render()}};
 })();
