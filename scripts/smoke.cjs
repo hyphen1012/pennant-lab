@@ -279,7 +279,8 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     const byTeam=new Map();
     for(const move of g.managerMoves||[]){
       assert(move.inId!==move.outId,'A substitution must change the real player');
-      assert(move.inning>=5&&move.inning<=12,'Manager moves are late-game decisions');
+      assert(move.inning>=(move.type==='pitch'?1:7)&&move.inning<=12,
+        'Bullpen can relieve an overworked starter early; fielding and batting changes stay late-game');
       assert(typeof move.managerName==='string'&&move.managerName.length>0);
       assert(['pinch','pitch','runner','defense',undefined].includes(move.type));
       const p=store.get(1).data.players.find(p=>p.id===move.inId);
