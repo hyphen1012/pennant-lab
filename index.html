@@ -2508,6 +2508,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     </details>`).join('')||'<p class="small">月末の到来後に記録が表示されます。</p>'}
     </section><section class="panel"><h3 class="panel-title">実装済みの経営ルール</h3><div class="event">契約金：選手年俸の1.25倍（最低${fmtMoney(0.08)}）</div><div class="event">年俸：次シーズンに進むとき一括精算</div><div class="event">入場料・スポンサー収入：シーズン成績に基づく概算額</div><div class="event">選手の放出：年俸負担を減らせるが、返金はなし</div><div class="event">ドラフト・トレード・複数年契約：今後の拡張対象</div></section><section class="panel"><div class="panel-head"><h3 class="panel-title">ゲームデータ</h3></div><p class="small">この端末のブラウザに自動保存されています。別端末には自動同期されません。</p><div class="actions"><button class="btn soft" data-action="export-save">セーブデータを書き出す</button><button class="btn outline" data-action="import-save">バックアップを読み込む</button></div><input id="import-save-file" type="file" accept=".json,application/json" style="display:none"><div style="margin-top:14px"><button class="btn danger" data-action="ask-reset">最初からやり直す</button></div></section>`;
   }
+
+  // Only actual substitutions stored with the game are displayed.
+  function managerMoveReport(g){
+    if(!Array.isArray(g.managerMoves))return '';
+    const moves=g.managerMoves;
+    return `<section class="panel manager-match-report">
+      <div class="panel-head"><h3 class="panel-title">BENCH REPORT · 監督の代打采配</h3>
+        <span class="pill">${moves.length}件</span></div>
+      ${moves.length?moves.map(move=>{
+        const p=getPlayer(move.inId),t=getTeam(move.teamId);
+        return `<div class="manager-move-row">
+          ${p?faceMini(p):'<span class="manager-move-fallback">⚾</span>'}
+          <div><strong>${move.inning}回${h(move.side)} · ${h(t?.short||'球団')} · 代打 ${h(move.inName)}</strong>
+          <small>${h(move.outName)}に代わって出場 · ${h(move.role||'選手')}</small></div>
+        </div>`;
+      }).join(''):'<p class="small">この試合では代打起用はありませんでした。</p>'}
+      <p class="tiny">代打は監督AIが試合中に判断し、GMの事前方針と守備適性を踏まえています。</p>
+    </section>`;
+  }
   function matchReportBody(g){
     const home=getTeam(g.home),away=getTeam(g.away),n=Math.max(g.inningsH.length,g.inningsA.length);
     const boxRows=(from,to,totalColumn)=>[[away,g.inningsA,g.awayScore],[home,g.inningsH,g.homeScore]].map(([t,a,total])=>
@@ -2522,7 +2541,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const cards=[ownId,ownId===home.id?away.id:home.id].filter(id=>id===home.id||id===away.id);
       box=cards.map((tid,index)=>`<${index?'details':'section'} class="panel"><${index?'summary':'h3'} class="panel-title">${h(getTeam(tid).name)} · 今日の個人成績 ${index?'（タップして表示）':''}</${index?'summary':'h3'}><div class="section-label review-section-heading hitter-heading" style="margin-top:9px">野手</div><div class="table-wrap"><table class="data-table review-stat-table hitter-stats"><thead><tr><th>選手</th><th>打数</th><th>安打</th><th>本</th><th>打点</th><th>四球</th></tr></thead><tbody>${hitterRows(tid)||'<tr><td colspan="6">出場なし</td></tr>'}</tbody></table></div><div class="section-label review-section-heading pitcher-heading">投手</div><div class="table-wrap"><table class="data-table review-stat-table pitcher-stats"><thead><tr><th>選手</th><th>投球回</th><th>被安打</th><th>自責</th><th>奪三振</th><th>四球</th></tr></thead><tbody>${pitcherRows(tid)||'<tr><td colspan="6">出場なし</td></tr>'}</tbody></table></div></${index?'details':'section'}>`).join('');
     }else box='<p class="small">旧バージョンの試合には個別の試合成績が保存されていません。</p>';
-    return `<section class="panel"><div class="panel-head"><h3 class="panel-title">イニング別スコア</h3><span class="pill">${n}回</span></div><div class="table-wrap result-table-wrap">${scores}</div><div class="divider"></div><h3 class="panel-title">主な出来事</h3>${g.events.length?g.events.map(e=>`<div class="event">${h(e)}</div>`).join(''):'<div class="event">本塁打などの特記事項はありません。</div>'}<div class="small" style="margin-top:12px">先発：${h(getPlayer(g.spAway)?.name||'選手')} / ${h(getPlayer(g.spHome)?.name||'選手')}</div></section>${box}`;
+    return `<section class="panel"><div class="panel-head"><h3 class="panel-title">イニング別スコア</h3><span class="pill">${n}回</span></div><div class="table-wrap result-table-wrap">${scores}</div><div class="divider"></div><h3 class="panel-title">主な出来事</h3>${g.events.length?g.events.map(e=>`<div class="event">${h(e)}</div>`).join(''):'<div class="event">本塁打などの特記事項はありません。</div>'}<div class="small" style="margin-top:12px">先発：${h(getPlayer(g.spAway)?.name||'選手')} / ${h(getPlayer(g.spHome)?.name||'選手')}</div></section>${managerMoveReport(g)}${box}`;
   }
   function matchReviewScreen(){
     const r=game.pendingReview,g=game.games.find(v=>v.id===r?.gameId&&v.year===r.year);
