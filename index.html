@@ -633,7 +633,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function effectiveFielding(player,role){
     if(!player||role==='DH')return 0;
-    return Math.round((player.defense*.85+player.arm*.15)*fieldingFactor(player,role));
+    return Math.round((effectiveSkill(player,'defense')*.85+effectiveSkill(player,'arm')*.15)*fieldingFactor(player,role));
   }
   function fieldingLabel(player,role){
     const tier=fieldingTier(player,role);
@@ -977,7 +977,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const entry=calendarNextDay();
     if(!entry)return null;
     // Recovery is applied on every calendar day, including rest days.
-    restoreDailyCondition();
+    restoreDailyCondition(entry.type);
     if(entry.type==='game'){
       if(entry.gameNo!==game.day+1)throw Error('Calendar game count out of sync');
       processDay();
@@ -1063,13 +1063,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function pushNews(message,date=calendarNextDay()?.date||null){game.news.unshift(message);game.news=game.news.slice(0,65);(game.newsArchive||(game.newsArchive=[])).push({year:game.year,day:game.day,date,text:message});}
   function lineUpOf(t){repairTeam(t);return t.lineup.map(id=>getPlayer(id)).filter(Boolean);}
   function choosePitcher(t,inning,starter,lead){
-    const pen=pitchers(t).filter(p=>p.pos==='RP').sort((a,b)=>rating(b)-rating(a));
+    const pen=pitchers(t).filter(p=>p.pos==='RP').sort((a,b)=>
+      rating(b)*fatigueFactor(b)-rating(a)*fatigueFactor(a)||b.energy-a.energy);
     const closer=pitchers(t).find(p=>p.pos==='CP');
     if(inning<=5||!pen.length)return starter;
     if(inning===6)return pen[2]||pen[0];
     if(inning===7)return pen[1]||pen[0];
     if(inning===8)return pen[0];
-    if(lead>=1&&lead<=3&&closer)return closer;
+    if(lead>=1&&lead<=3&&closer&&closer.energy>=35)return closer;
     return pen[(inning-9)%pen.length]||starter;
   }
   function halfInning(batTeam,fieldTeam,pitcher,batters,indexes,inning,targetScore,appear,events){
@@ -1085,11 +1086,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const st=batter.stats;
       if(!appear.bat.has(batter.id)){st.g++;appear.bat.add(batter.id)}
       st.pa++;
-      const pWalk=clamp(.078+(batter.contact-55)*.00035-(pitcher.control-55)*.0008,.035,.15);
-      const pStrike=clamp(.213-(batter.contact-55)*.0010+(pitcher.stuff-55)*.0014,.085,.34);
+      const contact=effectiveSkill(batter,'contact'),power=effectiveSkill(batter,'power');
+      const stuff=effectiveSkill(pitcher,'stuff'),control=effectiveSkill(pitcher,'control');
+      const pWalk=clamp(.078+(contact-55)*.00035-(control-55)*.0008,.035,.15);
+      const pStrike=clamp(.213-(contact-55)*.0010+(stuff-55)*.0014,.085,.34);
       // Defense is part of batted-ball outcomes, not the batter's base skill.
       // Excellent defenders suppress hits; unsuitable positions reduce efficiency.
-      const pHit=clamp(.245+(batter.contact-55)*.00175-(pitcher.stuff-55)*.0010
+      const pHit=clamp(.245+(contact-55)*.00175-(stuff-55)*.0010
         +(60-defense)*.00135,.115,.42);
       let r=rand(),rbi=0;
       if(r<pWalk){
@@ -1107,7 +1110,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       }else if(r<pWalk+pStrike+pHit){
         st.ab++;st.h++;pstat.h++;
         const old=bases.slice();bases=[null,null,null];
-        const hrChance=clamp(.055+(batter.power-50)*.0020-(pitcher.stuff-55)*.0004,.01,.21);
+        const hrChance=clamp(.055+(power-50)*.0020-(stuff-55)*.0004,.01,.21);
         const extr=rand();
         if(extr<hrChance){
           st.hr++;
@@ -1126,11 +1129,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         }else{
           if(old[2]){scoreRunner(old[2]);rbi++}
           if(old[1]){
-            if(rand()<clamp(.38+old[1].speed*.004, .4,.83)){scoreRunner(old[1]);rbi++}
+            if(rand()<clamp(.38+effectiveSkill(old[1],'speed')*.004, .4,.83)){scoreRunner(old[1]);rbi++}
             else bases[2]=old[1];
           }
           if(old[0]){
-            if(!bases[2]&&rand()<.16+old[0].speed*.0024)bases[2]=old[0];
+            if(!bases[2]&&rand()<.16+effectiveSkill(old[0],'speed')*.0024)bases[2]=old[0];
             else bases[1]=old[0];
           }
           bases[0]=batter;
@@ -1144,7 +1147,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         }
       }
       st.rbi+=rbi;
-      if(bases[0]&&!bases[1]&&bases[0].speed>=63&&rand()<(bases[0].speed-57)*.00125){
+      if(bases[0]&&!bases[1]&&effectiveSkill(bases[0],'speed')>=63&&rand()<(effectiveSkill(bases[0],'speed')-57)*.00125){
         bases[1]=bases[0];bases[0]=null;bases[1].stats.sb++;
       }
       if(targetScore!=null && run+targetScore.current > targetScore.away){walkOff=true;break}
@@ -1316,6 +1319,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(!Number.isInteger(p.lastAppearanceDay))p.lastAppearanceDay=null;
     return p;
   }
+  // No rubber banding: only the player's own physical condition affects skill.
+  // Excellent condition loses nothing; exhausted players perform noticeably worse.
+  function fatigueFactor(p){
+    initCondition(p);
+    return 1-Math.max(0,85-p.energy)*.0035;
+  }
+  const effectiveSkill=(p,key)=>p[key]*fatigueFactor(p);
   const conditionColor=p=>p.energy>=75?'#60c99e':p.energy>=45?'#eac675':'#e88b8e';
   const conditionLabel=p=>p.energy>=85?'良好':p.energy>=60?'やや疲労':p.energy>=35?'疲労':'要休養';
   function conditionBar(p){
@@ -1325,12 +1335,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <strong style="color:${conditionColor(p)}">${p.energy}%</strong><span class="condition-note">${conditionLabel(p)}</span>
     </div>`;
   }
-  function restoreDailyCondition(){
+  function restoreDailyCondition(dayType){
     for(const p of game.players){
       if(p.teamId==null||p.teamId<0)continue;
       initCondition(p);
       // Starting-pitcher recovery spans 4–6 days; hitters recover every day.
-      const gain=isPitch(p)?Math.ceil(82/p.recoveryDays):8+((p.id*11)%4);
+      const gain=isPitch(p)?Math.ceil(82/p.recoveryDays):
+        dayType==='game'?5+((p.id*11)%3):23+((p.id*13)%6);
       p.energy=clamp(p.energy+gain,0,100);
     }
   }
