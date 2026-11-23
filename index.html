@@ -277,6 +277,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .fielding-choice-heading strong{font-size:13px}
 .fielding-choice-heading em{font-style:normal;color:#dbbb68;font-size:10px}
 .fielding-choice small{font-size:10px;color:#b9c9da;line-height:1.45;overflow-wrap:anywhere}
+
+.calendar-current-date{color:#e9c768;font-size:12.5px;font-weight:800;margin:8px 0}
+.calendar-months{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+.calendar-month{border:1px solid #3b5068;border-radius:10px;padding:9px 11px;background:#16293f}
+.calendar-month>summary{cursor:pointer;color:#f4d380;font-weight:850;font-size:14px}
+.calendar-day{display:grid;grid-template-columns:99px minmax(0,1fr) auto;gap:6px;align-items:center;border-bottom:1px solid #30425b;padding:6px 1px;font-size:11px;color:#a3b7d0}
+.calendar-day:last-child{border:0}.calendar-day.game{color:#e8f0fc}.calendar-day.midseason{color:#e1be5c}
+.month-review{display:flex;flex-direction:column;gap:15px}.month-review h2{margin:0;color:#e9bf57;font-size:23px}
+.monthly-skill-row{display:grid;grid-template-columns:minmax(0,1fr) .7fr .95fr .3fr;gap:5px;padding:9px 1px;border-bottom:1px solid #3c4b62;font-size:11px}
+.monthly-skill-row .up{color:#60dbbc}.monthly-skill-row .down{color:#ff9b9b}
+.calendar-running{position:fixed;z-index:100;left:50%;transform:translateX(-50%);bottom:calc(80px + env(safe-area-inset-bottom));width:min(94vw,540px);border:1px solid #b99a50;background:#132840;color:#f8f3e9;padding:14px;border-radius:14px;box-shadow:0 8px 35px #0009;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -981,7 +992,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }else if(hitters(t).length<=12)return showToast('野手の必要人数を下回るため放出できません',true);
     p.teamId=null;repairTeam(t);pushNews(`${t.short}が${p.name}を自由契約にしました。`);save();render();showToast(`${p.name}を自由契約にしました`);
   }
-  function getDayText(){return game.day>=143?'全143試合終了':`${game.day+1} / 143 試合目`}
+  function getDayText(){const d=calendarNextDay();return game.day>=143?'全143試合終了':d?formatCalendarDate(d.date)+' · '+(d.type==='game'?'第'+d.gameNo+'戦':'休養日'):'全日程終了';}
   function gameByTeam(tid){return game.games.filter(g=>g.home===tid||g.away===tid).slice(-1)[0]}
   function teamBadge(team,size='mini-logo'){
     return `<span class="${size}" style="background:${team.color}">${h(team.letter)}</span>`;
@@ -1077,7 +1088,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function gameHeader(){
     const t=myTeam(),rank=rankings(t.league).findIndex(x=>x.id===t.id)+1;
-    return `<header class="top"><div class="top-in"><div class="top-high">${appLogo()}<div class="head-metrics"><div><small>選手</small><strong>${own(t).length}<i>/30</i></strong></div><div><small>ファン</small><strong>${(game.fans/10000).toFixed(1)}万人</strong></div><div><small>評価</small><strong>${game.ownerRating}</strong></div></div></div><div class="top-low"><button data-action="title" class="head-link">⌂ データ選択</button><strong>${game.year}年 · ${game.pendingReview?`第${game.pendingReview.day}戦 結果確認`:game.day>=143?'シーズン終了':`第${game.day+1}戦`}</strong><span class="gold-text">${fmtMoney(t.cash)}</span></div></div></header>`;
+    return `<header class="top"><div class="top-in"><div class="top-high">${appLogo()}<div class="head-metrics"><div><small>選手</small><strong>${own(t).length}<i>/30</i></strong></div><div><small>ファン</small><strong>${(game.fans/10000).toFixed(1)}万人</strong></div><div><small>評価</small><strong>${game.ownerRating}</strong></div></div></div><div class="top-low"><button data-action="title" class="head-link">⌂ データ選択</button><strong>${game.pendingReview?`第${game.pendingReview.day}戦 · 結果`:game.pendingMonth?'月次報告':game.day>=143?'全日程終了':formatCalendarDate(calendarNextDay()?.date)}</strong><span class="gold-text">${fmtMoney(t.cash)}</span></div></div></header>`;
   }
   function statBadge(v,label){return `<div class="ability-cell"><small>${label}</small><strong style="color:${rankColor(v)}">${grade(v)}</strong><em>${v}</em></div>`}
   function playerCard(p,actions=false){
@@ -1100,26 +1111,45 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function frontOfficeScreen(){
     const t=myTeam(),last=gameByTeam(t.id),next=game.day<143?game.schedule[game.day].find(m=>m.home===t.id||m.away===t.id):null;
     const opp=next?getTeam(next.home===t.id?next.away:next.home):null;
-    return `<section class="hero-stadium"><div class="eyebrow">HOME BALLPARK · ${game.year}</div><div class="hero-team">${teamBadge(t,'logo')}<div><h2>${h(t.name)}</h2><small>GM ${h(game.gmName||'GM')}</small></div></div><div class="hero-row"><span>東西ペナント</span><b>${game.day}/143 試合</b></div><div class="hero-record"><strong>${t.wins} <small>勝</small></strong><strong>${t.losses} <small>敗</small></strong><strong>${t.ties} <small>分</small></strong></div><div class="hero-progress"><span style="width:${game.day/143*100}%"></span></div><div class="hero-foot"><span>球団資金 <strong>${fmtMoney(t.cash)}</strong></span><span>次の相手 <strong>${opp?h(opp.short):'シーズン終了'}</strong></span></div></section>
+    return `<section class="hero-stadium"><div class="eyebrow">HOME BALLPARK · ${game.year}</div><div class="hero-team">${teamBadge(t,'logo')}<div><h2>${h(t.name)}</h2><small>GM ${h(game.gmName||'GM')}</small></div></div><div class="hero-row"><span>東西ペナント</span><b>${game.day}/143 試合</b></div><div class="hero-record"><strong>${t.wins} <small>勝</small></strong><strong>${t.losses} <small>敗</small></strong><strong>${t.ties} <small>分</small></strong></div><div class="hero-progress"><span style="width:${game.day/143*100}%"></span></div><div class="calendar-current-date">🗓 ${getDayText()}</div><div class="hero-foot"><span>球団資金 <strong>${fmtMoney(t.cash)}</strong></span><span>次の相手 <strong>${opp?h(opp.short):'シーズン終了'}</strong></span></div></section>
     <section class="panel desk-panel"><div class="desk-heading"><div><div class="eyebrow">GM DESK</div><h3>業務一覧</h3><small>判断と決断が球団の未来を変える</small></div><button class="btn primary" data-action="advance" data-days="1" ${game.day>=143?'disabled':''}>▶ 1試合進める</button></div><button class="desk-task" data-action="tab" data-tab="roster" data-roster="lineup"><span>⚾</span><span><b>スタメン・先発の確認</b><small>打順とローテーションを組む</small></span><em> › </em></button><button class="desk-task" data-action="tab" data-tab="market"><span>✦</span><span><b>自由契約選手の獲得</b><small>${freeAgents().length}名が所属先を探しています</small></span><em> › </em></button><button class="desk-task" data-action="tab" data-tab="business"><span>¥</span><span><b>予算・年俸をチェック</b><small>今季の支払予定を確認する</small></span><em> › </em></button></section>
     <section class="panel"><div class="panel-head"><h3 class="panel-title">日程を進める</h3><span class="pill">${getDayText()}</span></div>${progressButtons()}</section><section class="panel"><div class="panel-head"><h3 class="panel-title">直近の試合結果</h3></div>${lastGamePanel()}</section><section class="panel"><div class="panel-head"><h3 class="panel-title">リーグ順位</h3><button class="btn sm outline" data-action="tab" data-tab="records">順位表を見る</button></div>${standingTable(t.league,true)}</section><section class="panel"><h3 class="panel-title">クラブニュース</h3>${game.news.slice(0,6).map(n=>`<div class="event">${h(n)}</div>`).join('')}</section>`;
   }
   function businessScreen(){return `<div class="screen-top"><div class="eyebrow">BUSINESS & FINANCE</div><h2>球団経営</h2></div><div class="subtabs">${[['finance','収支・予算'],['market','補強市場']].map(([key,label])=>`<button class="subtab ${ui.businessSub===key?'active':''}" data-action="business-sub" data-sub="${key}">${label}</button>`).join('')}</div>${ui.businessSub==='market'?marketScreen():financeScreen()}`}
+  function monthlyReviewScreen(){
+    const r=game.monthlyArchive?.find(v=>v.year===game.pendingMonth?.year&&v.id===game.pendingMonth?.id);
+    if(!r)return `<section class="panel"><h3>月次報告</h3><button class="btn primary full" data-action="finish-month">確認</button></section>`;
+    return `<div class="month-review"><div class="eyebrow">MONTHLY REPORT</div><h2>${r.year}年${Number(r.month.slice(-2))}月の月次報告</h2>
+      <p class="small">${formatCalendarDate(r.date)}締め</p>
+      <div class="grid3"><div class="metric"><div class="lab">勝利</div><div class="val">${r.wins}</div></div><div class="metric"><div class="lab">敗戦</div><div class="val">${r.losses}</div></div><div class="metric"><div class="lab">引分</div><div class="val">${r.ties}</div></div></div>
+      <section class="panel"><h3 class="panel-title">月次収支（暫定見込み）</h3>
+        <p class="small">収入見込み ${fmtMoney(r.estimatedRevenue)} ／ 年俸負担見込み ${fmtMoney(r.estimatedPayroll)}</p>
+        <p class="small">※現在は入出金しません。融資・支払不能の判定は未実装で、精算は従来どおり年末です。</p></section>
+      <section class="panel"><h3 class="panel-title">選手能力の月間変動</h3>
+        ${r.changes?.length?r.changes.map(x=>`<div class="monthly-skill-row"><b>${h(x.name)}</b><span>${h(x.label)}</span><span>${x.from} → ${x.to}</span><strong class="${x.delta>0?'up':'down'}">${x.delta>0?'+':''}${x.delta}</strong></div>`).join(''):'<p class="small">今月は能力値の変動がありませんでした。</p>'}</section>
+      <button class="btn primary full" data-action="finish-month">月次報告を確認する ›</button></div>`;
+  }
   function calendarScreen(){
     const cal=game.calendar||calendarForSeason(game.year);
     const midName={allstar:'オールスター',world:'世界シリーズ',international:'国際代表大会'}[cal.midseason];
-    const current=game.day>=SEASON_GAMES?'レギュラーシーズン終了':(game.schedule[game.day]?.[0]?.kind==='interleague'?'交流戦':'リーグ戦');
+    const groups=new Map();
+    for(const d of cal.days){const m=monthKey(d.date);if(!groups.has(m))groups.set(m,[]);groups.get(m).push(d)}
+    const next=calendarNextDay(),myId=game.selectedId;
     return `<section class="panel"><h3 class="panel-title">${game.year}年 年間日程</h3>
-      <p class="small">全${SEASON_GAMES}試合（同一リーグ125試合＋交流戦18試合）・東西ともDH制</p>
-      <div class="year-record"><b>${game.day} / ${SEASON_GAMES}試合</b></div>
-      <p class="small">現在：${current}</p>
-      <div class="progress-track" style="height:9px;background:#233851;border-radius:8px;overflow:hidden"><div style="height:100%;width:${Math.round(game.day/SEASON_GAMES*100)}%;background:#42bcae"></div></div>
-      <div class="event"><strong>第1〜55試合</strong>　リーグ戦</div>
-      <div class="event"><strong>第56〜73試合</strong>　交流戦（6球団×3試合）</div>
-      <div class="event"><strong>シーズン中盤</strong>　${midName}（大会の試合エンジンは次段階で実装）</div>
-      <div class="event"><strong>第74〜143試合</strong>　リーグ戦</div>
-      <div class="event"><strong>レギュラーシーズン後</strong>　日本シリーズ（毎年）</div>
-      </section>`;
+      <p class="small">${formatCalendarDate(cal.startDate)}〜${formatCalendarDate(cal.endDate)} ／ 143試合（リーグ125＋交流18）</p>
+      <div class="year-record"><b>${game.day}/143試合</b></div>
+      <p class="small">次の日：${next?formatCalendarDate(next.date):'全日程終了'}</p>
+      <p class="small">交流戦：第56〜73戦 ／ 中盤：${midName}の休止期間 ※大会試合は未実装</p>
+      <div class="calendar-months">
+      ${[...groups.entries()].map(([key,days])=>`<details class="calendar-month" ${key===(next?monthKey(next.date):monthKey(cal.endDate))?'open':''}>
+        <summary>${Number(key.slice(-2))}月　${days.filter(d=>d.type==='game').length}試合${game.monthlyArchive?.some(x=>x.year===game.year&&x.id===key)?' ✓月次報告':''}</summary>
+        ${days.map(d=>{
+          const match=d.type==='game'?game.schedule[d.gameNo-1]?.find(m=>m.home===myId||m.away===myId):null;
+          const opp=match?getTeam(match.home===myId?match.away:match.home):null;
+          const result=d.type==='game'&&d.gameNo<=game.day?game.games.find(g=>g.day===d.gameNo&&(g.home===myId||g.away===myId)):null;
+          return `<div class="calendar-day ${d.type}"><span>${formatCalendarDate(d.date)}</span><span>${d.type==='game'?'第'+d.gameNo+'戦　'+(opp?h(opp.short):''):d.type==='midseason'?midName+'休止':d.reason}</span><strong>${result?result.homeScore+'-'+result.awayScore:''}</strong></div>`;
+        }).join('')}
+      </details>`).join('')}</div></section>`;
   }
   function archiveScreen(){
     const items=(game.seasonArchive||[]).slice().sort((a,b)=>b.year-a.year);
@@ -1283,7 +1313,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const me=myTeam(),myRuns=me.id===g.home?g.homeScore:g.awayScore,oppRuns=me.id===g.home?g.awayScore:g.homeScore;
     const opp=getTeam(me.id===g.home?g.away:g.home);
     const outcome=myRuns>oppRuns?'勝利':myRuns<oppRuns?'敗戦':'引き分け';
-    return `<div class="review-screen"><div class="review-kicker">${h(game.year)} SEASON · MATCH REPORT</div><div class="review-score"><h2>第${g.day}戦 · 試合結果</h2><span class="match-outcome">${outcome}</span><div class="score-pair"><div>${teamBadge(me)}<small>${h(me.short)}</small><b>${myRuns}</b></div><span class="mid-score">–</span><div>${teamBadge(opp)}<small>${h(opp.short)}</small><b>${oppRuns}</b></div></div><div class="review-games-count">${r.count>1?`${r.count}試合まとめて進行 · 最後の試合を表示中`:'この試合の結果を確認してから、次の日に進みます'}</div></div>${matchReportBody(g)}<button class="btn primary review-game-btn" data-action="finish-review">${game.day>=143?'結果を確認してシーズン終了へ':'結果を確認して次の日へ　›'}</button><p class="review-help">結果確認中は日付を切り替えません。下のボタンで進んでください。</p></div>`;
+    return `<div class="review-screen"><div class="review-kicker">${h(game.year)} SEASON · MATCH REPORT</div><div class="review-score"><h2>第${g.day}戦 · 試合結果</h2><span class="match-outcome">${outcome}</span><div class="score-pair"><div>${teamBadge(me)}<small>${h(me.short)}</small><b>${myRuns}</b></div><span class="mid-score">–</span><div>${teamBadge(opp)}<small>${h(opp.short)}</small><b>${oppRuns}</b></div></div><div class="review-games-count">${r.count>1?`${r.count}試合まとめて進行 · 最後の試合を表示中`:'この試合の結果を確認してから、次の日に進みます'}${g.date?' · '+formatCalendarDate(g.date):''}</div></div>${matchReportBody(g)}<button class="btn primary review-game-btn" data-action="finish-review">${game.day>=143?'結果を確認してシーズン終了へ':'結果を確認して次の日へ　›'}</button><p class="review-help">結果確認中は日付を切り替えません。下のボタンで進んでください。</p></div>`;
   }
   function resultModal(){
     if(ui.detail==null)return '';
@@ -1303,7 +1333,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(ui.page==='title'){app.innerHTML=titleScreen();return}
     if(ui.page==='setup'){app.innerHTML=setupScreen();return}
     const screens={hq:frontOfficeScreen,team:teamScreen,roster:rosterScreen,business:businessScreen,records:recordScreen,home:frontOfficeScreen,standings:standingsScreen,stats:statScreen,market:marketScreen,finance:financeScreen};
-    app.innerHTML=`<div class="app-shell">${header()}<main class="main">${game.pendingReview?matchReviewScreen():(ui.playerDetail!=null?playerDetails():(screens[ui.tab]||frontOfficeScreen)())}</main>${game.pendingReview?'':navbar()}</div>${ui.confirm?.type==='switch'?teamSwitchModal():confirmModal()}${game.pendingReview?'':resultModal()}${ui.busy?'<div class="loading"><div class="loading-inner"><span class="spinner"></span>全試合を計算しています…</div></div>':''}<input id="import-save-file" type="file" accept=".json,application/json" hidden>`;
+    app.innerHTML=`<div class="app-shell">${header()}<main class="main">${game.pendingReview?matchReviewScreen():game.pendingMonth?monthlyReviewScreen():(ui.playerDetail!=null?playerDetails():(screens[ui.tab]||frontOfficeScreen)())}</main>${game.pendingReview||game.pendingMonth?'':navbar()}</div>${ui.confirm?.type==='switch'?teamSwitchModal():confirmModal()}${game.pendingReview?'':resultModal()}${ui.busy?`<div class="calendar-running"><strong>${getDayText()}</strong><small>${game.day}/143試合</small><button class="btn outline" data-action="pause-calendar">一時停止</button></div>`:''}<input id="import-save-file" type="file" accept=".json,application/json" hidden>`;
   }
   function showToast(message,error=false){
     document.querySelector('.message')?.remove();
