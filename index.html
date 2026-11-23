@@ -352,12 +352,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 /* Match box-score sections use typographic hierarchy, not extra enclosing cards. */
 .review-section-heading{font-size:15px;letter-spacing:.8px;font-weight:900;padding:17px 3px 10px}
-.review-section-heading.hitter-heading{color:#f3ca78;border-bottom:2px solid #9f7b44}
-.review-section-heading.pitcher-heading{color:#9bd8ec;border-bottom:2px solid #477f99}
-.review-stat-table.hitter-stats thead th{color:#f0c683;background:linear-gradient(90deg,#9c783c26,#9c783c0b)}
-.review-stat-table.pitcher-stats thead th{color:#a2d9e8;background:linear-gradient(90deg,#548a9a31,#548a9a10)}
-.review-stat-table.hitter-stats tbody td:nth-child(4){color:#f4d28e;font-weight:800}
-.review-stat-table.pitcher-stats tbody td:nth-child(5){color:#9bdbea;font-weight:800}
+/* Subdued PowerPro-inspired green (fielders) and coral-red (pitchers). */
+.review-section-heading.hitter-heading{color:#77d8a0;border-bottom:2px solid #509c71}
+.review-section-heading.pitcher-heading{color:#ed8588;border-bottom:2px solid #b45f65}
+.review-stat-table.hitter-stats thead th{color:#9de2b4;background:linear-gradient(90deg,#3c815b28,#3c815b0a)}
+.review-stat-table.pitcher-stats thead th{color:#f4a0a2;background:linear-gradient(90deg,#963f482b,#963f480b)}
+.review-stat-table.hitter-stats tbody td:nth-child(4){color:#87ddb0;font-weight:800}
+.review-stat-table.pitcher-stats tbody td:nth-child(5){color:#f09a9e;font-weight:800}
+
+/* Paused playback controls must stay visible without scrolling down a box score. */
+.auto-paused-toolbar{position:fixed;z-index:110;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));width:min(94vw,560px);background:#172b43f5;border:1px solid #b99a5b;border-radius:13px;box-shadow:0 8px 32px #000a;padding:11px 12px;display:flex;align-items:center;justify-content:space-between;gap:9px;flex-wrap:wrap;color:#e9d4a1;font-size:12px;font-weight:800}
+.auto-paused-actions{display:flex;gap:8px;justify-content:flex-end;flex:1}
+.auto-paused-toolbar .btn{font-size:12px;padding:9px 12px;white-space:nowrap}
+@media(max-width:380px){.auto-paused-toolbar{gap:5px}.auto-paused-toolbar .btn{padding:8px 9px;font-size:11px}}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -855,6 +862,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     return `<div class="daily-playback">
       <span>${running?(paused?'⏸ 一時停止中 · タップで再開':'● 自動進行中 · 画面タップで一時停止'):'この日の記録'}</span>
       <button class="btn outline sm" data-action="${running?'pause-calendar':'auto-day-close'}">${running?(paused?'▶ 再開':'一時停止'):'本部に戻る'}</button>
+      ${paused?'<button class="btn outline sm" data-action="auto-return-hq">⌂ 本部に戻る</button>':''}
       ${!running&&advanceTargetRemaining()?'<button class="btn primary sm" data-action="resume-calendar">▶ 続きから</button>':''}
       ${running&&ui.autoDay?.type!=='game'?'<small class="news-gesture-hint">新聞はダブルタップで次の日へ</small>':''}
     </div>`;
@@ -1572,7 +1580,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(ui.page==='title'){app.innerHTML=titleScreen();return}
     if(ui.page==='setup'){app.innerHTML=setupScreen();return}
     const screens={hq:frontOfficeScreen,team:teamScreen,roster:rosterScreen,business:businessScreen,records:recordScreen,home:frontOfficeScreen,standings:standingsScreen,stats:statScreen,market:marketScreen,finance:financeScreen};
-    app.innerHTML=`<div class="app-shell ${ui.busy&&ui.autoDay?'auto-tappable':''}">${header()}<main class="main">${game.pendingReview?matchReviewScreen():ui.autoDay?(ui.autoDay.type==='game'?dailyGameScreen(ui.autoDay):dailyNewsScreen(ui.autoDay)):game.pendingMonth?monthlyReviewScreen():ui.monthHistory?monthlyReviewScreen(true):(ui.playerDetail!=null?playerDetails():(screens[ui.tab]||frontOfficeScreen)())}</main>${game.pendingReview||game.pendingMonth||ui.autoDay||ui.monthHistory?'':navbar()}</div>${ui.confirm?.type==='switch'?teamSwitchModal():confirmModal()}${game.pendingReview?'':resultModal()}${ui.busy&&!ui.autoDay?`<div class="calendar-running"><strong>${getDayText()}</strong><small>${game.day}/143試合</small><button class="btn outline" data-action="pause-calendar">一時停止</button></div>`:''}<input id="import-save-file" type="file" accept=".json,application/json" hidden>`;
+    app.innerHTML=`<div class="app-shell ${ui.busy&&ui.autoDay?'auto-tappable':''}">${header()}<main class="main">${game.pendingReview?matchReviewScreen():ui.autoDay?(ui.autoDay.type==='game'?dailyGameScreen(ui.autoDay):dailyNewsScreen(ui.autoDay)):game.pendingMonth?monthlyReviewScreen():ui.monthHistory?monthlyReviewScreen(true):(ui.playerDetail!=null?playerDetails():(screens[ui.tab]||frontOfficeScreen)())}</main>${game.pendingReview||game.pendingMonth||ui.autoDay||ui.monthHistory?'':navbar()}</div>${ui.confirm?.type==='switch'?teamSwitchModal():confirmModal()}${game.pendingReview?'':resultModal()}${ui.busy&&!ui.autoDay?`<div class="calendar-running"><strong>${getDayText()}</strong><small>${game.day}/143試合</small><button class="btn outline" data-action="pause-calendar">一時停止</button></div>`:''}${ui.busy&&ui.autoDay&&ui.autoPaused?'<div class="auto-paused-toolbar" role="group" aria-label="一時停止中の操作"><span>⏸ 一時停止中</span><div class="auto-paused-actions"><button class="btn primary sm" data-action="pause-calendar">▶ 再開</button><button class="btn outline sm" data-action="auto-return-hq">⌂ 本部に戻る</button></div></div>':''}<input id="import-save-file" type="file" accept=".json,application/json" hidden>`;
   }
   function showToast(message,error=false){
     document.querySelector('.message')?.remove();
@@ -1960,7 +1968,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const baseDelay=mode==='fast'?1000:2000;
     const startGame=game.day,startId=game.games.length;
     const hasMore=()=>oneDay?game.calendarIndex<calendarGoal:game.day<goal;
-    ui.busy=true;ui.pauseRequested=false;ui.autoPaused=false;ui.autoDay=null;ui.autoWait=null;
+    ui.busy=true;ui.pauseRequested=false;ui.autoPaused=false;ui.autoExitToHQ=false;ui.autoDay=null;ui.autoWait=null;
     clearPendingNewsTap();render();save();
     await new Promise(resolve=>setTimeout(resolve,35));
     let lastDay=null;
@@ -1983,7 +1991,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       if(oneDay||game.pendingMonth)break;
     }
     const interrupted=!!(ui.pauseRequested||document.hidden||storageFailure);
-    ui.busy=false;ui.pauseRequested=false;ui.autoPaused=false;ui.autoWait=null;
+    const returnToHQ=!!ui.autoExitToHQ;
+    ui.busy=false;ui.pauseRequested=false;ui.autoPaused=false;ui.autoExitToHQ=false;ui.autoWait=null;
     clearPendingNewsTap();
     const games=game.games.slice(startId).filter(g=>g.year===game.year&&(g.home===game.selectedId||g.away===game.selectedId));
     const last=games[games.length-1];
@@ -1997,9 +2006,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(!hasMore())game.advanceTarget=null;
     // Single-day results stay on screen until dismissed; the same applies to
     // the final visible result of a timed batch outside monthly boundaries.
-    if(showReview||(!oneDay&&game.pendingMonth)||skip)ui.autoDay=null;
+    if(showReview||(!oneDay&&game.pendingMonth)||skip||returnToHQ)ui.autoDay=null;
+    if(returnToHQ)ui.tab='hq';
     save();render();window.scrollTo({top:0,behavior:'instant'});
-    if(interrupted&&!game.pendingReview&&!game.pendingMonth)
+    if(interrupted&&!returnToHQ&&!game.pendingReview&&!game.pendingMonth)
       showToast('日程の進行を停止しました。タップで再開できます');
   };
   function offseasonExperience(phase){
@@ -2012,9 +2022,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   document.addEventListener('click',e=>{
     const el=e.target.closest('[data-action]');if(!el)return;
     const action=el.dataset.action;
-    if(!['playback-mode','pause-calendar','auto-day-close','resume-calendar','finish-month','monthly-history-open','monthly-history-close','fielding-open','fielding-close','fielding-set','swap-open','swap-close','swap-select','batch-expand','ceremony-start','ceremony-next'].includes(action))return;
+    if(!['playback-mode','pause-calendar','auto-return-hq','auto-day-close','resume-calendar','finish-month','monthly-history-open','monthly-history-close','fielding-open','fielding-close','fielding-set','swap-open','swap-close','swap-select','batch-expand','ceremony-start','ceremony-next'].includes(action))return;
     e.preventDefault();e.stopPropagation();
     if(action==='pause-calendar'){toggleAutoPause();return;}
+    if(action==='auto-return-hq'){
+      // Only a paused playback can exit this way. Release its pending timer
+      // so the awaiting advance loop can finish and save the resume target.
+      if(!ui.busy||!ui.autoPaused)return;
+      ui.autoExitToHQ=true;
+      ui.pauseRequested=true;
+      clearPendingNewsTap();
+      ui.autoWait?.skip();
+      return;
+    }
     if(action==='auto-day-close'){
       if(ui.busy||!ui.autoDay)return;
       ui.autoDay=null;ui.tab='hq';render();window.scrollTo({top:0,behavior:'instant'});return;
