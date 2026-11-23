@@ -679,7 +679,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     archiveSeason();
     let retireTotal=0;
     for(const p of game.players){
-      if(p.teamId===null)continue;
+      // Retired players keep their retirement age; free agents keep ageing.
+      if(p.teamId===-1)continue;
       p.age++;
       const retire=p.age>=41 || (p.age>=36&&rand()<((p.age-34)*.11));
       if(retire){p.teamId=-1;retireTotal++;continue}
@@ -764,7 +765,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function captureSeason(){
     for(const p of game.players){
       ensurePlayerExtras(p);
-      if(p.teamId===-1)continue;
+      if(p.teamId===-1||(p.teamId===null&&!(p.stats?.g>0)))continue;
       if(!p.seasonHistory.some(s=>s.year===game.year))p.seasonHistory.push({year:game.year,teamId:p.teamId,stats:statCopy(p)});
       if(!Array.isArray(p.abilityHistory))p.abilityHistory=[];
       if(!p.abilityHistory.some(s=>s.year===game.year)){
