@@ -7,7 +7,15 @@ const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
 assert(script);
 const listeners=[];
 const store=new Map(), local=new Map();
-const app={innerHTML:''};
+const watchRenders=[];
+const app={
+  _html:'',
+  get innerHTML(){return this._html;},
+  set innerHTML(markup){
+    this._html=markup;
+    if(markup.includes('watch-game-screen'))watchRenders.push(markup);
+  }
+};
 const db={
   objectStoreNames:{contains:()=>true},
   transaction:(name,mode)=>{
@@ -50,7 +58,7 @@ const localStorage={
   setItem:(key,value)=>local.set(key,String(value)),
   removeItem:key=>local.delete(key)
 };
-const fakeTimeout=(fn,ms,...args)=>ms>=500?0:setTimeout(fn,ms,...args);
+const fakeTimeout=(fn,ms,...args)=>ms>=3000?0:setTimeout(fn,ms>=300?0:ms,...args);
 const context={window,document,localStorage,console,setTimeout:fakeTimeout,
   clearTimeout,Date,Math,JSON,Number,String,Array,Object,Set,Map,
   Promise,Blob:global.Blob,URL:global.URL};
@@ -74,12 +82,14 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.7\.0 · MANAGER/);
+  assert.match(app.innerHTML,/VERSION 0\.7\.1 · WATCH/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
   dispatch('click',{action:'finish-setup'});
   assert.match(app.innerHTML,/data-action="mgr-open"/);
+  assert.match(app.innerHTML,/class="desk-task" data-action="mgr-open"/);
+  assert(!app.innerHTML.includes('class="panel manager-home"'),'Manager must appear in GM desk, not a separate panel');
   dispatch('click',{action:'mgr-open'});
   assert.match(app.innerHTML,/現監督・GM方針/);
   assert.match(app.innerHTML,/data-action="mgr-offer"/);
@@ -92,8 +102,21 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   dispatch('change',{change:'manager-order',key:'bullpen',value:'attack'});
   assert.match(app.innerHTML,/value="attack" selected/);
   await window.PennantLab.advance('day');
+  // The day action must show the simulated inning-by-inning watch before the final score.
+  for(let tries=0;tries<12&&watchRenders.length===0;tries++){
+    if(app.innerHTML.includes('data-action="auto-day-close"'))dispatch('click',{action:'auto-day-close'});
+    if(app.innerHTML.includes('data-action="finish-month"'))dispatch('click',{action:'finish-month'});
+    if(app.innerHTML.includes('data-action="injury-ack"'))dispatch('click',{action:'injury-ack'});
+    await window.PennantLab.advance('day');
+  }
+  assert(watchRenders.length>1,'One-day action should replay half innings before the final score');
+  assert(watchRenders.some(x=>x.includes('試合観戦モード')));
+  assert(watchRenders.some(x=>x.includes('イニング別スコア')));
+  assert(watchRenders.some(x=>x.includes('data-action="watch-skip"')));
+  assert(watchRenders.some(x=>x.includes('data-action="pause-calendar"')));
+  assert(!app.innerHTML.includes('watch-game-screen'),'After replay, show the normal game report');
   const after=window.PennantLab.getSnapshot();
-  assert(after.day>=0&&after.day<=1);
+  assert(after.day>=1&&after.day<=12);
   assert(after.games>=0);
   await flush();
   assert(store.get(1)?.data,'Game save should be persisted');
@@ -123,5 +146,5 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   for(const team of full.teams)assert.equal(team.w+team.l+team.t,143,'Every club plays 143 games');
   console.log('PASS: full 143-game season, 858 games, all 12 clubs, monthly and injury interruptions');
 
-  console.log('PASS: cold boot, 12 teams, manager room, hiring, GM policy, day progression and save');
+  console.log('PASS: cold boot, manager in GM desk, hiring, GM policy, inning-by-inning replay, day progression and save');
 })().catch(e=>{console.error(e);process.exitCode=1;});
