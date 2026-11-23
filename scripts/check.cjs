@@ -6,9 +6,9 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.8\.7 · MANAGER AI/);
+assert.match(html,/VERSION 0\.8\.8 · MANAGER AI/);
 assert.match(html,/const VERSION = 2;/);
-assert.match(html,/managerDecision\(t,'bullpen'\)/);
+assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
 assert.match(html,/data-action="mgr-offer"/);
 assert.match(html,/auto-paused-toolbar/);
@@ -384,3 +384,87 @@ assert.equal(pinchApi.pinchHitterChoice(managerFixture,currentBatter,{id:200},0,
   [null,null,null],8,makeContext([wrongPosition],-1)),null,
   'A substitute must be eligible to field the displaced position');
 console.log('PASS: live manager substitutions, GM policies, safe fielding and historical move logs');
+
+
+
+// v0.8.8: test the real runner, defense and non-reentering pitching choices.
+assert.match(html,/function managerPitcherChoice\(team,inning,lead,context\)/);
+assert.match(html,/function managerPinchRunner\(team,bases,inning,appear,context\)/);
+assert.match(html,/function managerDefenseUpgrade\(team,inning,lead,context,appear\)/);
+assert.match(html,/managerPitcherChoice\(home,i,homeScore-awayScore,context\)/);
+assert.match(html,/managerMoveLabel\(move\)/);
+assert.match(html,/appear\.def\.has\(p\.id\)/);
+const pitStart=inline[1].indexOf('  /* v0.8.8: inning-by-inning pitching staff.');
+const pitEnd=inline[1].indexOf('  /* v0.8.7:',pitStart);
+const benchStart=inline[1].indexOf('  /* v0.8.8: In-game runner replacement');
+const benchEnd=inline[1].indexOf('  function halfInning(',benchStart);
+assert(pitStart>=0&&pitEnd>pitStart&&benchStart>=0&&benchEnd>benchStart);
+const freshManagerDecision=(team,key)=>team.gmOrders[key]==='attack'?86:
+  team.gmOrders[key]==='safe'?14:52;
+const benchV088=vm.runInNewContext('(function(){'+inline[1].slice(pitStart,pitEnd)+
+  inline[1].slice(benchStart,benchEnd)+
+  '\nreturn {managerPitcherChoice,managerPinchRunner,managerDefenseUpgrade};})()',{
+  managerDecision:freshManagerDecision,
+  managerRatings:()=>({field:84,pitch:80}),
+  clamp:(n,lo,hi)=>Math.max(lo,Math.min(hi,n)),
+  pitchers:team=>team.pitchers,
+  availableForGame:p=>!p.injury,
+  effectiveSkill:(p,key)=>p[key]*(p.energy??100)/100,
+  fieldingTier:(p,role)=>p.pos===role?'main':'off',
+  effectiveFielding:(p)=>p.defense
+});
+const st={id:201,name:'先発甲',pos:'SP',stuff:62,control:60,energy:85,stats:{outs:22}};
+const rp={id:202,name:'中継ぎ乙',pos:'RP',stuff:81,control:79,energy:94,stats:{outs:0}};
+const rp2={id:203,name:'中継ぎ丙',pos:'RP',stuff:78,control:76,energy:91,stats:{outs:0}};
+const cp={id:204,name:'守護神丁',pos:'CP',stuff:92,control:88,energy:93,stats:{outs:0}};
+const pitTeam={id:2,manager:{id:'manager-z',name:'監督Z'},pitchers:[st,rp,rp2,cp],
+  gmOrders:{bullpen:'attack',steal:'attack',defense:'attack'}};
+const pitContext={awayId:2,outsBefore:new Map([[201,0],[202,0],[203,0],[204,0]]),
+  pitching:{2:{current:st,used:new Set([st.id])}},managerMoves:[]};
+const firstPit=benchV088.managerPitcherChoice(pitTeam,7,0,pitContext);
+assert.equal(firstPit.id,rp.id);
+assert.equal(pitContext.managerMoves[0].type,'pitch');
+assert.equal(pitContext.managerMoves[0].outId,st.id);
+assert.equal(benchV088.managerPitcherChoice(pitTeam,8,1,pitContext).id,rp.id,
+  'Do not unnecessarily replace a fresh reliever');
+rp.stats.outs=11;
+const lastPit=benchV088.managerPitcherChoice(pitTeam,9,2,pitContext);
+assert.equal(lastPit.id,cp.id,'Late one-to-three run lead uses fresh closer');
+assert(!pitContext.managerMoves.some((m,i)=>i>0&&m.inId===st.id),
+  'Removed starter never re-enters');
+assert.equal(pitContext.managerMoves.length,2);
+const slow={id:301,name:'遅い野手',pos:'2B',age:35,speed:38,defense:42,energy:100,stats:{g:4}};
+const runner={id:302,name:'俊足控え',pos:'2B',age:23,speed:91,defense:84,energy:100,stats:{g:0}};
+const defender={id:303,name:'守備名人',pos:'2B',age:27,speed:40,defense:99,energy:100,stats:{g:0}};
+const benchTeam={id:3,lineup:[301],fieldingRoles:{301:'2B'},
+  manager:{name:'監督Y'},gmOrders:{steal:'attack',defense:'attack'}};
+const benchContext={awayId:3,scoreDiff:-1,activeLineups:{3:[slow]},
+  bench:{3:[runner,defender]},changed:{3:new Set()},runnerUsed:{3:0},
+  defenseUsed:{3:0},managerMoves:[]};
+const apear={bat:new Set([301]),pitch:new Set(),run:new Set(),def:new Set()};
+const bases=[slow,null,null];
+benchV088.managerPinchRunner(benchTeam,bases,8,apear,benchContext);
+assert.equal(bases[0].id,runner.id);
+assert.equal(benchContext.activeLineups[3][0].id,runner.id);
+assert.equal(runner.stats.g,1);
+assert(apear.run.has(runner.id));
+assert.equal(benchContext.runnerUsed[3],1);
+assert.equal(benchContext.managerMoves[0].type,'runner');
+assert.equal(benchContext.bench[3].some(p=>p.id===runner.id),false);
+assert.equal(benchV088.managerPinchRunner(benchTeam,bases,9,apear,benchContext),undefined,
+  'No second replacement of the same batting order slot');
+const defContext={awayId:3,scoreDiff:2,activeLineups:{3:[slow]},
+  bench:{3:[runner,defender]},changed:{3:new Set()},runnerUsed:{3:0},
+  defenseUsed:{3:0},managerMoves:[]};
+benchV088.managerDefenseUpgrade(benchTeam,8,2,defContext,apear);
+assert.equal(defContext.activeLineups[3][0].id,defender.id);
+assert.equal(defender.stats.g,1);
+assert(apear.def.has(defender.id));
+assert.equal(defContext.managerMoves[0].type,'defense');
+assert.equal(benchTeam.lineup[0],slow.id,'GM original lineup stays unchanged');
+assert.equal(benchV088.managerDefenseUpgrade(benchTeam,9,2,defContext,apear),undefined);
+benchTeam.gmOrders.defense='safe';
+const passiveCtx={...defContext,changed:{3:new Set()},defenseUsed:{3:0},
+  activeLineups:{3:[slow]},bench:{3:[defender]},managerMoves:[]};
+assert.equal(benchV088.managerDefenseUpgrade(benchTeam,8,2,passiveCtx,apear),undefined);
+console.log('PASS: manager-controlled bullpen, runner, defensive specialist and no re-entry');

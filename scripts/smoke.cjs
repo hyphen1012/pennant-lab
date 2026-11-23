@@ -87,7 +87,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.8\.7 · MANAGER AI/);
+  assert.match(app.innerHTML,/VERSION 0\.8\.8 · MANAGER AI/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -235,20 +235,41 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert.equal(watchedMatches.length,143,'Manager AI must preserve the full 143 game schedule');
   const substituted=watchedMatches.flatMap(g=>(g.managerMoves||[]).map(m=>({...m,match:g})));
   const myMoves=substituted.filter(m=>m.teamId===gmOwned);
-  assert(myMoves.length>0,'Aggressive GM pinch policy should cause real bench appearances');
-  for(const move of substituted){
-    assert(move.inId!==move.outId,'A pinch hit changes the actual batter');
-    assert(move.inning>=7&&move.inning<=12,'Only late-game pinch hitting is currently enabled');
-    assert(typeof move.managerName==='string'&&move.managerName.length>0);
-    const batter=store.get(1).data.players.find(p=>p.id===move.inId);
-    assert(batter&&batter.teamId===move.teamId,'A pinch hitter must belong to his team');
-    assert(move.match.box?.bat.some(p=>p.id===move.inId&&p.pa>0),
-      'The substitute must record at least one real plate appearance');
+  const pinchMoves=myMoves.filter(m=>!m.type||m.type==='pinch');
+  const pitchMoves=myMoves.filter(m=>m.type==='pitch');
+  const runnerMoves=myMoves.filter(m=>m.type==='runner');
+  const defenseMoves=myMoves.filter(m=>m.type==='defense');
+  assert(pinchMoves.length>0,'Aggressive pinch policy should produce real plate appearances');
+  assert(pitchMoves.length>0,'Bullpen AI must make real pitching changes');
+  for(const g of watchedMatches){
+    const byTeam=new Map();
+    for(const move of g.managerMoves||[]){
+      assert(move.inId!==move.outId,'A substitution must change the real player');
+      assert(move.inning>=5&&move.inning<=12,'Manager moves are late-game decisions');
+      assert(typeof move.managerName==='string'&&move.managerName.length>0);
+      assert(['pinch','pitch','runner','defense',undefined].includes(move.type));
+      const p=store.get(1).data.players.find(p=>p.id===move.inId);
+      assert(p&&p.teamId===move.teamId,'Substitute must belong to his team');
+      const key=move.teamId+':'+move.inId;
+      assert(!byTeam.has(key),'Bench player cannot enter twice in one game');
+      byTeam.set(key,true);
+      if(move.type==='pitch'){
+        assert(g.box?.pitch.some(p=>p.id===move.inId&&p.outs>=0),
+          'Actual replacement pitcher must have a recorded appearance');
+      }else if(move.type==='pinch'||!move.type){
+        assert(g.box?.bat.some(p=>p.id===move.inId&&p.pa>0),
+          'Pinch hitter must have a plate appearance');
+      }else{
+        assert(g.box?.bat.some(p=>p.id===move.inId),
+          'Pinch runner and defensive specialist must count as participants');
+      }
+    }
   }
   assert(watchedMatches.some(g=>Array.isArray(g.managerMoves)),
-    'Watched game reports must persist substitution logs');
-  console.log('PASS: '+myMoves.length+' user-team pinch-hit decisions, all recorded with real batting stats');
-
+    'Watched game reports must persist actual manager changes');
+  console.log('PASS: bench AI: '+pinchMoves.length+' pinch hitters, '+
+    pitchMoves.length+' pitching changes, '+runnerMoves.length+
+    ' pinch runners, '+defenseMoves.length+' defensive replacements');
   assert(monthlyRenders.length>0,'Month-end reports must show the GM inbox');
   assert(monthlyRenders.some(v=>v.includes('球団運営スタッフ')));
   if(medicalRenders.length)assert(medicalRenders.every(v=>v.includes('チーム医療スタッフ')));
