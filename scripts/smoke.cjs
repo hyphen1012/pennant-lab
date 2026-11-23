@@ -7,13 +7,16 @@ const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
 assert(script);
 const listeners=[];
 const store=new Map(), local=new Map();
-const watchRenders=[];
+const watchRenders=[],introRenders=[],gameSetRenders=[],resultRenders=[];
 const app={
   _html:'',
   get innerHTML(){return this._html;},
   set innerHTML(markup){
     this._html=markup;
     if(markup.includes('watch-game-screen'))watchRenders.push(markup);
+    if(markup.includes('game-cinematic-intro'))introRenders.push(markup);
+    if(markup.includes('game-cinematic-outro'))gameSetRenders.push(markup);
+    if(markup.includes('game-result-hero'))resultRenders.push(markup);
   }
 };
 const db={
@@ -82,7 +85,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.7\.2 · WATCH/);
+  assert.match(app.innerHTML,/VERSION 0\.8\.0 · GAME FEEL/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -109,6 +112,14 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     if(app.innerHTML.includes('data-action="injury-ack"'))dispatch('click',{action:'injury-ack'});
     await window.PennantLab.advance('day');
   }
+  assert(introRenders.length>0,'One-day game starts with a PLAY BALL introduction');
+  assert(introRenders[0].includes('PLAY BALL'));
+  assert(!introRenders[0].includes('result-score-row'),'Pregame must not reveal the result');
+  assert(gameSetRenders.length>0,'Game-set moment precedes the detailed result');
+  assert(gameSetRenders.some(x=>x.includes('GAME SET')));
+  assert(resultRenders.some(x=>x.includes('result-verdict')),'The result must use a cinematic result card');
+  assert(resultRenders.some(x=>x.includes('result-score-row')),'The final score is in the result card');
+  assert(resultRenders.some(x=>x.includes('result-table')),'The detailed result fits the no-scroll scoreboard');
   assert(watchRenders.length>1,'One-day action should replay half innings before the final score');
   assert(watchRenders.some(x=>x.includes('試合観戦モード')));
   assert(watchRenders.some(x=>x.includes('イニング別スコア')));
@@ -146,5 +157,5 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   for(const team of full.teams)assert.equal(team.w+team.l+team.t,143,'Every club plays 143 games');
   console.log('PASS: full 143-game season, 858 games, all 12 clubs, monthly and injury interruptions');
 
-  console.log('PASS: cold boot, manager in GM desk, hiring, GM policy, inning-by-inning replay, day progression and save');
+  console.log('PASS: cold boot, manager, PLAY BALL, inning replay, GAME SET, result, save, and full season');
 })().catch(e=>{console.error(e);process.exitCode=1;});
