@@ -1797,7 +1797,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(!spHome||!spAway)throw Error('No available pitcher: injury roster protection failed');
     home.starterIndex++;away.starterIndex++;
     const watchBox=(home.id===game.selectedId||away.id===game.selectedId);
-    const watchPlayers=watchBox?[...new Map([...lineupH,...lineupA,...pitchers(home),...pitchers(away)].map(p=>[p.id,p])).values()]:[];
+    // Pinch hitters must appear in the game-specific box score and receive fatigue.
+    const participants=[...hitters(home),...hitters(away),...pitchers(home),...pitchers(away)];
+    const watchPlayers=watchBox?[...new Map(participants.map(p=>[p.id,p])).values()]:[];
     const preStats=watchBox?new Map(watchPlayers.map(p=>[p.id,{...p.stats}])):null;
     const startOutsH=spHome.stats.outs,startOutsA=spAway.stats.outs;
     const outsBefore=new Map([...pitchers(home),...pitchers(away)].map(p=>[p.id,p.stats.outs]));
@@ -1806,16 +1808,28 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const indexes={[home.id]:0,[away.id]:0};
     const inningsH=[],inningsA=[],events=[];
     const scoringPlays=watchBox?[]:null;
+    const managerMoves=watchBox?[]:null;
+    const context={
+      awayId:away.id,activeLineups:{[home.id]:lineupH,[away.id]:lineupA},
+      bench:{
+        [home.id]:hitters(home).filter(p=>availableForGame(p)&&!home.lineup.includes(p.id)),
+        [away.id]:hitters(away).filter(p=>availableForGame(p)&&!away.lineup.includes(p.id))
+      },
+      changed:{[home.id]:new Set(),[away.id]:new Set()},
+      pinchUsed:{[home.id]:0,[away.id]:0},scoreDiff:0,managerMoves
+    };
     let homeScore=0,awayScore=0;
     let closerH=null,closerA=null;
     for(let i=1;i<=12;i++){
       const awayPitcher=choosePitcher(home,i,spHome,homeScore-awayScore);
-      const top=halfInning(away,home,awayPitcher,lineupA,indexes,i,null,appear,events,scoringPlays);
+      context.scoreDiff=awayScore-homeScore;
+      const top=halfInning(away,home,awayPitcher,lineupA,indexes,i,null,appear,events,scoringPlays,context);
       inningsA.push(top.run);awayScore+=top.run;
       if(awayPitcher.pos==='CP')closerH=awayPitcher;
       if(i>=9&&homeScore>awayScore){inningsH.push(null);break}
       const homePitcher=choosePitcher(away,i,spAway,awayScore-homeScore);
-      const bot=halfInning(home,away,homePitcher,lineupH,indexes,i,{current:homeScore,away:awayScore},appear,events,scoringPlays);
+      context.scoreDiff=homeScore-awayScore;
+      const bot=halfInning(home,away,homePitcher,lineupH,indexes,i,{current:homeScore,away:awayScore},appear,events,scoringPlays,context);
       inningsH.push(bot.run);homeScore+=bot.run;
       if(homePitcher.pos==='CP')closerA=homePitcher;
       if(i>=9&&(homeScore!==awayScore||bot.walkOff))break;
@@ -1838,13 +1852,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       date:calendarNextDay()?.date||null,home:home.id,away:away.id,homeScore,awayScore,inningsH,inningsA,events:events.slice(0,8),outcome,spHome:spHome.id,spAway:spAway.id};
     if(watchBox){
       result.scoringPlays=scoringPlays;
+      result.managerMoves=managerMoves;
       const delta=(p,k)=>Number(p.stats[k]||0)-Number(preStats.get(p.id)?.[k]||0);
       result.box={
         bat:watchPlayers.filter(p=>!isPitch(p)&&delta(p,'pa')>0).map(p=>({id:p.id,teamId:p.teamId,pa:delta(p,'pa'),ab:delta(p,'ab'),h:delta(p,'h'),hr:delta(p,'hr'),rbi:delta(p,'rbi'),bb:delta(p,'bb'),k:delta(p,'k'),sb:delta(p,'sb')})),
         pitch:watchPlayers.filter(p=>isPitch(p)&&delta(p,'g')>0).map(p=>({id:p.id,teamId:p.teamId,outs:delta(p,'outs'),er:delta(p,'er'),h:delta(p,'h'),k:delta(p,'k'),bb:delta(p,'bb'),w:delta(p,'w'),l:delta(p,'l'),sv:delta(p,'sv')}))
       };
     }
-    consumeGameCondition([...lineupH,...lineupA,...pitchers(home),...pitchers(away)],appear,outsBefore);
+    consumeGameCondition(participants,appear,outsBefore);
     game.games.push(result);
     return result;
   }
