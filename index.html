@@ -297,6 +297,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 .month-history-button{background:#1d3048;border:1px solid #3e516c;border-radius:9px;padding:11px 10px;display:flex;align-items:center;gap:9px;width:100%;text-align:left;color:#dae5f5;font-size:12px;margin:7px 0}
 .month-history-button strong{color:#f0c765;font-size:14px}.month-history-button span{flex:1}.month-history-button b{color:#efcd79;white-space:nowrap}
+.month-history-year{border:1px solid #334a63;padding:8px 10px;border-radius:9px;margin-top:8px}
+.month-history-year>summary{cursor:pointer;font-weight:800;color:#e6c36e;font-size:13px}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -1315,7 +1317,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const projRevenue=r2(8.5+(t.wins/Math.max(game.day,1))*6+(rank===1?2.5:rank===2?1.2:0));
     return `<h2 class="page-title">球団経営</h2><p class="page-sub">FA獲得契約金と、シーズン末の年俸支払いを管理します。</p><div class="grid2" style="margin-bottom:12px"><div class="metric"><div class="lab">保有資金</div><div class="val finance-money-value">${fmtMoney(t.cash)}</div></div><div class="metric"><div class="lab">選手年俸総額</div><div class="val finance-money-value">${fmtSalary(pay)}</div></div></div><section class="panel"><h3 class="panel-title">GMの仕事</h3><p class="small">選手の年俸はシーズン終了後、翌年に進める際に精算します。シーズン成績が良いほど収入も増えます。</p><div class="metric" style="margin-top:12px"><div class="lab">参考：現在の勝率で計算したシーズン収入見込み</div><div class="val" style="font-size:19.8px">${fmtMoney(projRevenue)}</div><div class="sub">シーズン終了時に確定。今後の勝敗・順位によって変動します。</div></div><div class="divider"></div><div class="row between"><strong style="font-size:13.5px">所属人数</strong><span class="small">野手${hitters(t).length}人・投手${pitchers(t).length}人（最大30人）</span></div><div class="actions" style="margin-top:14px"><button class="btn primary" data-action="tab" data-tab="market">FA市場へ</button><button class="btn outline" data-action="tab" data-tab="roster" data-roster="players">選手を整理</button></div></section><section class="panel"><h3 class="panel-title">月次報告の履歴</h3>
     <p class="small">暫定見込みのため月次の入出金はまだ行いません。</p>
-    ${(game.monthlyArchive||[]).filter(m=>m.year===game.year).slice().reverse().map(m=>`<button class="month-history-button" data-action="monthly-history-open" data-year="${m.year}" data-month="${m.id}"><strong>${Number(m.month.slice(-2))}月</strong><span>${m.wins}勝${m.losses}敗${m.ties}分　能力変動${m.changes.length}件</span><b>詳細 ›</b></button>`).join('')||'<p class="small">月末の到来後に記録が表示されます。</p>'}
+    ${[...new Set((game.monthlyArchive||[]).map(m=>m.year))].sort((a,b)=>b-a).map(year=>`<details class="month-history-year" ${year===game.year?'open':''}>
+      <summary>${year}年の月次報告</summary>
+      ${game.monthlyArchive.filter(m=>m.year===year).slice().reverse().map(m=>`<button class="month-history-button" data-action="monthly-history-open" data-year="${m.year}" data-month="${m.id}"><strong>${Number(m.month.slice(-2))}月</strong><span>${m.wins}勝${m.losses}敗${m.ties}分　能力変動${m.changes.length}件</span><b>詳細 ›</b></button>`).join('')}
+    </details>`).join('')||'<p class="small">月末の到来後に記録が表示されます。</p>'}
     </section><section class="panel"><h3 class="panel-title">実装済みの経営ルール</h3><div class="event">契約金：選手年俸の1.25倍（最低${fmtMoney(0.08)}）</div><div class="event">年俸：次シーズンに進むとき一括精算</div><div class="event">入場料・スポンサー収入：シーズン成績に基づく概算額</div><div class="event">選手の放出：年俸負担を減らせるが、返金はなし</div><div class="event">ドラフト・トレード・複数年契約：今後の拡張対象</div></section><section class="panel"><div class="panel-head"><h3 class="panel-title">ゲームデータ</h3></div><p class="small">この端末のブラウザに自動保存されています。別端末には自動同期されません。</p><div class="actions"><button class="btn soft" data-action="export-save">セーブデータを書き出す</button><button class="btn outline" data-action="import-save">バックアップを読み込む</button></div><input id="import-save-file" type="file" accept=".json,application/json" style="display:none"><div style="margin-top:14px"><button class="btn danger" data-action="ask-reset">最初からやり直す</button></div></section>`;
   }
   function matchReportBody(g){
