@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.8\.9 · BENCH REPORT/);
+assert.match(html,/VERSION 0\.9\.0 · BULLPEN/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -512,3 +512,60 @@ assert.match(html,/\.manager-move-details\[open\] \.manager-details-closed\{disp
 assert.match(html,/\.manager-move-details>summary:focus-visible/);
 assert.match(html,/managerMoveReport\(g\)/);
 console.log('PASS: BENCH REPORT defaults to two items and expands/collapses native details for 3+');
+
+
+
+// v0.9.0 — realistic inning-midpoint relief by accumulated pitch counts,
+// score pressure and batter handedness; no withdrawn pitcher can reenter.
+assert.match(html,/function managerMidInningPitcherChoice\(team,inning,lead,bases,outs,batter,context\)/);
+assert.match(html,/managerMidInningPitcherChoice\(fieldTeam,inning,/);
+assert(html.includes('context?.runnerResponsibility?.get(runner?.id)||pitcher'));
+assert.match(html,/context\.runnerResponsibility\.set\(fast\.id,inheritedPitcher\)/);
+assert.match(html,/pstat\.pitches=\(Number\(pstat\.pitches\)\|\|0\)\+usedPitches/);
+assert.match(html,/pstat\.bf=\(Number\(pstat\.bf\)\|\|0\)\+1/);
+assert.match(html,/pitchCounts:\{/);
+assert.match(html,/pitches:delta\(p,'pitches'\)/);
+assert.match(html,/<th>投球回<\/th><th>球数<\/th>/);
+assert.match(html,/pitchLoad=pitched/);
+const midStart=inline[1].indexOf('  /* v0.9.0 — Pitch counts');
+const midEnd=inline[1].indexOf('  /* v0.8.7:',midStart);
+assert(midStart>=0&&midEnd>midStart);
+const midAPI=vm.runInNewContext('(function(){'+inline[1].slice(midStart,midEnd)+
+  '\nreturn managerMidInningPitcherChoice;})()',{
+  managerDecision:()=>76,managerRatings:()=>({pitch:72}),
+  clamp:(x,a,b)=>Math.max(a,Math.min(b,x)),
+  pitchers:team=>team.pitchers,
+  availableForGame:p=>!p.injury,
+  effectiveSkill:(p,key)=>p[key]*(p.energy??100)/100,
+  derivedBatHand:()=> '左'
+});
+const starter={id:901,name:'先発投手',pos:'SP',hand:'右',stamina:65,energy:100,stuff:74,control:74,stats:{outs:16}};
+const righty={id:902,name:'右中継ぎ',pos:'RP',hand:'右',stamina:49,energy:100,stuff:80,control:80};
+const lefty={id:903,name:'左中継ぎ',pos:'RP',hand:'左',stamina:49,energy:100,stuff:80,control:80};
+const club={id:7,manager:{id:'m',name:'監督'},pitchers:[starter,righty,lefty]};
+const ctx={awayId:7,managerMoves:[],pitching:{7:{current:starter,used:new Set([starter.id])}},
+  pitchCounts:{7:new Map([[starter.id,90]])}};
+const leftBatter={id:998,name:'左打者',batHand:'左'};
+const next=midAPI(club,7,-1,[null,{id:15},null],1,leftBatter,ctx);
+assert.equal(next.id,lefty.id,'Same-side matchup should win a close relief decision');
+assert.equal(ctx.pitching[7].current.id,lefty.id);
+assert.equal(ctx.managerMoves[0].type,'pitch');
+assert.equal(ctx.managerMoves[0].pitchCount,90);
+assert.equal(ctx.managerMoves[0].midInning,true);
+assert.equal(ctx.managerMoves[0].reason,'走者を背負った場面での継投');
+assert(ctx.pitching[7].used.has(starter.id)&&ctx.pitching[7].used.has(lefty.id));
+assert.equal(midAPI(club,7,-1,[null,{id:15},null],1,leftBatter,ctx).id,lefty.id,
+  'A fresh reliever must remain in the game');
+ctx.pitchCounts[7].set(lefty.id,40);
+assert.equal(midAPI(club,8,-1,[{id:15},{id:16},null],1,
+  {...leftBatter,batHand:'右'},ctx).id,righty.id,
+  'After workload limit, next unused reliever can enter');
+assert.equal(ctx.managerMoves.length,2);
+assert(!ctx.managerMoves.some(m=>m.inId===starter.id),'Starter cannot reenter');
+assert.equal(midAPI(club,8,-1,[{id:15},{id:16},null],1,leftBatter,ctx).id,righty.id,
+  'No further substitution if all relievers already used');
+const earlyCtx={...ctx,managerMoves:[],pitching:{7:{current:starter,used:new Set([starter.id])}},
+  pitchCounts:{7:new Map([[starter.id,40]])}};
+assert.equal(midAPI(club,4,0,[null,null,null],0,leftBatter,earlyCtx).id,starter.id,
+  'No premature early-inning mid-inning pitching replacement');
+console.log('PASS: pitch-count bullpen, left/right matchup, workload and no pitcher reentry');

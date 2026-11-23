@@ -87,7 +87,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.8\.9 · BENCH REPORT/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.0 · BULLPEN/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -235,6 +235,38 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   const gmOwned=full.selectedId;
   const watchedMatches=archivedMatches.filter(g=>g.home===gmOwned||g.away===gmOwned);
   assert.equal(watchedMatches.length,143,'Manager AI must preserve the full 143 game schedule');
+
+  // All runs must have exactly one pitcher accountable, including inherited
+  // runners scoring AFTER a pitching substitution. Pitch counts come only
+  // from actually faced batters and scale proportionally to fatigue.
+  let midInningMoves=0,seasonPitches=0;
+  for(const g of watchedMatches){
+    assert(g.box&&Array.isArray(g.box.pitch)&&g.box.pitch.length>=2,
+      'Both teams must have actual pitching appearances');
+    assert.equal(g.box.pitch.reduce((n,p)=>n+p.er,0),g.homeScore+g.awayScore,
+      'Inherited runs must be charged once to the responsible pitcher');
+    for(const p of g.box.pitch){
+      assert(Number.isInteger(p.pitches)&&p.pitches>=2&&p.pitches<=245,
+        'Every pitcher appearance must log a plausible pitch count');
+      assert(Number.isInteger(p.bf)&&p.bf>=1,'Pitcher must face actual hitters');
+      assert(p.pitches>=2*p.bf&&p.pitches<=7*p.bf,
+        'Every plate appearance contributes a bounded number of pitches');
+      seasonPitches+=p.pitches;
+    }
+    const mid=(g.managerMoves||[]).filter(m=>m.type==='pitch'&&m.midInning);
+    for(const m of mid){
+      assert(Number.isInteger(m.pitchCount)&&m.pitchCount>=12,
+        'Pressure-relief changes can occur before the normal 29-pitch closer limit');
+      assert(['球数による継投','走者を背負った場面での継投'].includes(m.reason));
+      assert(g.box.pitch.some(p=>p.id===m.inId&&p.bf>0));
+    }
+    midInningMoves+=mid.length;
+  }
+  assert(seasonPitches>10000,'143 user games must accumulate real pitch counts');
+  assert(midInningMoves>0,'Manager must make actual mid-inning relief moves');
+  console.log('PASS: '+midInningMoves+' mid-inning pitching changes, '+
+    seasonPitches+' actual simulated pitches, inherited runs reconciled');
+
   const substituted=watchedMatches.flatMap(g=>(g.managerMoves||[]).map(m=>({...m,match:g})));
   const myMoves=substituted.filter(m=>m.teamId===gmOwned);
   const pinchMoves=myMoves.filter(m=>!m.type||m.type==='pinch');
@@ -247,7 +279,8 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     const byTeam=new Map();
     for(const move of g.managerMoves||[]){
       assert(move.inId!==move.outId,'A substitution must change the real player');
-      assert(move.inning>=5&&move.inning<=12,'Manager moves are late-game decisions');
+      assert(move.inning>=(move.type==='pitch'?1:7)&&move.inning<=12,
+        'Bullpen can relieve an overworked starter early; fielding and batting changes stay late-game');
       assert(typeof move.managerName==='string'&&move.managerName.length>0);
       assert(['pinch','pitch','runner','defense',undefined].includes(move.type));
       const p=store.get(1).data.players.find(p=>p.id===move.inId);
