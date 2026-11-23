@@ -1472,8 +1472,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       ?`${last.inning}回${last.side} · ${h(current.short)}が得点`
       :`${last.inning}回${last.side} · ${h(current.short)}の攻撃終了`;
     const event=last&&!active?(g.events||[]).find(x=>x.startsWith(`${last.inning}回 ${current.short} `)):null;
+    const onFieldMove=last&&!active?(g.managerMoves||[]).find(x=>x.inning===last.inning&&x.teamId===last.teamId):null;
     const note=active?`${last.play.batterName}選手が${watchScoringTitle(last.play)}`
-      :last?(event||`${current.name}はこの回${last.runs}点を記録`)
+      :last?(onFieldMove?`${onFieldMove.managerName}監督が${onFieldMove.outName}に代えて${onFieldMove.inName}を代打起用。`:(event||`${current.name}はこの回${last.runs}点を記録`))
       :`${away.name} 対 ${home.name} · まもなく試合開始`;
     // Progress is tied to completed scheduled innings, never future plays or score totals.
     const finishedHalves=revealed.length;
@@ -1682,7 +1683,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(context.managerMoves)context.managerMoves.push({
       inning,side:team.id===context.awayId?'表':'裏',teamId:team.id,
       outId:current.id,outName:current.name,inId:chosen.id,inName:chosen.name,
-      slot,role:team.fieldingRoles[team.lineup[slot]]
+      slot,role:team.fieldingRoles[team.lineup[slot]],
+      managerId:team.manager?.id||null,managerName:team.manager?.name||'監督'
     });
     return chosen;
   }
@@ -3401,6 +3403,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         </div>
       </div>`;
     }).join('');
+    const recentTeamGames=game.games.filter(g=>g.year===game.year
+      &&(g.home===team.id||g.away===team.id)).slice(-15);
+    const ownMoves=recentTeamGames.flatMap(g=>(g.managerMoves||[]).filter(move=>
+      move.teamId===team.id&&move.managerId===m.id).map(move=>({...move,gameNo:g.day})));
     const renewalEligible=m.contractYears===1&&game.day>=98&&m.renewedYear!==game.year;
     return `<div class="manager-office">
       <section class="panel manager-sheet">
@@ -3427,7 +3433,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         <div class="panel-head"><h3 class="panel-title">GMからの戦術指示</h3><span class="pill">6項目</span></div>
         <p class="small">指定しない項目は監督が判断します。GMの指示は次の試合から反映。指示と信条が衝突すると不満が蓄積します。</p>
         ${traits}
-        <p class="tiny">継投・盗塁・バント・守備・若手育成は試合計算に反映。代打の実際の選手交代は次の開発段階です。</p>
+        <p class="tiny">GMの方針を受けて監督が継投・盗塁・バント・守備を判断。代打と若手重視は、試合後半のベンチ起用にも反映されます。</p>
+      </section>
+      <section class="panel manager-activity-panel">
+        <div class="panel-head"><h3 class="panel-title">最近の監督采配</h3>
+          <span class="pill">直近15試合 · ${ownMoves.length}件</span></div>
+        <p class="small">試合後半の代打は監督が自動判断します。代わった野手の打席・守備は、実際の試合結果に反映されます。</p>
+        ${ownMoves.length?ownMoves.slice(-4).reverse().map(move=>`<div class="manager-activity-row">
+          <b>第${move.gameNo}戦 · ${move.inning}回${h(move.side)}</b>
+          <span>代打 ${h(move.inName)} <small>（${h(move.outName)}に代わって出場）</small></span>
+        </div>`).join(''):'<p class="small">今季の直近15試合では、現在の監督による代打起用はありません。</p>'}
       </section>
       <section class="panel manager-candidates">
         <h3 class="panel-title">監督候補を比較して雇用</h3>
