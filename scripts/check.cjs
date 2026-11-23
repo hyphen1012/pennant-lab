@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.8\.5 · PORTRAITS/);
+assert.match(html,/VERSION 0\.8\.6 · PORTRAITS/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(t,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -280,3 +280,31 @@ assert.match(html,/\.avatar\.player-portrait>.face-artwork/);
 assert.match(html,/\.manager-portrait>.face-artwork/);
 assert.match(html,/\.special-name-tag/);
 console.log('PASS: rank colors, average-based single rings, stable SVG faces and title themes');
+
+
+// v0.8.6: The exact same five-stat ability ring and overall number badge
+// must be reusable in lineup, swap, FA, and future draft/foreign markets.
+const lineupBadge=identity.faceMini(batter,{overall:true});
+const pitcherBadge=identity.faceMini(pitcher,{overall:true});
+assert.match(lineupBadge,/class="face-mini [^"]*has-overall"/);
+assert.match(lineupBadge,/--avatar-color:#E85062/);
+assert.match(lineupBadge,/<b class="portrait-overall">73<\/b>/);
+assert.match(pitcherBadge,/--avatar-color:#E8AA3F/);
+assert.match(pitcherBadge,/<b class="portrait-overall">65<\/b>/);
+assert.doesNotMatch(identity.faceMini(batter),/portrait-overall/);
+assert.equal((lineupBadge.match(/<svg\b/g)||[]).length,1);
+assert.match(lineupBadge,/viewBox="12 10 96 96"/);
+assert.match(identity.renderFaceArtwork(batter),/viewBox="12 10 96 96"/);
+assert.match(html,/faceLabel\(p,\{overall:true\}\)/);
+assert.match(html,/faceMini\(p,\{overall:true\}\)/);
+assert.match(html,/function recruitmentCandidateCard\(p,options=\{\}\)/);
+assert.match(html,/class="recruit-candidate"/);
+assert.match(html,/\.recruit-contract\{display:grid;/);
+assert.match(html,/data-action="\$\{h\(action\)\}"/);
+assert.match(html,/\.face-mini\.has-overall .portrait-overall/);
+assert.match(html,/\.face-mini\.has-overall>.face-mini-artwork/);
+assert.match(html,/showOverall=options\.overall===true&&!theme\.hidden/);
+assert.doesNotMatch(identity.faceMini(immortal,{overall:true}),/portrait-overall/,
+  'A hidden special prospect must not leak its real overall rating');
+assert.match(identity.faceMini(titled,{overall:true}),/--avatar-color:#B28AFF/);
+console.log('PASS: close-up faces, mini overall badges in lineup, swap and reusable recruitment cards');
