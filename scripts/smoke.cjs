@@ -7,7 +7,7 @@ const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
 assert(script);
 const listeners=[];
 const store=new Map(), local=new Map();
-const watchRenders=[],introRenders=[],gameSetRenders=[],resultRenders=[];
+const watchRenders=[],introRenders=[],gameSetRenders=[],resultRenders=[],medicalRenders=[],monthlyRenders=[];
 const app={
   _html:'',
   get innerHTML(){return this._html;},
@@ -17,6 +17,8 @@ const app={
     if(markup.includes('game-cinematic-intro'))introRenders.push(markup);
     if(markup.includes('game-cinematic-outro'))gameSetRenders.push(markup);
     if(markup.includes('game-result-hero'))resultRenders.push(markup);
+    if(markup.includes('gm-briefing-screen'))medicalRenders.push(markup);
+    if(markup.includes('gm-month-report'))monthlyRenders.push(markup);
   }
 };
 const db={
@@ -85,7 +87,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.8\.1 · GAME FEEL/);
+  assert.match(app.innerHTML,/VERSION 0\.8\.2 · GM BRIEFING/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -164,8 +166,11 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   const full=window.PennantLab.getSnapshot();
   assert(done||full.day===143,'The full 143-game schedule must complete');
   assert.equal(full.games,858,'12 teams × 143 games should result in 858 games');
+  assert(monthlyRenders.length>0,'Month-end reports must show the GM inbox');
+  assert(monthlyRenders.some(v=>v.includes('球団運営スタッフ')));
+  if(medicalRenders.length)assert(medicalRenders.every(v=>v.includes('チーム医療スタッフ')));
   for(const team of full.teams)assert.equal(team.w+team.l+team.t,143,'Every club plays 143 games');
   console.log('PASS: full 143-game season, 858 games, all 12 clubs, monthly and injury interruptions');
 
-  console.log('PASS: cinematic v0.8.1 manager portraits/ratings, custom GM orders, game flow and season');
+  console.log('PASS: v0.8.2 cinematic watch, manager, personalized GM reports, save and season');
 })().catch(e=>{console.error(e);process.exitCode=1;});
