@@ -206,10 +206,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .quick-abilities{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0 5px}
 .quick-ability{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#9aabc2;white-space:nowrap}
 .quick-ability b{font-size:16px;font-weight:950;line-height:1.2}
-.player-season-line{background:#101d30;border:1px solid #2b4762;border-radius:7px;padding:7px 8px;margin:7px 0 0;display:flex;gap:7px;justify-content:space-between;align-items:center;flex-wrap:wrap}
-.player-season-line span{font-size:10px;color:#abbed1;white-space:nowrap}
-.player-season-line strong{font-size:12px;color:#edf2fa;font-variant-numeric:tabular-nums}
-.player-season-line .season-title{color:#dfb74d;font-size:10px;font-weight:850;letter-spacing:.5px}
+/* A two-line stat ledger on the same background as the abilities above. */
+.player-season-line{background:none;border:0;border-radius:0;padding:0;margin:8px 0 0;display:flex;flex-direction:column;align-items:stretch;gap:5px;min-width:0}
+.player-season-line .season-stats-row{display:flex;align-items:baseline;flex-wrap:nowrap;gap:clamp(5px,1.4vw,15px);min-width:0}
+.player-season-line .season-stats-row span{font-size:10px;color:#abbed1;white-space:nowrap}
+.player-season-line .season-stats-row strong{font-size:12px;color:#edf2fa;font-variant-numeric:tabular-nums}
+.player-season-line .season-title{color:#dfb74d!important;font-size:10px;font-weight:850;letter-spacing:.3px}
+@media(max-width:380px){.player-season-line .season-stats-row{gap:5px}.player-season-line .season-stats-row span{font-size:9px}.player-season-line .season-stats-row strong{font-size:11px}}
 .next-start-alert{border-radius:11px;padding:12px 13px;background:linear-gradient(90deg,#183b43,#192b3e);border:1px solid #32675f;margin-bottom:13px}
 .next-start-alert strong{color:#edd074}.next-start-alert small{display:block;color:#b8cadb;margin-top:4px}
 .lineup-wrap .lineup-buttons{align-self:start;margin-top:5px}
@@ -947,8 +950,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function currentSeasonLine(p){
     const st=p.stats;
-    return isPitch(p)?`<div class="player-season-line"><span class="season-title">今季成績</span><span>登板 <strong>${st.g}</strong></span><span>防御率 <strong>${era(p)}</strong></span><span>勝敗 <strong>${st.w}-${st.l}</strong></span><span>投球回 <strong>${Math.floor(st.outs/3)}.${st.outs%3}</strong></span><span>K <strong>${st.k}</strong></span></div>`:
-      `<div class="player-season-line"><span class="season-title">今季成績</span><span>試合 <strong>${st.g}</strong></span><span>打率 <strong>${avg(p)}</strong></span><span>本 <strong>${st.hr}</strong></span><span>打点 <strong>${st.rbi}</strong></span><span>盗塁 <strong>${st.sb}</strong></span></div>`;
+    return isPitch(p)?`<div class="player-season-line" aria-label="今季投手成績">
+      <div class="season-stats-row"><span class="season-title">今季成績</span><span>登板 <strong>${st.g}</strong></span><span>防御率 <strong>${era(p)}</strong></span><span>勝敗 <strong>${st.w}-${st.l}</strong></span></div>
+      <div class="season-stats-row"><span>投球回 <strong>${Math.floor(st.outs/3)}.${st.outs%3}</strong></span><span>K <strong>${st.k}</strong></span></div>
+    </div>`:
+      `<div class="player-season-line" aria-label="今季野手成績">
+      <div class="season-stats-row"><span class="season-title">今季成績</span><span>試合 <strong>${st.g}</strong></span><span>打率 <strong>${avg(p)}</strong></span></div>
+      <div class="season-stats-row"><span>本塁打 <strong>${st.hr}</strong></span><span>打点 <strong>${st.rbi}</strong></span><span>盗塁 <strong>${st.sb}</strong></span></div>
+    </div>`;
   }
   function abilityShort(label,value){return `<span class="quick-ability">${label} <b style="color:${gradeBriefColor(value)}">${gradeBrief(value)}</b></span>`}
   function nextStarterInfo(t){
