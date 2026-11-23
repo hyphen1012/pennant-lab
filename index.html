@@ -1034,6 +1034,76 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
 
   /* v0.7.1: precomputed inning-by-inning replay for the one-day watch action. */
+
+  /* v0.8.0 — presentation only: the match simulation and save format remain unchanged. */
+  function matchOutcome(g){
+    const mine=g.home===game.selectedId?g.homeScore:g.awayScore;
+    const theirs=g.home===game.selectedId?g.awayScore:g.homeScore;
+    return {mine,theirs,tone:mine>theirs?'win':mine<theirs?'loss':'draw',
+      label:mine>theirs?'勝利':mine<theirs?'敗戦':'引き分け'};
+  }
+  function highlightPlayer(g){
+    if(!g.box?.bat?.length)return null;
+    const winner=g.homeScore>g.awayScore?g.home:g.awayScore>g.homeScore?g.away:game.selectedId;
+    const candidates=g.box.bat.filter(x=>x.teamId===winner);
+    if(!candidates.length)return null;
+    return candidates.slice().sort((a,b)=>{
+      const score=x=>x.hr*5+x.rbi*3+x.h*1.3+x.sb*.8+x.bb*.4;
+      return score(b)-score(a)||b.h-a.h;
+    })[0]||null;
+  }
+  function resultHeroCard(g){
+    const outcome=matchOutcome(g),mine=myTeam(),other=getTeam(g.home===mine.id?g.away:g.home);
+    const star=highlightPlayer(g),player=star?getPlayer(star.id):null;
+    const hasStar=star&&(star.h>0||star.rbi>0||star.sb>0);
+    const lastEvent=Array.isArray(g.events)&&g.events.length?g.events[g.events.length-1]:null;
+    return `<section class="game-result-hero result-${outcome.tone}">
+      <div class="result-lights" aria-hidden="true"></div>
+      <div class="result-intro"><span>GAME SET</span><span>${g.year} SEASON · 第${g.day}戦</span></div>
+      <div class="result-verdict">${outcome.label}</div>
+      <div class="result-score-row">
+        <div class="result-club">${teamBadge(mine)}<strong class="league-club-name ${leagueClass(mine.league)}">${h(mine.short)}</strong><b>${outcome.mine}</b></div>
+        <span class="result-mid">−</span>
+        <div class="result-club">${teamBadge(other)}<strong class="league-club-name ${leagueClass(other.league)}">${h(other.short)}</strong><b>${outcome.theirs}</b></div>
+      </div>
+      <p class="result-dateline">${g.date?formatCalendarDate(g.date):''} · ${g.home===mine.id?'ホームゲーム':'ビジターゲーム'}</p>
+      ${hasStar&&player?`<div class="result-spotlight">
+        <div class="result-spotlight-label">TODAY'S KEY PLAYER</div>
+        <div class="result-spotlight-content">${faceMini(player)}
+          <span><b>${h(player.name)}</b><small>${star.h}安打 · ${star.hr}本塁打 · ${star.rbi}打点${star.sb?' · '+star.sb+'盗塁':''}</small></span>
+        </div>
+      </div>`:lastEvent?`<p class="result-key-event">${h(lastEvent)}</p>`:''}
+    </section>`;
+  }
+  function gameDayIntroScreen(entry,g){
+    const away=getTeam(g.away),home=getTeam(g.home);
+    return `<section class="game-cinematic game-cinematic-intro" aria-label="試合開始">
+      <div class="cinema-stadium" aria-hidden="true"><div class="cinema-field"></div></div>
+      <p class="cinema-overline">PENNANT LAB · ${g.year} SEASON</p>
+      <div class="cinema-date">${formatCalendarDate(entry.date,true)} · 第${g.day}戦</div>
+      <div class="cinema-billboard">
+        <div class="cinema-team">${teamBadge(away)}<strong>${h(away.short)}</strong><small>VISITOR</small></div>
+        <span class="cinema-vs">VS</span>
+        <div class="cinema-team">${teamBadge(home)}<strong>${h(home.short)}</strong><small>HOME</small></div>
+      </div>
+      <div class="cinema-mainword">PLAY BALL</div>
+      <p class="cinema-footnote">本日のペナントレース、まもなくプレーボール。</p>
+      <button class="btn outline cinema-skip" data-action="watch-skip">試合結果へスキップ ›</button>
+    </section>`;
+  }
+  function gameSetScreen(g){
+    const result=matchOutcome(g),mine=myTeam(),opponent=getTeam(g.home===mine.id?g.away:g.home);
+    return `<section class="game-cinematic game-cinematic-outro result-${result.tone}" aria-label="試合終了">
+      <div class="cinema-stadium" aria-hidden="true"><div class="cinema-field"></div></div>
+      <p class="cinema-overline">PENNANT LAB · MATCH FINISHED</p>
+      <div class="cinema-mainword game-set-word">GAME SET</div>
+      <div class="cinema-verdict">${result.label}</div>
+      <p class="cinema-footnote">${h(mine.short)} vs ${h(opponent.short)} · 第${g.day}戦</p>
+      <div class="cinema-result-next">試合結果を表示します</div>
+      <button class="btn outline cinema-skip" data-action="watch-skip">結果を見る ›</button>
+    </section>`;
+  }
+
   function watchInningFrames(g){
     if(!g)return [];
     const frames=[],length=Math.max(g.inningsA?.length||0,g.inningsH?.length||0);
@@ -1048,6 +1118,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const g=game.games.find(x=>x.year===game.year&&x.day===entry.gameNo
       &&(x.home===game.selectedId||x.away===game.selectedId));
     if(!g)return dailyGameScreen(entry);
+    if(ui.watchGame?.phase==='intro')return gameDayIntroScreen(entry,g);
+    if(ui.watchGame?.phase==='final')return gameSetScreen(g);
     const frames=watchInningFrames(g),step=Math.min(Math.max(0,ui.watchGame?.step||0),frames.length);
     const revealed=frames.slice(0,step),away=getTeam(g.away),home=getTeam(g.home);
     const total=teamId=>revealed.filter(x=>x.teamId===teamId).reduce((n,x)=>n+x.runs,0);
@@ -1068,7 +1140,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const note=last?(event||`${current.name}はこの回${last.runs}点を記録`):
       `${away.name} 対 ${home.name} · まもなく試合開始`;
     const progress=frames.length?Math.round(step/frames.length*100):0;
-    return `<div class="watch-game-screen">
+    const justScored=last?.runs>0;
+    const oldScore=last?total(last.teamId)-last.runs:0;
+    const recentEvents=revealed.slice(-6).reverse().flatMap(frame=>
+      (g.events||[]).filter(e=>e.startsWith(`${frame.inning}回 ${getTeam(frame.teamId).short} `))
+        .map(e=>({frame,text:e}))).slice(0,3);
+    return `<div class="watch-game-screen ${justScored?'watch-scored':''}">
       <div class="review-kicker">PENNANT LAB · INNING WATCH</div>
       <section class="panel watch-hero">
         <div class="watch-overline"><span class="watch-live-dot"></span> 試合観戦モード <span>${formatCalendarDate(entry.date)}</span></div>
@@ -1078,10 +1155,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
           <div>${teamBadge(home)}<span class="watch-club ${leagueClass(home.league)}">${h(home.short)}</span><strong>${total(g.home)}</strong></div>
         </div>
         <div class="watch-inning-info"><strong>${inningLabel}</strong><small>${step}/${frames.length} 半イニング</small></div>
+        ${justScored?`<div class="watch-scoring-flash">＋${last.runs} RUNS <small>${h(current.short)} · ${oldScore} → ${total(last.teamId)}</small></div>`:''}
         <div class="watch-progress"><i style="width:${progress}%"></i></div>
       </section>
       <section class="panel watch-scoreboard"><h3 class="panel-title">イニング別スコア</h3><div class="table-wrap"><table class="watch-table"><thead><tr><th>球団</th>${Array.from({length:9},(_,i)=>`<th>${i+1}</th>`).join('')}<th>計</th></tr></thead><tbody>${rows}</tbody></table>${extras}</div></section>
-      <section class="panel watch-commentary"><small>INNING REPORT</small><h3>${inningLabel}</h3><p>${h(note)}</p></section>
+      <section class="panel watch-commentary"><small>INNING REPORT</small><h3>${inningLabel}</h3><p>${h(note)}</p>
+        ${recentEvents.length?`<div class="watch-moment-list">${recentEvents.map(x=>`<div><span>${x.frame.inning}回${x.frame.side}</span><b>${h(x.text)}</b></div>`).join('')}</div>`:''}
+      </section>
       <div class="watch-controls">
         <button class="btn outline" data-action="pause-calendar">${ui.autoPaused?'▶ 再開':'⏸ 一時停止'}</button>
         <button class="btn primary" data-action="watch-skip">試合結果へ ›</button>
@@ -1094,17 +1174,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(ui.watchGame?.year===game.year&&ui.watchGame?.day===entry.gameNo)return watchGameScreen(entry);
     const g=game.games.find(x=>x.year===game.year&&x.day===entry.gameNo&&(x.home===game.selectedId||x.away===game.selectedId));
     if(!g)return `<section class="panel"><h3>${formatCalendarDate(entry.date)}</h3><p>試合結果がありません。</p>${dailyPlaybackControls()}</section>`;
-    const me=myTeam(),opp=getTeam(g.home===me.id?g.away:g.home);
-    const scored=g.home===me.id?g.homeScore:g.awayScore,allowed=g.home===me.id?g.awayScore:g.homeScore;
     return `<div class="review-screen daily-game-screen">
       <div class="review-kicker">${game.year} SEASON · MATCH REPORT</div>
       ${ui.busy?'<div class="game-touch-hint">画面をタップ：一時停止／再開</div>':''}
-      <div class="review-score"><h2>第${g.day}戦 · 試合結果</h2>
-        <span class="match-outcome">${scored>allowed?'勝利':scored<allowed?'敗戦':'引き分け'}</span>
-        <div class="score-pair"><div>${teamBadge(me)}<small class="league-club-name ${leagueClass(me.league)}">${h(me.short)}</small><b>${scored}</b></div>
-        <span class="mid-score">–</span><div>${teamBadge(opp)}<small class="league-club-name ${leagueClass(opp.league)}">${h(opp.short)}</small><b>${allowed}</b></div></div>
-        <div class="review-games-count">${formatCalendarDate(entry.date)}　日次試合レポート</div>
-      </div>
+      ${resultHeroCard(g)}
       ${matchReportBody(g)}
       ${dailyPlaybackControls()}</div>`;
   }
@@ -1891,10 +1964,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function matchReviewScreen(){
     const r=game.pendingReview,g=game.games.find(v=>v.id===r?.gameId&&v.year===r.year);
     if(!r||!g)return `<section class="panel"><h2>試合結果を読み込めませんでした</h2><button class="btn primary full" data-action="finish-review">本部へ進む</button></section>`;
-    const me=myTeam(),myRuns=me.id===g.home?g.homeScore:g.awayScore,oppRuns=me.id===g.home?g.awayScore:g.homeScore;
-    const opp=getTeam(me.id===g.home?g.away:g.home);
-    const outcome=myRuns>oppRuns?'勝利':myRuns<oppRuns?'敗戦':'引き分け';
-    return `<div class="review-screen"><div class="review-kicker">${h(game.year)} SEASON · MATCH REPORT</div><div class="review-score"><h2>第${g.day}戦 · 試合結果</h2><span class="match-outcome">${outcome}</span><div class="score-pair"><div>${teamBadge(me)}<small class="league-club-name ${leagueClass(me.league)}">${h(me.short)}</small><b>${myRuns}</b></div><span class="mid-score">–</span><div>${teamBadge(opp)}<small class="league-club-name ${leagueClass(opp.league)}">${h(opp.short)}</small><b>${oppRuns}</b></div></div><div class="review-games-count">${r.count>1?`${r.count}試合まとめて進行 · 最後の試合を表示中`:'この試合の結果を確認してから、次の日に進みます'}${g.date?' · '+formatCalendarDate(g.date):''}</div></div>${matchReportBody(g)}<button class="btn primary review-game-btn" data-action="finish-review">${game.day>=143?'結果を確認してシーズン終了へ':'結果を確認して次の日へ　›'}</button><p class="review-help">結果確認中は日付を切り替えません。下のボタンで進んでください。</p></div>`;
+    return `<div class="review-screen"><div class="review-kicker">${h(game.year)} SEASON · MATCH REPORT</div>
+      ${resultHeroCard(g)}
+      ${r.count>1?`<p class="review-help">${r.count}試合まとめて進行 · 最後の試合を表示中</p>`:''}
+      ${matchReportBody(g)}
+      <button class="btn primary review-game-btn" data-action="finish-review">${game.day>=143?'結果を確認してシーズン終了へ':'結果を確認して次の日へ　›'}</button>
+      <p class="review-help">結果確認中は日付を切り替えません。下のボタンで進んでください。</p></div>`;
   }
   function resultModal(){
     if(ui.detail==null)return '';
@@ -2182,7 +2257,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   matchReviewScreen=function(){
     const r=game.pendingReview;
     if(r?.mode==='season')return seasonSummary();
-    return oldMatchReview03().replace('<div class="review-score">',`${r?.gameIds?.length>1?batchSummary(r):''}<div class="review-score">`);
+    return oldMatchReview03().replace('<section class="game-result-hero',`${r?.gameIds?.length>1?batchSummary(r):''}<section class="game-result-hero`);
   };
   const oldReport03=matchReportBody;
   matchReportBody=function(g){
@@ -2314,20 +2389,31 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       lastDay=entry;
       if(game.pendingEvent)break; // Major injury pauses even fast skip.
       if(!skip){
+        // Set the intro phase before the first render: never flash the final score.
+        const watchOneDay=oneDay&&entry.type==='game';
+        if(watchOneDay)ui.watchGame={year:game.year,day:entry.gameNo,step:0,phase:'intro'};
         ui.autoDay=entry;
         ui.autoPaused=false;
         save();render();window.scrollTo({top:0,behavior:'instant'});
-        if(oneDay&&entry.type==='game'){
-          // Keep the already-computed outcome hidden until the replay finishes.
+        if(watchOneDay){
+          // The result is already calculated, but every presentation stage is spoiler-safe.
           const g=game.games.find(x=>x.year===game.year&&x.day===entry.gameNo
             &&(x.home===game.selectedId||x.away===game.selectedId));
           const frames=watchInningFrames(g);
-          ui.watchGame={year:game.year,day:entry.gameNo,step:0};ui.watchSkip=false;
-          const interval=mode==='fast'?450:750;
-          for(let step=0;step<=frames.length;step++){
-            if(ui.pauseRequested||document.hidden||ui.watchSkip)break;
-            ui.watchGame.step=step;render();
-            await waitForDailyDisplay(interval);
+          ui.watchSkip=false;
+          await waitForDailyDisplay(mode==='fast'?360:950);
+          if(!ui.pauseRequested&&!document.hidden&&!ui.watchSkip){
+            ui.watchGame.phase='live';
+            const interval=mode==='fast'?400:760;
+            for(let step=0;step<=frames.length;step++){
+              if(ui.pauseRequested||document.hidden||ui.watchSkip)break;
+              ui.watchGame.step=step;render();
+              await waitForDailyDisplay(interval);
+            }
+          }
+          if(!ui.pauseRequested&&!document.hidden&&!ui.watchSkip){
+            ui.watchGame.phase='final';render();
+            await waitForDailyDisplay(mode==='fast'?420:1150);
           }
           ui.watchGame=null;ui.watchSkip=false;
           if(ui.pauseRequested||document.hidden)break;
