@@ -433,7 +433,7 @@ assert.equal(lastPit.id,cp.id,'Late one-to-three run lead uses fresh closer');
 assert(!pitContext.managerMoves.some((m,i)=>i>0&&m.inId===st.id),
   'Removed starter never re-enters');
 assert.equal(pitContext.managerMoves.length,2);
-const slow={id:301,name:'遅い野手',pos:'2B',age:35,speed:38,energy:100,stats:{g:4}};
+const slow={id:301,name:'遅い野手',pos:'2B',age:35,speed:38,defense:42,energy:100,stats:{g:4}};
 const runner={id:302,name:'俊足控え',pos:'2B',age:23,speed:91,defense:84,energy:100,stats:{g:0}};
 const defender={id:303,name:'守備名人',pos:'2B',age:27,speed:40,defense:99,energy:100,stats:{g:0}};
 const benchTeam={id:3,lineup:[301],fieldingRoles:{301:'2B'},
