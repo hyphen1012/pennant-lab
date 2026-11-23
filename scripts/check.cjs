@@ -519,7 +519,7 @@ console.log('PASS: BENCH REPORT defaults to two items and expands/collapses nati
 // score pressure and batter handedness; no withdrawn pitcher can reenter.
 assert.match(html,/function managerMidInningPitcherChoice\(team,inning,lead,bases,outs,batter,context\)/);
 assert.match(html,/managerMidInningPitcherChoice\(fieldTeam,inning,/);
-assert.match(html,/context\.runnerResponsibility\?\.get\(runner\?\.id\)\|\|pitcher/);
+assert(html.includes('context?.runnerResponsibility?.get(runner?.id)||pitcher'));
 assert.match(html,/context\.runnerResponsibility\.set\(fast\.id,inheritedPitcher\)/);
 assert.match(html,/pstat\.pitches=\(Number\(pstat\.pitches\)\|\|0\)\+usedPitches/);
 assert.match(html,/pstat\.bf=\(Number\(pstat\.bf\)\|\|0\)\+1/);
