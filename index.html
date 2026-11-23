@@ -338,13 +338,26 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(max-width:390px){.daily-newspaper{padding:13px 12px}.daily-newspaper.columns .paper-briefs{grid-template-columns:1fr}.paper-dateline{font-size:8px;letter-spacing:0}.paper-icon{flex-basis:42px;height:42px;font-size:21px}.paper-brief{padding:9px 10px}}
 
 /* Touch anywhere on the active daily report to pause, then tap to resume. */
-.app-shell.auto-tappable{touch-action:manipulation;cursor:pointer}
+/* No full-page pointer / WebKit pressed-state overlay: mobile newspaper tap
+   gestures should never paint a translucent flash over the entire screen. */
+.app-shell.auto-tappable{touch-action:manipulation;cursor:default;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.app-shell.auto-tappable,.app-shell.auto-tappable *{-webkit-tap-highlight-color:transparent}
+.app-shell.auto-tappable .main,.app-shell.auto-tappable .daily-newspaper,.app-shell.auto-tappable .daily-game-screen{-webkit-user-select:none;user-select:none}
 .app-shell.auto-tappable .daily-playback button{cursor:pointer}
 .news-gesture-hint{display:block;flex-basis:100%;font-size:11px;letter-spacing:.2px;color:#f0d58d}
 /* Muted violet distinguishes playback instructions from news and club badges. */
 .paper-touch-hint{font-size:11px;font-weight:700;letter-spacing:.15px;color:#f2eaff;background:#372b4f;border:1px solid #9f8bc7;border-left:4px solid #b8a1e5;border-radius:7px;padding:9px 10px;margin:-6px 0 12px;text-align:center;line-height:1.55;box-shadow:0 2px 8px #050a1933}
 .game-touch-hint{font-size:11px;color:#c9ddb9;text-align:center;background:#1a3b3b;border:1px solid #4f7567;border-radius:8px;padding:7px 9px;margin:3px auto 13px;max-width:550px}
 .daily-playback:has(.news-gesture-hint){gap:6px}
+
+/* Match box-score sections use typographic hierarchy, not extra enclosing cards. */
+.review-section-heading{font-size:15px;letter-spacing:.8px;font-weight:900;padding:17px 3px 10px}
+.review-section-heading.hitter-heading{color:#f3ca78;border-bottom:2px solid #9f7b44}
+.review-section-heading.pitcher-heading{color:#9bd8ec;border-bottom:2px solid #477f99}
+.review-stat-table.hitter-stats thead th{color:#f0c683;background:linear-gradient(90deg,#9c783c26,#9c783c0b)}
+.review-stat-table.pitcher-stats thead th{color:#a2d9e8;background:linear-gradient(90deg,#548a9a31,#548a9a10)}
+.review-stat-table.hitter-stats tbody td:nth-child(4){color:#f4d28e;font-weight:800}
+.review-stat-table.pitcher-stats tbody td:nth-child(5){color:#9bdbea;font-weight:800}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -1529,7 +1542,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const pitcherRows=(teamId)=>g.box.pitch.filter(v=>v.teamId===teamId).map(v=>`<tr><td class="name">${h(getPlayer(v.id)?.name||'投手')}</td><td>${Math.floor(v.outs/3)}.${v.outs%3}</td><td>${v.h}</td><td>${v.er}</td><td>${v.k}</td><td>${v.bb}</td></tr>`).join('');
       const ownId=game.selectedId;
       const cards=[ownId,ownId===home.id?away.id:home.id].filter(id=>id===home.id||id===away.id);
-      box=cards.map((tid,index)=>`<${index?'details':'section'} class="panel"><${index?'summary':'h3'} class="panel-title">${h(getTeam(tid).name)} · 今日の個人成績 ${index?'（タップして表示）':''}</${index?'summary':'h3'}><div class="section-label" style="margin-top:9px">打撃</div><div class="table-wrap"><table class="data-table review-stat-table"><thead><tr><th>選手</th><th>打数</th><th>安打</th><th>本</th><th>打点</th><th>四球</th></tr></thead><tbody>${hitterRows(tid)||'<tr><td colspan="6">出場なし</td></tr>'}</tbody></table></div><div class="section-label">投手</div><div class="table-wrap"><table class="data-table review-stat-table"><thead><tr><th>選手</th><th>投球回</th><th>被安打</th><th>自責</th><th>奪三振</th><th>四球</th></tr></thead><tbody>${pitcherRows(tid)||'<tr><td colspan="6">出場なし</td></tr>'}</tbody></table></div></${index?'details':'section'}>`).join('');
+      box=cards.map((tid,index)=>`<${index?'details':'section'} class="panel"><${index?'summary':'h3'} class="panel-title">${h(getTeam(tid).name)} · 今日の個人成績 ${index?'（タップして表示）':''}</${index?'summary':'h3'}><div class="section-label review-section-heading hitter-heading" style="margin-top:9px">野手</div><div class="table-wrap"><table class="data-table review-stat-table hitter-stats"><thead><tr><th>選手</th><th>打数</th><th>安打</th><th>本</th><th>打点</th><th>四球</th></tr></thead><tbody>${hitterRows(tid)||'<tr><td colspan="6">出場なし</td></tr>'}</tbody></table></div><div class="section-label review-section-heading pitcher-heading">投手</div><div class="table-wrap"><table class="data-table review-stat-table pitcher-stats"><thead><tr><th>選手</th><th>投球回</th><th>被安打</th><th>自責</th><th>奪三振</th><th>四球</th></tr></thead><tbody>${pitcherRows(tid)||'<tr><td colspan="6">出場なし</td></tr>'}</tbody></table></div></${index?'details':'section'}>`).join('');
     }else box='<p class="small">旧バージョンの試合には個別の試合成績が保存されていません。</p>';
     return `<section class="panel"><div class="panel-head"><h3 class="panel-title">イニング別スコア</h3><span class="pill">${n}回</span></div><div class="table-wrap"><table class="data-table"><thead><tr><th>球団</th>${Array.from({length:n},(_,i)=>`<th>${i+1}</th>`).join('')}<th>計</th></tr></thead><tbody>${tbody}</tbody></table></div><div class="divider"></div><h3 class="panel-title">主な出来事</h3>${g.events.length?g.events.map(e=>`<div class="event">${h(e)}</div>`).join(''):'<div class="event">本塁打などの特記事項はありません。</div>'}<div class="small" style="margin-top:12px">先発：${h(getPlayer(g.spAway)?.name||'選手')} / ${h(getPlayer(g.spHome)?.name||'選手')}</div></section>${box}`;
   }
