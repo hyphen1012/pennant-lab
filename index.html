@@ -1869,7 +1869,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(!appear.bat.has(chosen.p.id)&&!appear.run.has(chosen.p.id)&&!appear.def.has(chosen.p.id))chosen.p.stats.g++;
     appear.def.add(chosen.p.id);
     if(context.managerMoves)context.managerMoves.push({
-      type:'defense',inning:inning+1,
+      type:'defense',inning:team.id===context.awayId?inning:inning+1,
       side:team.id===context.awayId?'裏':'表',teamId:team.id,
       outId:chosen.previous.id,outName:chosen.previous.name,
       inId:chosen.p.id,inName:chosen.p.name,slot:chosen.slot,role:chosen.role,
