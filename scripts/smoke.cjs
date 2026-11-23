@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
 assert(script);
 const listeners=[];
-const store=new Map(), local=new Map();
+const store=new Map(), local=new Map(), overlays=[];
 const watchRenders=[],introRenders=[],gameSetRenders=[],resultRenders=[],medicalRenders=[],monthlyRenders=[];
 const app={
   _html:'',
@@ -49,7 +49,7 @@ const domElement=()=>({innerHTML:'',textContent:'',className:'',style:{},remove(
   appendChild(){},click(){},setAttribute(){}});
 const document={
   hidden:false,
-  body:{appendChild() {},insertAdjacentHTML(){}},
+  body:{appendChild() {},insertAdjacentHTML(where,markup){overlays.push(markup)}},
   querySelector:sel=>sel==='#app'?app:null,
   querySelectorAll:()=>[],
   createElement:()=>domElement(),
@@ -87,7 +87,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.8\.5 · PORTRAITS/);
+  assert.match(app.innerHTML,/VERSION 0\.8\.6 · PORTRAITS/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -108,6 +108,40 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert.match(app.innerHTML,/class="profile-row"/);
   assert.match(app.innerHTML,/class="avatar player-portrait/);
   assert.match(app.innerHTML,/class="face-artwork"/);
+
+  // Both starting lineup and starting rotation show the same player overall badge
+  // on top of the five-stat ring; the swap list must use it too.
+  dispatch('click',{action:'tab',tab:'roster'});
+  assert.match(app.innerHTML,/スターティングメンバー/);
+  assert.match(app.innerHTML,/class="player-pick-btn roster-pick-btn"/);
+  assert.match(app.innerHTML,/class="portrait-overall"/);
+  assert.match(app.innerHTML,/has-overall/);
+  assert.match(app.innerHTML,/data-kind="lineup"/);
+  dispatch('click',{action:'swap-open',kind:'lineup',slot:'0'});
+  assert(overlays.some(markup=>markup.includes('class="swap-candidate"')),
+    'The swap modal must show replacement player candidates');
+  const modal=overlays.at(-1);
+  assert.match(modal,/class="face-mini [^"]*has-overall"/);
+  assert.match(modal,/class="portrait-overall"/);
+  assert.match(modal,/--avatar-color:#/);
+  dispatch('click',{action:'swap-close'});
+  dispatch('click',{action:'roster-mode',mode:'rotation'});
+  assert.match(app.innerHTML,/data-kind="rotation"/);
+  assert.match(app.innerHTML,/class="portrait-overall"/);
+
+  // The FA market is a readable vertical list rather than a horizontally
+  // scrollable table; draft/foreign scouting may use the same card renderer.
+  dispatch('click',{action:'tab',tab:'business'});
+  dispatch('click',{action:'business-sub',sub:'market'});
+  assert.match(app.innerHTML,/自由契約選手/);
+  assert.match(app.innerHTML,/class="recruit-list"/);
+  assert.match(app.innerHTML,/class="recruit-candidate"/);
+  assert.match(app.innerHTML,/class="face-mini [^"]*has-overall"/);
+  assert.match(app.innerHTML,/class="portrait-overall"/);
+  assert.match(app.innerHTML,/data-action="sign"/);
+  assert.match(app.innerHTML,/契約金/);
+  assert(!app.innerHTML.includes('<table class="data-table">'),
+    'Recruitment screen should not gain a wide horizontal table');
   dispatch('click',{action:'tab',tab:'hq'});
 
   assert.match(app.innerHTML,/data-action="mgr-open"/);
