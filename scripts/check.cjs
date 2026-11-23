@@ -98,3 +98,35 @@ assert.doesNotMatch(html,/data-change="manager-order"/);
 assert.match(html,/m\.discontent>=75/);
 assert.match(html,/辞任の意向/);
 assert.match(html,/契約更改を拒否/);
+
+
+// When contracts expire, high discontent must produce refusal and a caretaker.
+// Happy managers renew without an unexpected dismissal.
+const yStart=inline[1].indexOf('  const prevNext07=nextSeason;');
+const yEnd=inline[1].indexOf('  const prevCalendar07=processCalendarDay;',yStart);
+assert(yStart>0&&yEnd>yStart);
+const endOfYearSource=inline[1].slice(yStart,yEnd);
+function simulateManagerExpiry(discontent){
+  const team={id:2,short:'東京',cash:5,manager:{
+    name:'旧監督',salary:.2,contractYears:1,discontent
+  }};
+  const game={year:2031,day:143,teams:[team],managerHistory:[]};
+  const news=[];
+  const context={game,storageFailure:false,Number,
+    r2:n=>Math.round(n*100)/100,
+    makeManager:()=>({id:'acting',name:'暫定監督',contractYears:2,salary:.14,discontent:0}),
+    pushNews:x=>news.push(x),save(){}};
+  vm.runInNewContext('(function(){let nextSeason=function(){game.year++;game.day=0;};'+
+    endOfYearSource+' nextSeason();})()',context);
+  return {game,news};
+}
+const refused=simulateManagerExpiry(88);
+assert.equal(refused.game.teams[0].manager.name,'暫定監督');
+assert.equal(refused.game.teams[0].manager.contractYears,1);
+assert.match(refused.game.managerHistory[0].text,/契約更改を拒否/);
+assert.equal(refused.news.length,1);
+const renewed=simulateManagerExpiry(10);
+assert.equal(renewed.game.teams[0].manager.name,'旧監督');
+assert.equal(renewed.game.teams[0].manager.contractYears,1);
+assert.match(renewed.game.managerHistory[0].text,/契約を更新/);
+assert.equal(renewed.news.length,0);
