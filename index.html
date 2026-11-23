@@ -1589,7 +1589,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       if(!myTeam().lineup.includes(id))return;
       ui.swap=null;ui.fielding={id};render();return;
     }
-    if(action==='fielding-close'){ui.fielding=null;render();return;}
+    if(action==='fielding-close'){
+      // Tapping an explanatory part inside the dialog must not dismiss it.
+      if(el.classList?.contains('fielding-overlay')&&e.target.closest('[data-stop="true"]'))return;
+      ui.fielding=null;render();return;
+    }
     if(action==='fielding-set'){
       if(!ui.fielding||game.pendingReview||ui.busy)return;
       const id=Number(el.dataset.id),role=el.dataset.role;
