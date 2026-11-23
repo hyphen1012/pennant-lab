@@ -87,7 +87,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.8\.2 · GM BRIEFING/);
+  assert.match(app.innerHTML,/VERSION 0\.8\.3 · WATCH/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -137,6 +137,10 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(watchRenders.some(x=>x.includes('イニング別スコア')));
   assert(watchRenders.some(x=>x.includes('data-action="watch-skip"')));
   assert(watchRenders.some(x=>x.includes('data-action="pause-calendar"')));
+  assert(watchRenders.every(x=>!/\\d+\\/\\d+ 半イニング/.test(x)),
+    'Do not disclose the total number of half-innings before the match ends');
+  assert(watchRenders.every(x=>x.includes('class="watch-progress"')),
+    'Keep the progress gauge visible without a match-length counter');
   assert(!app.innerHTML.includes('watch-game-screen'),'After replay, show the normal game report');
   const after=window.PennantLab.getSnapshot();
   assert(after.day>=1&&after.day<=12);
