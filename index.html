@@ -1639,19 +1639,48 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function pushNews(message,date=calendarNextDay()?.date||null){game.news.unshift(message);game.news=game.news.slice(0,65);(game.newsArchive||(game.newsArchive=[])).push({year:game.year,day:game.day,date,text:message});}
   function lineUpOf(t){repairTeam(t);return t.lineup.map(id=>getPlayer(id)).filter(Boolean);}
-  function choosePitcher(t,inning,starter,lead){
-    const pen=pitchers(t).filter(p=>p.pos==='RP'&&availableForGame(p)).sort((a,b)=>
-      rating(b)*fatigueFactor(b)-rating(a)*fatigueFactor(a)||b.energy-a.energy);
-    const closer=pitchers(t).find(p=>p.pos==='CP'&&availableForGame(p));
-    const early=managerDecision(t,'bullpen');
-    if(inning<=5||!pen.length||(inning===6&&early<68)||(inning===7&&early<32))return starter;
-    if(inning===6)return pen[2]||pen[0];
-    if(inning===7)return pen[1]||pen[0];
-    if(inning===8)return pen[0];
-    if(lead>=1&&lead<=3&&closer&&closer.energy>=35)return closer;
-    return pen[(inning-9)%pen.length]||starter;
-  }
 
+  /* v0.8.8: inning-by-inning pitching staff. No pitcher re-enters after removal. */
+  function managerPitcherChoice(team,inning,lead,context){
+    const state=context.pitching[team.id];
+    const incumbent=state.current;
+    if(!incumbent)return null;
+    const outs=incumbent.stats.outs-(context.outsBefore.get(incumbent.id)||0);
+    const ratingPitch=managerRatings(team.manager).pitch;
+    const aggressive=managerDecision(team,'bullpen');
+    const latePressure=(inning>=8&&lead>=-2&&lead<=4);
+    // Manager competence changes when pressure and observed workload justify a change.
+    const desired=incumbent.pos==='SP'
+      ?(aggressive>=70?5:aggressive>=40?6:7)+(ratingPitch<52?1:0)
+      :(incumbent.pos==='CP'?2:3);
+    const tiring=incumbent.pos==='SP'?outs>=18:outs>=6;
+    const overworked=incumbent.pos==='SP'?outs>=24:outs>=9;
+    const exhausted=incumbent.energy<26;
+    const change=overworked||exhausted||(inning>desired&&(tiring||latePressure))
+      ||(incumbent.pos==='SP'&&inning>=desired&&tiring);
+    if(!change)return incumbent;
+    const available=pitchers(team).filter(p=>p.id!==incumbent.id
+      &&['RP','CP'].includes(p.pos)&&availableForGame(p)&&!state.used.has(p.id));
+    if(!available.length)return incumbent;
+    const preferCloser=inning>=9&&lead>=1&&lead<=3;
+    const relievers=available.map(p=>{
+      const hand=effectiveSkill(p,'stuff')*.58+effectiveSkill(p,'control')*.42;
+      const type=(p.pos==='CP'?(preferCloser?16:inning<8?-18:-6):(preferCloser?-4:4));
+      const energy=clamp((p.energy-65)*.14,-8,6);
+      const pressure=latePressure?ratingPitch*.025:0;
+      return {p,score:hand+type+energy+pressure};
+    }).sort((x,y)=>y.score-x.score||x.p.id-y.p.id);
+    const chosen=relievers[0].p;
+    state.used.add(chosen.id);
+    state.current=chosen;
+    if(context.managerMoves)context.managerMoves.push({
+      type:'pitch',inning,side:team.id===context.awayId?'裏':'表',
+      teamId:team.id,outId:incumbent.id,outName:incumbent.name,
+      inId:chosen.id,inName:chosen.name,role:'投手',
+      managerId:team.manager?.id||null,managerName:team.manager?.name||'監督'
+    });
+    return chosen;
+  }
   /* v0.8.7: GM sets pregame tactics; the manager chooses actual game-day players.
      Substitution is local to this match and never rewrites the GM's saved lineup. */
   function liveDefenseScore(team,activeLineup){
