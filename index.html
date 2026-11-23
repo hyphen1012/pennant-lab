@@ -1631,15 +1631,71 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(lead>=1&&lead<=3&&closer&&closer.energy>=35)return closer;
     return pen[(inning-9)%pen.length]||starter;
   }
-  function halfInning(batTeam,fieldTeam,pitcher,batters,indexes,inning,targetScore,appear,events,scoringPlays){
+
+  /* v0.8.7: GM sets pregame tactics; the manager chooses actual game-day players.
+     Substitution is local to this match and never rewrites the GM's saved lineup. */
+  function liveDefenseScore(team,activeLineup){
+    if(!activeLineup||activeLineup.every((p,i)=>p?.id===team.lineup[i]))return teamDefenseScore(team);
+    const roles=syncLineupFielding(team);
+    let total=0,weight=0;
+    for(const [role,w] of Object.entries(FIELD_WEIGHTS)){
+      const slot=team.lineup.findIndex(id=>roles[id]===role);
+      const substitute=slot>=0?activeLineup[slot]:null;
+      total+=w*(substitute?effectiveFielding(substitute,role):20);
+      weight+=w;
+    }
+    return weight?total/weight:60;
+  }
+  function pinchHitterChoice(team,current,pitcher,slot,bases,inning,context){
+    if(!context||inning<7||!current||context.changed[team.id].has(slot))return null;
+    const appetite=managerDecision(team,'pinch');
+    const quota=appetite>=68?2:appetite>=36?1:0;
+    if(context.pinchUsed[team.id]>=quota || (inning===7&&appetite<68))return null;
+    // Preserve a late lead; a tying or winning run situation encourages action.
+    if(context.scoreDiff>0||(context.scoreDiff< -5 && appetite<78))return null;
+    const originalId=team.lineup[slot],role=team.fieldingRoles?.[originalId];
+    if(!role)return null; // Never allow an unknown defensive position.
+    const youth=managerDecision(team,'youth');
+    const managerField=managerRatings(team.manager).field;
+    const hasRunners=bases.some(Boolean);
+    const strength=p=>effectiveSkill(p,'contact')*(hasRunners?.57:.72)
+      +effectiveSkill(p,'power')*(hasRunners?.43:.28);
+    const source=context.bench[team.id].filter(p=>availableForGame(p)
+      &&(role==='DH'||fieldingTier(p,role)!=='off'));
+    if(!source.length)return null;
+    const sorted=source.map(p=>({
+      player:p,score:strength(p)+(youth>=62&&p.age<=25?Math.min(5,(youth-55)*.16):0)
+    })).sort((a,b)=>b.score-a.score||a.player.id-b.player.id);
+    const best=sorted[0];
+    const minGain=clamp(5+(65-managerField)*.055-(appetite-50)*.07,1.5,9);
+    return best.score>=strength(current)+minGain?best.player:null;
+  }
+  function managerPinchBatter(team,batters,indexes,inning,bases,pitcher,context){
+    if(!context)return batters[indexes[team.id]%batters.length];
+    const slot=indexes[team.id]%batters.length,current=batters[slot];
+    const chosen=pinchHitterChoice(team,current,pitcher,slot,bases,inning,context);
+    if(!chosen)return current;
+    batters[slot]=chosen;
+    context.bench[team.id]=context.bench[team.id].filter(p=>p.id!==chosen.id);
+    context.changed[team.id].add(slot);
+    context.pinchUsed[team.id]++;
+    if(context.managerMoves)context.managerMoves.push({
+      inning,side:team.id===context.awayId?'表':'裏',teamId:team.id,
+      outId:current.id,outName:current.name,inId:chosen.id,inName:chosen.name,
+      slot,role:team.fieldingRoles[team.lineup[slot]]
+    });
+    return chosen;
+  }
+  function halfInning(batTeam,fieldTeam,pitcher,batters,indexes,inning,targetScore,appear,events,scoringPlays,context){
     let out=0,run=0,bases=[null,null,null],pa=0,walkOff=false;
     const bst=batTeam.id,field=fieldTeam.id;
-    const defense=clamp(teamDefenseScore(fieldTeam)+(managerDecision(fieldTeam,'defense')-50)*.06,20,98);
+    const defense=clamp(liveDefenseScore(fieldTeam,context?.activeLineups?.[fieldTeam.id])
+      +(managerDecision(fieldTeam,'defense')-50)*.06,20,98);
     const pstat=pitcher.stats;
     if(!appear.pitch.has(pitcher.id)){pstat.g++;appear.pitch.add(pitcher.id)}
     const scoreRunner=(runner)=>{run++;if(runner)runner.stats.r++;pstat.er++};
     while(out<3&&pa<35){
-      pa++;const batter=batters[indexes[bst]%batters.length];indexes[bst]++;
+      pa++;const batter=managerPinchBatter(batTeam,batters,indexes,inning,bases,pitcher,context);indexes[bst]++;
       if(!batter)break;
       const st=batter.stats;
       if(!appear.bat.has(batter.id)){st.g++;appear.bat.add(batter.id)}
