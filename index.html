@@ -1491,7 +1491,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(lead>=1&&lead<=3&&closer&&closer.energy>=35)return closer;
     return pen[(inning-9)%pen.length]||starter;
   }
-  function halfInning(batTeam,fieldTeam,pitcher,batters,indexes,inning,targetScore,appear,events){
+  function halfInning(batTeam,fieldTeam,pitcher,batters,indexes,inning,targetScore,appear,events,scoringPlays){
     let out=0,run=0,bases=[null,null,null],pa=0,walkOff=false;
     const bst=batTeam.id,field=fieldTeam.id;
     const defense=clamp(teamDefenseScore(fieldTeam)+(managerDecision(fieldTeam,'defense')-50)*.06,20,98);
@@ -1513,7 +1513,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const pHit=clamp(.245+(contact-55)*.00175-(stuff-55)*.0010
         +(60-defense)*.00135,.115,.42);
       let r=rand(),rbi=0;
+      const runsBefore=run;
+      let scoringKind='';
       if(r<pWalk){
+        scoringKind='walk';
         st.bb++;pstat.bb++;
         if(bases[0]){
           if(bases[1]){
@@ -1531,20 +1534,24 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         const hrChance=clamp(.055+(power-50)*.0020-(stuff-55)*.0004,.01,.21);
         const extr=rand();
         if(extr<hrChance){
+          scoringKind='hr';
           st.hr++;
           for(const runner of old)if(runner){scoreRunner(runner);rbi++}
           scoreRunner(batter);rbi++;
           if(events.length<20)events.push(`${inning}回 ${batTeam.short} ${batter.name}が${rbi}ラン本塁打`);
         }else if(extr<hrChance+.022){
+          scoringKind='triple';
           st.triples++;
           for(const runner of old)if(runner){scoreRunner(runner);rbi++}
           bases[2]=batter;
         }else if(extr<hrChance+.23){
+          scoringKind='double';
           st.doubles++;
           for(const runner of [old[2],old[1]])if(runner){scoreRunner(runner);rbi++}
           if(old[0]){if(rand()<.50){scoreRunner(old[0]);rbi++}else bases[2]=old[0]}
           bases[1]=batter;
         }else{
+          scoringKind='single';
           if(old[2]){scoreRunner(old[2]);rbi++}
           if(old[1]){
             if(rand()<clamp(.38+effectiveSkill(old[1],'speed')*.004, .4,.83)){scoreRunner(old[1]);rbi++}
@@ -1557,6 +1564,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
           bases[0]=batter;
         }
       }else{
+        scoringKind='out';
         st.ab++;
         if(bases[0]&&!bases[1]&&out<2&&rand()<clamp((managerDecision(batTeam,'bunt')-25)*.0017,0,.11)){
           st.ab--;bases[1]=bases[0];bases[0]=null;out++;pstat.outs++;
@@ -1567,6 +1575,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         }
       }
       st.rbi+=rbi;
+      // Persist authentic scoring plate appearances only for games with a watched club.
+      // One event is recorded per scoring play, not a fabricated inning summary.
+      if(scoringPlays&&run>runsBefore){
+        scoringPlays.push({inning,teamId:batTeam.id,batterId:batter.id,
+          batterName:batter.name,kind:scoringKind,runs:run-runsBefore,rbi});
+      }
       if(bases[0]&&!bases[1]&&effectiveSkill(bases[0],'speed')>=63&&rand()<(effectiveSkill(bases[0],'speed')-57)*.00125*(.55+managerDecision(batTeam,'steal')/100)){
         bases[1]=bases[0];bases[0]=null;bases[1].stats.sb++;
       }
@@ -1595,16 +1609,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const appear={bat:new Set(),pitch:new Set()};
     const indexes={[home.id]:0,[away.id]:0};
     const inningsH=[],inningsA=[],events=[];
+    const scoringPlays=watchBox?[]:null;
     let homeScore=0,awayScore=0;
     let closerH=null,closerA=null;
     for(let i=1;i<=12;i++){
       const awayPitcher=choosePitcher(home,i,spHome,homeScore-awayScore);
-      const top=halfInning(away,home,awayPitcher,lineupA,indexes,i,null,appear,events);
+      const top=halfInning(away,home,awayPitcher,lineupA,indexes,i,null,appear,events,scoringPlays);
       inningsA.push(top.run);awayScore+=top.run;
       if(awayPitcher.pos==='CP')closerH=awayPitcher;
       if(i>=9&&homeScore>awayScore){inningsH.push(null);break}
       const homePitcher=choosePitcher(away,i,spAway,awayScore-homeScore);
-      const bot=halfInning(home,away,homePitcher,lineupH,indexes,i,{current:homeScore,away:awayScore},appear,events);
+      const bot=halfInning(home,away,homePitcher,lineupH,indexes,i,{current:homeScore,away:awayScore},appear,events,scoringPlays);
       inningsH.push(bot.run);homeScore+=bot.run;
       if(homePitcher.pos==='CP')closerA=homePitcher;
       if(i>=9&&(homeScore!==awayScore||bot.walkOff))break;
@@ -1626,6 +1641,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const result={id:game.games.length+1,year:game.year,day:game.day+1,
       date:calendarNextDay()?.date||null,home:home.id,away:away.id,homeScore,awayScore,inningsH,inningsA,events:events.slice(0,8),outcome,spHome:spHome.id,spAway:spAway.id};
     if(watchBox){
+      result.scoringPlays=scoringPlays;
       const delta=(p,k)=>Number(p.stats[k]||0)-Number(preStats.get(p.id)?.[k]||0);
       result.box={
         bat:watchPlayers.filter(p=>!isPitch(p)&&delta(p,'pa')>0).map(p=>({id:p.id,teamId:p.teamId,pa:delta(p,'pa'),ab:delta(p,'ab'),h:delta(p,'h'),hr:delta(p,'hr'),rbi:delta(p,'rbi'),bb:delta(p,'bb'),k:delta(p,'k'),sb:delta(p,'sb')})),
