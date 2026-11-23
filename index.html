@@ -1894,16 +1894,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     };
     while(out<3&&pa<35){
       pa++;
-      // Check real game pitch count and the next batter's hitting side before each PA.
-      const onDeck=batters[indexes[bst]%batters.length];
+      // The batting manager announces a real pinch hitter first; the defending
+      // manager then evaluates the handedness of the batter actually facing him.
+      const batter=managerPinchBatter(batTeam,batters,indexes,inning,bases,pitcher,context);indexes[bst]++;
+      if(!batter)break;
       const nextPitcher=managerMidInningPitcherChoice(fieldTeam,inning,
-        -(context?.scoreDiff||0)-run,bases,out,onDeck,context);
+        -(context?.scoreDiff||0)-run,bases,out,batter,context);
       if(nextPitcher&&nextPitcher.id!==pitcher.id){
         pitcher=nextPitcher;pstat=pitcher.stats;
         if(!appear.pitch.has(pitcher.id)){pstat.g++;appear.pitch.add(pitcher.id)}
       }
-      const batter=managerPinchBatter(batTeam,batters,indexes,inning,bases,pitcher,context);indexes[bst]++;
-      if(!batter)break;
       const st=batter.stats;
       if(!appear.bat.has(batter.id)){if(!appear.run.has(batter.id)&&!appear.def.has(batter.id))st.g++;appear.bat.add(batter.id)}
       st.pa++;
