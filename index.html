@@ -2760,7 +2760,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       return `<div class="manager-move-row">
         ${p?faceMini(p):'<span class="manager-move-fallback">⚾</span>'}
         <div><strong>${move.inning}回${h(move.side)} · ${h(t?.short||'球団')} · ${managerMoveLabel(move)} ${h(move.inName)}</strong>
-        <small>${h(move.outName)}に代わって出場 · ${h(move.role||'選手')}</small></div>
+        <small>${h(move.outName)}に代わって出場 · ${h(move.role||'選手')}${move.type==='pitch'&&move.midInning&&Number.isFinite(move.pitchCount)?` · ${move.pitchCount}球で交代${move.reason?' · '+h(move.reason):''}`:''}</small></div>
       </div>`;
     };
     return `<section class="panel manager-match-report">
