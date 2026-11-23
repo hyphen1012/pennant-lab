@@ -603,8 +603,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     syncLineupFielding(team);
   }
   function repairTeam(team){
-    const allHit=hitters(team).sort((a,b)=>btrRating(b)-btrRating(a));
-    const allSP=pitchers(team).filter(p=>p.pos==='SP').sort((a,b)=>rating(b)-rating(a));
+    const allHit=hitters(team).filter(availableForGame).sort((a,b)=>btrRating(b)-btrRating(a));
+    const allSP=pitchers(team).filter(p=>p.pos==='SP'&&availableForGame(p)).sort((a,b)=>rating(b)-rating(a));
     const validHit=new Set(allHit.map(p=>p.id));
     const validSP=new Set(allSP.map(p=>p.id));
     let l=[...new Set((team.lineup||[]).filter(id=>validHit.has(id)))];
@@ -861,6 +861,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function dailyBulletin(entry){
     if(!Array.isArray(game.dailyBulletins))game.dailyBulletins=[];
     if(!Array.isArray(game.conditionArchive))game.conditionArchive=[];
+    if(!Array.isArray(game.injuryArchive))game.injuryArchive=[];
     let edition=game.dailyBulletins.find(x=>x.year===game.year&&x.date===entry.date);
     if(!edition){
       edition=buildDailyNews(entry);
@@ -976,7 +977,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function processCalendarDay(){
     const entry=calendarNextDay();
     if(!entry)return null;
-    // Recovery is applied on every calendar day, including rest days.
+    // Recovery and injury healing advance on every calendar day.
+    progressInjuries(entry.date);
     restoreDailyCondition(entry.type);
     if(entry.type==='game'){
       if(entry.gameNo!==game.day+1)throw Error('Calendar game count out of sync');
@@ -1004,7 +1006,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     });
     ['C','1B','2B','3B','SS','OF','OF','OF','OF','SP','SP','SP','RP','RP','CP','SP','OF','SS','2B','1B','RP','C'].forEach(pos=>addPlayer(null,pos));
     game.schedule=scheduleForSeason();game.calendar=calendarForSeason(game.year);
-    game.calendarIndex=0;game.monthlyArchive=[];game.dailyBulletins=[];game.conditionArchive=[];game.pendingMonth=null;game.playbackMode='normal';game.advanceTarget=null;
+    game.calendarIndex=0;game.monthlyArchive=[];game.dailyBulletins=[];game.conditionArchive=[];game.injuryArchive=[];game.pendingEvent=null;game.pendingMonth=null;game.playbackMode='normal';game.advanceTarget=null;
     game.monthStart=monthlySnapshot(game.calendar.days[0].date);
     game.news=['新リーグが開幕！ 12球団による143試合制のペナントが始まります。'];
     save();
@@ -1063,9 +1065,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function pushNews(message,date=calendarNextDay()?.date||null){game.news.unshift(message);game.news=game.news.slice(0,65);(game.newsArchive||(game.newsArchive=[])).push({year:game.year,day:game.day,date,text:message});}
   function lineUpOf(t){repairTeam(t);return t.lineup.map(id=>getPlayer(id)).filter(Boolean);}
   function choosePitcher(t,inning,starter,lead){
-    const pen=pitchers(t).filter(p=>p.pos==='RP').sort((a,b)=>
+    const pen=pitchers(t).filter(p=>p.pos==='RP'&&availableForGame(p)).sort((a,b)=>
       rating(b)*fatigueFactor(b)-rating(a)*fatigueFactor(a)||b.energy-a.energy);
-    const closer=pitchers(t).find(p=>p.pos==='CP');
+    const closer=pitchers(t).find(p=>p.pos==='CP'&&availableForGame(p));
     if(inning<=5||!pen.length)return starter;
     if(inning===6)return pen[2]||pen[0];
     if(inning===7)return pen[1]||pen[0];
@@ -1157,8 +1159,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function simulateGame(match){
     const home=getTeam(match.home),away=getTeam(match.away);
     const lineupH=lineUpOf(home),lineupA=lineUpOf(away);
-    const spHome=getPlayer(home.rotation[home.starterIndex%home.rotation.length]);
-    const spAway=getPlayer(away.rotation[away.starterIndex%away.rotation.length]);
+    const readyStarter=t=>{
+      repairTeam(t);
+      const pool=t.rotation.map(getPlayer).filter(availableForGame);
+      const backup=pitchers(t).filter(availableForGame).sort((a,b)=>rating(b)-rating(a));
+      return pool.length?pool[t.starterIndex%pool.length]:backup[0];
+    };
+    const spHome=readyStarter(home),spAway=readyStarter(away);
+    if(!spHome||!spAway)throw Error('No available pitcher: injury roster protection failed');
     home.starterIndex++;away.starterIndex++;
     const watchBox=(home.id===game.selectedId||away.id===game.selectedId);
     const watchPlayers=watchBox?[...new Map([...lineupH,...lineupA,...pitchers(home),...pitchers(away)].map(p=>[p.id,p])).values()]:[];
@@ -1215,6 +1223,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const today=game.schedule[game.day];
     for(const match of today)simulateGame(match);
     game.day++;
+    // Injury news is emitted after day++ so it is stored on the right match day.
+    for(const e of game.injuryEventsToday||[]){
+      const p=getPlayer(e.playerId),t=getTeam(e.teamId);
+      pushNews(`${t.short}・${p.name}に${e.label}。復帰まで約${e.days}日。`,e.date);
+      if(e.teamId===game.selectedId&&e.days>=14&&!game.pendingEvent)
+        game.pendingEvent={type:'injury',...e};
+    }
+    game.injuryEventsToday=[];
     // Simple prototype fan/evaluation simulation; does not affect existing baseball calculations.
     const mine=myTeam(),last=gameByTeam(mine.id);
     if(last){
@@ -1254,7 +1270,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       });
       p.salary=r2(clamp(p.salary*.72+Math.pow(rating(p)/70,3)*.095,.05,2.5));
       p.stats=newStats(isPitch(p));
-      initCondition(p);p.energy=100;p.lastAppearanceDay=null;
+      initCondition(p);p.energy=100;p.lastAppearanceDay=null;p.injury=null;
     }
     const finalRank = Object.fromEntries(game.teams.map(t=>[t.id,rankings(t.league).findIndex(x=>x.id===t.id)]));
     const finalWins = Object.fromEntries(game.teams.map(t=>[t.id,t.wins]));
@@ -1317,6 +1333,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     p.energy=clamp(Math.round(Number.isFinite(p.energy)?p.energy:100),0,100);
     p.recoveryDays=Number.isFinite(p.recoveryDays)?recoverySpan(p):4+((Number(p.id)||0)*53+7)%3;
     if(!Number.isInteger(p.lastAppearanceDay))p.lastAppearanceDay=null;
+    if(!p.injury||!Number.isFinite(p.injury.daysLeft)||p.injury.daysLeft<=0)p.injury=null;
     return p;
   }
   // No rubber banding: only the player's own physical condition affects skill.
@@ -1326,8 +1343,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     return 1-Math.max(0,85-p.energy)*.0035;
   }
   const effectiveSkill=(p,key)=>p[key]*fatigueFactor(p);
-  const conditionColor=p=>p.energy>=75?'#60c99e':p.energy>=45?'#eac675':'#e88b8e';
-  const conditionLabel=p=>p.energy>=85?'良好':p.energy>=60?'やや疲労':p.energy>=35?'疲労':'要休養';
+  const conditionColor=p=>p.injury?'#e8949b':p.energy>=75?'#60c99e':p.energy>=45?'#eac675':'#e88b8e';
+  const conditionLabel=p=>p.injury?`負傷 残${p.injury.daysLeft}日`:p.energy>=85?'良好':p.energy>=60?'やや疲労':p.energy>=35?'疲労':'要休養';
+  const availableForGame=p=>!!p&&!p.injury;
   function conditionBar(p){
     initCondition(p);
     return `<div class="condition-status" aria-label="${h(p.name)}のコンディション ${p.energy}%">
@@ -1345,6 +1363,38 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       p.energy=clamp(p.energy+gain,0,100);
     }
   }
+  function progressInjuries(iso){
+    for(const p of game.players){
+      if(!p.injury||p.teamId==null||p.teamId<0)continue;
+      p.injury.daysLeft--;
+      if(p.injury.daysLeft>0)continue;
+      const old=p.injury;
+      p.injury=null;
+      pushNews(`${getTeam(p.teamId).short}・${p.name}が${old.label}から復帰。`,iso);
+    }
+  }
+  function considerInjury(p,entryDate){
+    if(p.injury||p.teamId==null||p.teamId<0)return;
+    const t=getTeam(p.teamId);
+    // Never strand the lineup or leave a club entirely without pitchers.
+    const healthy=(isPitch(p)?pitchers(t):hitters(t)).filter(availableForGame).length;
+    if(healthy<=(isPitch(p)?3:9))return;
+    const risk=(isPitch(p)?.0021:.00075)*(1+(100-p.energy)/39)*(p.age>=33?1.28:1);
+    if(rand()>=risk)return;
+    // The outcome is probabilistic even at full energy; exhaustion only
+    // raises likelihood and severity.
+    const fatigue=(100-p.energy)/100,roll=rand();
+    const serious=roll<(.07+fatigue*.12);
+    const moderate=!serious&&roll<(.30+fatigue*.17);
+    const label=serious?'長期離脱':moderate?'筋肉の負傷':'軽い張り';
+    const days=serious?ri(21,46):moderate?ri(9,20):ri(3,8);
+    p.injury={label,daysLeft:days,totalDays:days,date:entryDate,level:serious?'serious':moderate?'moderate':'minor'};
+    if(!Array.isArray(game.injuryArchive))game.injuryArchive=[];
+    const info={year:game.year,day:game.day+1,date:entryDate,playerId:p.id,teamId:t.id,label,days,level:p.injury.level};
+    game.injuryArchive.push(info);
+    if(!Array.isArray(game.injuryEventsToday))game.injuryEventsToday=[];
+    game.injuryEventsToday.push(info);
+  }
   function consumeGameCondition(players,appear,outsBefore){
     const unique=new Map(players.map(p=>[p.id,p]));
     for(const p of unique.values()){
@@ -1357,6 +1407,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const pitchLoad=pitched?(p.pos==='SP'?Math.min(84,46+Math.round(thrown*.9)):Math.min(39,15+Math.round(thrown*.8))):0;
       p.energy=clamp(p.energy-battingLoad-pitchLoad,0,100);
       p.lastAppearanceDay=game.calendarIndex;
+      considerInjury(p,calendarNextDay()?.date||null);
     }
   }
   function ensurePlayerExtras(p){
@@ -1375,6 +1426,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(!Array.isArray(game.newsArchive))game.newsArchive=[];
     if(!Array.isArray(game.dailyBulletins))game.dailyBulletins=[];
     if(!Array.isArray(game.conditionArchive))game.conditionArchive=[];
+    if(!Array.isArray(game.injuryArchive))game.injuryArchive=[];
     if(!game.calendar||game.calendar.year!==game.year||!Array.isArray(game.calendar.days))
       game.calendar=calendarForSeason(game.year);
     if(!Number.isInteger(game.calendarIndex)||game.calendarIndex<0||game.calendarIndex>game.calendar.days.length){
@@ -1621,7 +1673,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     return `<div class="roster-screen"><div class="roster-intro"><div><h2 class="page-title">選手・チーム編成</h2><p class="page-sub">${game.year}年 · ${game.day}試合終了時点の今季成績</p></div><button class="btn sm outline" data-action="back-to-hq">‹ 戻る</button></div><div class="control-bar"><div class="chips">${menus.map(([tab,label])=>`<button class="chip ${ui.rosterMode===tab?'active':''}" data-action="roster-mode" data-mode="${tab}">${label}</button>`).join('')}</div><span class="pill">所属 ${own(t).length}/30人</span></div>${ui.rosterMode==='lineup'?lineupScreen(t):ui.rosterMode==='rotation'?rotationScreen(t):playersScreen(t)}${rosterActions()}</div>`;
   }
   function lineupScreen(t){
-    const arr=hitters(t).sort((a,b)=>rating(b)-rating(a));
+    const arr=hitters(t).filter(availableForGame).sort((a,b)=>rating(b)-rating(a));
     const fielding=syncLineupFielding(t);
     return `<section class="panel lineup-wrap"><div class="panel-head"><h3 class="panel-title">スターティングメンバー</h3><span class="small">DH制・9人</span></div><p class="small">名前を押すと選手入れ替え、番号横の守備位置を押すと守備変更、▲ ▼で打順変更。能力はS〜F表示。</p>${t.lineup.map((id,i)=>{
       const p=getPlayer(id);
@@ -1631,7 +1683,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }).join('')}<p class="tiny" style="margin:13px 0 0">※守備適性はメイン100%・サブ82%・適性外55%。DHは守備しません。守備力は相手の安打確率に影響します。</p></section>`;
   }
   function rotationScreen(t){
-    const all=pitchers(t).filter(p=>p.pos==='SP').sort((a,b)=>rating(b)-rating(a));
+    const all=pitchers(t).filter(p=>p.pos==='SP'&&availableForGame(p)).sort((a,b)=>rating(b)-rating(a));
     return `${nextStarterInfo(t)}<section class="panel lineup-wrap"><div class="panel-head"><h3 class="panel-title">先発ローテーション</h3><span class="pill">5人制</span></div><p class="small">投手ごとの今季防御率・登板・勝敗を確認しながら、登板順を変更できます。</p>${t.rotation.map((id,i)=>{
       const p=getPlayer(id);if(!p)return '';
       const active=i===t.starterIndex%t.rotation.length;
@@ -2074,7 +2126,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       if(html)document.body.insertAdjacentHTML('beforeend',html);
     }
     if(ui.swap&&ui.page==='game'&&!game.pendingReview){
-    const t=myTeam(),kind=ui.swap.kind,players=kind==='lineup'?hitters(t):pitchers(t).filter(p=>p.pos==='SP');
+    const t=myTeam(),kind=ui.swap.kind,players=kind==='lineup'?hitters(t).filter(availableForGame):pitchers(t).filter(p=>p.pos==='SP'&&availableForGame(p));
     players.sort((a,b)=>rating(b)-rating(a));
     const box=`<div class="overlay" data-action="swap-close"><div class="swap-dialog" role="dialog" aria-modal="true" data-stop="true"><div class="swap-head"><h3>選手を入れ替える</h3><button class="btn sm outline" data-action="swap-close">閉じる ✕</button></div><p class="small">能力と今季成績を見比べて選択してください。</p><div class="swap-list">${players.map(p=>`<button class="swap-candidate" data-action="swap-select" data-id="${p.id}">${faceMini(p)}<span class="swap-data"><b>${h(p.name)} <small>(${namePos(p.pos)}・${throwBat(p)})</small></b><span>${isPitch(p)?`防御率 ${era(p)} · ${p.stats.w}勝 · K${p.stats.k}`:`打率 ${avg(p)} · ${p.stats.hr}本 · ${p.stats.rbi}点`}</span></span><span class="swap-ability" style="color:${gradeBriefColor(rating(p))}">${gradeBrief(rating(p))}</span></button>`).join('')}</div></div></div>`;
     document.body.insertAdjacentHTML('beforeend',box);
@@ -2215,7 +2267,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(action==='swap-open'){ui.fielding=null;ui.swap={kind:el.dataset.kind,slot:Number(el.dataset.slot)};render();return;}
     if(action==='swap-close'){ui.swap=null;document.querySelector('.overlay:has(.swap-dialog)')?.remove();return;}
     if(action==='swap-select'){
-      if(!ui.swap)return;
+      if(!ui.swap||!availableForGame(getPlayer(el.dataset.id)))return;
       const arr=ui.swap.kind==='lineup'?myTeam().lineup:myTeam().rotation,slot=ui.swap.slot,id=Number(el.dataset.id),old=arr[slot],other=arr.indexOf(id);
       if(other>=0)arr[other]=old;
       arr[slot]=id;if(ui.swap.kind==='lineup')syncLineupFielding(myTeam());ui.swap=null;save();render();return;
