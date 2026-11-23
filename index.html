@@ -428,7 +428,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const cycle=Math.floor(i/6),rotation=i%6;
       return eastIds.map((eid,j)=>{
         const wid=westIds[(j+rotation)%6];
-        const eastHome=cycle===0||(cycle===2&&((j+rotation)%2===0));
+        const eastHome=cycle===0||(cycle===2&&rotation%2===0);
         return {home:eastHome?eid:wid,away:eastHome?wid:eid,kind:'interleague'};
       });
     });
