@@ -63,7 +63,7 @@ function dispatch(type,data={}){
     classList:{contains:()=>false},
     closest:selector=>selector==='[data-action]'&&data.action?el:null
   };
-  const event={target:el,preventDefault(){},stopImmediatePropagation(){this.stopped=true;},stopped:false};
+  const event={target:el,preventDefault(){},stopPropagation(){},stopImmediatePropagation(){this.stopped=true;},stopped:false};
   const acts=listeners.filter(l=>l.type===type);
   for(const l of [...acts.filter(x=>x.capture),...acts.filter(x=>!x.capture)]){
     if(event.stopped)break;
@@ -97,5 +97,31 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(after.games>=0);
   await flush();
   assert(store.get(1)?.data,'Game save should be persisted');
+
+  // Play a complete season with skip mode, acknowledging month-end and injury reports.
+  dispatch('click',{action:'auto-day-close'});
+  dispatch('click',{action:'playback-mode',mode:'skip'});
+  let done=false;
+  for(let attempt=0;attempt<120;attempt++){
+    const before=window.PennantLab.getSnapshot().day;
+    if(before===143){done=true;break;}
+    const page=app.innerHTML;
+    if(page.includes('data-action="injury-ack"'))dispatch('click',{action:'injury-ack'});
+    else if(page.includes('data-action="finish-month"'))dispatch('click',{action:'finish-month'});
+    else if(page.includes('data-action="finish-review"'))dispatch('click',{action:'finish-review'});
+    await window.PennantLab.advance(attempt===0?143:'resume');
+    const now=window.PennantLab.getSnapshot().day;
+    if(now===before&&!app.innerHTML.includes('data-action="injury-ack"')&&
+      !app.innerHTML.includes('data-action="finish-month"')&&
+      !app.innerHTML.includes('data-action="finish-review"')){
+      throw new Error('Season made no progress at game '+now);
+    }
+  }
+  const full=window.PennantLab.getSnapshot();
+  assert(done||full.day===143,'The full 143-game schedule must complete');
+  assert.equal(full.games,858,'12 teams × 143 games should result in 858 games');
+  for(const team of full.teams)assert.equal(team.w+team.l+team.t,143,'Every club plays 143 games');
+  console.log('PASS: full 143-game season, 858 games, all 12 clubs, monthly and injury interruptions');
+
   console.log('PASS: cold boot, 12 teams, manager room, hiring, GM policy, day progression and save');
 })().catch(e=>{console.error(e);process.exitCode=1;});
