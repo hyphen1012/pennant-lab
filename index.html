@@ -736,7 +736,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const home=getTeam(last.home),away=getTeam(last.away);
       const winner=last.homeScore===last.awayScore?null:last.homeScore>last.awayScore?home:away;
       articles.push({tag:'前節の熱戦',type:'game',
-        headline:winner?`${winner.short}が白星、接戦を制す`:'譲らぬ一戦、両軍引き分け',
+        headline:winner?`${winner.short}が白星、前節の勝負を制す`:'譲らぬ一戦、両軍引き分け',
         body:`${away.short} ${last.awayScore}―${last.homeScore} ${home.short}。第${last.day}戦の試合結果を振り返る。`,
         stat:`${away.short} ${last.awayScore} – ${last.homeScore} ${home.short}`});
     }
@@ -1133,7 +1133,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }else if(hitters(t).length<=12)return showToast('野手の必要人数を下回るため放出できません',true);
     p.teamId=null;repairTeam(t);pushNews(`${t.short}が${p.name}を自由契約にしました。`);save();render();showToast(`${p.name}を自由契約にしました`);
   }
-  function getDayText(){const d=calendarNextDay();return game.day>=143?'全143試合終了':d?formatCalendarDate(d.date)+' · '+(d.type==='game'?'第'+d.gameNo+'戦':'休養日'):'全日程終了';}
+  function getDayText(){const d=ui.autoDay||calendarNextDay();return game.day>=143?'全143試合終了':d?formatCalendarDate(d.date)+' · '+(d.type==='game'?'第'+d.gameNo+'戦':d.type==='midseason'?'中盤休止日':'休養日'):'全日程終了';}
   function gameByTeam(tid){return game.games.filter(g=>g.home===tid||g.away===tid).slice(-1)[0]}
   function teamBadge(team,size='mini-logo'){
     return `<span class="${size}" style="background:${team.color}">${h(team.letter)}</span>`;
@@ -1230,7 +1230,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function gameHeader(){
     const t=myTeam(),rank=rankings(t.league).findIndex(x=>x.id===t.id)+1;
-    return `<header class="top"><div class="top-in"><div class="top-high">${appLogo()}<div class="head-metrics"><div><small>選手</small><strong>${own(t).length}<i>/30</i></strong></div><div><small>ファン</small><strong>${(game.fans/10000).toFixed(1)}万人</strong></div><div><small>評価</small><strong>${game.ownerRating}</strong></div></div></div><div class="top-low"><button data-action="title" class="head-link">⌂ データ選択</button><strong>${game.pendingReview?`第${game.pendingReview.day}戦 · 結果`:game.pendingMonth?'月次報告':game.day>=143?'全日程終了':formatCalendarDate(calendarNextDay()?.date)}</strong><span class="gold-text">${fmtMoney(t.cash)}</span></div></div></header>`;
+    return `<header class="top"><div class="top-in"><div class="top-high">${appLogo()}<div class="head-metrics"><div><small>選手</small><strong>${own(t).length}<i>/30</i></strong></div><div><small>ファン</small><strong>${(game.fans/10000).toFixed(1)}万人</strong></div><div><small>評価</small><strong>${game.ownerRating}</strong></div></div></div><div class="top-low"><button data-action="title" class="head-link">⌂ データ選択</button><strong>${game.pendingReview?`第${game.pendingReview.day}戦 · 結果`:game.pendingMonth?'月次報告':game.day>=143?'全日程終了':formatCalendarDate(ui.autoDay?.date||calendarNextDay()?.date)}</strong><span class="gold-text">${fmtMoney(t.cash)}</span></div></div></header>`;
   }
   function statBadge(v,label){return `<div class="ability-cell"><small>${label}</small><strong style="color:${rankColor(v)}">${grade(v)}</strong><em>${v}</em></div>`}
   function playerCard(p,actions=false){
