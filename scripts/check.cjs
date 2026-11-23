@@ -552,7 +552,7 @@ assert.equal(ctx.pitching[7].current.id,lefty.id);
 assert.equal(ctx.managerMoves[0].type,'pitch');
 assert.equal(ctx.managerMoves[0].pitchCount,90);
 assert.equal(ctx.managerMoves[0].midInning,true);
-assert.equal(ctx.managerMoves[0].reason,'球数による継投');
+assert.equal(ctx.managerMoves[0].reason,'走者を背負った場面での継投');
 assert(ctx.pitching[7].used.has(starter.id)&&ctx.pitching[7].used.has(lefty.id));
 assert.equal(midAPI(club,7,-1,[null,{id:15},null],1,leftBatter,ctx).id,lefty.id,
   'A fresh reliever must remain in the game');
