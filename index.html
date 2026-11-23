@@ -1321,6 +1321,28 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }
     return frames;
   }
+  // Split only real, verified scoring plate appearances into replay moments.
+  // Legacy saves without play data remain inning-by-inning, never fabricated.
+  function watchReplaySteps(g){
+    const source=Array.isArray(g.scoringPlays)?g.scoringPlays:[];
+    return watchInningFrames(g).flatMap(frame=>{
+      const plays=source.filter(p=>p&&p.inning===frame.inning&&p.teamId===frame.teamId
+        &&Number.isFinite(p.runs)&&p.runs>0&&typeof p.batterName==='string');
+      const verified=plays.reduce((n,p)=>n+p.runs,0)===frame.runs;
+      return [...(verified?plays.map(p=>({...frame,phase:'score',play:p})):[]),
+        {...frame,phase:'end'}];
+    });
+  }
+  function watchScoringTitle(play){
+    const n=Number(play.rbi||play.runs)||1;
+    if(play.kind==='hr')return n===1?'ソロホームラン':n===4?'満塁ホームラン':String(n)+'ランホームラン';
+    if(play.kind==='single')return n+'点タイムリーヒット';
+    if(play.kind==='double')return n+'点タイムリー二塁打';
+    if(play.kind==='triple')return n+'点タイムリー三塁打';
+    if(play.kind==='walk')return '押し出し四球';
+    if(play.kind==='out')return 'アウトの間に1点';
+    return play.runs+'点を記録';
+  }
   function watchGameScreen(entry){
     const g=game.games.find(x=>x.year===game.year&&x.day===entry.gameNo
       &&(x.home===game.selectedId||x.away===game.selectedId));
@@ -2651,7 +2673,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
           // The result is already calculated, but every presentation stage is spoiler-safe.
           const g=game.games.find(x=>x.year===game.year&&x.day===entry.gameNo
             &&(x.home===game.selectedId||x.away===game.selectedId));
-          const frames=watchInningFrames(g);
+          const frames=watchReplaySteps(g);
           ui.watchSkip=false;
           await waitForDailyDisplay(mode==='fast'?720:1900);
           if(!ui.pauseRequested&&!document.hidden&&!ui.watchSkip){
@@ -2660,7 +2682,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
             for(let step=0;step<=frames.length;step++){
               if(ui.pauseRequested||document.hidden||ui.watchSkip)break;
               ui.watchGame.step=step;render();
-              await waitForDailyDisplay(interval);
+              const scoring=frames[step-1]?.phase==='score';
+              await waitForDailyDisplay(scoring?(mode==='fast'?900:1700):interval);
             }
           }
           if(!ui.pauseRequested&&!document.hidden&&!ui.watchSkip){
