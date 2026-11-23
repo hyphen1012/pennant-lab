@@ -1349,14 +1349,24 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(!g)return dailyGameScreen(entry);
     if(ui.watchGame?.phase==='intro')return gameDayIntroScreen(entry,g);
     if(ui.watchGame?.phase==='final')return gameSetScreen(g);
-    const frames=watchInningFrames(g),step=Math.min(Math.max(0,ui.watchGame?.step||0),frames.length);
-    const revealed=frames.slice(0,step),away=getTeam(g.away),home=getTeam(g.home);
-    const total=teamId=>revealed.filter(x=>x.teamId===teamId).reduce((n,x)=>n+x.runs,0);
-    const inningCount=Math.max(9,g.inningsA.length,g.inningsH.length);
+    const steps=watchReplaySteps(g),step=Math.min(Math.max(0,ui.watchGame?.step||0),steps.length);
+    const shown=steps.slice(0,step),last=shown[shown.length-1]||null;
+    const revealed=shown.filter(x=>x.phase==='end');
+    const active=last?.phase==='score'?last:null;
+    const partial=active?shown.filter(x=>x.phase==='score'
+      &&x.inning===active.inning&&x.teamId===active.teamId):[];
+    const away=getTeam(g.away),home=getTeam(g.home);
+    const total=teamId=>revealed.filter(x=>x.teamId===teamId).reduce((n,x)=>n+x.runs,0)
+      +(active?.teamId===teamId?partial.reduce((n,x)=>n+x.play.runs,0):0);
+    // Extra innings appear in the table only when the game actually reaches them.
+    const inningCount=Math.max(9,last?.inning||0);
     // Innings 1–9 always occupy a fixed-width table; 10–12 are shown below, not offscreen.
     const buildRows=(from,to,totals)=>[[away,g.away],[home,g.home]].map(([t,teamId])=>
       `<tr><th class="watch-team ${leagueClass(t.league)}">${h(t.short)}</th>${Array.from({length:to-from+1},(_,i)=>{
-        const frame=revealed.find(x=>x.inning===from+i&&x.teamId===teamId);
+        const completed=revealed.find(x=>x.inning===from+i&&x.teamId===teamId);
+        const live=active?.inning===from+i&&active?.teamId===teamId
+          ?partial.reduce((n,x)=>n+x.play.runs,0):null;
+        const frame=completed|| (live==null?null:{runs:live});
         return `<td class="${frame?'played':''}">${frame?frame.runs:'·'}</td>`;
       }).join('')}${totals?`<td class="watch-total">${total(teamId)}</td>`:''}</tr>`).join('');
     const rows=buildRows(1,9,true);
