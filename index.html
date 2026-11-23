@@ -250,7 +250,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .lineup-wrap .lineup-n{width:38px;height:30px;display:flex;justify-content:center;align-items:center;gap:2px;white-space:nowrap;font-size:11.4px}
 .lineup-wrap .lineup-n em{font-size:10.4px;font-style:normal;color:#f1d995}
 /* Balanced roster identity: emphasize the player's portrait and name only. */
-.player-pick-btn.roster-pick-btn{min-height:68px;align-items:center;padding:7px 9px}
+.player-pick-btn.roster-pick-btn{min-height:68px;align-items:center;padding:7px 9px;background:linear-gradient(110deg,#29415b 0%,#20354e 70%,#1a3048 100%);border-color:#58738d}
 .roster-pick-btn .roster-pick-content{display:flex;flex:1;flex-direction:column;min-width:0;gap:3px}
 .roster-pick-btn .face-label{display:inline-flex;align-items:center;gap:10px;min-width:0;max-width:100%;font-size:15.6px;font-weight:850;line-height:1.25}
 .roster-pick-btn .face-label .face-mini{width:42px;height:42px;flex:0 0 42px}
@@ -458,6 +458,28 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .manager-tactic>div{min-width:0}.manager-tactic .select{width:min(52%,220px);flex-shrink:0}.manager-home .row{gap:10px}
 .manager-home .row>div{display:flex;flex-direction:column}.manager-home small{color:var(--muted)}.manager-offer .btn{flex-shrink:0}
 @media(max-width:410px){.manager-tactic{align-items:stretch;flex-direction:column}.manager-tactic .select{width:100%;max-width:none}}
+
+/* v0.7.1: live-looking replay panel uses the game's dark navy / gold palette. */
+.watch-game-screen{display:flex;flex-direction:column;gap:12px;padding-bottom:24px}
+.watch-hero{background:radial-gradient(ellipse at 50% 75%,#213c56,#172942 70%);border-color:#7a6840}
+.watch-overline{display:flex;align-items:center;gap:7px;color:#edd085;font-size:11px;font-weight:800;letter-spacing:.3px}
+.watch-overline>span:last-child{margin-left:auto;color:#afc2d9;font-weight:500;letter-spacing:0}
+.watch-live-dot{width:8px;height:8px;border-radius:50%;background:#ec745f;box-shadow:0 0 10px #ec745f88}
+.watch-score{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:11px;align-items:center;margin:14px 0}
+.watch-score>div{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.watch-score .team-badge{margin-bottom:1px}.watch-score strong{font-size:clamp(30px,7vw,46px);color:#f6f7ff;font-variant-numeric:tabular-nums;line-height:1.15}
+.watch-score .watch-club{font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.watch-separator{font-size:27px;color:#dbc27d}.watch-inning-info{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px}
+.watch-inning-info small{color:#aebed3;font-size:10px;white-space:nowrap}.watch-progress{height:5px;background:#344963;border-radius:6px;overflow:hidden;margin-top:10px}
+.watch-progress i{height:100%;background:linear-gradient(90deg,#d0a943,#f4d67b);display:block;transition:width .2s}
+.watch-scoreboard .table-wrap{overflow-x:auto}.watch-table{width:100%;min-width:400px;border-collapse:collapse;font-size:11px}
+.watch-table th,.watch-table td{min-width:25px;text-align:center;padding:7px 3px;border-bottom:1px solid #344962;color:#6d849d}
+.watch-table th{color:#c4d1e1}.watch-table td.played{color:#f6f6fb;font-weight:700}
+.watch-table th.watch-team{text-align:left;white-space:nowrap}.watch-table .watch-total{color:#efc35c;font-weight:900;border-left:1px solid #51647c}
+.watch-commentary{min-height:108px}.watch-commentary>small{color:#dfb64e;letter-spacing:1.4px;font-weight:900}
+.watch-commentary h3{font-size:16px;margin:7px 0}.watch-commentary p{font-size:13px;color:#bdcbe0;margin:0}
+.watch-controls{display:flex;gap:9px}.watch-controls button{flex:1;min-height:45px}.watch-hint{text-align:center;color:#8ea6bf}
+@media(max-width:380px){.watch-score{gap:6px}.watch-inning-info{font-size:11px}}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -1000,7 +1022,61 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       ${entry.type==='midseason'?'<p class="paper-note">大会の実試合は今後実装予定です。</p>':''}
       ${dailyPlaybackControls()}</section>`;
   }
+
+  /* v0.7.1: precomputed inning-by-inning replay for the one-day watch action. */
+  function watchInningFrames(g){
+    if(!g)return [];
+    const frames=[],length=Math.max(g.inningsA?.length||0,g.inningsH?.length||0);
+    for(let i=0;i<length;i++){
+      const away=g.inningsA?.[i],home=g.inningsH?.[i];
+      if(Number.isFinite(away))frames.push({inning:i+1,side:'表',teamId:g.away,runs:away});
+      if(Number.isFinite(home))frames.push({inning:i+1,side:'裏',teamId:g.home,runs:home});
+    }
+    return frames;
+  }
+  function watchGameScreen(entry){
+    const g=game.games.find(x=>x.year===game.year&&x.day===entry.gameNo
+      &&(x.home===game.selectedId||x.away===game.selectedId));
+    if(!g)return dailyGameScreen(entry);
+    const frames=watchInningFrames(g),step=Math.min(Math.max(0,ui.watchGame?.step||0),frames.length);
+    const revealed=frames.slice(0,step),away=getTeam(g.away),home=getTeam(g.home);
+    const total=teamId=>revealed.filter(x=>x.teamId===teamId).reduce((n,x)=>n+x.runs,0);
+    const inningCount=Math.max(9,g.inningsA.length,g.inningsH.length);
+    const rows=[[away,g.away],[home,g.home]].map(([t,teamId])=>
+      \`<tr><th class="watch-team \${leagueClass(t.league)}">\${h(t.short)}</th>\${Array.from({length:inningCount},(_,i)=>{
+        const frame=revealed.find(x=>x.inning===i+1&&x.teamId===teamId);
+        return \`<td class="\${frame?'played':''}">\${frame?frame.runs:'·'}</td>\`;
+      }).join('')}<td class="watch-total">\${total(teamId)}</td></tr>\`).join('');
+    const last=revealed[revealed.length-1],current=last?getTeam(last.teamId):null;
+    const inningLabel=last?\`\${last.inning}回\${last.side} · \${h(current.short)}の攻撃終了\`:'プレーボール';
+    const event=last?g.events.find(x=>x.startsWith(\`\${last.inning}回 \${current.short} \`)):null;
+    const note=last?(event||\`\${h(current.name)}はこの回\${last.runs}点を記録\`):
+      \`\${h(away.name)} 対 \${h(home.name)} · まもなく試合開始\`;
+    const progress=frames.length?Math.round(step/frames.length*100):0;
+    return \`<div class="watch-game-screen">
+      <div class="review-kicker">PENNANT LAB · INNING WATCH</div>
+      <section class="panel watch-hero">
+        <div class="watch-overline"><span class="watch-live-dot"></span> 試合観戦モード <span>\${formatCalendarDate(entry.date)}</span></div>
+        <div class="watch-score">
+          <div>\${teamBadge(away)}<span class="watch-club \${leagueClass(away.league)}">\${h(away.short)}</span><strong>\${total(g.away)}</strong></div>
+          <span class="watch-separator">–</span>
+          <div>\${teamBadge(home)}<span class="watch-club \${leagueClass(home.league)}">\${h(home.short)}</span><strong>\${total(g.home)}</strong></div>
+        </div>
+        <div class="watch-inning-info"><strong>\${inningLabel}</strong><small>\${step}/\${frames.length} 半イニング</small></div>
+        <div class="watch-progress"><i style="width:\${progress}%"></i></div>
+      </section>
+      <section class="panel watch-scoreboard"><h3 class="panel-title">イニング別スコア</h3><div class="table-wrap"><table class="watch-table"><thead><tr><th>球団</th>\${Array.from({length:inningCount},(_,i)=>\`<th>\${i+1}</th>\`).join('')}<th>計</th></tr></thead><tbody>\${rows}</tbody></table></div></section>
+      <section class="panel watch-commentary"><small>INNING REPORT</small><h3>\${inningLabel}</h3><p>\${note}</p></section>
+      <div class="watch-controls">
+        <button class="btn outline" data-action="pause-calendar">\${ui.autoPaused?'▶ 再開':'⏸ 一時停止'}</button>
+        <button class="btn primary" data-action="watch-skip">試合結果へ ›</button>
+      </div>
+      <p class="tiny watch-hint">記録された試合をイニングごとに再生中。画面タップで一時停止できます。<br>休養日は従来どおり球界新聞を表示します。</p>
+      </div>\`;
+  }
+
   function dailyGameScreen(entry){
+    if(ui.watchGame?.year===game.year&&ui.watchGame?.day===entry.gameNo)return watchGameScreen(entry);
     const g=game.games.find(x=>x.year===game.year&&x.day===entry.gameNo&&(x.home===game.selectedId||x.away===game.selectedId));
     if(!g)return `<section class="panel"><h3>${formatCalendarDate(entry.date)}</h3><p>試合結果がありません。</p>${dailyPlaybackControls()}</section>`;
     const me=myTeam(),opp=getTeam(g.home===me.id?g.away:g.home);
@@ -2109,7 +2185,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     ensurePlayerExtras(p);
     const main=positionFull(p.pos),sub=p.subPos?positionFull(p.subPos):null;
     const meta=`<span class="roster-pick-meta"><span>メイン ${main}</span>${sub?`<span>サブ ${sub}</span>`:''}<span class="roster-pick-hand">${throwBat(p)}</span></span>`;
-    return `<button class="player-pick-btn roster-pick-btn" data-action="swap-open" data-kind="${kind}" data-slot="${slot}" aria-label="${h(p.name)} ${main} ${throwBat(p)} を入れ替える"><span class="roster-pick-content">${faceLabel(p)}${meta}</span><span class="pick-grade">${gradeBrief(rating(p))} ▾</span></button>`;
+    return `<button class="player-pick-btn roster-pick-btn" data-action="swap-open" data-kind="${kind}" data-slot="${slot}" aria-label="${h(p.name)} ${main} ${throwBat(p)} を入れ替える"><span class="roster-pick-content">${faceLabel(p)}${meta}</span><span class="pick-grade" style="color:${gradeBriefColor(rating(p))}">${gradeBrief(rating(p))} ▾</span></button>`;
   }
   const oldLineup03=lineupScreen;
   lineupScreen=function(t){return oldLineup03(t).replace(/<select class="select" aria-label="\d+番打者" data-change="lineup" data-slot="(\d+)">[\s\S]*?<\/select>/g,(m,slot)=>{
@@ -2226,7 +2302,22 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         ui.autoDay=entry;
         ui.autoPaused=false;
         save();render();window.scrollTo({top:0,behavior:'instant'});
-        if(!oneDay){
+        if(oneDay&&entry.type==='game'){
+          // Keep the already-computed outcome hidden until the replay finishes.
+          const g=game.games.find(x=>x.year===game.year&&x.day===entry.gameNo
+            &&(x.home===game.selectedId||x.away===game.selectedId));
+          const frames=watchInningFrames(g);
+          ui.watchGame={year:game.year,day:entry.gameNo,step:0};ui.watchSkip=false;
+          const interval=mode==='fast'?450:750;
+          for(let step=0;step<=frames.length;step++){
+            if(ui.pauseRequested||document.hidden||ui.watchSkip)break;
+            ui.watchGame.step=step;render();
+            await waitForDailyDisplay(interval);
+          }
+          ui.watchGame=null;ui.watchSkip=false;
+          if(ui.pauseRequested||document.hidden)break;
+          render();
+        }else if(!oneDay){
           // News always gets five seconds, even in the 1s/day fast mode.
           await waitForDailyDisplay(entry.type==='game'?baseDelay:5000);
           if(ui.pauseRequested||document.hidden)break;
@@ -2493,8 +2584,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   };
   const prevHQ07=frontOfficeScreen;
   frontOfficeScreen=function(){
-    return prevHQ07().replace('<section class="panel desk-panel">',
-      `<section class="panel manager-home"><div class="row between"><div><small>監督・GM方針</small><strong>${h(myTeam().manager?.name||'監督')}</strong></div><button class="btn sm outline" data-action="mgr-open">監督室へ ›</button></div></section><section class="panel desk-panel">`);
+    return prevHQ07().replace('<button class="desk-task" data-action="tab" data-tab="market">',
+      `<button class="desk-task" data-action="mgr-open"><span>♟</span><span><b>監督・GM方針</b><small>${h(myTeam().manager?.name||'監督')}監督の采配と契約を確認する</small></span><em> › </em></button><button class="desk-task" data-action="tab" data-tab="market">`);
   };
   const prevNext07=nextSeason;
   nextSeason=function(){
@@ -2555,6 +2646,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     t.gmOrders[key]=order;save();render();showToast('GM方針を保存しました');
   },true);
 
+  document.addEventListener('click',e=>{
+    const el=e.target.closest('[data-action]');
+    if(el?.dataset.action!=='watch-skip'||!ui.busy||!ui.watchGame)return;
+    e.stopImmediatePropagation();
+    ui.watchSkip=true;ui.autoWait?.skip();
+  },true);
   const appRoot=document.querySelector('#app');
   if(appRoot)appRoot.innerHTML='<div class="title-screen"><h2>セーブデータを読み込んでいます…</h2></div>';
   (async()=>{
