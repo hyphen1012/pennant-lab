@@ -492,6 +492,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(max-width:380px){.watch-score{gap:6px}.watch-inning-info{font-size:11px}}
 
 /* v0.8.0 — cinematic moments. All visual motion is optional; scores come from saved matches. */
+.result-table-wrap{min-width:0;overflow-x:visible}
+.result-table{width:100%;table-layout:fixed;font-size:clamp(9px,2.4vw,11px)}
+.review-screen .panel:has(.result-table){border-color:#665c4c}
+.result-table th,.result-table td{font-variant-numeric:tabular-nums}
+.result-table th.watch-team{font-weight:900}
+.review-screen .event{border-left:2px solid #caa751;padding-left:10px}
+.review-screen .panel-title{letter-spacing:.2px}
+
 .game-cinematic{position:relative;isolation:isolate;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
   min-height:clamp(470px,69svh,720px);padding:28px 16px;border:1px solid #6e5b35;border-radius:18px;
   background:radial-gradient(ellipse at 50% 78%,#25494c 0,#132a40 37%,#091525 82%);box-shadow:inset 0 0 60px #08101cbb,0 20px 40px #03091255}
@@ -2040,7 +2048,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function matchReportBody(g){
     const home=getTeam(g.home),away=getTeam(g.away),n=Math.max(g.inningsH.length,g.inningsA.length);
-    const tbody=[[away,g.inningsA,g.awayScore],[home,g.inningsH,g.homeScore]].map(([t,a,total])=>`<tr><td class="name"><span class="league-club-name ${leagueClass(t.league)}">${h(t.short)}</span></td>${Array.from({length:n},(_,i)=>`<td>${a[i]==null?'–':a[i]}</td>`).join('')}<td class="num-strong">${total}</td></tr>`).join('');
+    const boxRows=(from,to,totalColumn)=>[[away,g.inningsA,g.awayScore],[home,g.inningsH,g.homeScore]].map(([t,a,total])=>
+      `<tr><th class="watch-team ${leagueClass(t.league)}">${h(t.short)}</th>${Array.from({length:to-from+1},(_,i)=>`<td class="${a[from+i-1]==null?'':'played'}">${a[from+i-1]==null?'–':a[from+i-1]}</td>`).join('')}${totalColumn?`<td class="watch-total">${total}</td>`:''}</tr>`).join('');
+    const scores=`<table class="watch-table result-table"><thead><tr><th>球団</th>${Array.from({length:9},(_,i)=>`<th>${i+1}</th>`).join('')}<th>計</th></tr></thead><tbody>${boxRows(1,9,true)}</tbody></table>
+      ${n>9?`<div class="watch-extra-label">延長戦</div><table class="watch-table watch-extra-table"><thead><tr><th>球団</th>${Array.from({length:n-9},(_,i)=>`<th>${i+10}</th>`).join('')}</tr></thead><tbody>${boxRows(10,n,false)}</tbody></table>`:''}`;
     let box='';
     if(g.box){
       const hitterRows=(teamId)=>g.box.bat.filter(v=>v.teamId===teamId).map(v=>`<tr><td class="name">${h(getPlayer(v.id)?.name||'選手')}</td><td>${v.ab}</td><td>${v.h}</td><td>${v.hr}</td><td>${v.rbi}</td><td>${v.bb}</td></tr>`).join('');
@@ -2049,7 +2060,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const cards=[ownId,ownId===home.id?away.id:home.id].filter(id=>id===home.id||id===away.id);
       box=cards.map((tid,index)=>`<${index?'details':'section'} class="panel"><${index?'summary':'h3'} class="panel-title">${h(getTeam(tid).name)} · 今日の個人成績 ${index?'（タップして表示）':''}</${index?'summary':'h3'}><div class="section-label review-section-heading hitter-heading" style="margin-top:9px">野手</div><div class="table-wrap"><table class="data-table review-stat-table hitter-stats"><thead><tr><th>選手</th><th>打数</th><th>安打</th><th>本</th><th>打点</th><th>四球</th></tr></thead><tbody>${hitterRows(tid)||'<tr><td colspan="6">出場なし</td></tr>'}</tbody></table></div><div class="section-label review-section-heading pitcher-heading">投手</div><div class="table-wrap"><table class="data-table review-stat-table pitcher-stats"><thead><tr><th>選手</th><th>投球回</th><th>被安打</th><th>自責</th><th>奪三振</th><th>四球</th></tr></thead><tbody>${pitcherRows(tid)||'<tr><td colspan="6">出場なし</td></tr>'}</tbody></table></div></${index?'details':'section'}>`).join('');
     }else box='<p class="small">旧バージョンの試合には個別の試合成績が保存されていません。</p>';
-    return `<section class="panel"><div class="panel-head"><h3 class="panel-title">イニング別スコア</h3><span class="pill">${n}回</span></div><div class="table-wrap"><table class="data-table"><thead><tr><th>球団</th>${Array.from({length:n},(_,i)=>`<th>${i+1}</th>`).join('')}<th>計</th></tr></thead><tbody>${tbody}</tbody></table></div><div class="divider"></div><h3 class="panel-title">主な出来事</h3>${g.events.length?g.events.map(e=>`<div class="event">${h(e)}</div>`).join(''):'<div class="event">本塁打などの特記事項はありません。</div>'}<div class="small" style="margin-top:12px">先発：${h(getPlayer(g.spAway)?.name||'選手')} / ${h(getPlayer(g.spHome)?.name||'選手')}</div></section>${box}`;
+    return `<section class="panel"><div class="panel-head"><h3 class="panel-title">イニング別スコア</h3><span class="pill">${n}回</span></div><div class="table-wrap result-table-wrap">${scores}</div><div class="divider"></div><h3 class="panel-title">主な出来事</h3>${g.events.length?g.events.map(e=>`<div class="event">${h(e)}</div>`).join(''):'<div class="event">本塁打などの特記事項はありません。</div>'}<div class="small" style="margin-top:12px">先発：${h(getPlayer(g.spAway)?.name||'選手')} / ${h(getPlayer(g.spHome)?.name||'選手')}</div></section>${box}`;
   }
   function matchReviewScreen(){
     const r=game.pendingReview,g=game.games.find(v=>v.id===r?.gameId&&v.year===r.year);
@@ -2064,7 +2075,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function resultModal(){
     if(ui.detail==null)return '';
     const g=game.games.find(x=>x.id===ui.detail);if(!g)return '';
-    return `<div class="overlay" data-action="close-overlay"><div class="dialog" style="max-width:690px;max-height:91vh;overflow-y:auto" role="dialog" aria-modal="true" aria-label="試合結果" data-stop="true"><div class="panel-head"><h3 class="panel-title">${g.year}年 第${g.day}戦 試合結果</h3><button class="btn sm outline" data-action="close-modal">閉じる ✕</button></div>${matchReportBody(g)}</div></div>`;
+    return `<div class="overlay" data-action="close-overlay"><div class="dialog" style="max-width:690px;max-height:91vh;overflow-y:auto" role="dialog" aria-modal="true" aria-label="試合結果" data-stop="true"><div class="panel-head"><h3 class="panel-title">${g.year}年 第${g.day}戦 試合結果</h3><button class="btn sm outline" data-action="close-modal">閉じる ✕</button></div>${resultHeroCard(g)}${matchReportBody(g)}</div></div>`;
   }
   function confirmModal(){
     const c=ui.confirm;if(!c)return '';
