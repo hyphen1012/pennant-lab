@@ -1400,18 +1400,27 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
           <div>${teamBadge(home)}<span class="watch-club ${leagueClass(home.league)}">${h(home.short)}</span><strong>${total(g.home)}</strong></div>
         </div>
         <div class="watch-inning-info"><strong>${inningLabel}</strong></div>
-        ${justScored?`<div class="watch-scoring-flash">＋${last.runs} RUNS <small>${h(current.short)} · ${oldScore} → ${total(last.teamId)}</small></div>`:''}
+        ${justScored?`<div class="watch-scoring-flash watch-scoring-${last.play.kind==='hr'?'homer':'timely'}">
+          <div class="watch-scoring-kicker">${last.play.kind==='hr'?'HOME RUN!':'SCORING PLAY!'}</div>
+          <div class="watch-scoring-player">${scorerPortrait}<div>
+            <strong>${h(last.play.batterName)}</strong>
+            <b>${h(watchScoringTitle(last.play))}</b>
+          </div></div>
+          <small>${h(current.short)} · ＋${last.play.runs}点 · ${oldScore} → ${total(last.teamId)}</small>
+        </div>`:''}
         <div class="watch-progress"><i style="width:${progress}%"></i></div>
       </section>
       <section class="panel watch-scoreboard"><h3 class="panel-title">イニング別スコア</h3><div class="table-wrap"><table class="watch-table"><thead><tr><th>球団</th>${Array.from({length:9},(_,i)=>`<th>${i+1}</th>`).join('')}<th>計</th></tr></thead><tbody>${rows}</tbody></table>${extras}</div></section>
-      <section class="panel watch-commentary"><small>INNING REPORT</small><h3>${inningLabel}</h3><p>${h(note)}</p>
-        ${recentEvents.length?`<div class="watch-moment-list">${recentEvents.map(x=>`<div><span>${x.frame.inning}回${x.frame.side}</span><b>${h(x.text)}</b></div>`).join('')}</div>`:''}
+      <section class="panel watch-commentary"><small>${active?'SCORING REPORT':'INNING REPORT'}</small>
+        <h3>${inningLabel}</h3><p>${h(note)}</p>
+        ${recentEvents.length?`<div class="watch-moment-list">${recentEvents.map(x=>
+          `<div><span>${x.inning}回${x.side}</span><b>${h(x.play.batterName)} · ${h(watchScoringTitle(x.play))}</b></div>`).join('')}</div>`:''}
       </section>
       <div class="watch-controls">
         <button class="btn outline" data-action="pause-calendar">${ui.autoPaused?'▶ 再開':'⏸ 一時停止'}</button>
         <button class="btn primary" data-action="watch-skip">試合結果へ ›</button>
       </div>
-      <p class="tiny watch-hint">記録された試合をイニングごとに再生中。画面タップで一時停止できます。<br>休養日は従来どおり球界新聞を表示します。</p>
+      <p class="tiny watch-hint">実際の得点プレーを順に再生しています。画面タップで一時停止できます。<br>詳細記録のない過去データはイニング単位で表示します。</p>
       </div>`;
   }
 
