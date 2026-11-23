@@ -2751,27 +2751,100 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       m.trust=clamp(Math.round((70-m.discontent*.6)*10)/10,10,95);
     }
   }
+
+  /* A stable fictional portrait and familiar S–F scout grades for every manager. */
+  function managerPortrait(manager,teamId){
+    const id=String(manager.id||manager.name).split('').reduce((n,ch)=>((n*31+ch.charCodeAt(0))>>>0),17);
+    return `<span class="manager-portrait">${faceMini({id:id||1,name:manager.name,teamId,pos:'OF'})}</span>`;
+  }
+  function managerRatings(m){
+    const lead=Number(m.leadership)||60,t=m.tendency||{};
+    const seed=String(m.id||m.name).split('').reduce((v,c)=>((v*33+c.charCodeAt(0))>>>0),23);
+    const bias=n=>((seed>>n)%15)-7;
+    return {
+      field:clamp(Math.round(lead*.58+(Number(t.youth)||50)*.22+(Number(t.defense)||50)*.20+bias(0)),38,96),
+      pitch:clamp(Math.round(lead*.68+(Number(t.bullpen)||50)*.32+bias(5)),38,96),
+      tactical:clamp(Math.round(lead*.77+(Number(t.bunt)||50)*.12+(Number(t.steal)||50)*.11+bias(10)),38,96),
+      development:clamp(Math.round(lead*.40+(Number(t.youth)||50)*.60+bias(14)),38,96)
+    };
+  }
+  const managerTone=value=>Number(value)>=50?'積極的':'消極的';
+  function managerGradeStrip(m){
+    const rating=managerRatings(m);
+    return `<div class="manager-grade-strip">${[
+      ['野手起用',rating.field],['投手起用',rating.pitch],
+      ['采配的中',rating.tactical],['育成力',rating.development]
+    ].map(([label,v])=>`<div class="manager-grade"><small>${label}</small><b style="color:${gradeBriefColor(v)}">${gradeBrief(v)}</b></div>`).join('')}</div>`;
+  }
+  function managerRiskMessage(m){
+    if((m.discontent||0)>=75)return '不満が深刻です。監督は契約更改への拒否を示唆しています。';
+    if((m.discontent||0)>=60)return '監督が辞任の意向を伝えています。方針の衝突を見直す必要があります。';
+    if((m.discontent||0)>=35)return 'GMとの方針の違いに、監督は不満を抱いているようです。';
+    return '';
+  }
   function managerScreen(){
     ensureManagers();
     const team=myTeam(),m=team.manager,offers=[1,2,3].map(i=>makeManager(team.id,game.year,i));
-    const traits=MANAGER_TACTICS.map(([key,label,attack,safe])=>{
-      const choice=team.gmOrders[key],p=managerDecision(team,key);
-      return `<div class="manager-tactic"><div><strong>${label}</strong><small>監督の傾向 ${m.tendency[key]}/100 · 現在の采配 ${p}/100</small></div>
-        <select class="select" data-change="manager-order" data-key="${key}" aria-label="${label}の方針">
-          <option value="auto" ${choice==='auto'?'selected':''}>監督に任せる</option>
-          <option value="attack" ${choice==='attack'?'selected':''}>${attack}</option>
-          <option value="safe" ${choice==='safe'?'selected':''}>${safe}</option>
-        </select></div>`;
+    const traits=MANAGER_TACTICS.map(([key,label])=>{
+      const choice=team.gmOrders[key],level=managerDecision(team,key);
+      const group=[['auto','監督に任せる'],['attack','積極的'],['safe','消極的']];
+      return `<div class="manager-strategy">
+        <div class="manager-strategy-head"><strong>${label}</strong><div class="manager-traits">
+          <span>監督の傾向 <b>${managerTone(m.tendency[key])}</b></span>
+          <span>現在の采配 <b>${managerTone(level)}</b></span>
+        </div></div>
+        <div class="manager-options" role="group" aria-label="${label}のGM方針">
+          ${group.map(([value,caption])=>`<button type="button" class="manager-option ${choice===value?'selected':''}"
+            data-action="mgr-order" data-key="${key}" data-choice="${value}"
+            aria-pressed="${choice===value}">${caption}</button>`).join('')}
+        </div>
+      </div>`;
     }).join('');
-    return `<div class="manager-office"><section class="panel"><div class="panel-head"><h3 class="panel-title">現監督・GM方針</h3><span class="pill">契約残 ${m.contractYears}年</span></div>
-      <div class="manager-profile"><span class="manager-face">⚾</span><div><strong>${h(m.name)}</strong><small>${m.age}歳 · ${h(m.style)} · 指揮力 ${m.leadership}/100</small><small>年俸 ${fmtMoney(m.salary)}（来季移行時に精算）</small></div></div>
-      <div class="metrics-grid manager-meter"><div><small>信頼</small><strong>${Math.round(m.trust)}</strong></div><div><small>不満</small><strong>${Math.round(m.discontent)}</strong></div><div><small>采配</small><strong>${m.leadership}</strong></div></div>
-      <p class="small">GMが指定しない項目は監督が判断。指示は次の試合から反映します。監督は基本的に指示に従いますが、信条と矛盾する指示が続くと不満が蓄積します。</p>${traits}
-      <p class="tiny">継投・盗塁・バント・守備・若手育成は試合や経験値の計算に接続済み。代打の実際の交代処理、監督解任ルールは今後の段階で追加します。試合中の操作はありません。</p>
-      </section><section class="panel"><h3 class="panel-title">監督候補を比較して雇用</h3><p class="small">新監督に交代すると、現在のGM戦術指示は引き継ぎます。契約金は新監督の年俸の30%。</p>
-      ${offers.map((c,i)=>`<div class="manager-offer"><div><strong>${h(c.name)}</strong><small>${c.age}歳 · ${h(c.style)} · 指揮力 ${c.leadership}</small><small>年俸 ${fmtMoney(c.salary)} · ${c.contractYears}年契約</small><small>継投 ${c.tendency.bullpen}／盗塁 ${c.tendency.steal}／育成 ${c.tendency.youth}</small></div>
-      <button class="btn sm primary" data-action="mgr-offer" data-slot="${i+1}" ${team.cash<r2(c.salary*.3)?'disabled':''}>雇用する</button></div>`).join('')}
-      </section><section class="panel"><h3 class="panel-title">監督人事の履歴</h3>${(game.managerHistory||[]).filter(x=>x.teamId===team.id).slice(-10).reverse().map(x=>`<div class="event">${x.year}年 ${h(x.text)}</div>`).join('')||'<p class="small">人事履歴はまだありません。</p>'}</section></div>`;
+    const renewalEligible=m.contractYears===1&&game.day>=98&&m.renewedYear!==game.year;
+    return `<div class="manager-office">
+      <section class="panel manager-sheet">
+        <div class="panel-head"><h3 class="panel-title">監督・GM方針</h3><span class="pill">契約残 ${m.contractYears}年</span></div>
+        <div class="manager-profile">
+          ${managerPortrait(m,team.id)}
+          <div class="manager-identity"><strong>${h(m.name)}</strong>
+            <small>${m.age}歳 · ${h(m.style)}タイプ</small>
+            <small>年俸 ${fmtMoney(m.salary)} · ${m.contractYears}年契約</small>
+          </div>
+        </div>
+        ${managerGradeStrip(m)}
+        <div class="manager-relations" aria-label="監督との信頼と不満">
+          <div><span>信頼</span><b>${Math.round(m.trust)}</b></div>
+          <div class="${m.discontent>=55?'is-warning':''}"><span>不満</span><b>${Math.round(m.discontent)}</b></div>
+        </div>
+        ${managerRiskMessage(m)?`<div class="manager-warning">⚠ ${managerRiskMessage(m)}</div>`:''}
+        ${renewalEligible?`<div class="manager-renew-box"><strong>来季に向けた契約更改</strong>
+          <p class="small">不満が大きい監督は打診を断る場合があります。契約金は年俸の20％です。</p>
+          <button class="btn primary" data-action="mgr-renew">来季の続投を打診する</button>
+        </div>`:''}
+      </section>
+      <section class="panel manager-orders-panel">
+        <div class="panel-head"><h3 class="panel-title">GMからの戦術指示</h3><span class="pill">6項目</span></div>
+        <p class="small">指定しない項目は監督が判断します。GMの指示は次の試合から反映。指示と信条が衝突すると不満が蓄積します。</p>
+        ${traits}
+        <p class="tiny">継投・盗塁・バント・守備・若手育成は試合計算に反映。代打の実際の選手交代は次の開発段階です。</p>
+      </section>
+      <section class="panel manager-candidates">
+        <h3 class="panel-title">監督候補を比較して雇用</h3>
+        <p class="small">監督の交代後もGMの戦術指示は引き継がれます。契約金は新監督の年俸の30％。</p>
+        ${offers.map((c,i)=>`<div class="manager-offer">
+          ${managerPortrait(c,team.id)}
+          <div class="manager-candidate-info"><strong>${h(c.name)}</strong>
+            <small>${c.age}歳 · ${h(c.style)}タイプ · 年俸 ${fmtMoney(c.salary)}</small>
+            <small>契約 ${c.contractYears}年</small>
+            ${managerGradeStrip(c)}
+          </div>
+          <button class="btn sm primary" data-action="mgr-offer" data-slot="${i+1}" ${team.cash<r2(c.salary*.3)?'disabled':''}>雇用</button>
+        </div>`).join('')}
+      </section>
+      <section class="panel"><h3 class="panel-title">監督人事の履歴</h3>
+        ${(game.managerHistory||[]).filter(x=>x.teamId===team.id).slice(-10).reverse().map(x=>`<div class="event">${x.year}年 ${h(x.text)}</div>`).join('')||'<p class="small">人事履歴はまだありません。</p>'}
+      </section>
+    </div>`;
   }
   const prevEnsure07=ensureGameExtras;
   ensureGameExtras=function(){prevEnsure07();ensureManagers();};
