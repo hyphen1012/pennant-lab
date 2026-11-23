@@ -1256,6 +1256,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         game.pendingEvent={type:'injury',...e};
     }
     game.injuryEventsToday=[];
+    // Update healthy starters immediately, before a GM opens the lineup screen.
+    for(const team of game.teams)repairTeam(team);
     // Simple prototype fan/evaluation simulation; does not affect existing baseball calculations.
     const mine=myTeam(),last=gameByTeam(mine.id);
     if(last){
@@ -1706,7 +1708,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function rosterActions(){return `<div class="roster-fast-actions"><button class="btn outline" data-action="back-to-hq">‹ 本部に戻る</button><button class="btn primary" data-action="advance-day" ${game.day>=143?'disabled':''}>▶ この編成で次の日へ</button></div>`}
   function rosterScreen(){
-    const t=myTeam();
+    const t=myTeam();repairTeam(t);
     const menus=[['lineup','打順'],['rotation','先発'],['players','全選手']];
     return `<div class="roster-screen"><div class="roster-intro"><div><h2 class="page-title">選手・チーム編成</h2><p class="page-sub">${game.year}年 · ${game.day}試合終了時点の今季成績</p></div><button class="btn sm outline" data-action="back-to-hq">‹ 戻る</button></div><div class="control-bar"><div class="chips">${menus.map(([tab,label])=>`<button class="chip ${ui.rosterMode===tab?'active':''}" data-action="roster-mode" data-mode="${tab}">${label}</button>`).join('')}</div><span class="pill">所属 ${own(t).length}/30人</span></div>${ui.rosterMode==='lineup'?lineupScreen(t):ui.rosterMode==='rotation'?rotationScreen(t):playersScreen(t)}${rosterActions()}</div>`;
   }
