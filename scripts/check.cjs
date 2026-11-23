@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.8\.6 · PORTRAITS/);
+assert.match(html,/VERSION 0\.8\.7 · MANAGER AI/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(t,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -308,3 +308,79 @@ assert.doesNotMatch(identity.faceMini(immortal,{overall:true}),/portrait-overall
   'A hidden special prospect must not leak its real overall rating');
 assert.match(identity.faceMini(titled,{overall:true}),/--avatar-color:#B28AFF/);
 console.log('PASS: close-up faces, mini overall badges in lineup, swap and reusable recruitment cards');
+
+
+
+// v0.8.7: Actual pinch hitter substitutions, not just a textual AI choice.
+assert.match(html,/function pinchHitterChoice\(team,current,pitcher,slot,bases,inning,context\)/);
+assert.match(html,/function managerPinchBatter\(team,batters,indexes,inning,bases,pitcher,context\)/);
+assert.match(html,/const top=halfInning\(away,home,awayPitcher,lineupA,indexes,i,null,appear,events,scoringPlays,context\)/);
+assert.match(html,/result\.managerMoves=managerMoves/);
+assert.match(html,/function managerMoveReport\(g\)/);
+assert.match(html,/managerMoveReport\(g\)/);
+assert.match(html,/class="manager-activity-row"/);
+const pinchBegin=inline[1].indexOf('  /* v0.8.7: GM sets pregame tactics;');
+const pinchEnd=inline[1].indexOf('  function halfInning(',pinchBegin);
+assert(pinchBegin>0&&pinchEnd>pinchBegin);
+const pinchCode=inline[1].slice(pinchBegin,pinchEnd);
+const safeClamp=(value,min,max)=>Math.max(min,Math.min(max,value));
+const pinchApi=vm.runInNewContext('(function(){'+pinchCode+
+  '\nreturn {pinchHitterChoice,managerPinchBatter,liveDefenseScore};})()',{
+  managerDecision:(t,key)=>t.gmOrders[key]==='attack'?86:t.gmOrders[key]==='safe'?14:52,
+  managerRatings:()=>({field:76}),
+  effectiveSkill:(p,key)=>p[key]*((p.energy||100)/100),
+  availableForGame:p=>!p.injury,
+  fieldingTier:(p,role)=>p.pos===role?'main':'off',
+  teamDefenseScore:()=>40,
+  syncLineupFielding:t=>t.fieldingRoles,
+  FIELD_WEIGHTS:{'2B':1},
+  effectiveFielding:(p)=>p.defense||50,
+  clamp:safeClamp
+});
+const currentBatter={id:101,name:'現役選手',pos:'2B',age:34,
+  energy:55,contact:43,power:37,defense:45};
+const youngBench={id:105,name:'控え若手',pos:'2B',age:22,
+  energy:100,contact:76,power:70,defense:81};
+const wrongPosition={id:106,name:'守備適性なし',pos:'C',age:25,
+  energy:100,contact:90,power:95,defense:90};
+const managerFixture={id:2,short:'東京',lineup:[101],
+  fieldingRoles:{101:'2B'},manager:{id:'mgr-x',name:'監督甲'},
+  gmOrders:{pinch:'attack',youth:'attack'}};
+function makeContext(bench=[youngBench,wrongPosition],lead=-1){
+  return {awayId:2,activeLineups:{2:[currentBatter]},bench:{2:[...bench]},
+    changed:{2:new Set()},pinchUsed:{2:0},scoreDiff:lead,managerMoves:[]};
+}
+const tacticalContext=makeContext();
+const inGameLineup=[currentBatter],battingIndexes={2:0};
+const chosen=pinchApi.managerPinchBatter(managerFixture,inGameLineup,battingIndexes,
+  8,[currentBatter,null,null],{id:200},tacticalContext);
+assert.equal(chosen.id,youngBench.id);
+assert.equal(inGameLineup[0].id,youngBench.id);
+assert.equal(managerFixture.lineup[0],currentBatter.id,
+  'Game-level AI must never rewrite the GM saved batting lineup');
+assert.equal(tacticalContext.pinchUsed[2],1);
+assert.equal(tacticalContext.bench[2].some(x=>x.id===youngBench.id),false);
+assert.equal(tacticalContext.managerMoves[0].inName,'控え若手');
+assert.equal(tacticalContext.managerMoves[0].outName,'現役選手');
+assert.equal(tacticalContext.managerMoves[0].role,'2B');
+assert.equal(tacticalContext.managerMoves[0].managerId,'mgr-x');
+assert.equal(pinchApi.managerPinchBatter(managerFixture,inGameLineup,battingIndexes,
+  9,[null,null,null],{id:200},tacticalContext).id,youngBench.id,
+  'A replaced slot cannot be swapped again later');
+assert.equal(pinchApi.liveDefenseScore(managerFixture,inGameLineup),81,
+  'Bench defense must really replace starter fielding in later innings');
+managerFixture.gmOrders.pinch='safe';
+assert.equal(pinchApi.pinchHitterChoice(managerFixture,currentBatter,{id:200},0,
+  [null,null,null],9,makeContext()),null,
+  'Conservative GM policy must suppress late pinch-hitting');
+managerFixture.gmOrders.pinch='attack';
+assert.equal(pinchApi.pinchHitterChoice(managerFixture,currentBatter,{id:200},0,
+  [null,null,null],6,makeContext()),null,
+  'No manager pinch hit before the seventh inning');
+assert.equal(pinchApi.pinchHitterChoice(managerFixture,currentBatter,{id:200},0,
+  [null,null,null],8,makeContext([],0)),null,
+  'A team with no suitable healthy bench hitter cannot substitute');
+assert.equal(pinchApi.pinchHitterChoice(managerFixture,currentBatter,{id:200},0,
+  [null,null,null],8,makeContext([wrongPosition],-1)),null,
+  'A substitute must be eligible to field the displaced position');
+console.log('PASS: live manager substitutions, GM policies, safe fielding and historical move logs');
