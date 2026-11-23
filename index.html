@@ -1829,11 +1829,68 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     return `<span class="${size} league-badge ${leagueClass(team.league)}" style="background:${team.color}" title="${leagueName(team.league)}">${h(team.letter)}</span>`;
   }
   // v0.2 presentation layer. Original v0.1 simulation functions remain intact.
+
+  // v0.8.5: one authoritative ability grade and palette across the UI.
   const grade=v=>v>=100?'SS':v>=99?'S+':v>=90?'S':v>=80?'A':v>=70?'B':v>=60?'C':v>=50?'D':v>=40?'E':'F';
-  const gradeBrief=v=>v>=100?'SS':v>=99?'S+':v>=90?'S':v>=80?'A':v>=70?'B':v>=60?'C':v>=50?'D':v>=40?'E':'F';
-  const gradeBriefColor=v=>v>=85?'#f7d04f':v>=75?'#ee8cc5':v>=65?'#f17670':v>=55?'#48c1e9':v>=45?'#50d5aa':v>=35?'#d0aa70':'#8c96aa';
-  const rankColor=v=>v>=88?'#f8c845':v>=74?'#ef82b5':v>=60?'#ee655f':v>=46?'#36c6a5':'#5eb4ee';
-  const portrait=p=>`<span class="avatar" style="--avatar-color:${isPitch(p)?'#e979aa':'#51b7d8'}">${faceMini(p)}<b>${rating(p)}</b></span>`;
+  const gradeBrief=grade;
+  const GRADE_COLORS=Object.freeze({
+    SS:'#DCE3EB','S+':'#F6D46A',S:'#F1C54B',A:'#DE58BB',
+    B:'#E85062',C:'#E8AA3F',D:'#A1CF47',E:'#43C86B',F:'#41B6E6'
+  });
+  const gradeBriefColor=v=>GRADE_COLORS[grade(v)]||GRADE_COLORS.F;
+  const rankColor=gradeBriefColor;
+  const SPECIAL_PLAYER_THEMES=Object.freeze({
+    PARALLEL:{name:'PARALLEL',ring:'#B28AFF',accent:'#6951CE',symbol:'◇'},
+    STAR:{name:'STAR',ring:'#FFE070',accent:'#D49F2E',symbol:'★'},
+    LEGEND:{name:'LEGEND',ring:'#FF6175',accent:'#8D2840',symbol:'◆'},
+    IMMORTAL:{name:'IMMORTAL',ring:'#EBF3FF',accent:'#151D30',symbol:'✧'},
+    RETURN:{name:'再来',ring:'#6ED7C0',accent:'#267D72',symbol:'↻'},
+    REBIRTH:{name:'転生',ring:'#84B4FF',accent:'#365DAF',symbol:'◎'},
+    RINNE:{name:'輪廻転生',ring:'#E7E7FC',accent:'#3D315C',symbol:'✺'}
+  });
+  function playerTitleTheme(p){
+    const raw=String(p?.specialCategory||p?.originCategory||'').trim();
+    const key=({再来:'RETURN',再来選手:'RETURN',転生:'REBIRTH',転生選手:'REBIRTH',
+      輪廻転生:'RINNE',REINCARNATION:'RINNE',
+      PARALLEL:'PARALLEL',STAR:'STAR',LEGEND:'LEGEND',IMMORTAL:'IMMORTAL',
+      RETURN:'RETURN',REBIRTH:'REBIRTH',RINNE:'RINNE'})[raw.toUpperCase()]||raw.toUpperCase();
+    return SPECIAL_PLAYER_THEMES[key]||null;
+  }
+  function displayedAbilityValues(p){
+    return isPitch(p)
+      ?[p.stuff,p.control,Math.round((p.stuff+p.control)/2),p.stamina,p.talent]
+      :[p.contact,p.power,p.speed,p.defense,p.talent];
+  }
+  function playerDisplayedAbilityAverage(p){
+    const values=displayedAbilityValues(p);
+    return values.every(Number.isFinite)?Math.round(values.reduce((n,v)=>n+v,0)/values.length):null;
+  }
+  function playerVisualTheme(p,visibility='known'){
+    const special=playerTitleTheme(p);
+    const hidden=visibility==='unknown'||p?.scoutingHidden===true||p?.abilitiesHidden===true;
+    const avg=hidden?null:playerDisplayedAbilityAverage(p);
+    const ring=special?.ring||(avg===null?'#75869B':gradeBriefColor(avg));
+    return {ring,accent:special?.accent||ring,nameColor:special?.ring||'#F4F6FC',
+      category:special?.name||null,symbol:special?.symbol||null,hidden,
+      average:avg,grade:avg===null?null:grade(avg)};
+  }
+  function specialNameTag(p){
+    const theme=playerTitleTheme(p);
+    return theme?`<span class="special-name-tag" style="--title-color:${theme.ring}">${theme.symbol} ${theme.name}</span>`:'';
+  }
+  function themedPlayerName(p){
+    const theme=playerVisualTheme(p);
+    return `<span class="themed-player-name" style="color:${theme.nameColor}">${h(p.name)}</span>${specialNameTag(p)}`;
+  }
+  // The SVG is the artwork only. This span draws the one and only avatar ring.
+  const portrait=p=>{
+    const theme=playerVisualTheme(p);
+    return `<span class="avatar player-portrait ${theme.category?'special-portrait':''}"
+      style="--avatar-color:${theme.ring};--avatar-accent:${theme.accent}"
+      title="${theme.category?theme.category+' · ':''}能力平均 ${theme.average??'非公開'}">
+      ${renderFaceArtwork(p,{hidden:theme.hidden})}
+      ${theme.hidden?'':`<b>${rating(p)}</b>`}</span>`;
+  };
   // Physical condition is separate from the existing pitch-stamina ability.
   const recoverySpan=p=>clamp(Math.round(Number.isFinite(p.recoveryDays)?p.recoveryDays:5),4,6);
   function initCondition(p){
@@ -2015,7 +2072,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const stats=isPitch(p)?[['球威',p.stuff],['制球',p.control],['変化',Math.round((p.stuff+p.control)/2)],['体力',p.stamina],['精神',p.talent]]:[['巧打',p.contact],['長打',p.power],['走力',p.speed],['守備',p.defense],['精神',p.talent]];
     const rosterGrading=ui.tab==='roster';
     const abilityCards=stats.map(([label,num])=>rosterGrading?`<div class="ability-cell"><small>${label}</small><strong style="color:${gradeBriefColor(num)}">${gradeBrief(num)}</strong></div>`:statBadge(num,label)).join('');
-    return `<div class="player-card"><button class="player-row" data-action="player-detail" data-id="${p.id}">${portrait(p)}<span class="player-main"><span class="player-name">${h(p.name)} <small>(${p.age})</small></span><span class="player-caption">${positionFull(p.pos)} · ${throwBat(p)}　${fmtSalary(p.salary)}</span></span><span class="player-affinity">♥ ${p.affinity}</span><span class="chev">›</span></button>${conditionBar(p)}<button class="abilities" data-action="player-detail" data-id="${p.id}">${abilityCards}</button>${actions?`<div class="player-card-action"><button class="btn sm outline" data-action="player-detail" data-id="${p.id}">詳細・成績</button><button class="btn sm danger" data-action="ask-release" data-id="${p.id}">戦力外</button></div>`:''}</div>`;
+    return `<div class="player-card"><button class="player-row" data-action="player-detail" data-id="${p.id}">${portrait(p)}<span class="player-main"><span class="player-name">${themedPlayerName(p)} <small>(${p.age})</small></span><span class="player-caption">${positionFull(p.pos)} · ${throwBat(p)}　${fmtSalary(p.salary)}</span></span><span class="player-affinity">♥ ${p.affinity}</span><span class="chev">›</span></button>${conditionBar(p)}<button class="abilities" data-action="player-detail" data-id="${p.id}">${abilityCards}</button>${actions?`<div class="player-card-action"><button class="btn sm outline" data-action="player-detail" data-id="${p.id}">詳細・成績</button><button class="btn sm danger" data-action="ask-release" data-id="${p.id}">戦力外</button></div>`:''}</div>`;
   }
   function teamScreen(){
     const t=myTeam(),position=rankings(t.league).findIndex(x=>x.id===t.id)+1;
@@ -2152,7 +2209,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       body=`<section class="panel"><h3 class="panel-title">年度別成績</h3><div class="table-wrap"><table class="data-table"><thead><tr><th>年度</th><th>球団</th>${pitch?'<th>登板</th><th>投球回</th><th>防御率</th><th>勝</th><th>敗</th><th>奪三振</th>':'<th>試合</th><th>打率</th><th>安打</th><th>本塁打</th><th>打点</th><th>盗塁</th>'}</tr></thead><tbody>${rows.map(s=>{const st=s.stats,tm=getTeam(s.teamId);return `<tr><td>${s.year}</td><td>${tm?h(tm.short):'FA'}</td>${pitch?`<td>${st.g}</td><td>${Math.floor(st.outs/3)}.${st.outs%3}</td><td>${st.outs?(st.er*27/st.outs).toFixed(2):'--.--'}</td><td>${st.w}</td><td>${st.l}</td><td>${st.k}</td>`:`<td>${st.g}</td><td>${st.ab?(st.h/st.ab).toFixed(3).replace(/^0/,''):'---'}</td><td>${st.h}</td><td>${st.hr}</td><td>${st.rbi}</td><td>${st.sb}</td>`}</tr>`}).join('')}</tbody></table></div><p class="tiny">v0.1以前に終了した年度の成績は保存されていないため、復元できません。</p></section>`;
     }
     if(ui.playerDetailTab==='memo')body=`<section class="panel"><h3 class="panel-title">GMメモ</h3><p class="small">この選手について残したメモはセーブデータに保存されます。</p><textarea class="player-memo" data-change="player-memo" data-id="${p.id}" placeholder="来季の構想・育成方針・補強候補などを記録">${h(p.memo)}</textarea><div class="tiny">入力欄から離れると保存されます。</div></section>`;
-    return `<div class="detail-back"><button class="ghost-btn" data-action="close-player">‹ 戻る</button></div><div class="player-profile"><div class="player-club">${t?h(t.name):'自由契約選手'} <span>${namePos(p.pos)}</span></div><div class="profile-row">${portrait(p)}<div><h2>${h(p.name)} <small>(${p.age})</small></h2><div class="profile-meta">${positionFull(p.pos)} · ${throwBat(p)} · ${fmtSalary(p.salary)}</div><div class="profile-meta">総合 ${rating(p)} · 愛着 ♥${p.affinity}</div></div></div></div><div class="player-detail-condition">${conditionBar(p)}<p class="tiny">コンディションは現在の疲労度です。投手能力の「体力」とは別に管理されます。</p></div><div class="subtabs detail-tabs">${[['abilities','能力'],['growth','能力推移'],['stats','成績'],['memo','メモ']].map(([key,label])=>`<button class="subtab ${ui.playerDetailTab===key?'active':''}" data-action="detail-tab" data-sub="${key}">${label}</button>`).join('')}</div>${body}`;
+    return `<div class="detail-back"><button class="ghost-btn" data-action="close-player">‹ 戻る</button></div><div class="player-profile"><div class="player-club">${t?h(t.name):'自由契約選手'} <span>${namePos(p.pos)}</span></div><div class="profile-row">${portrait(p)}<div><h2>${themedPlayerName(p)} <small>(${p.age})</small></h2><div class="profile-meta">${positionFull(p.pos)} · ${throwBat(p)} · ${fmtSalary(p.salary)}</div><div class="profile-meta">総合 ${rating(p)} · 愛着 ♥${p.affinity}</div></div></div></div><div class="player-detail-condition">${conditionBar(p)}<p class="tiny">コンディションは現在の疲労度です。投手能力の「体力」とは別に管理されます。</p></div><div class="subtabs detail-tabs">${[['abilities','能力'],['growth','能力推移'],['stats','成績'],['memo','メモ']].map(([key,label])=>`<button class="subtab ${ui.playerDetailTab===key?'active':''}" data-action="detail-tab" data-sub="${key}">${label}</button>`).join('')}</div>${body}`;
   }
 
   function navbar(){return gameNav()}
