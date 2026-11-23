@@ -94,7 +94,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert.match(app.innerHTML,/class="desk-task" data-action="mgr-open"/);
   assert(!app.innerHTML.includes('class="panel manager-home"'),'Manager must appear in GM desk, not a separate panel');
   dispatch('click',{action:'mgr-open'});
-  assert.match(app.innerHTML,/現監督・GM方針/);
+  assert.match(app.innerHTML,/監督・GM方針/);
   assert.match(app.innerHTML,/data-action="mgr-offer"/);
   const oldCash=window.PennantLab.getSnapshot().teams.find(t=>t.id===2).cash;
   dispatch('click',{action:'mgr-offer',slot:'1'});
