@@ -1373,18 +1373,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const extras=inningCount>9?`<div class="watch-extra-label">延長戦</div><table class="watch-table watch-extra-table">
       <thead><tr><th>球団</th>${Array.from({length:inningCount-9},(_,i)=>`<th>${i+10}</th>`).join('')}</tr></thead>
       <tbody>${buildRows(10,inningCount,false)}</tbody></table>`:'';
-    const last=revealed[revealed.length-1],current=last?getTeam(last.teamId):null;
-    const inningLabel=last?`${last.inning}回${last.side} · ${h(current.short)}の攻撃終了`:'プレーボール';
-    const event=last?g.events.find(x=>x.startsWith(`${last.inning}回 ${current.short} `)):null;
-    const note=last?(event||`${current.name}はこの回${last.runs}点を記録`):
-      `${away.name} 対 ${home.name} · まもなく試合開始`;
-    // Use fixed regulation/extra-innings milestones, never the result-dependent number of frames.
-    const progress=Math.min(100,Math.round(step<=18?step/18*95:95+(step-18)/6*5));
-    const justScored=last?.runs>0;
-    const oldScore=last?total(last.teamId)-last.runs:0;
-    const recentEvents=revealed.slice(-6).reverse().flatMap(frame=>
-      (g.events||[]).filter(e=>e.startsWith(`${frame.inning}回 ${getTeam(frame.teamId).short} `))
-        .map(e=>({frame,text:e}))).slice(0,3);
+    const current=last?getTeam(last.teamId):null;
+    const inningLabel=!last?'プレーボール':active
+      ?`${last.inning}回${last.side} · ${h(current.short)}が得点`
+      :`${last.inning}回${last.side} · ${h(current.short)}の攻撃終了`;
+    const event=last&&!active?(g.events||[]).find(x=>x.startsWith(`${last.inning}回 ${current.short} `)):null;
+    const note=active?`${last.play.batterName}選手が${watchScoringTitle(last.play)}`
+      :last?(event||`${current.name}はこの回${last.runs}点を記録`)
+      :`${away.name} 対 ${home.name} · まもなく試合開始`;
+    // Progress is tied to completed scheduled innings, never future plays or score totals.
+    const finishedHalves=revealed.length;
+    const progress=Math.min(100,Math.round(finishedHalves<=18
+      ?finishedHalves/18*95:95+(finishedHalves-18)/6*5));
+    const justScored=!!active;
+    const oldScore=active?total(last.teamId)-last.play.runs:0;
+    const batter=active?getPlayer(last.play.batterId):null;
+    const scorerPortrait=batter?faceMini(batter):'<span class="watch-scorer-ball">⚾</span>';
+    const recentEvents=shown.filter(x=>x.phase==='score').slice(-4).reverse();
     return `<div class="watch-game-screen ${justScored?'watch-scored':''}">
       <div class="review-kicker">PENNANT LAB · INNING WATCH</div>
       <section class="panel watch-hero">
