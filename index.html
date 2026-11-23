@@ -1930,43 +1930,59 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(ui.busy||game.pendingReview||game.pendingMonth||ui.monthHistory)return;
     if(game.day>=SEASON_GAMES)return;
     const resume=days==='resume'&&game.advanceTarget?.year===game.year;
+    const oneDay=days==='day'||(resume&&game.advanceTarget?.kind==='date');
     const requested=Math.max(1,Number(days)||1);
-    const goal=resume?game.advanceTarget.goal:Math.min(SEASON_GAMES,game.day+requested);
-    if(!resume)game.advanceTarget={year:game.year,goal};
-    const mode=game.playbackMode||'normal',delay=mode==='normal'?2000:mode==='fast'?1000:0;
+    const goal=resume?game.advanceTarget.goal:oneDay?game.day:Math.min(SEASON_GAMES,game.day+requested);
+    const calendarGoal=resume?game.advanceTarget.calendarGoal:
+      oneDay?Math.min(game.calendar.days.length,game.calendarIndex+1):null;
+    if(!resume)game.advanceTarget={
+      year:game.year,goal,kind:oneDay?'date':'games',calendarGoal
+    };
+    const mode=game.playbackMode||'normal',skip=mode==='skip'&&!oneDay;
+    const baseDelay=mode==='fast'?1000:2000;
     const startGame=game.day,startId=game.games.length;
-    ui.busy=true;ui.pauseRequested=false;ui.autoDay=null;render();save();
+    const hasMore=()=>oneDay?game.calendarIndex<calendarGoal:game.day<goal;
+    ui.busy=true;ui.pauseRequested=false;ui.autoPaused=false;ui.autoDay=null;ui.autoWait=null;
+    clearPendingNewsTap();render();save();
     await new Promise(resolve=>setTimeout(resolve,35));
     let lastDay=null;
-    while(game.day<goal&&!ui.pauseRequested&&!game.pendingMonth){
+    while(hasMore()&&!ui.pauseRequested&&!game.pendingMonth){
       if(storageFailure||document.hidden)break;
       const entry=processCalendarDay();
       if(!entry)break;
       lastDay=entry;
-      if(delay){
-        // Put a complete match report or a baseball newspaper on screen.
-        // The delay is spent reading this day's page, not watching a date bar.
+      if(!skip){
         ui.autoDay=entry;
+        ui.autoPaused=false;
         save();render();window.scrollTo({top:0,behavior:'instant'});
-        await new Promise(resolve=>setTimeout(resolve,delay));
-        if(ui.pauseRequested||document.hidden)break;
+        if(!oneDay){
+          // News always gets five seconds, even in the 1s/day fast mode.
+          await waitForDailyDisplay(entry.type==='game'?baseDelay:5000);
+          if(ui.pauseRequested||document.hidden)break;
+        }
       }
-      if(game.pendingMonth)break;
+      // One-day controls advance exactly one civil date, including rest days.
+      if(oneDay||game.pendingMonth)break;
     }
-    const paused=ui.pauseRequested||!!document.hidden;
-    ui.busy=false;ui.pauseRequested=false;
+    const interrupted=!!(ui.pauseRequested||document.hidden||storageFailure);
+    ui.busy=false;ui.pauseRequested=false;ui.autoPaused=false;ui.autoWait=null;
+    clearPendingNewsTap();
     const games=game.games.slice(startId).filter(g=>g.year===game.year&&(g.home===game.selectedId||g.away===game.selectedId));
     const last=games[games.length-1];
-    // Skip retains its batch report; visible playback has already shown every
-    // day, so never replay an older match after a rest day.
-    const review=mode==='skip'?!!last:lastDay?.type==='game'&&!!last;
-    if(review)game.pendingReview={year:game.year,day:last.day,gameId:last.id,
+    const completedSeason=game.day===SEASON_GAMES&&!oneDay;
+    // Fast skip keeps the legacy batch report. Continuous playback has
+    // already shown the daily report, so don't duplicate the final match.
+    const showReview=!!last&&(skip||completedSeason);
+    if(showReview)game.pendingReview={year:game.year,day:last.day,gameId:last.id,
       count:game.day-startGame,gameIds:games.map(g=>g.id),
-      mode:game.day===SEASON_GAMES?'season':game.day-startGame>=30?'30':game.day-startGame>=7?'7':'single'};
-    if(game.day>=goal)game.advanceTarget=null;
-    if(!paused||game.pendingReview||game.pendingMonth)ui.autoDay=null;
+      mode:completedSeason?'season':game.day-startGame>=30?'30':game.day-startGame>=7?'7':'single'};
+    if(!hasMore())game.advanceTarget=null;
+    // Single-day results stay on screen until dismissed; the same applies to
+    // the final visible result of a timed batch outside monthly boundaries.
+    if(showReview||(!oneDay&&game.pendingMonth)||skip)ui.autoDay=null;
     save();render();window.scrollTo({top:0,behavior:'instant'});
-    if(paused&&!game.pendingReview&&!game.pendingMonth)showToast('日程の進行を一時停止しました');
+    if(interrupted&&!game.pendingReview&&!game.pendingMonth)
+      showToast('日程の進行を停止しました。タップで再開できます');
   };
   function offseasonExperience(phase){
     const value=phase==='winter'?25:phase==='self'?22:30;
