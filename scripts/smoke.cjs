@@ -87,11 +87,29 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.8\.4 · SCORING/);
+  assert.match(app.innerHTML,/VERSION 0\.8\.5 · PORTRAITS/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
   dispatch('click',{action:'finish-setup'});
+
+  dispatch('click',{action:'tab',tab:'team'});
+  assert.match(app.innerHTML,/チームメンバー/);
+  assert.match(app.innerHTML,/class="avatar player-portrait/);
+  assert.match(app.innerHTML,/class="face-artwork"/);
+  assert(!/<span class="avatar[^>]*>[\s\S]*?<span class="face-mini/.test(
+    app.innerHTML.split('class="player-card"')[1]?.split('</button>')[0]||''),
+    'Player icon must not contain a second face-mini ring');
+  const avatarCount=(app.innerHTML.match(/class="avatar player-portrait/g)||[]).length;
+  assert(avatarCount>=20,'The team roster should render portraits for every club player');
+  const playerButton=app.innerHTML.match(/data-action="player-detail" data-id="(\d+)"/);
+  assert(playerButton,'Player detail button exists');
+  dispatch('click',{action:'player-detail',id:playerButton[1]});
+  assert.match(app.innerHTML,/class="profile-row"/);
+  assert.match(app.innerHTML,/class="avatar player-portrait/);
+  assert.match(app.innerHTML,/class="face-artwork"/);
+  dispatch('click',{action:'tab',tab:'hq'});
+
   assert.match(app.innerHTML,/data-action="mgr-open"/);
   assert.match(app.innerHTML,/class="desk-task" data-action="mgr-open"/);
   assert(!app.innerHTML.includes('class="panel manager-home"'),'Manager must appear in GM desk, not a separate panel');
