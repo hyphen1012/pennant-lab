@@ -249,13 +249,21 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .lineup-wrap .lineup-item{grid-template-columns:38px minmax(0,1fr) auto;column-gap:5px}
 .lineup-wrap .lineup-n{width:38px;height:30px;display:flex;justify-content:center;align-items:center;gap:2px;white-space:nowrap;font-size:11.4px}
 .lineup-wrap .lineup-n em{font-size:10.4px;font-style:normal;color:#f1d995}
-.player-pick-btn.roster-pick-btn{min-height:57px;align-items:center}
+/* Balanced roster identity: emphasize the player's portrait and name only. */
+.player-pick-btn.roster-pick-btn{min-height:68px;align-items:center;padding:7px 9px}
 .roster-pick-btn .roster-pick-content{display:flex;flex:1;flex-direction:column;min-width:0;gap:3px}
-.roster-pick-btn .face-label{display:inline-flex;min-width:0;max-width:100%;font-size:12.5px}
-.roster-pick-btn .roster-pick-meta{display:flex;flex-wrap:wrap;column-gap:7px;row-gap:2px;color:#aebed3;font-size:10.4px;line-height:1.3}
+.roster-pick-btn .face-label{display:inline-flex;align-items:center;gap:10px;min-width:0;max-width:100%;font-size:15.6px;font-weight:850;line-height:1.25}
+.roster-pick-btn .face-label .face-mini{width:42px;height:42px;flex:0 0 42px}
+.roster-pick-btn .face-label>span:last-child{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.roster-pick-btn .roster-pick-meta{display:flex;flex-wrap:wrap;column-gap:7px;row-gap:2px;color:#aebed3;font-size:10.4px;line-height:1.3;font-weight:400}
 .roster-pick-btn .roster-pick-meta>span{white-space:nowrap}
 .roster-pick-btn .roster-pick-hand{color:#d5deeb;font-weight:700}
-@media(max-width:390px){.roster-pick-btn .roster-pick-meta{font-size:9.4px;column-gap:5px}.roster-pick-btn .face-label{font-size:11.4px}}
+@media(max-width:390px){
+  .player-pick-btn.roster-pick-btn{min-height:64px;padding:6px 7px}
+  .roster-pick-btn .face-label{font-size:14.2px;gap:8px}
+  .roster-pick-btn .face-label .face-mini{width:38px;height:38px;flex-basis:38px}
+  .roster-pick-btn .roster-pick-meta{font-size:9.4px;column-gap:5px}
+}
 
 /* Editable defensive roles: a compact role chip opens the positional suitability matrix. */
 .lineup-wrap .fielding-trigger{position:relative;border:1px solid #59647d;cursor:pointer;min-height:36px;padding:2px 3px}
