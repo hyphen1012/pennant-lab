@@ -1736,6 +1736,79 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     });
     return chosen;
   }
+
+  /* v0.8.8: In-game runner replacement preserves the actual base, batting
+     slot and future defensive role. Never re-enter a replaced player. */
+  function managerPinchRunner(team,bases,inning,appear,context){
+    if(!context||inning<7||context.scoreDiff>2||context.scoreDiff< -4)return;
+    const intent=managerDecision(team,'steal');
+    const quota=intent>=68?2:intent>=38?1:0;
+    if(context.runnerUsed[team.id]>=quota)return;
+    const active=context.activeLineups[team.id];
+    const roles=team.fieldingRoles||{};
+    const candidates=bases.map((runner,base)=>({runner,base,slot:active.findIndex(p=>p?.id===runner?.id)}))
+      .filter(x=>x.runner&&x.slot>=0&&!context.changed[team.id].has(x.slot));
+    for(const current of candidates){
+      const role=roles[team.lineup[current.slot]];
+      if(!role)continue;
+      const bench=context.bench[team.id].filter(p=>availableForGame(p)
+        &&(role==='DH'||fieldingTier(p,role)!=='off'));
+      const fast=bench.sort((a,b)=>effectiveSkill(b,'speed')-effectiveSkill(a,'speed')
+        ||a.id-b.id)[0];
+      if(!fast)return;
+      const gain=effectiveSkill(fast,'speed')-effectiveSkill(current.runner,'speed');
+      const minGain=clamp(12-(intent-50)*.09-(managerRatings(team.manager).field-60)*.04,7,18);
+      if(gain<minGain)continue;
+      bases[current.base]=fast;
+      active[current.slot]=fast;
+      context.bench[team.id]=context.bench[team.id].filter(p=>p.id!==fast.id);
+      context.changed[team.id].add(current.slot);
+      context.runnerUsed[team.id]++;
+      if(!appear.run.has(fast.id)&&!appear.bat.has(fast.id)){fast.stats.g++;appear.run.add(fast.id)}
+      if(context.managerMoves)context.managerMoves.push({
+        type:'runner',inning,side:team.id===context.awayId?'表':'裏',teamId:team.id,
+        outId:current.runner.id,outName:current.runner.name,
+        inId:fast.id,inName:fast.name,slot:current.slot,role,
+        managerId:team.manager?.id||null,managerName:team.manager?.name||'監督'
+      });
+      return fast;
+    }
+  }
+  /* Defense-only substitution between half-innings. Positions are preserved,
+     no substitution can come from a used player or create a missing fielder. */
+  function managerDefenseUpgrade(team,inning,lead,context){
+    if(!context||inning<7||lead<1||lead>5)return;
+    const intent=managerDecision(team,'defense');
+    const quota=intent>=68?2:intent>=40?1:0;
+    if(context.defenseUsed[team.id]>=quota)return;
+    const active=context.activeLineups[team.id],roles=team.fieldingRoles||{};
+    const options=[];
+    for(let i=0;i<active.length;i++){
+      if(context.changed[team.id].has(i))continue;
+      const previous=active[i],role=roles[team.lineup[i]];
+      if(!previous||!role||role==='DH')continue;
+      for(const p of context.bench[team.id]){
+        if(!availableForGame(p)||fieldingTier(p,role)==='off')continue;
+        const improvement=effectiveFielding(p,role)-effectiveFielding(previous,role);
+        const minimum=clamp(9-(intent-50)*.10-(managerRatings(team.manager).field-60)*.06,4,13);
+        if(improvement>=minimum)options.push({slot:i,role,previous,p,improvement});
+      }
+    }
+    options.sort((a,b)=>b.improvement-a.improvement||a.p.id-b.p.id);
+    const chosen=options[0];if(!chosen)return;
+    active[chosen.slot]=chosen.p;
+    context.bench[team.id]=context.bench[team.id].filter(p=>p.id!==chosen.p.id);
+    context.changed[team.id].add(chosen.slot);
+    context.defenseUsed[team.id]++;
+    if(context.managerMoves)context.managerMoves.push({
+      type:'defense',inning:inning+1,
+      side:team.id===context.awayId?'裏':'表',teamId:team.id,
+      outId:chosen.previous.id,outName:chosen.previous.name,
+      inId:chosen.p.id,inName:chosen.p.name,slot:chosen.slot,role:chosen.role,
+      managerId:team.manager?.id||null,managerName:team.manager?.name||'監督'
+    });
+    return chosen.p;
+  }
   function halfInning(batTeam,fieldTeam,pitcher,batters,indexes,inning,targetScore,appear,events,scoringPlays,context){
     let out=0,run=0,bases=[null,null,null],pa=0,walkOff=false;
     const bst=batTeam.id,field=fieldTeam.id;
@@ -1748,7 +1821,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       pa++;const batter=managerPinchBatter(batTeam,batters,indexes,inning,bases,pitcher,context);indexes[bst]++;
       if(!batter)break;
       const st=batter.stats;
-      if(!appear.bat.has(batter.id)){st.g++;appear.bat.add(batter.id)}
+      if(!appear.bat.has(batter.id)){if(!appear.run.has(batter.id))st.g++;appear.bat.add(batter.id)}
       st.pa++;
       const contact=effectiveSkill(batter,'contact'),power=effectiveSkill(batter,'power');
       const stuff=effectiveSkill(pitcher,'stuff'),control=effectiveSkill(pitcher,'control');
@@ -1827,6 +1900,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         scoringPlays.push({inning,teamId:batTeam.id,batterId:batter.id,
           batterName:batter.name,kind:scoringKind,runs:run-runsBefore,rbi});
       }
+      managerPinchRunner(batTeam,bases,inning,appear,context);
       if(bases[0]&&!bases[1]&&effectiveSkill(bases[0],'speed')>=63&&rand()<(effectiveSkill(bases[0],'speed')-57)*.00125*(.55+managerDecision(batTeam,'steal')/100)){
         bases[1]=bases[0];bases[0]=null;bases[1].stats.sb++;
       }
