@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.7\.2 · WATCH/);
+assert.match(html,/VERSION 0\.8\.0 · GAME FEEL/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(t,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -72,3 +72,19 @@ assert.doesNotMatch(regulation,/watch-extra-table/,'No extra-inning table before
 assert.match(extra,/<th>9<\/th><th>計<\/th>/,'The main scoreboard remains fixed for extra innings');
 assert.match(extra,/watch-extra-table/,'Extra innings appear in a second no-scroll table');
 assert.match(extra,/<th>10<\/th><th>11<\/th><th>12<\/th>/);
+
+// Cinematic presentation must not write to saved game state or fabricate player performance.
+assert.match(html,/function gameDayIntroScreen\(entry,g\)/);
+assert.match(html,/function gameSetScreen\(g\)/);
+assert.match(html,/function resultHeroCard\(g\)/);
+assert.match(html,/function highlightPlayer\(g\)/);
+assert.match(html,/game-result-hero/);
+assert.match(html,/prefers-reduced-motion:reduce/);
+assert.match(html,/phase='intro'/);
+assert.match(html,/phase='final'/);
+assert.match(html,/if\(watchOneDay\)ui\.watchGame=\{year:game\.year/);
+assert.match(html,/const watchOneDay=oneDay&&entry\.type==='game'/);
+assert.match(html,/result-table-wrap/);
+assert.match(html,/watch-table result-table/);
+assert.match(html,/watch-extra-table/);
+assert.match(html,/return oldMatchReview03\(\)\.replace\('<section class="game-result-hero'/);
