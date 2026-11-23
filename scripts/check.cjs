@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.8\.4 · SCORING/);
+assert.match(html,/VERSION 0\.8\.5 · PORTRAITS/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(t,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -217,3 +217,66 @@ const hrNames=vm.runInNewContext(watchSource+
 assert.equal(hrNames[0],'ソロホームラン');
 assert.equal(hrNames[1],'3ランホームラン');
 assert.equal(hrNames[2],'満塁ホームラン');
+
+
+
+// v0.8.5: one grade palette, displayed-ability mean ring, stable detailed
+// fictional SVG artwork, no nested ring, and special-title precedence.
+const paletteStart=inline[1].indexOf('  // v0.8.5: one authoritative ability grade');
+const paletteEnd=inline[1].indexOf('  // Physical condition is separate',paletteStart);
+const faceStart=inline[1].indexOf('  function renderFaceArtwork(p,options={})');
+const faceEnd=inline[1].indexOf('  // Existing player portraits receive',faceStart);
+assert(paletteStart>=0&&paletteEnd>paletteStart&&faceStart>0&&faceEnd>faceStart);
+const portraitSource=inline[1].slice(paletteStart,paletteEnd)+
+  '\n'+inline[1].slice(faceStart,faceEnd);
+const identity=vm.runInNewContext('(function(){'+portraitSource+
+  '\nreturn {grade,gradeBrief,gradeBriefColor,rankColor,playerDisplayedAbilityAverage,'+
+  'playerVisualTheme,playerTitleTheme,portrait,faceMini,faceLabel,renderFaceArtwork,'+
+  'themedPlayerName};})()',{
+  isPitch:p=>['SP','RP','CP'].includes(p.pos),rating:p=>p.overall||73,
+  h:s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+});
+const hexMap={
+  SS:'#DCE3EB','S+':'#F6D46A',S:'#F1C54B',A:'#DE58BB',
+  B:'#E85062',C:'#E8AA3F',D:'#A1CF47',E:'#43C86B',F:'#41B6E6'
+};
+for(const [num,rank] of [[100,'SS'],[99,'S+'],[90,'S'],[80,'A'],
+  [70,'B'],[60,'C'],[50,'D'],[40,'E'],[0,'F']]){
+  assert.equal(identity.grade(num),rank);
+  assert.equal(identity.gradeBrief(num),rank);
+  assert.equal(identity.gradeBriefColor(num),hexMap[rank]);
+  assert.equal(identity.rankColor(num),hexMap[rank]);
+}
+const batter={id:2001,name:'伊藤 祐樹',age:33,pos:'2B',
+  contact:63,power:75,speed:94,defense:73,arm:42,talent:58,overall:73};
+const pitcher={id:2002,name:'鈴木 大輝',age:36,pos:'SP',
+  stuff:81,control:60,stamina:55,talent:54,overall:65};
+assert.equal(identity.playerDisplayedAbilityAverage(batter),73);
+assert.equal(identity.playerVisualTheme(batter).ring,hexMap.B);
+assert.equal(identity.playerDisplayedAbilityAverage(pitcher),64);
+assert.equal(identity.playerVisualTheme(pitcher).ring,hexMap.C);
+const portraitHTML=identity.portrait(batter);
+assert.match(portraitHTML,/--avatar-color:#E85062/);
+assert.match(portraitHTML,/<b>73<\/b>/);
+assert.equal((portraitHTML.match(/class="avatar/g)||[]).length,1);
+assert.equal((portraitHTML.match(/<svg\b/g)||[]).length,1);
+assert.doesNotMatch(portraitHTML,/class="face-mini/,'No nested ring');
+assert.match(portraitHTML,/class="face-artwork"/);
+assert.equal(identity.renderFaceArtwork(batter),identity.renderFaceArtwork(batter));
+assert.notEqual(identity.renderFaceArtwork(batter),identity.renderFaceArtwork(pitcher));
+const titled={...batter,specialCategory:'PARALLEL'};
+assert.equal(identity.playerVisualTheme(titled).ring,'#B28AFF');
+assert.match(identity.themedPlayerName(titled),/PARALLEL/);
+assert.match(identity.themedPlayerName(titled),/#B28AFF/);
+assert.match(identity.portrait(titled),/special-portrait/);
+const immortal={...batter,specialCategory:'IMMORTAL',abilitiesHidden:true};
+assert.equal(identity.playerVisualTheme(immortal).average,null);
+assert.match(identity.portrait(immortal),/未公開の選手シルエット/);
+assert.doesNotMatch(identity.portrait(immortal),/<b>73<\/b>/);
+assert.equal(identity.playerVisualTheme(immortal).ring,'#EBF3FF');
+assert.equal(identity.playerVisualTheme({...batter,specialCategory:'LEGEND'}).ring,'#FF6175');
+assert.equal(identity.playerVisualTheme({...batter,originCategory:'輪廻転生'}).ring,'#E7E7FC');
+assert.match(html,/\.avatar\.player-portrait>.face-artwork/);
+assert.match(html,/\.manager-portrait>.face-artwork/);
+assert.match(html,/\.special-name-tag/);
+console.log('PASS: rank colors, average-based single rings, stable SVG faces and title themes');
