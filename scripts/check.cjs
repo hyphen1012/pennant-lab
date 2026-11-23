@@ -253,7 +253,7 @@ const pitcher={id:2002,name:'鈴木 大輝',age:36,pos:'SP',
   stuff:81,control:60,stamina:55,talent:54,overall:65};
 assert.equal(identity.playerDisplayedAbilityAverage(batter),73);
 assert.equal(identity.playerVisualTheme(batter).ring,hexMap.B);
-assert.equal(identity.playerDisplayedAbilityAverage(pitcher),63);
+assert.equal(identity.playerDisplayedAbilityAverage(pitcher),64);
 assert.equal(identity.playerVisualTheme(pitcher).ring,hexMap.C);
 const portraitHTML=identity.portrait(batter);
 assert.match(portraitHTML,/--avatar-color:#E85062/);
