@@ -667,6 +667,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function halfInning(batTeam,fieldTeam,pitcher,batters,indexes,inning,targetScore,appear,events){
     let out=0,run=0,bases=[null,null,null],pa=0,walkOff=false;
     const bst=batTeam.id,field=fieldTeam.id;
+    const defense=teamDefenseScore(fieldTeam);
     const pstat=pitcher.stats;
     if(!appear.pitch.has(pitcher.id)){pstat.g++;appear.pitch.add(pitcher.id)}
     const scoreRunner=(runner)=>{run++;if(runner)runner.stats.r++;pstat.er++};
@@ -680,7 +681,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const pStrike=clamp(.213-(batter.contact-55)*.0010+(pitcher.stuff-55)*.0014,.085,.34);
       // Defense is part of batted-ball outcomes, not the batter's base skill.
       // Excellent defenders suppress hits; unsuitable positions reduce efficiency.
-      const defense=teamDefenseScore(fieldTeam);
       const pHit=clamp(.245+(batter.contact-55)*.00175-(pitcher.stuff-55)*.0010
         +(60-defense)*.00135,.115,.42);
       let r=rand(),rbi=0;
