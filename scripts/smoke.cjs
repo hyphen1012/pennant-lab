@@ -87,7 +87,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.8\.3 · WATCH/);
+  assert.match(app.innerHTML,/VERSION 0\.8\.4 · SCORING/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -174,6 +174,36 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(monthlyRenders.some(v=>v.includes('球団運営スタッフ')));
   if(medicalRenders.length)assert(medicalRenders.every(v=>v.includes('チーム医療スタッフ')));
   for(const team of full.teams)assert.equal(team.w+team.l+team.t,143,'Every club plays 143 games');
+
+  // Every selected-club run must be traceable to a real scoring plate
+  // appearance and equal the actual totals saved in the game.
+  await flush();
+  const matchArchive=store.get(1)?.data?.games||[];
+  const selectedMatches=matchArchive.filter(g=>g.home===full.selectedId||g.away===full.selectedId);
+  assert.equal(selectedMatches.length,143,'143 watched-club games are recorded');
+  let recordedScoringPlays=0;
+  for(const g of selectedMatches){
+    assert(Array.isArray(g.scoringPlays),'Selected-club matches have actual RBI play logs');
+    assert.equal(g.scoringPlays.reduce((n,p)=>n+p.runs,0),g.homeScore+g.awayScore,
+      'Recorded scoring appearances equal the final runs, without fabricated scores');
+    for(let inning=1;inning<=Math.max(g.inningsH.length,g.inningsA.length);inning++){
+      for(const [teamId,runs] of [[g.home,g.inningsH[inning-1]],[g.away,g.inningsA[inning-1]]]){
+        if(!Number.isFinite(runs))continue;
+        const logged=g.scoringPlays.filter(p=>p.inning===inning&&p.teamId===teamId);
+        assert.equal(logged.reduce((n,p)=>n+p.runs,0),runs,
+          'Each half-inning is the sum of its real scoring plate appearances');
+        for(const p of logged){
+          assert(typeof p.batterName==='string'&&p.batterName.length>1);
+          assert(['hr','single','double','triple','walk','out'].includes(p.kind));
+          assert(p.runs>=1&&p.runs<=4);
+        }
+        recordedScoringPlays+=logged.length;
+      }
+    }
+  }
+  assert(recordedScoringPlays>0,'Season must contain actual player-named scoring plays');
+  console.log('PASS: '+recordedScoringPlays+' real batter-attributed scoring plays across 143 watched games');
+
   console.log('PASS: full 143-game season, 858 games, all 12 clubs, monthly and injury interruptions');
 
   console.log('PASS: v0.8.2 cinematic watch, manager, personalized GM reports, save and season');
