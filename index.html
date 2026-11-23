@@ -363,12 +363,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     };
     const eastIds=leagueTeams('E').map(t=>t.id),westIds=leagueTeams('W').map(t=>t.id);
     const east=leagueRound(eastIds),west=leagueRound(westIds);
+    // Each intra-league pair plays 25 times: alternate the hosting club and
+    // distribute the odd 25th home game so every club gets 62/63 league homes.
+    const hostPair=(pair,ids,cycle)=>{
+      const ia=ids.indexOf(pair[0]),ib=ids.indexOf(pair[1]);
+      const low=Math.min(ia,ib),high=Math.max(ia,ib),gap=high-low;
+      const lowGetsExtra=gap<3||(gap===3&&low%2===0);
+      const extra=ids[lowGetsExtra?low:high],other=pair.find(id=>id!==extra);
+      const home=cycle%2===0?extra:other,away=home===extra?other:extra;
+      return {home,away,kind:'league'};
+    };
     const intraleague=Array.from({length:125},(_,i)=>{
-      const reverse=Math.floor(i/5)%2===1;
-      return [east[i%5],west[i%5]].flat().map(pair=>{
-        const [a,b]=reverse?[pair[1],pair[0]]:pair;
-        return {home:a,away:b,kind:'league'};
-      });
+      const cycle=Math.floor(i/5),round=i%5;
+      return [...east[round].map(pair=>hostPair(pair,eastIds,cycle)),
+              ...west[round].map(pair=>hostPair(pair,westIds,cycle))];
     });
     // 18 contiguous interleague dates; each East/West pairing occurs 3 times.
     const interleague=Array.from({length:INTERLEAGUE_GAMES},(_,i)=>{
