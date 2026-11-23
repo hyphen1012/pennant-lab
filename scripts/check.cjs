@@ -80,7 +80,7 @@ assert.match(html,/function resultHeroCard\(g\)/);
 assert.match(html,/function highlightPlayer\(g\)/);
 assert.match(html,/game-result-hero/);
 assert.match(html,/prefers-reduced-motion:reduce/);
-assert.match(html,/phase='intro'/);
+assert.match(html,/phase:'intro'/);
 assert.match(html,/phase='final'/);
 assert.match(html,/if\(watchOneDay\)ui\.watchGame=\{year:game\.year/);
 assert.match(html,/const watchOneDay=oneDay&&entry\.type==='game'/);
