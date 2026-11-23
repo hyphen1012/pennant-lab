@@ -365,6 +365,55 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .auto-paused-actions{display:flex;gap:8px;justify-content:flex-end;flex:1}
 .auto-paused-toolbar .btn{font-size:12px;padding:9px 12px;white-space:nowrap}
 @media(max-width:380px){.auto-paused-toolbar{gap:5px}.auto-paused-toolbar .btn{padding:8px 9px;font-size:11px}}
+
+/* LEAGUE IDENTITY — independent of player green/red, individual club colors.
+   Catcher-like blue for East, infielder-like yellow for West. */
+.league-east{--league-tone:#78bff0;--league-strong:#acdafa;--league-border:#568eae;--league-surface:#1b3952;--league-tint:#25527e24}
+.league-west{--league-tone:#ead06e;--league-strong:#f5e39e;--league-border:#ae9550;--league-surface:#403a25;--league-tint:#d7b84a24}
+.league-tag{display:inline-flex;align-items:center;gap:4px;vertical-align:baseline;color:var(--league-tone);border:1px solid var(--league-border);border-radius:6px;background:var(--league-tint);padding:2px 7px;font-size:10px;font-weight:900;letter-spacing:.15px;white-space:nowrap}
+.league-club-name{color:var(--league-tone);font-weight:800}
+.league-heading{color:var(--league-tone)!important}
+.league-panel{border-top:3px solid var(--league-border)}
+.league-badge{box-shadow:0 0 0 2px var(--league-border);border:1px solid #ffffff38}
+.top.league-east .top-low{border-bottom:2px solid #568eae}
+.top.league-west .top-low{border-bottom:2px solid #ae9550}
+.hero-stadium.league-east{border-color:#568eae}
+.hero-stadium.league-west{border-color:#ae9550}
+.hero-stadium .league-tag{margin-top:5px}
+.setup-tabs .league-tab,.chips .league-tab{border:1px solid var(--league-border);color:var(--league-tone);background:var(--league-tint)}
+.setup-tabs .league-tab.active,.chips .league-tab.active{background:var(--league-surface);color:var(--league-strong);border:1px solid var(--league-tone);box-shadow:inset 0 -2px 0 var(--league-tone)}
+.choose-team.league-east,.team-card.league-east{border-left:3px solid #568eae}
+.choose-team.league-west,.team-card.league-west{border-left:3px solid #ae9550}
+.choose-team.league-east.chosen{border-color:#78bff0;background:#1a334a}
+.choose-team.league-west.chosen{border-color:#ead06e;background:#363326}
+.team-card.league-east:hover,.team-card.league-west:hover{border-color:var(--league-tone)}
+.league-table{border-left:3px solid var(--league-border);padding-left:5px}
+.league-table .data-table th{color:var(--league-tone);background:var(--league-tint)}
+.league-table .league-stand-rank{color:var(--league-strong);font-weight:900}
+.league-table .data-table tr.focus{background:var(--league-tint)}
+.league-table .data-table tr.focus td:first-child{border-left-color:var(--league-tone)}
+.league-history-row{line-height:1.9}
+.league-box.league-east{border-top:3px solid #568eae}
+.league-box.league-west{border-top:3px solid #ae9550}
+.league-box h3{color:var(--league-tone)}
+.league-box .stand-line.mine{color:var(--league-tone);background:var(--league-tint)}
+.league-champs>div.league-east{border-top:3px solid #568eae}
+.league-champs>div.league-west{border-top:3px solid #ae9550}
+.league-champs>div b{color:var(--league-strong)}
+.award-winner.league-east{border-left:3px solid #568eae}
+.award-winner.league-west{border-left:3px solid #ae9550}
+.award-winner .award-medal .league-tag{font-size:11px}
+.daily-newspaper .paper-lead.league-east{border-top-color:#568eae}
+.daily-newspaper .paper-lead.league-west{border-top-color:#ead06e}
+.daily-newspaper .paper-brief.league-east{border-left-color:#568eae}
+.daily-newspaper .paper-brief.league-west{border-left-color:#ead06e}
+.daily-newspaper .paper-lead.league-east .paper-kicker,.daily-newspaper .paper-brief.league-east .paper-kicker{color:#a4d9fa}
+.daily-newspaper .paper-lead.league-west .paper-kicker,.daily-newspaper .paper-brief.league-west .paper-kicker{color:#f4dc89}
+.daily-newspaper .paper-lead.league-east .paper-highlight{color:#a4d9fa}
+.daily-newspaper .paper-lead.league-west .paper-highlight{color:#f4dc89}
+.review-score .score-pair .league-club-name{color:var(--league-tone)}
+.calendar-day .league-club-name{color:var(--league-tone)}
+@media(max-width:380px){.league-tag{font-size:9px;padding:2px 5px}.league-table{padding-left:3px}}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -771,14 +820,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }
     for(const league of ['E','W']){
       const first=rankings(league)[0];if(!first)continue;
-      articles.push({tag:league==='E'?'東リーグ':'西リーグ',type:'standing',
+      articles.push({tag:leagueName(league),league,type:'standing',
         headline:`${first.short}、${league==='E'?'東':'西'}リーグ首位を走る`,
         body:`${first.wins}勝${first.losses}敗${first.ties}分。各球団のペナント争いが続いている。`,
         stat:`${first.wins}勝 ${first.losses}敗`});
     }
     const top=game.players.filter(p=>p.teamId!=null&&p.teamId>=0&&!isPitch(p)&&p.stats?.hr>0)
       .sort((a,b)=>b.stats.hr-a.stats.hr||b.stats.rbi-a.stats.rbi||a.id-b.id)[0];
-    if(top)articles.push({tag:'注目の打者',type:'player',
+    if(top)articles.push({tag:'注目の打者',type:'player',league:getTeam(top.teamId)?.league,
       headline:`${top.name}、今季${top.stats.hr}本塁打`,
       body:`${getTeam(top.teamId).short}の${top.name}が本塁打${top.stats.hr}本、${top.stats.rbi}打点を記録。`,
       stat:`${top.stats.hr} HR`});
@@ -877,10 +926,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <div class="paper-dateband"><strong>${formatCalendarDate(entry.date,true)}</strong><span>${label}</span></div>
       ${ui.busy?'<div class="paper-touch-hint">紙面をタップ：一時停止／再開　・　ダブルタップ：次の日へ</div>':''}
       <div class="paper-stories">
-        <article class="paper-lead"><div class="paper-kicker">TOP STORY / ${h(main.tag)}</div>
+        <article class="paper-lead ${storyLeague(main)?leagueClass(storyLeague(main)):''}"><div class="paper-kicker">TOP STORY / ${h(main.tag)}</div>
           <h2>${h(main.headline)}</h2><p>${h(main.body)}</p>
           <div class="paper-highlight">${h(main.stat||'球界の最新情報')}</div></article>
-        <div class="paper-briefs">${rest.map((a,i)=>`<article class="paper-brief">
+        <div class="paper-briefs">${rest.map((a,i)=>`<article class="paper-brief ${storyLeague(a)?leagueClass(storyLeague(a)):''}">
           <div class="paper-kicker">0${i+2} / ${h(a.tag)}</div><h3>${h(a.headline)}</h3>
           <p>${h(a.body)}</p><b>${h(a.stat||'')}</b>
         </article>`).join('')}</div>
@@ -899,8 +948,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       ${ui.busy?'<div class="game-touch-hint">画面をタップ：一時停止／再開</div>':''}
       <div class="review-score"><h2>第${g.day}戦 · 試合結果</h2>
         <span class="match-outcome">${scored>allowed?'勝利':scored<allowed?'敗戦':'引き分け'}</span>
-        <div class="score-pair"><div>${teamBadge(me)}<small>${h(me.short)}</small><b>${scored}</b></div>
-        <span class="mid-score">–</span><div>${teamBadge(opp)}<small>${h(opp.short)}</small><b>${allowed}</b></div></div>
+        <div class="score-pair"><div>${teamBadge(me)}<small class="league-club-name ${leagueClass(me.league)}">${h(me.short)}</small><b>${scored}</b></div>
+        <span class="mid-score">–</span><div>${teamBadge(opp)}<small class="league-club-name ${leagueClass(opp.league)}">${h(opp.short)}</small><b>${allowed}</b></div></div>
         <div class="review-games-count">${formatCalendarDate(entry.date)}　日次試合レポート</div>
       </div>
       ${matchReportBody(g)}
@@ -1385,7 +1434,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
           const match=d.type==='game'?game.schedule[d.gameNo-1]?.find(m=>m.home===myId||m.away===myId):null;
           const opp=match?getTeam(match.home===myId?match.away:match.home):null;
           const result=d.type==='game'&&d.gameNo<=game.day?game.games.find(g=>g.day===d.gameNo&&(g.home===myId||g.away===myId)):null;
-          return `<div class="calendar-day ${d.type}"><span>${formatCalendarDate(d.date)}</span><span>${d.type==='game'?'第'+d.gameNo+'戦　'+(opp?h(opp.short):''):d.type==='midseason'?midName+'休止':d.reason}</span><strong>${result?result.homeScore+'-'+result.awayScore:''}</strong></div>`;
+          return `<div class="calendar-day ${d.type}"><span>${formatCalendarDate(d.date)}</span><span>${d.type==='game'?'第'+d.gameNo+'戦　'+(opp?`<span class="league-club-name ${leagueClass(opp.league)}">${h(opp.short)}</span>`:''):d.type==='midseason'?midName+'休止':d.reason}</span><strong>${result?result.homeScore+'-'+result.awayScore:''}</strong></div>`;
         }).join('')}
       </details>`).join('')}</div></section>`;
   }
@@ -1547,7 +1596,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function matchReportBody(g){
     const home=getTeam(g.home),away=getTeam(g.away),n=Math.max(g.inningsH.length,g.inningsA.length);
-    const tbody=[[away,g.inningsA,g.awayScore],[home,g.inningsH,g.homeScore]].map(([t,a,total])=>`<tr><td class="name">${h(t.short)}</td>${Array.from({length:n},(_,i)=>`<td>${a[i]==null?'–':a[i]}</td>`).join('')}<td class="num-strong">${total}</td></tr>`).join('');
+    const tbody=[[away,g.inningsA,g.awayScore],[home,g.inningsH,g.homeScore]].map(([t,a,total])=>`<tr><td class="name"><span class="league-club-name ${leagueClass(t.league)}">${h(t.short)}</span></td>${Array.from({length:n},(_,i)=>`<td>${a[i]==null?'–':a[i]}</td>`).join('')}<td class="num-strong">${total}</td></tr>`).join('');
     let box='';
     if(g.box){
       const hitterRows=(teamId)=>g.box.bat.filter(v=>v.teamId===teamId).map(v=>`<tr><td class="name">${h(getPlayer(v.id)?.name||'選手')}</td><td>${v.ab}</td><td>${v.h}</td><td>${v.hr}</td><td>${v.rbi}</td><td>${v.bb}</td></tr>`).join('');
@@ -1564,7 +1613,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const me=myTeam(),myRuns=me.id===g.home?g.homeScore:g.awayScore,oppRuns=me.id===g.home?g.awayScore:g.homeScore;
     const opp=getTeam(me.id===g.home?g.away:g.home);
     const outcome=myRuns>oppRuns?'勝利':myRuns<oppRuns?'敗戦':'引き分け';
-    return `<div class="review-screen"><div class="review-kicker">${h(game.year)} SEASON · MATCH REPORT</div><div class="review-score"><h2>第${g.day}戦 · 試合結果</h2><span class="match-outcome">${outcome}</span><div class="score-pair"><div>${teamBadge(me)}<small>${h(me.short)}</small><b>${myRuns}</b></div><span class="mid-score">–</span><div>${teamBadge(opp)}<small>${h(opp.short)}</small><b>${oppRuns}</b></div></div><div class="review-games-count">${r.count>1?`${r.count}試合まとめて進行 · 最後の試合を表示中`:'この試合の結果を確認してから、次の日に進みます'}${g.date?' · '+formatCalendarDate(g.date):''}</div></div>${matchReportBody(g)}<button class="btn primary review-game-btn" data-action="finish-review">${game.day>=143?'結果を確認してシーズン終了へ':'結果を確認して次の日へ　›'}</button><p class="review-help">結果確認中は日付を切り替えません。下のボタンで進んでください。</p></div>`;
+    return `<div class="review-screen"><div class="review-kicker">${h(game.year)} SEASON · MATCH REPORT</div><div class="review-score"><h2>第${g.day}戦 · 試合結果</h2><span class="match-outcome">${outcome}</span><div class="score-pair"><div>${teamBadge(me)}<small class="league-club-name ${leagueClass(me.league)}">${h(me.short)}</small><b>${myRuns}</b></div><span class="mid-score">–</span><div>${teamBadge(opp)}<small class="league-club-name ${leagueClass(opp.league)}">${h(opp.short)}</small><b>${oppRuns}</b></div></div><div class="review-games-count">${r.count>1?`${r.count}試合まとめて進行 · 最後の試合を表示中`:'この試合の結果を確認してから、次の日に進みます'}${g.date?' · '+formatCalendarDate(g.date):''}</div></div>${matchReportBody(g)}<button class="btn primary review-game-btn" data-action="finish-review">${game.day>=143?'結果を確認してシーズン終了へ':'結果を確認して次の日へ　›'}</button><p class="review-help">結果確認中は日付を切り替えません。下のボタンで進んでください。</p></div>`;
   }
   function resultModal(){
     if(ui.detail==null)return '';
