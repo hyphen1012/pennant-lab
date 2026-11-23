@@ -1822,6 +1822,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const minGain=clamp(12-(intent-50)*.09-(managerRatings(team.manager).field-60)*.04,7,18);
       if(gain<minGain)continue;
       bases[current.base]=fast;
+      const inheritedPitcher=context.runnerResponsibility?.get(current.runner.id);
+      if(inheritedPitcher)context.runnerResponsibility.set(fast.id,inheritedPitcher);
+      context.runnerResponsibility?.delete(current.runner.id);
       active[current.slot]=fast;
       context.bench[team.id]=context.bench[team.id].filter(p=>p.id!==fast.id);
       context.changed[team.id].add(current.slot);
@@ -1879,15 +1882,32 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const bst=batTeam.id,field=fieldTeam.id;
     const defense=clamp(liveDefenseScore(fieldTeam,context?.activeLineups?.[fieldTeam.id])
       +(managerDecision(fieldTeam,'defense')-50)*.06,20,98);
-    const pstat=pitcher.stats;
+    let pstat=pitcher.stats;
     if(!appear.pitch.has(pitcher.id)){pstat.g++;appear.pitch.add(pitcher.id)}
-    const scoreRunner=(runner)=>{run++;if(runner)runner.stats.r++;pstat.er++};
+    // Each runner retains the responsibility of the pitcher who put them on base.
+    // Pinch-runners inherit that responsibility; changing pitchers does not erase it.
+    const scoreRunner=(runner)=>{
+      run++;if(runner)runner.stats.r++;
+      const liable=context?.runnerResponsibility?.get(runner?.id)||pitcher;
+      liable.stats.er++;
+      if(runner)context?.runnerResponsibility?.delete(runner.id);
+    };
     while(out<3&&pa<35){
-      pa++;const batter=managerPinchBatter(batTeam,batters,indexes,inning,bases,pitcher,context);indexes[bst]++;
+      pa++;
+      // Check real game pitch count and the next batter's hitting side before each PA.
+      const onDeck=batters[indexes[bst]%batters.length];
+      const nextPitcher=managerMidInningPitcherChoice(fieldTeam,inning,
+        -(context?.scoreDiff||0)-run,bases,out,onDeck,context);
+      if(nextPitcher&&nextPitcher.id!==pitcher.id){
+        pitcher=nextPitcher;pstat=pitcher.stats;
+        if(!appear.pitch.has(pitcher.id)){pstat.g++;appear.pitch.add(pitcher.id)}
+      }
+      const batter=managerPinchBatter(batTeam,batters,indexes,inning,bases,pitcher,context);indexes[bst]++;
       if(!batter)break;
       const st=batter.stats;
       if(!appear.bat.has(batter.id)){if(!appear.run.has(batter.id)&&!appear.def.has(batter.id))st.g++;appear.bat.add(batter.id)}
       st.pa++;
+      context?.runnerResponsibility?.set(batter.id,pitcher);
       const contact=effectiveSkill(batter,'contact'),power=effectiveSkill(batter,'power');
       const stuff=effectiveSkill(pitcher,'stuff'),control=effectiveSkill(pitcher,'control');
       const pWalk=clamp(.078+(contact-55)*.00035-(control-55)*.0008,.035,.15);
@@ -1911,6 +1931,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         }
         bases[0]=batter;
       }else if(r<pWalk+pStrike){
+        scoringKind='strikeout';
         st.ab++;st.k++;pstat.k++;pstat.outs++;out++;
       }else if(r<pWalk+pStrike+pHit){
         st.ab++;st.h++;pstat.h++;
@@ -1958,6 +1979,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
           out++;pstat.outs++;
         }
       }
+      // Deterministic-with-seed simulated pitch total from the real plate appearance.
+      const usedPitches=ri(2,6)+(scoringKind==='walk'||scoringKind==='strikeout'?1:0);
+      pstat.pitches=(Number(pstat.pitches)||0)+usedPitches;
+      pstat.bf=(Number(pstat.bf)||0)+1;
+      if(context?.pitchCounts?.[field])
+        context.pitchCounts[field].set(pitcher.id,(context.pitchCounts[field].get(pitcher.id)||0)+usedPitches);
       st.rbi+=rbi;
       // Persist authentic scoring plate appearances only for games with a watched club.
       // One event is recorded per scoring play, not a fabricated inning summary.
@@ -1971,6 +1998,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       }
       if(targetScore!=null && run+targetScore.current > targetScore.away){walkOff=true;break}
     }
+    context?.runnerResponsibility?.clear();
     return {run,walkOff};
   }
   function simulateGame(match){
