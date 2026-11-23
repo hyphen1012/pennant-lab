@@ -227,6 +227,8 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(done||full.day===143,'The full 143-game schedule must complete');
   assert.equal(full.games,858,'12 teams × 143 games should result in 858 games');
 
+  // The IndexedDB writes are serialized; read only after pending writes settle.
+  await flush();
   const archivedMatches=store.get(1)?.data?.games||[];
   const gmOwned=full.selectedId;
   const watchedMatches=archivedMatches.filter(g=>g.home===gmOwned||g.away===gmOwned);
