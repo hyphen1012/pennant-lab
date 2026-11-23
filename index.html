@@ -2334,9 +2334,50 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     filtered=filtered.slice(0,30);
     return `<h2 class="page-title">個人成績ランキング</h2><p class="page-sub">毎試合の打席結果を集計して更新します。</p><div class="control-bar"><div class="chips"><button class="chip ${batting?'active':''}" data-action="stats-mode" data-mode="bat">打者</button><button class="chip ${!batting?'active':''}" data-action="stats-mode" data-mode="pitch">投手</button></div><select class="select" data-change="stats-scope">${selectable.map(([id,label])=>`<option value="${id}" ${ui.statsScope===id?'selected':''}>${id==='E'?'🔵 ':id==='W'?'🟡 ':''}${label}</option>`).join('')}</select></div><section class="panel"><div class="panel-head"><h3 class="panel-title">${batting?'打撃成績（本塁打順）':'投手成績（勝利数順）'}</h3><span class="pill">${game.day}/143 試合</span></div><div class="table-wrap"><table class="data-table"><thead><tr><th>選手</th><th>球団</th>${batting?'<th>打率</th><th>試合</th><th>打席</th><th>安打</th><th>本塁打</th><th>打点</th><th>盗塁</th>':'<th>防御率</th><th>試合</th><th>投球回</th><th>勝</th><th>敗</th><th>セーブ</th><th>奪三振</th>'}</tr></thead><tbody>${filtered.map(p=>`<tr><td class="name">${h(p.name)}</td><td><span class="league-club-name ${leagueClass(getTeam(p.teamId).league)}">${h(getTeam(p.teamId).short)}</span></td>${batting?`<td>${avg(p)}</td><td>${p.stats.g}</td><td>${p.stats.pa}</td><td>${p.stats.h}</td><td class="num-strong">${p.stats.hr}</td><td>${p.stats.rbi}</td><td>${p.stats.sb}</td>`:`<td>${era(p)}</td><td>${p.stats.g}</td><td>${(p.stats.outs/3).toFixed(1)}</td><td class="num-strong">${p.stats.w}</td><td>${p.stats.l}</td><td>${p.stats.sv}</td><td>${p.stats.k}</td>`}</tr>`).join('')}</tbody></table></div><p class="tiny" style="margin:13px 0 0">打率・防御率などは試作版の簡略ルールに基づく計算です。投球回の端数は内部ではアウト数で管理。</p></section>`;
   }
+
+  // Shared recruitment identity/card: the same portrait, title theme and
+  // overall badge will be used for FA, draft and foreign-player markets.
+  function recruitmentCandidateCard(p,options={}){
+    const action=options.action||'sign';
+    const caption=options.actionLabel||'獲得';
+    const selectAllowed=options.canSelect!==false;
+    const cost=Number.isFinite(options.cost)?options.cost:signingCost(p);
+    const feeTitle=options.feeLabel||'契約金';
+    return `<article class="recruit-candidate">
+      <div class="recruit-player">
+        ${faceMini(p,{overall:true})}
+        <div class="recruit-identity">
+          <strong>${themedPlayerName(p)}</strong>
+          <small>${p.age}歳 · ${positionFull(p.pos)} · ${throwBat(p)}</small>
+        </div>
+        <div class="recruit-overall" aria-label="総合評価 ${gradeBrief(rating(p))}"
+          style="color:${gradeBriefColor(rating(p))}">${gradeBrief(rating(p))}</div>
+      </div>
+      <div class="recruit-contract">
+        <div><small>年俸</small><b>${fmtSalary(p.salary)}</b></div>
+        <div><small>${h(feeTitle)}</small><b>${fmtMoney(cost)}</b></div>
+        <button class="btn sm primary" data-action="${h(action)}" data-id="${p.id}"
+          ${selectAllowed?'':'disabled'}>${h(caption)}</button>
+      </div>
+    </article>`;
+  }
   function marketScreen(){
     const t=myTeam(),agents=freeAgents().sort((a,b)=>rating(b)-rating(a));
-    return `<h2 class="page-title">FA補強市場</h2><p class="page-sub">候補選手を獲得し、戦力を強化。契約金は即時に球団資金から支払われます。</p><div class="grid3" style="margin-bottom:13px"><div class="metric"><div class="lab">現在の資金</div><div class="val finance-market-money">${fmtMoney(t.cash)}</div></div><div class="metric"><div class="lab">所属選手</div><div class="val">${own(t).length}<small style="font-size:12.5px">/30</small></div></div><div class="metric"><div class="lab">FA候補</div><div class="val">${agents.length}<small style="font-size:12.5px">人</small></div></div></div><div class="notice">獲得した選手は「編成」で打順や先発に設定できます。年俸は翌シーズンへの移行時に支払います。</div><section class="panel"><div class="panel-head"><h3 class="panel-title">自由契約選手</h3><span class="small">総合能力順</span></div><div class="table-wrap"><table class="data-table"><thead><tr><th>選手</th><th>年齢</th><th>守備</th><th>総合</th><th>年俸</th><th>契約金</th><th>獲得</th></tr></thead><tbody>${agents.map(p=>`<tr><td class="name">${h(p.name)}</td><td>${p.age}</td><td>${namePos(p.pos)}</td><td class="num-strong">${rating(p)}</td><td>${fmtSalary(p.salary)}</td><td>${fmtMoney(signingCost(p))}</td><td><button class="btn sm primary" data-action="sign" data-id="${p.id}" ${t.cash<signingCost(p)||own(t).length>=30?'disabled':''}>獲得</button></td></tr>`).join('')}</tbody></table></div></section>`;
+    const rosterFull=own(t).length>=30;
+    return `<h2 class="page-title">FA補強市場</h2>
+      <p class="page-sub">候補選手を獲得し、戦力を強化。契約金は即時に球団資金から支払われます。</p>
+      <div class="grid3" style="margin-bottom:13px">
+        <div class="metric"><div class="lab">現在の資金</div><div class="val finance-market-money">${fmtMoney(t.cash)}</div></div>
+        <div class="metric"><div class="lab">所属選手</div><div class="val">${own(t).length}<small style="font-size:12.5px">/30</small></div></div>
+        <div class="metric"><div class="lab">FA候補</div><div class="val">${agents.length}<small style="font-size:12.5px">人</small></div></div>
+      </div>
+      <div class="notice">獲得した選手は「編成」で打順や先発に設定できます。年俸は翌シーズンへの移行時に支払います。</div>
+      <section class="panel recruit-market">
+        <div class="panel-head"><h3 class="panel-title">自由契約選手</h3><span class="small">総合能力順</span></div>
+        <div class="recruit-list">${agents.map(p=>recruitmentCandidateCard(p,{
+          action:'sign',actionLabel:'獲得',feeLabel:'契約金',canSelect:!rosterFull&&t.cash>=signingCost(p)
+        })).join('')||'<p class="small">現在、獲得できる自由契約選手はいません。</p>'}</div>
+      </section>`;
   }
   function financeScreen(){
     const t=myTeam(),pay=payroll(t),rank=rankings(t.league).findIndex(x=>x.id===t.id)+1;
