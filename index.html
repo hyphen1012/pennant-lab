@@ -588,12 +588,100 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     return days;
   }
   function calendarForSeason(year){
-    // Upcoming special events are metadata here; the tournament engines will
-    // be implemented separately. No tournament victory is simulated yet.
+    // Japanese-style seasonal rhythm: late-March opening, Mondays and alternate
+    // Thursdays off, and a four-day midseason break after the 73rd game.
+    // All dates are UTC civil dates, independent of the viewer's timezone.
     const cycle=((year-2027)%4+4)%4;
     const midseason=cycle===1?'world':cycle===3?'international':'allstar';
+    const endMarch=new Date(Date.UTC(year,2,31));
+    const daysBack=(endMarch.getUTCDay()-5+7)%7; // Friday on/before March 31
+    const firstMs=Date.UTC(year,2,31-daysBack),dayMs=86400000;
+    const days=[];let gameNo=0,interlude=0;
+    for(let offset=0;gameNo<SEASON_GAMES&&offset<290;offset++){
+      const date=new Date(firstMs+offset*dayMs),weekday=date.getUTCDay();
+      const iso=date.toISOString().slice(0,10),week=Math.floor(offset/7);
+      let type='rest',reason='';
+      if(interlude>0){type='midseason';reason=midseason;interlude--;}
+      else if(weekday===1){reason='定期休養日';}
+      else if(weekday===4&&week%2===1){reason='移動・調整日';}
+      else{
+        gameNo++;
+        type='game';
+        reason=gameNo>=56&&gameNo<=73?'交流戦':'リーグ戦';
+        if(gameNo===73)interlude=4;
+      }
+      days.push({date:iso,type,reason,gameNo:type==='game'?gameNo:null});
+    }
+    if(gameNo!==SEASON_GAMES)throw Error('Calendar must contain 143 game dates');
     return {year,regularGames:SEASON_GAMES,leagueGames:125,interleagueGames:INTERLEAGUE_GAMES,
-      interleagueStart:56,interleagueEnd:73,midseasonAfter:73,midseason};
+      interleagueStart:56,interleagueEnd:73,midseasonAfter:73,midseason,
+      startDate:days[0].date,endDate:days[days.length-1].date,days};
+  }
+  function calendarNextDay(){
+    return game.calendar?.days?.[game.calendarIndex||0]||null;
+  }
+  function formatCalendarDate(iso,showYear=false){
+    if(!iso)return '日程終了';
+    const [y,m,d]=iso.split('-').map(Number);
+    const w=['日','月','火','水','木','金','土'][new Date(Date.UTC(y,m-1,d)).getUTCDay()];
+    return `${showYear?y+'年':''}${m}月${d}日（${w}）`;
+  }
+  function monthKey(iso){return iso?.slice(0,7)||'';}
+  function monthlySnapshot(iso){
+    const t=myTeam();
+    const skills=p=>isPitch(p)?['stuff','control','stamina']:['contact','power','speed','defense','arm'];
+    return {month:monthKey(iso),teamId:t.id,wins:t.wins,losses:t.losses,ties:t.ties,
+      players:Object.fromEntries(own(t).map(p=>[p.id,{name:p.name,values:Object.fromEntries(skills(p).map(k=>[k,p[k]]))}]))};
+  }
+  function finalizeMonth(iso){
+    const start=game.monthStart;
+    if(!start||start.month!==monthKey(iso))return;
+    const t=myTeam(),labels={contact:'巧打',power:'長打',speed:'走力',defense:'守備',arm:'肩力',
+      stuff:'球威',control:'制球',stamina:'体力'};
+    const changes=[];
+    for(const p of own(t)){
+      const prior=start.players?.[p.id]?.values;
+      if(!prior)continue; // Joined after the start of this month.
+      for(const [key,oldValue] of Object.entries(prior)){
+        if(!Number.isFinite(p[key])||p[key]===oldValue)continue;
+        changes.push({id:p.id,name:p.name,skill:key,label:labels[key],from:oldValue,to:p[key],delta:p[key]-oldValue});
+      }
+    }
+    const date=iso,month=start.month,report={
+      id:month,year:game.year,month,date,teamId:t.id,
+      games:(t.wins-start.wins)+(t.losses-start.losses)+(t.ties-start.ties),
+      wins:t.wins-start.wins,losses:t.losses-start.losses,ties:t.ties-start.ties,
+      changes,
+      // Financial settlement is intentionally not charged before loans / debt
+      // and the agreed full monthly accounting engine are implemented.
+      estimatedRevenue:r2(8.5/6+Math.max(0,(t.wins-start.wins))*0.012),
+      estimatedPayroll:r2(payroll(t)/6),
+      cashAtClose:t.cash,
+      provisional:true
+    };
+    if(!Array.isArray(game.monthlyArchive))game.monthlyArchive=[];
+    if(!game.monthlyArchive.some(v=>v.year===report.year&&v.id===report.id)){
+      game.monthlyArchive.push(report);
+      game.pendingMonth={year:report.year,id:report.id};
+      pushNews(`${game.year}年${Number(month.slice(-2))}月の月次報告を作成。月間${report.wins}勝${report.losses}敗${report.ties}分。`);
+    }
+    game.monthStart=null;
+  }
+  function processCalendarDay(){
+    const entry=calendarNextDay();
+    if(!entry)return null;
+    if(entry.type==='game'){
+      if(entry.gameNo!==game.day+1)throw Error('Calendar game count out of sync');
+      processDay();
+      for(const g of game.games.slice(-6))if(g.day===game.day&&g.year===game.year)g.date=entry.date;
+    }
+    game.calendarIndex++;
+    const next=calendarNextDay();
+    const endOfMonth=!next||monthKey(next.date)!==monthKey(entry.date);
+    if(endOfMonth)finalizeMonth(entry.date);
+    if(next&&(!game.monthStart||game.monthStart.month!==monthKey(next.date)))
+      game.monthStart=monthlySnapshot(next.date);
+    return entry;
   }
   function buildFresh(){
     game={v:VERSION,seed:((Date.now()^0x53e719f1)>>>0)||1937,nextId:1,year:2027,day:0,
@@ -607,6 +695,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     });
     ['C','1B','2B','3B','SS','OF','OF','OF','OF','SP','SP','SP','RP','RP','CP','SP','OF','SS','2B','1B','RP','C'].forEach(pos=>addPlayer(null,pos));
     game.schedule=scheduleForSeason();game.calendar=calendarForSeason(game.year);
+    game.calendarIndex=0;game.monthlyArchive=[];game.pendingMonth=null;game.playbackMode='normal';game.advanceTarget=null;
+    game.monthStart=monthlySnapshot(game.calendar.days[0].date);
     game.news=['新リーグが開幕！ 12球団による143試合制のペナントが始まります。'];
     save();
   }
@@ -794,7 +884,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const clos=outcome==='home'?closerH:closerA;
       if(clos&&clos.id!==wPitch.id&&Math.abs(homeScore-awayScore)<=3)clos.stats.sv++;
     }
-    const result={id:game.games.length+1,year:game.year,day:game.day+1,home:home.id,away:away.id,homeScore,awayScore,inningsH,inningsA,events:events.slice(0,8),outcome,spHome:spHome.id,spAway:spAway.id};
+    const result={id:game.games.length+1,year:game.year,day:game.day+1,
+      date:calendarNextDay()?.date||null,home:home.id,away:away.id,homeScore,awayScore,inningsH,inningsA,events:events.slice(0,8),outcome,spHome:spHome.id,spAway:spAway.id};
     if(watchBox){
       const delta=(p,k)=>Number(p.stats[k]||0)-Number(preStats.get(p.id)?.[k]||0);
       result.box={
@@ -866,6 +957,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       repairTeam(t);
     }
     game.year++;game.day=0;game.games=[];game.schedule=scheduleForSeason();game.calendar=calendarForSeason(game.year);
+    game.calendarIndex=0;game.pendingMonth=null;game.advanceTarget=null;
+    game.monthStart=monthlySnapshot(game.calendar.days[0].date);
     captureOveralls();
     while(freeAgents().length<22)addPlayer(null,pick(POSITIONS),true);
     pushNews(`${game.year}年シーズン開幕。引退${retireTotal}人・新人自動補充、球団収支を精算しました。`);
@@ -912,7 +1005,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     game.teams.forEach(syncLineupFielding);
     if(!Array.isArray(game.seasonArchive))game.seasonArchive=[];
     if(!Array.isArray(game.newsArchive))game.newsArchive=[];
-    if(!game.calendar||game.calendar.year!==game.year)game.calendar=calendarForSeason(game.year);
+    if(!game.calendar||game.calendar.year!==game.year||!Array.isArray(game.calendar.days))
+      game.calendar=calendarForSeason(game.year);
+    if(!Number.isInteger(game.calendarIndex)||game.calendarIndex<0||game.calendarIndex>game.calendar.days.length){
+      // Preserve v2 saves: the next date is the day after the most recent played game.
+      const past=game.calendar.days.findIndex(d=>d.type==='game'&&d.gameNo===game.day);
+      game.calendarIndex=game.day===0?0:past>=0?past+1:game.calendar.days.length;
+    }
+    if(!Array.isArray(game.monthlyArchive))game.monthlyArchive=[];
+    if(!['normal','fast','skip'].includes(game.playbackMode))game.playbackMode='normal';
+    if(!game.monthStart||game.monthStart.month!==monthKey(calendarNextDay()?.date))
+      game.monthStart=calendarNextDay()?monthlySnapshot(calendarNextDay().date):null;
     if(!game.gmName)game.gmName='GM';
     if(!game.ownerRating)game.ownerRating=60;
     if(!game.fieldRating)game.fieldRating=60;
@@ -947,6 +1050,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const awards=(game.awards||[]).map(a=>({...a}));
     const postseason=game.postseason?JSON.parse(JSON.stringify(game.postseason)):null;
     game.seasonArchive.push({year:game.year,standings,awards,postseason,
+      startDate:game.calendar?.startDate,endDate:game.calendar?.endDate,
       myTeamId:game.selectedId,myCash:myTeam().cash,
       headlines:(game.newsArchive||[]).filter(n=>n.year===game.year).map(n=>({...n}))
     });
