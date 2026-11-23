@@ -2388,6 +2388,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const selectAllowed=options.canSelect!==false;
     const cost=Number.isFinite(options.cost)?options.cost:signingCost(p);
     const feeTitle=options.feeLabel||'契約金';
+    const visible=!playerVisualTheme(p).hidden;
+    const displayRank=visible?gradeBrief(rating(p)):'???';
     return `<article class="recruit-candidate">
       <div class="recruit-player">
         ${faceMini(p,{overall:true})}
@@ -2395,8 +2397,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
           <strong>${themedPlayerName(p)}</strong>
           <small>${p.age}歳 · ${positionFull(p.pos)} · ${throwBat(p)}</small>
         </div>
-        <div class="recruit-overall" aria-label="総合評価 ${gradeBrief(rating(p))}"
-          style="color:${gradeBriefColor(rating(p))}">${gradeBrief(rating(p))}</div>
+        <div class="recruit-overall" aria-label="総合評価 ${displayRank}"
+          style="color:${visible?gradeBriefColor(rating(p)):'#9AACBD'}">${displayRank}</div>
       </div>
       <div class="recruit-contract">
         <div><small>年俸</small><b>${fmtSalary(p.salary)}</b></div>
