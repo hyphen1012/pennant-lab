@@ -14,6 +14,7 @@ on:
   push:
     paths:
       - 'scripts/long-run.cjs'
+      - 'scripts/farm-check.cjs'
       - '.github/workflows/long-run.yml'
 
 permissions:
@@ -32,6 +33,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Farm regression
+        run: node scripts/farm-check.cjs
       - name: Full engine endurance
         shell: bash
         run: |
