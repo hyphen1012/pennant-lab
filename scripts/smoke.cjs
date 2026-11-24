@@ -296,6 +296,13 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   // An actionable counter-offer deliberately interrupts a season skip.
   for(let n=0;n<30&&window.PennantLab.getSnapshot().day<143;n++){
     await flush();
+    if(app.innerHTML.includes('data-action="rare-news-next"')){
+      dispatch('click',{action:'rare-news-next'});
+      assert(app.innerHTML.includes('data-action="rare-news-next"'));
+      assert(app.innerHTML.includes('ニューススタジオのキャスター'));
+      dispatch('click',{action:'rare-news-next'});
+      assert(app.innerHTML.includes('data-action="rare-news-ack"'));
+    }
     if(app.innerHTML.includes('data-action="rare-news-ack"')){
       dispatch('click',{action:'rare-news-ack'});
       await new Promise(r=>setTimeout(r,70));continue;

@@ -1079,3 +1079,15 @@ assert(Math.abs(counts.PARALLEL/10000-1/3)<.02);assert(Math.abs(counts.STAR/1000
 }
 
 assert.match(html,/rareDaily\(entry\)/);assert.match(html,/if\(pendingRareNews\(\)\.length\)\{game\.rareResume/);assert.match(html,/rare-draft-continue/);assert.match(html,/rarePanel\(c.player,'scout'\)/);console.log('PASS: special news checkpoint and category scene hooks');
+
+{
+const a=inline[1].indexOf('function broadcastMood('),b=inline[1].indexOf('  function rareDraftIntro(',a);
+const api=vm.runInNewContext('(function(){const isPitch=p=>p.pos==="SP",playerTitleTheme=p=>({name:p.specialCategory});'+inline[1].slice(a,b)+';return {broadcastMood,broadcastTournament,broadcastInfo,broadcastStudio,broadcastCutArt};})()');
+for(const category of ['IMMORTAL','輪廻転生','LEGEND','転生','STAR','PARALLEL','再来'])for(const pos of ['SP','OF']){
+ const p={name:'秘密選手',pos,specialCategory:category},c={player:p,school:'試験高校'},meta=api.broadcastTournament(c),e={id:'2027:tournament:1',category,name:p.name,title:'試験高校、全国大会優勝！',...meta},x=api.broadcastInfo(e,p,c);
+ if(['IMMORTAL','輪廻転生'].includes(category)){assert.equal(x.name,'????');assert(!x.speech.includes(p.name));assert(x.speech.includes(pos==='SP'?'完全試合':'二桁以上'));assert.equal(x.mood,'fear');}
+ else {assert.equal(x.name,p.name);assert(x.speech.includes(p.name));assert.equal(x.mood,['LEGEND','転生'].includes(category)?'history':'celebrate');}
+ assert(api.broadcastStudio(x.mood).includes('<svg'));assert(api.broadcastCutArt().includes('<svg'));
+}
+assert.match(html,/action==='draft-page'\)\{render\(\);draftJump\(0\);\}/);console.log('PASS: category broadcast, concealed identity, pitcher/batter result, artwork and draft pagination');
+}
