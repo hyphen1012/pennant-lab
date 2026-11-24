@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.38 · SCOUT THEATRE/);
+assert.match(html,/VERSION 0\.9\.39 · DRAFT FLOW/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -964,7 +964,7 @@ console.log('PASS: deterministic draft lottery and recruitment hooks');
 {
 const a=inline[1].indexOf('  const RECRUIT_VALUES='),b=inline[1].indexOf('  function draftReport(',a);
 const c=inline[1].indexOf('  function draftOffer('),d=inline[1].indexOf('  function draftNegotiateCPU(',c);
-const api=vm.runInNewContext('(function(){const t={id:1,cash:10,wins:90,losses:50},r2=n=>Math.round(n*100)/100,clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),draftHash=()=>.5,getTeam=()=>t,own=()=>[],draftCandidate=(d,id)=>d.candidates.find(c=>c.id===id);'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {t,recruitmentProfile,recruitmentInitial,recruitmentReaction,draftReply,draftOfferResponse,draftScoutCost};})()');
+const api=vm.runInNewContext('(function(){const t={id:1,cash:10,wins:90,losses:50},r2=n=>Math.round(n*100)/100,clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),draftHash=()=>.5,getTeam=()=>t,own=()=>[],draftSigningRoom=()=>true,draftCandidate=(d,id)=>d.candidates.find(c=>c.id===id);'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {t,recruitmentProfile,recruitmentInitial,recruitmentReaction,draftReply,draftOfferResponse,draftScoutCost};})()');
 const profile=api.recruitmentProfile('a','育成',false,null);
 const c1={id:1,player:{pos:'SP'},type:'高校生',preferredTeam:1,preference:'育成',strength:3,threshold:43,overseas:false,status:'rights',personality:profile};
 const row={teamId:1,candidateId:1,status:'rights'},draft={year:2027,candidates:[c1]};
@@ -996,3 +996,20 @@ console.log('PASS: sealed tickets, unique winner, saved selection, scout dossier
 }
 
 assert.match(html,/data-action="draft-report-view"/);
+
+{
+const a=inline[1].indexOf('  const DRAFT_MIN='),b=inline[1].indexOf('  const DRAFT_REGIONS=',a);
+const c=inline[1].indexOf('  function draftRights('),d=inline[1].indexOf('  function draftReleasePlayer(',c);
+const api=vm.runInNewContext('(function(){const game={selectedId:1},players=[],own=t=>players.filter(p=>p.teamId===t.id),rating=()=>60;'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {players,DRAFT_MIN,draftCanNominate,draftSigningRoom,draftReleaseOptions,draftRosterRoom};})()');
+const t={id:1},draft={picks:[]},candidate={status:'available',player:{pos:'OF'}};
+let id=0;for(const [pos,n] of Object.entries(api.DRAFT_MIN))for(let i=0;i<n;i++)api.players.push({id:++id,teamId:1,pos,age:25});
+while(api.players.length<29)api.players.push({id:++id,teamId:1,pos:'OF',age:25});
+draft.picks.push({teamId:1,status:'rights',pos:'OF'});
+assert(!api.draftRosterRoom(draft,t,'OF'));assert(api.draftCanNominate(draft,t,candidate));
+assert(api.draftSigningRoom(draft,t,'OF'));draft.picks[0].status='signed';
+assert(!api.draftSigningRoom(draft,t,'OF'));assert(api.draftCanNominate(draft,t,candidate));
+assert(api.draftReleaseOptions(t).every(p=>p.pos==='OF'));api.draftReleaseOptions(t)[0].teamId=null;
+assert(api.draftSigningRoom(draft,t,'OF'));
+assert.match(html,/draftShowReport\(id,true\)/);
+console.log('PASS: manual nominations at full roster, separate signing cap, safe release options, report scroll hook');
+}
