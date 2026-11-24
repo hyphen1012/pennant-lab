@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.61 · RINNE AWAKENING/);
+assert.match(html,/VERSION 0\.9\.62 · RARE PORTRAITS/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1160,3 +1160,11 @@ assert(intact.includes('rinne-piece whole'));assert(!intact.includes('rinne-frag
 assert.match(html,/renderFaceArtwork\(p,\{hidden:true,rinneSmile:true\}\)/);assert.match(html,/options\.rinneSmile\?/);assert.match(html,/x\.category==='輪廻転生'&&x\.tournament&&x\.hidden\?'<div class="rinne-voice">/);console.log('PASS: RINNE-only concealed smile and delayed monologue');
 
 {const smile=html.match(/<g class="rinne-smile"[^>]*>(.*?)<\/g>/s)?.[1];assert(smile);assert(!smile.includes('#e9deed'));assert.equal((smile.match(/fill="none"/g)||[]).length,2);assert(smile.includes('stroke="#19131f"'));console.log('PASS: RINNE closed-mouth smirk, no exposed teeth');}
+
+{
+const base={...batter,age:18,appearanceSeed:12345};const normal=identity.renderFaceArtwork(base);
+const special=['PARALLEL','STAR','LEGEND','IMMORTAL'].map(specialCategory=>identity.renderFaceArtwork({...base,specialCategory}));assert.equal(new Set([normal,...special]).size,5);assert(special[3].includes('data-permanent-mask="true"'));assert(!special[0].includes('data-permanent-mask'));assert(!identity.renderFaceArtwork({...base,specialCategory:'IMMORTAL'},{hidden:true}).includes('data-portrait-base'));
+const reincarnated=identity.renderFaceArtwork({...base,id:654321,appearanceSeed:654321,originCategory:'REBIRTH',pastLifeAppearance:{seed:12345,baseCategory:null}});assert(reincarnated.includes('data-portrait-inherited="転生"'));
+const strip=s=>s.replace(/ data-portrait-category="[^"]*"/,'').replace(/<g data-portrait-inherited="[^"]*">.*?<\/g>/s,'').trim();assert.equal(strip(reincarnated),strip(normal));
+const paradox=identity.renderFaceArtwork({...base,id:654321,originCategory:'PARADOX',pastLifeAppearance:{seed:12345,baseCategory:'PARALLEL'}});assert(paradox.includes('data-portrait-base="PARALLEL"'));assert(paradox.includes('data-portrait-inherited="異界転生"'));assert(!paradox.includes('data-permanent-mask'));console.log('PASS: distinctive rare faces, inherited geometry, original special style and permanent IMMORTAL mist');
+}
