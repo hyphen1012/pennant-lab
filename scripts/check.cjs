@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.6 · CALENDAR/);
+assert.match(html,/VERSION 0\.9\.7 · EVENTS/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -606,3 +606,13 @@ assert.match(dateMarkup,/calendar-date-current" role="status"><span>2028-03-25/)
 assert.match(html,/translateY\(calc\(-1 \* var\(--date-step\)\)\)/);
 assert.match(html,/calendar-date-confirm/);
 console.log('PASS: full-row civil date reel and fixed center marker');
+
+const evStart=inline[1].indexOf('  function eventIntroInfo(){'),evEnd=inline[1].indexOf('  function ceremonyView(){',evStart);
+const eventApi=vm.runInNewContext('(function(){let game={year:2028,day:143,ceremonyStage:"awards-all",pendingCeremonyIntro:"awards-all"};let ui={};'+inline[1].slice(evStart,evEnd)+'\nreturn {game,ui,eventIntroInfo,eventIntroScreen};})()',{h:String});
+assert.equal(eventApi.eventIntroInfo().title,'年間表彰式');
+assert.match(eventApi.eventIntroScreen(eventApi.eventIntroInfo()),/data-event="awards-all"/);
+eventApi.game.pendingMonth={};assert.equal(eventApi.eventIntroInfo(),null);delete eventApi.game.pendingMonth;
+eventApi.game.ceremonyStage='camp';eventApi.game.pendingCeremonyIntro='camp';assert.equal(eventApi.eventIntroInfo().year,2029);
+eventApi.game.day=0;eventApi.game.year=2029;eventApi.game.pendingCeremonyIntro='opening';assert.equal(eventApi.eventIntroInfo().title,'新シーズン開幕');
+eventApi.game.day=1;assert.equal(eventApi.eventIntroInfo(),null);
+console.log('PASS: milestone titles, correct season years and pending-report priority');

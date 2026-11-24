@@ -88,7 +88,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.6 · CALENDAR/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.7 · EVENTS/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -347,5 +347,34 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 
   console.log('PASS: full 143-game season, 858 games, all 12 clubs, monthly and injury interruptions');
 
-  console.log('PASS: v0.8.2 cinematic watch, manager, personalized GM reports, save and season');
+  // Resolve final required reports before the existing offseason sequence.
+  for(let i=0;i<8;i++){
+    const page=app.innerHTML;
+    const action=['injury-ack','finish-review','auto-day-close','finish-month'].find(a=>page.includes('data-action="'+a+'"'));
+    if(!action)break;
+    dispatch('click',{action});
+  }
+  dispatch('click',{action:'tab',tab:'hq'});
+  assert(app.innerHTML.includes('data-action="ceremony-start"'));
+  dispatch('click',{action:'ceremony-start'});
+  const titles=['awards-all','settlement','winter','self','camp','opening'];
+  for(const key of titles){
+    assert(app.innerHTML.includes('data-event="'+key+'"'),'Milestone title: '+key);
+    assert(!app.innerHTML.includes('data-action="ceremony-next"'),'No underlying transition on title');
+    const before=window.PennantLab.getSnapshot();
+    dispatch('click',{action:'event-intro-continue',event:key});
+    assert(!app.innerHTML.includes('data-event="'+key+'"'));
+    assert.equal(window.PennantLab.getSnapshot().year,before.year);
+    assert.equal(window.PennantLab.getSnapshot().day,before.day);
+    if(key==='opening')break;
+    dispatch('click',{action:'ceremony-next'});
+    if(key==='awards-all')dispatch('click',{action:'ceremony-next'});
+  }
+  assert.equal(window.PennantLab.getSnapshot().year,full.year+1);
+  assert.equal(window.PennantLab.getSnapshot().day,0);
+  assert(app.innerHTML.includes('data-action="advance-day"'));
+  await flush();
+  assert.equal(store.get(1).data.pendingCeremonyIntro,null);
+  console.log('PASS: six milestone titles, full offseason sequence and next-year opening');
+  console.log('PASS: v0.9.7 cinematic watch, manager, personalized GM reports, save and season');
 })().catch(e=>{console.error(e);process.exitCode=1;});
