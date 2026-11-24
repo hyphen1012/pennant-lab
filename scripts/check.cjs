@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.17 · FRONT OFFICE/);
+assert.match(html,/VERSION 0\.9\.18 · FRONT OFFICE/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -693,9 +693,24 @@ for(const outcome of ['win','loss','draw'])assert(html.includes('data-outcome="'
 assert.match(html,/meeting-flap\{[^}]*width:50%/);
 assert.match(html,/\[data-turn="forward"\]>\.meeting-fixed\{clip-path:inset\(0 50% 0 0\)/);
 assert.match(html,/\[data-turn="back"\]>\.meeting-fixed\{clip-path:inset\(0 0 0 50%\)/);
-assert.match(html,/\[data-turn="forward"\]>\.meeting-flap\{left:50%;transform-origin:left center/);
-assert.match(html,/\[data-turn="back"\]>\.meeting-flap\{left:0;transform-origin:right center/);
+assert.match(html,/\[data-turn="forward"\]>\.meeting-flap\{left:50%;perspective-origin:left center/);
+assert.match(html,/\[data-turn="back"\]>\.meeting-flap\{left:0;perspective-origin:right center/);
 assert.match(html,/animation:meeting-fixed-release 1\.2s/);
 assert(!html.includes('animation:paper-turn '),'Full sheet must no longer rotate');
 assert.match(html,/try\{render\(\);\}finally\{ui\.meetingTurn=null;\}/);
 console.log('PASS: three result palettes and independent directional half-sheet turns');
+
+const curlStart=inline[1].indexOf('  function meetingCurlStrips('),curlEnd=inline[1].indexOf('  function monthlyReviewScreen(',curlStart);
+const curl=vm.runInNewContext('(function(){'+inline[1].slice(curlStart,curlEnd)+';return meetingCurlStrips;})()');
+for(const dir of ['forward','back']){
+  const markup=curl('test',dir);
+  assert.equal((markup.match(/class="meeting-curl-strip"/g)||[]).length,10);
+  assert(markup.includes('left:'+(dir==='forward'?0:90)+'%;animation-name:meeting-curl-0'));
+  assert(markup.includes('style="left:'+(dir==='forward'?-1000:-900)+'%">test'));
+}
+assert.match(html,/\.meeting-paper \.meeting-medical-row>\.face-mini\{width:44px;height:44px;min-width:44px;max-width:44px/);
+assert.match(html,/\.meeting-row>span:first-child:not\(\.face-mini\)/);
+assert.match(html,/class="meeting-row meeting-match-row meeting-table-head"/);
+assert.match(html,/class="meeting-row meeting-change-row meeting-table-head"/);
+assert.match(html,/@keyframes meeting-curl-9/);
+console.log('PASS: curved ten-strip page turns, fixed medical portraits and report columns');

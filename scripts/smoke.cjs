@@ -92,6 +92,8 @@ function finishMeeting(){
     assert(app.innerHTML.includes('meeting-paper meeting-current'));
     assert(app.innerHTML.includes('meeting-paper meeting-fixed'));
     assert(app.innerHTML.includes('class="meeting-flap"'));
+    assert.equal((app.innerHTML.match(/class="meeting-curl-strip"/g)||[]).length,10);
+    assert(app.innerHTML.includes('meeting-match-row meeting-table-head'));
     assert(app.innerHTML.includes('01 月例会議資料'));
     assert(app.innerHTML.includes('02 今月の戦績'));
     dispatch('click',{action:'meeting-page',step:'-1'});
@@ -105,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.17 · FRONT OFFICE/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.18 · FRONT OFFICE/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
