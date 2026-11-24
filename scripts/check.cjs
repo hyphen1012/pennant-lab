@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.65 · SCOUTING FRONTIER/);
+assert.match(html,/VERSION 0\.9\.66 · LEGACY ECHO/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1200,7 +1200,7 @@ const src=pools.draft.RINNE[0],p={id:999,teamId:null,pos:'OF',hand:'右',ssEligi
 api.applyReincarnationTalent(p,src,2031,'draft',73);assert.equal(p.id,999);assert.equal(p.name,src.name);assert.equal(p.pos,'SP');assert.equal(p.age,22);assert.equal(p.appearanceSeed,src.pastLifeAppearance.seed);assert.equal(p.reincarnation.parentId,src.playerId);assert.equal(p.reincarnation.generation,1);assert.equal(p.specialCategory,'輪廻転生');assert.equal(p.originCategory,'RINNE');assert.equal(p.ssEligible.length,0);assert.equal(p.stats.g,0);assert(p.stuff<=98);assert(p.talent<=99);
 const empty={draft:{},foreign:{}};assert.equal(api.reincarnationBirthPlan(empty,73,2031).draft.length,0);
 const blocked=api.reincarnationBirthPlan(pools,73,2031,Object.values(pools.draft).flat().map(x=>x.playerId));assert.equal(blocked.draft.length,0);
-const c={id:999,player:{id:999,pos:'SP'},type:'大学生',school:'試験大学',region:'関東',status:'available'};const birth={ids:[]};api.applyReincarnationPool([c],[src],73,2031,'draft',birth);assert.equal(c.school,'試験大学');assert(c.nationalChampion);assert.equal(birth.ids[0],999);
+const candidate={id:999,player:{id:999,pos:'SP'},type:'大学生',school:'試験大学',region:'関東',status:'available'};const birth={ids:[]};api.applyReincarnationPool([candidate],[src],73,2031,'draft',birth);assert.equal(candidate.school,'試験大学');assert(candidate.nationalChampion);assert.equal(birth.ids[0],999);
 const overseas={id:1000,player:{id:1000,pos:'SP'},country:'台湾',career:{league:'東アジア'},status:'available'};api.applyReincarnationPool([overseas],[pools.foreign.RETURN[0]],73,2031,'foreign',{ids:[]});assert.equal(overseas.player.originMarket,'foreign');assert.equal(overseas.player.nationality,'台湾');assert.equal(overseas.player.specialCategory,'再来');console.log('PASS: 10,000 annual reincarnation draws, tier caps, route separation, inherited identity, fresh statistics and domestic/foreign placement');
 }
 
@@ -1216,4 +1216,26 @@ const snapshot=JSON.stringify(foreign);assert.equal(api.ensureScoutSchedule(fore
 assert.equal(new Set(['PARALLEL','STAR','LEGEND','IMMORTAL'].map(api.foreignDiscoverySpeech)).size,4);
 assert.match(html,/scoutDiscoveryDaily\(entry\)/);assert.match(html,/foreignRate:1\/80/);assert.match(html,/data-action="foreign-upgrade"/);
 console.log('PASS: progressive fixed candidate discovery schedule and independent scout levels');
+}
+
+{
+const src=inline[1],part=(a,b)=>src.slice(src.indexOf(a),src.indexOf(b,src.indexOf(a)));
+const api=vm.runInNewContext('(function(){'+part('  function draftHash(','  // Fixed annual identities;')+part('  function planOpeningC(','  function openingCPlan(')+'return {planOpeningC};})()');
+const source=(playerId,tier,rootId=playerId)=>({playerId,tier,rootId});
+const ret=source(1,'RETURN'),reb=source(2,'REBIRTH'),rin=source(3,'RINNE'),myth=source(4,'MYTH');
+const pools={draft:{RETURN:[ret],REBIRTH:[reb],RINNE:[rin]},foreign:{}},natural={draft:[rin],foreign:[]};
+const completed=api.planOpeningC(natural,pools);
+assert.equal(completed.draft.length,3);assert(completed.draft.includes(ret));assert(completed.draft.includes(reb));assert(completed.draft.includes(rin));assert.equal(natural.draft.length,1);
+assert.equal(api.planOpeningC(natural,pools,[1]),null);assert.equal(api.planOpeningC(natural,pools,[],[2]),null);
+assert.equal(api.planOpeningC({draft:[],foreign:[reb,myth]},pools),null);
+assert.equal(api.planOpeningC(completed,pools).draft.length,3);
+assert.equal(api.planOpeningC({draft:[],foreign:[]},{draft:{RETURN:[ret],REBIRTH:[source(9,'REBIRTH',1)]},foreign:{}}),null);
+console.log('PASS: opening C additive guarantees, shared caps and root deduplication');
+const lin=vm.runInNewContext('(function(){const isPitch=p=>p.pos==="SP";const newStats=()=>({g:0,h:0,hr:0,rbi:0,sb:0,w:0,k:0,sv:0});'+part('  function careerRows(','  function careerRate(')+part('  function lineageMetricKeys(','  function rareReply(')+part('  function lineageMembers(','  function lineagePanel(')+'return {lineageRecordCrossings,lineageMembers,pastLifeSpeech};})()');
+const parent={id:1,teamId:-1,pos:'OF',name:'同名',seasonHistory:[{year:2029,stats:{h:100,hr:10,g:20}}]},kid={id:2,teamId:2,pos:'OF',name:'同名',reincarnation:{rootId:1,parentId:1,generation:1,retirementAge:40,retirementTeamName:'東京'},stats:{h:101,hr:10,g:30}};
+assert.equal(lin.lineageRecordCrossings(kid,parent,2030).map(x=>x.k).join(','),'h');
+assert.equal(lin.lineageMembers([kid,parent,{id:3,name:'同名'}],kid).map(x=>x.id).join(','),'1,2');
+assert(lin.pastLifeSpeech({...kid,reincarnation:{...kid.reincarnation,parentId:-1}},'reply',2).includes('40'));
+assert.match(html,/universityTournamentYearChecked/);assert.match(html,/大学全国大会優勝/);assert.match(html,/前世との系譜/);
+console.log('PASS: lineage identity, record crossing and retirement-age dialogue');
 }
