@@ -722,6 +722,7 @@ assert.doesNotMatch(html,/\.meeting-cover\{[^}]*min-height:inherit/);
 assert.match(html,/\.meeting-curl-strip>\.meeting-paper\{[^}]*min-height:0/);
 console.log('PASS: cover shares intrinsic layout height across fixed and curved layers');
 
+{
 const careerStart=inline[1].indexOf('  function careerRows('),careerEnd=inline[1].indexOf('  function careerTitles(',careerStart);
 const careerApi=vm.runInNewContext('(function(){'+inline[1].slice(careerStart,careerEnd)+';return {careerRows,careerTotals,careerRate,careerInnings,careerCrossings};})()',{newStats:p=>p?{g:0,outs:0,er:0,w:0,k:0,sv:0}:{g:0,ab:0,h:0,hr:0,rbi:0,sb:0}});
 const cp={teamId:1,seasonHistory:[{year:2027,stats:{g:100,ab:400,h:120,hr:10}},{year:2027,stats:{g:100,ab:400,h:120,hr:10}}],stats:{g:20,ab:50,h:10,hr:2}};
@@ -735,3 +736,5 @@ assert.equal(careerApi.careerRate(pt,true),'2.77');assert.equal(careerApi.career
 assert.equal(careerApi.careerCrossings({h:1001},{h:2},false)[0][1],1000);
 assert.equal(careerApi.careerCrossings({h:1001},{h:1},false).length,0);
 console.log('PASS: career totals, weighted rates, retired players and threshold crossing');
+
+}
