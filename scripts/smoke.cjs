@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.45 · CLUB CRESTS/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.46 · OVERSEAS BASE/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -188,6 +188,15 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert.match(app.innerHTML,/契約金/);
   assert(!app.innerHTML.includes('<table class="data-table">'),
     'Recruitment screen should not gain a wide horizontal table');
+  const beforeForeign=window.PennantLab.getSnapshot().playerCount;
+  dispatch('click',{action:'business-sub',sub:'foreign'});
+  assert(app.innerHTML.includes('海外スカウト'));assert(app.innerHTML.includes('data-action="foreign-init"'));
+  dispatch('click',{action:'foreign-init'});assert(app.innerHTML.includes('36名'));assert(app.innerHTML.includes('未調査'));assert(!app.innerHTML.includes('data-action="sign"'));
+  const foreignHtml=app.innerHTML;
+  dispatch('click',{action:'business-sub',sub:'market'});dispatch('click',{action:'business-sub',sub:'foreign'});
+  assert.equal(app.innerHTML,foreignHtml);assert.equal(window.PennantLab.getSnapshot().playerCount,beforeForeign);
+  dispatch('click',{action:'foreign-filter',value:'pitch'});assert(app.innerHTML.includes('12名'));
+  dispatch('click',{action:'foreign-filter',value:'all'});
   dispatch('click',{action:'tab',tab:'hq'});
 
   assert.match(app.innerHTML,/data-action="mgr-open"/);

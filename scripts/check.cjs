@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.45 · CLUB CRESTS/);
+assert.match(html,/VERSION 0\.9\.46 · OVERSEAS BASE/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1049,4 +1049,10 @@ assert.match(html,/\.draft-rumor-mark\{[^}]*width:26px/);console.log('PASS: comp
 const hashStart=inline[1].indexOf('  function draftHash('),hashEnd=inline[1].indexOf('  function draftScoutProfile(',hashStart),a=inline[1].indexOf('  const CLUB_PALETTE='),b=inline[1].indexOf('  function clubRgb(',a);
 const api=vm.runInNewContext('(function(){'+inline[1].slice(hashStart,hashEnd)+inline[1].slice(a,b)+';return {ensureCPUClubEmblems,clubIdentity,cpuClubEmblem,clubMotifArtwork};})()');
 const g={started:true,selectedId:2,seed:2027,teams:Array.from({length:12},(_,id)=>({id,color:'#2865aa',letter:'A'}))};g.teams[2].emblem={shape:'circle',pattern:'solid',accent:'#ffffff',font:'bold'};const own=JSON.stringify(g.teams[2]);assert(api.ensureCPUClubEmblems(g));assert.equal(JSON.stringify(g.teams[2]),own);assert.equal(g.seed,2027);assert.equal(new Set(g.teams.filter(t=>t.id!==2).map(t=>t.emblem.motif)).size,11);const saved=JSON.stringify(g);assert(!api.ensureCPUClubEmblems(g));assert.equal(JSON.stringify(g),saved);const copy=JSON.parse(saved);copy.seed=999;assert(!api.ensureCPUClubEmblems(copy));assert.equal(JSON.stringify(copy.teams),JSON.stringify(g.teams));assert.equal(api.clubIdentity(g.teams[2]).motif,'letter');for(const t of g.teams.filter(t=>t.id!==2)){assert(api.clubMotifArtwork(t.emblem.motif).includes('<svg'));assert.equal(t.color,'#2865aa');}assert.notEqual(JSON.stringify(api.cpuClubEmblem(g.teams[0],1)),JSON.stringify(api.cpuClubEmblem(g.teams[0],2)));console.log('PASS: randomized fixed CPU crests, vector art, unchanged own identity and simulation seed');
+}
+
+{
+const a=inline[1].indexOf('  const FOREIGN_COUNTRIES='),b=inline[1].indexOf('  function foreignMarketScreen(',a);
+const api=vm.runInNewContext('(function(){const game={year:2027,seed:1937,nextId:1000,players:[]};const POSITIONS=["C","1B","2B","3B","SS","OF","SP","RP","CP"];const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));const rand=()=>{game.seed=(Math.imul(game.seed,1664525)+1013904223)>>>0;return game.seed/4294967296;};const ri=(a,b)=>a+Math.floor(rand()*(b-a+1)),pick=a=>a[Math.floor(rand()*a.length)];const seasonSkillKeys=p=>["skill"];const createPlayer=(t,pos)=>({id:game.nextId++,teamId:t,pos,skill:60,talent:60});'+inline[1].slice(a,b)+';return {game,ensureForeignMarket};})()');
+const m=api.ensureForeignMarket();assert.equal(m.candidates.length,36);assert.equal(new Set(m.candidates.map(c=>c.country)).size,10);assert.equal(new Set(m.candidates.map(c=>c.id)).size,36);assert.equal(new Set(m.candidates.map(c=>c.player.name)).size,36);assert(m.candidates.every(c=>c.player.teamId===null&&c.player.originMarket==="foreign"&&c.player.isForeign&&c.career.seasons<=c.player.age-18&&c.career.toYear===2026));assert.equal(api.game.seed,1937);assert.equal(api.game.players.length,0);assert.equal(api.ensureForeignMarket(),m);assert.equal(api.game.nextId,1036);api.game.year++;assert.notEqual(api.ensureForeignMarket(),m);assert.equal(api.game.nextId,1072);assert.equal(api.game.seed,1937);console.log('PASS: annual independent foreign pool, origin metadata, country variety, non-reroll and unique IDs');
 }
