@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.50 · FINAL OFFER/);
+assert.match(html,/VERSION 0\.9\.51 · RARE TALENTS/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1053,7 +1053,7 @@ const g={started:true,selectedId:2,seed:2027,teams:Array.from({length:12},(_,id)
 }
 
 {
-const a=inline[1].indexOf('  const FOREIGN_COUNTRIES='),b=inline[1].indexOf('  function foreignMarketScreen(',a);
+const a=inline[1].indexOf('  function draftHash('),b=inline[1].indexOf('  function foreignMarketScreen(',a);
 const api=vm.runInNewContext('(function(){const game={year:2027,seed:1937,nextId:1000,players:[]};const POSITIONS=["C","1B","2B","3B","SS","OF","SP","RP","CP"];const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));const rand=()=>{game.seed=(Math.imul(game.seed,1664525)+1013904223)>>>0;return game.seed/4294967296;};const ri=(a,b)=>a+Math.floor(rand()*(b-a+1)),pick=a=>a[Math.floor(rand()*a.length)];const seasonSkillKeys=p=>["skill"];const createPlayer=(t,pos)=>({id:game.nextId++,teamId:t,pos,skill:60,talent:60});'+inline[1].slice(a,b)+';return {game,ensureForeignMarket};})()');
 const m=api.ensureForeignMarket();assert.equal(m.candidates.length,36);assert.equal(new Set(m.candidates.map(c=>c.country)).size,10);assert.equal(new Set(m.candidates.map(c=>c.id)).size,36);assert.equal(new Set(m.candidates.map(c=>c.player.name)).size,36);assert(m.candidates.every(c=>c.player.teamId===null&&c.player.originMarket==="foreign"&&c.player.isForeign&&c.career.seasons<=c.player.age-18&&c.career.toYear===2026));assert.equal(api.game.seed,1937);assert.equal(api.game.players.length,0);assert.equal(api.ensureForeignMarket(),m);assert.equal(api.game.nextId,1036);api.game.year++;assert.notEqual(api.ensureForeignMarket(),m);assert.equal(api.game.nextId,1072);assert.equal(api.game.seed,1937);console.log('PASS: annual independent foreign pool, origin metadata, country variety, non-reroll and unique IDs');
 }
@@ -1070,3 +1070,10 @@ const t={id:2,name:'東京',cash:10},c={id:100,country:'キューバ',kind:'regu
 }
 
 assert.match(html,/foreign-talk-pin/);assert.match(html,/foreignReportView/);assert.match(html,/foreignTick\(entry.date\)/);console.log('PASS: delayed foreign decision and saved progress');
+
+{
+const a=inline[1].indexOf('  function draftHash('),b=inline[1].indexOf('  // Foreign recruitment is a separate',a);
+const api=vm.runInNewContext('(function(){const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));const seasonSkillKeys=p=>["contact","power","speed","defense","arm"];'+inline[1].slice(a,b)+';return {specialBirthPlan,specialApplyPool,specialGrowthAptitude,applySpecialTalent};})()');
+const counts={PARALLEL:0,STAR:0,LEGEND:0};let empty=0;for(let year=2027;year<12027;year++){const p=api.specialBirthPlan(1937,year,'draft');assert(p.filter(x=>x==='PARALLEL').length<=2);assert(p.filter(x=>x==='STAR').length<=1);assert(p.filter(x=>x==='LEGEND').length<=1);if(!p.length)empty++;for(const k of Object.keys(counts))if(p.includes(k))counts[k]++;assert.equal(JSON.stringify(p),JSON.stringify(api.specialBirthPlan(1937,year,'draft')));}
+assert(Math.abs(counts.PARALLEL/10000-1/3)<.02);assert(Math.abs(counts.STAR/10000-1/7)<.02);assert(Math.abs(counts.LEGEND/10000-.1)<.02);assert(empty>4000);let year=2027;while(api.specialBirthPlan(1937,year,'draft').length<2)year++;const candidates=Array.from({length:120},(_,i)=>({id:i+1,type:i%2?'高校生':'大学生',school:'学校'+i,region:'地域'+i,player:{id:i+1,contact:50,power:50,speed:50,defense:50,arm:50,talent:55}}));const result=api.specialApplyPool(candidates,1937,year,'draft');const selected=candidates.filter(x=>x.player.specialCategory);assert.equal(selected.length,result.ids.length);assert(selected.every(x=>x.type==='高校生'&&x.school===result.school&&x.nationalChampion&&x.player.talent>=84&&x.player.growthAptitude));assert.equal(candidates.length,120);assert(candidates.every(x=>!x.player.ssEligible));console.log('PASS: 10000 annual rare-talent draws, stable categories, shared champion school, roster count and no SS grant',counts);
+}
