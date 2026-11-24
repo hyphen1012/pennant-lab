@@ -1882,10 +1882,18 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 .draft-cut-total{text-align:center;padding:15px;background:#102034;border:1px solid #58748a;border-radius:10px;color:#9ed8b8}.draft-cut-total b{font-size:38px}.draft-cut-total span{font-size:20px;color:#c7d6e4}.draft-cut-total[data-over=true] b{color:#f2b47a}.roster-cut-room .draft-release-row button{flex:0 0 auto;max-width:42%;white-space:normal;min-height:42px}.roster-cut-room .draft-release-row>span:first-child{flex:0 0 auto}
 
-.farm-hero{background:linear-gradient(150deg,#153b39,#142235 72%);border-color:#416b67}.farm-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0}.farm-summary>div{background:#101f2c;border:1px solid #405562;border-radius:9px;padding:9px 7px}.farm-summary small,.farm-summary b{display:block}.farm-summary small{font-size:11px;color:#a2b5c0}.farm-summary b{font-size:16px;color:#dce8e7;white-space:nowrap}.farm-player{border:1px solid #34485b;border-radius:10px;padding:10px;margin-top:9px;background:#142538}.farm-person{display:flex;align-items:center;gap:10px;width:100%;border:0;color:inherit;background:none;text-align:left;padding:0}.farm-person>span:not(.avatar){flex:1;min-width:0}.farm-person b,.farm-person small{display:block;line-height:1.4}.farm-person small{font-size:11px;color:#a9b9ca}.farm-person>strong{font-size:22px}.farm-meta{display:flex;justify-content:space-between;font-size:11px;color:#a7b8c7;margin:7px 0}.farm-controls{display:flex;align-items:end;gap:8px;margin-top:8px}.farm-controls label{display:grid;gap:4px;flex:1;min-width:0;font-size:11px;color:#b1bfcd}.farm-controls select{width:100%}.farm-controls .btn{flex-shrink:0}.farm-facility,.farm-report,.farm-match{border-top:1px solid #3b4b5e;padding:12px 0}.farm-facility h3{display:flex;justify-content:space-between;font-size:15px}.farm-facility h3 span{color:#84cdb4}.farm-level{display:flex;gap:5px;margin:9px 0}.farm-level i{flex:1;height:7px;border-radius:4px;background:#35475b}.farm-level i.on{background:#77bdab}.farm-match{display:flex;justify-content:space-between;gap:8px;font-size:13px}.farm-report small{color:#a8b7c8}.farm-report p{margin:5px 0}.farm-growth svg{width:100%;max-height:145px}.roster-screen .control-bar{flex-wrap:wrap}.roster-screen .control-bar .chips{flex-wrap:wrap}
+.farm-hero{background:linear-gradient(150deg,#153b39,#142235 72%);border-color:#416b67}.farm-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0}.farm-summary>div{background:#101f2c;border:1px solid #405562;border-radius:9px;padding:9px 7px}.farm-summary small,.farm-summary b{display:block}.farm-summary small{font-size:11px;color:#a2b5c0}.farm-summary b{font-size:16px;color:#dce8e7;white-space:nowrap}.farm-player{border:1px solid #34485b;border-radius:10px;padding:10px;margin-top:9px;background:#142538}.farm-person{display:flex;align-items:center;gap:10px;width:100%;border:0;color:inherit;background:none;text-align:left;padding:0}.farm-person>span:not(.face-mini){flex:1;min-width:0}.farm-player-info b,.farm-player-info small{display:block;line-height:1.4}.farm-player-info b>small{display:inline;font-size:11px}.farm-person small{font-size:11px;color:#a9b9ca}.farm-person>strong{font-size:22px}.farm-meta{display:flex;justify-content:space-between;font-size:11px;color:#a7b8c7;margin:7px 0}.farm-controls{display:flex;align-items:end;gap:8px;margin-top:8px}.farm-controls label{display:grid;gap:4px;flex:1;min-width:0;font-size:11px;color:#b1bfcd}.farm-controls select{width:100%}.farm-controls .btn{flex-shrink:0}.farm-facility,.farm-report,.farm-match{border-top:1px solid #3b4b5e;padding:12px 0}.farm-facility h3{display:flex;justify-content:space-between;font-size:15px}.farm-facility h3 span{color:#84cdb4}.farm-level{display:flex;gap:5px;margin:9px 0}.farm-level i{flex:1;height:7px;border-radius:4px;background:#35475b}.farm-level i.on{background:#77bdab}.farm-match{display:flex;justify-content:space-between;gap:8px;font-size:13px}.farm-report small{color:#a8b7c8}.farm-report p{margin:5px 0}.farm-growth svg{width:100%;max-height:145px}.roster-screen .control-bar{flex-wrap:wrap}.roster-screen .control-bar .chips{flex-wrap:wrap}
 
 
 .infra-controls{margin:10px 0}.infra-controls .btn{margin:5px 0}.infra-warning{color:#e8a4a0;font-size:12px}.farm-level{gap:2px}.farm-level i.elite{border:1px solid #ac8952}.farm-level i.elite.on{background:#d4ae61}
+
+/* Fixed-size farm portraits; the portrait itself must never inherit the flexible text column. */
+.farm-person>.face-mini,.farm-stat-person>.face-mini{width:44px;height:44px;min-width:44px;max-width:44px;min-height:44px;max-height:44px;flex:0 0 44px;aspect-ratio:1/1;align-self:center;box-sizing:border-box}
+.farm-person>.face-mini>.face-mini-artwork,.farm-person>.face-mini .face-artwork,.farm-stat-person>.face-mini>.face-artwork{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:cover}
+.farm-person>.farm-player-info{flex:1;min-width:0;overflow-wrap:anywhere}
+.farm-person>strong{flex:none}
+@media(max-width:360px){.farm-person>.face-mini,.farm-stat-person>.face-mini{width:38px;height:38px;min-width:38px;max-width:38px;min-height:38px;max-height:38px;flex-basis:38px}}
+.infra-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}.infra-metrics>div{background:#102232;border:1px solid #405562;padding:10px;border-radius:9px;min-width:0}.infra-metrics small,.infra-metrics b{display:block}.infra-metrics small{font-size:11px;color:#a2b5c0}.infra-metrics b{font-size:clamp(13px,3.5vw,18px);margin-top:4px;overflow-wrap:anywhere}.infra-item .infra-lv{white-space:nowrap;color:#89cdb5;font-size:14px}.infra-item .infra-lv.elite{color:#dfbc70}.infra-item h3{margin:0}.infra-group .infra-item:last-child{padding-bottom:0}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -5540,7 +5548,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function appLogo(){return `<div class="app-brand"><span class="brand-mark">⚾</span><span><b>PENNANT<span class="brand-gold"> LAB</span></b><small>BASEBALL GENERAL MANAGER</small></span></div>`}
   function slotData(i){try{const raw=localStorage.getItem(SLOT_PREFIX+i);if(!raw)return null;const d=JSON.parse(raw);return d&&Array.isArray(d.teams)&&d.teams.length===12?d:null}catch(e){return null}}
   function titleScreen(){
-    return `<div class="title-screen"><div class="title-hero"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.9.70 · CLUB INVESTMENT</span></div><div class="title-slot-title">セーブデータを選択</div><div class="title-slots">${[1,2,3].map(i=>{
+    return `<div class="title-screen"><div class="title-hero"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.9.71 · CLUB FACILITIES</span></div><div class="title-slot-title">セーブデータを選択</div><div class="title-slots">${[1,2,3].map(i=>{
       const d=slotData(i),t=d?.teams?.find(t=>t.id===d.selectedId);
       return `<button class="save-slot ${d?.started?'has-game':'empty-slot'} ${t?leagueClass(t.league):''}" data-action="${d?.started?'continue-slot':'new-slot'}" data-slot="${i}">${d?.started?teamBadge(t,'slot-emblem'):'<span class="slot-emblem">＋</span>'}<span class="slot-label">${d?.started?`<strong>${h(t.name)}</strong><small>${leagueTag(t.league)}　${d.year}年 · ${d.day}/143試合 · ${h(d.gmName||'GM')}</small><small>${d.teams.find(t=>t.id===d.selectedId)?.wins||0}勝　${fmtMoney(t.cash)}</small>`:`<strong>新しい球団で始める</strong><small>空きデータ ${i}</small>`}</span><span class="slot-index">DATA ${i} ›</span></button>`;
     }).join('')}</div><button class="btn outline full" data-action="rare-preview-open">特殊選手の演出確認モード ›</button><div class="title-info">本体データは端末内データベースに保存されます。バックアップは「経営」からJSON形式で書き出せます。<br>v0.3以前のテストセーブは引き継がれません。</div></div>`;
@@ -5584,7 +5592,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const opp=next?getTeam(next.home===t.id?next.away:next.home):null;
     const rank=rankings(t.league).findIndex(x=>x.id===t.id)+1;
     const managerPriority=t.manager&&(t.manager.discontent>=50||t.manager.contractYears===1)?'recommended':'optional';
-    const financePriority=t.cash<(payroll(t)+Number(t.manager?.salary||0))/6?'recommended':'optional';
+    const financePriority=t.cash<(payroll(t)+Number(t.manager?.salary||0)+infraAnnual(t))/6||infraForecast(t)<0?'recommended':'optional';
     const market=game.foreignMarket?.year===game.year?game.foreignMarket:null,conv=market?.negotiations?.[t.id],fc=conv&&market.candidates.find(c=>c.id===conv.candidateId);
     const overseasDuty=conv?(conv.status==='waiting'?'返答待ち · '+(conv.updates?.at(-1)?.text||'代理人からの連絡を待っています'):conv.status==='talk'?'交渉中 · '+fc?.player.name:['counter','rival-pending'].includes(conv.status)?'最終回答が到着 · '+fc?.player.name:'結果到着 · '+fc?.player.name):market?'海外候補の調査・獲得交渉':'海外の新戦力を発掘する';
     const duties=[
@@ -5594,7 +5602,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       ['optional','✦','自由契約選手の獲得',freeAgents().length+'名が所属先を探しています','data-action="tab" data-tab="market"'],
       ['optional','⌕','新人スカウト',game.draft?.year===game.year?'ドラフト候補の調査・発掘':'今年の新人候補を調査する','data-action="tab" data-tab="business" data-sub="scout"'],
       [conv&&conv.status!=='waiting'?'recommended':'optional','◎','海外スカウト',overseasDuty,'data-action="tab" data-tab="business" data-sub="foreign"'],
-      [financePriority,'¥','予算・年俸をチェック','今季の支払予定を確認する','data-action="tab" data-tab="business"']
+      [financePriority,'▣','球団施設・設備管理','各施設・スカウトの強化と維持費を一括管理','data-action="tab" data-tab="business" data-sub="facilities"']
     ].sort((a,b)=>Number(b[0]==='recommended')-Number(a[0]==='recommended'));
     const suggested=duties.filter(d=>d[0]==='recommended').length;
     return `<section class="hero-stadium ${leagueClass(t.league)}"><div class="eyebrow">HOME BALLPARK · ${game.year}</div><div class="hero-team">${teamBadge(t,'logo')}<div><h2>${h(t.name)}</h2><small>GM ${h(game.gmName||'GM')}</small> ${leagueTag(t.league)}</div></div><div class="hero-context"><div><small>リーグ順位</small><strong>${game.day?rank+'位':'開幕前'}</strong></div><div><small>ファン</small><strong>${(game.fans/10000).toFixed(1)}万人</strong></div><div><small>総年俸</small><strong>${fmtSalary(payroll(t))}</strong></div></div><div class="hero-row"><span>東西ペナント</span><b>${game.day}/143 試合</b></div><div class="hero-record"><strong>${t.wins} <small>勝</small></strong><strong>${t.losses} <small>敗</small></strong><strong>${t.ties} <small>分</small></strong></div><div class="hero-progress"><span style="width:${game.day/143*100}%"></span></div><div class="calendar-current-date">🗓 ${getDayText()}</div><div class="hero-foot"><span>球団資金 <strong>${fmtMoney(t.cash)}</strong></span><span>次の相手 <strong>${opp?h(opp.short):'シーズン終了'}</strong></span></div></section>
@@ -6581,7 +6589,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(act==='tab'){
       ui.clubDraft=null;ui.playerDetail=null;ui.tab=b.dataset.tab;if(b.dataset.roster)ui.rosterMode=b.dataset.roster;
       if(ui.tab==='market'){ui.businessSub='market';ui.tab='business'}
-      if(ui.tab==='business'&&['scout','foreign'].includes(b.dataset.sub)){ui.businessSub=b.dataset.sub;ui.foreignReportId=null;}
+      if(ui.tab==='business'&&['finance','scout','foreign','facilities'].includes(b.dataset.sub)){ui.businessSub=b.dataset.sub;ui.foreignReportId=null;}
       render();window.scrollTo({top:0,behavior:'instant'});return;
     }
     if(act==='roster-mode'){ui.rosterMode=b.dataset.mode;render();return}
@@ -7833,10 +7841,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   buildFresh=function(){prevBuild07();ensureManagers();save();};
   const prevBusiness07=businessScreen;
   businessScreen=function(){
-    const tabs=[['finance','収支・予算'],['market','補強市場'],['scout','新人スカウト'],['foreign','海外スカウト'],['manager','監督室'],['club','球団設定']];
+    const tabs=[['finance','収支・予算'],['facilities','施設・設備'],['market','補強市場'],['scout','新人スカウト'],['foreign','海外スカウト'],['manager','監督室'],['club','球団設定']];
     return `<div class="screen-top"><div class="eyebrow">BUSINESS & STAFF</div><h2>球団経営</h2></div>
       <div class="subtabs">${tabs.map(([key,label])=>`<button class="subtab ${ui.businessSub===key?'active':''}" data-action="business-sub" data-sub="${key}">${label}</button>`).join('')}</div>
-      ${ui.businessSub==='scout'?draftScoutScreen():ui.businessSub==='foreign'?foreignMarketScreen():ui.businessSub==='club'?clubIdentityEditor(myTeam()):ui.businessSub==='manager'?managerScreen():ui.businessSub==='market'?marketScreen():financeScreen()}`;
+      ${ui.businessSub==='facilities'?infraManagementScreen(myTeam()):ui.businessSub==='scout'?draftScoutScreen():ui.businessSub==='foreign'?foreignMarketScreen():ui.businessSub==='club'?clubIdentityEditor(myTeam()):ui.businessSub==='manager'?managerScreen():ui.businessSub==='market'?marketScreen():financeScreen()}`;
   };
   // v0.9.14: manager duty is now rendered by the shared deskTask component.
   const prevNext07=nextSeason;
@@ -8225,7 +8233,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function farmRosterCard(t,p){
     const tier=p.farmTier===2?'二軍':'一軍',disabled=p.farmTier===2?firstPlayers(t).length>=FARM_LIMIT||!!p.injury:!farmCanDemote(t,p);
     const change=rating(p)-(p.farmOpeningOverall??rating(p)),skills=['balanced',...seasonSkillKeys(p)];
-    return '<div class="farm-player"><button class="farm-person" data-action="player-detail" data-id="'+p.id+'">'+faceMini(p,{overall:true})+'<span><b>'+themedPlayerName(p)+' <small>('+p.age+')</small></b><small>'+positionMarkup(p.pos)+' · '+FARM_GROWTH[farmGrowthType(p)][0]+' · '+tier+'</small><small>'+farmStatLine(p)+'</small></span><strong style="color:'+gradeBriefColor(rating(p))+'">'+gradeBrief(rating(p))+'</strong></button><div class="farm-meta"><span>総合変化 '+(change>=0?'+':'')+change+'</span><span>育成 '+(p.farmTrainingDays||0)+'日</span></div>'+conditionBar(p)+'<div class="farm-controls"><label>重点育成<select class="select" data-change="farm-focus" data-id="'+p.id+'">'+skills.map(k=>'<option value="'+k+'" '+(p.trainFocus===k?'selected':'')+'>'+FARM_SKILL[k]+'</option>').join('')+'</select></label><button class="btn sm outline" data-action="farm-move" data-id="'+p.id+'" '+(disabled?'disabled':'')+'>'+(p.farmTier===2?'一軍へ昇格':'二軍へ降格')+'</button></div></div>';
+    return '<div class="farm-player"><button class="farm-person" data-action="player-detail" data-id="'+p.id+'">'+faceMini(p,{overall:true})+'<span class="farm-player-info"><b>'+themedPlayerName(p)+' <small>('+p.age+')</small></b><small>'+positionMarkup(p.pos)+' · '+FARM_GROWTH[farmGrowthType(p)][0]+' · '+tier+'</small><small>'+farmStatLine(p)+'</small></span><strong style="color:'+gradeBriefColor(rating(p))+'">'+gradeBrief(rating(p))+'</strong></button><div class="farm-meta"><span>総合変化 '+(change>=0?'+':'')+change+'</span><span>育成 '+(p.farmTrainingDays||0)+'日</span></div>'+conditionBar(p)+'<div class="farm-controls"><label>重点育成<select class="select" data-change="farm-focus" data-id="'+p.id+'">'+skills.map(k=>'<option value="'+k+'" '+(p.trainFocus===k?'selected':'')+'>'+FARM_SKILL[k]+'</option>').join('')+'</select></label><button class="btn sm outline" data-action="farm-move" data-id="'+p.id+'" '+(disabled?'disabled':'')+'>'+(p.farmTier===2?'一軍へ昇格':'二軍へ降格')+'</button></div></div>';
   }
   function farmScreen(t){
     const f=farmState(),staff=farmClub(t),one=firstPlayers(t),two=farmPlayers(t),sub=ui.farmSub||'manage',filter=ui.farmFilter||'farm',mode=ui.farmMode||'bat',current=f.clubs[t.id];
@@ -8235,7 +8243,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       html+='<section class="panel"><h3 class="panel-title">登録・育成方針</h3><p class="small">手動の昇降格を行うと手動運用へ切り替わります。先に降格して登録枠を空けることができます。</p><div class="chips">'+[['farm','二軍 '+two.length],['first','一軍 '+one.length]].map(([k,v])=>'<button class="chip '+(filter===k?'active':'')+'" data-action="farm-filter" data-value="'+k+'">'+v+'</button>').join('')+'</div>'+list.map(p=>farmRosterCard(t,p)).join('')+(list.length?'':'<p class="small">所属選手はいません。ドラフトや昇降格で補充できます。</p>')+'</section>';
     }else if(sub==='stats'){
       const list=game.players.filter(p=>p.teamId===t.id&&p.farmYear===game.year&&isPitch(p)===(mode==='pitch')&&p.farmStats?.g).sort((a,b)=>mode==='pitch'?b.farmStats.k-a.farmStats.k:b.farmStats.h-a.farmStats.h);
-      html+='<section class="panel"><h3 class="panel-title">今季二軍個人成績</h3><div class="chips">'+[['bat','野手'],['pitch','投手']].map(([k,v])=>'<button class="chip '+(mode===k?'active':'')+'" data-action="farm-stats-mode" data-value="'+k+'">'+v+'</button>').join('')+'</div>'+list.map(p=>'<button class="career-person" data-action="player-detail" data-id="'+p.id+'">'+faceMini(p)+'<span><b>'+themedPlayerName(p)+'</b><small>'+farmStatLine(p)+'</small></span><em>'+(p.farmTier===1?'一軍':'二軍')+'</em></button>').join('')+(list.length?'':'<p class="small">試合記録はまだありません。</p>')+'</section>';
+      html+='<section class="panel"><h3 class="panel-title">今季二軍個人成績</h3><div class="chips">'+[['bat','野手'],['pitch','投手']].map(([k,v])=>'<button class="chip '+(mode===k?'active':'')+'" data-action="farm-stats-mode" data-value="'+k+'">'+v+'</button>').join('')+'</div>'+list.map(p=>'<button class="career-person farm-stat-person" data-action="player-detail" data-id="'+p.id+'">'+faceMini(p)+'<span><b>'+themedPlayerName(p)+'</b><small>'+farmStatLine(p)+'</small></span><em>'+(p.farmTier===1?'一軍':'二軍')+'</em></button>').join('')+(list.length?'':'<p class="small">試合記録はまだありません。</p>')+'</section>';
     }else if(sub==='schedule'){
       const y=Number(ui.farmArchiveYear||game.year),data=y===game.year?f:game.farmArchive.find(x=>x.year===y)||f;
       const rank=game.teams.filter(x=>x.league===t.league).map(x=>({team:x,...data.clubs[x.id]})).sort((a,b)=>(b.w/Math.max(1,b.w+b.l))-(a.w/Math.max(1,a.w+a.l))||b.w-a.w||a.team.id-b.team.id);
@@ -8279,7 +8287,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const base=farmBaseDetail(),p=getPlayer(ui.playerDetail);if(!p)return base;
     return base+(ui.playerDetailTab==='stats'?farmCareerPanel(p):ui.playerDetailTab==='growth'?farmGrowthPanel(p):'');
   };
-  function farmUIAllowed(){return ui.page==='game'&&!ui.busy&&!storageFailure&&!game.pendingMonth&&!game.pendingReview&&!game.pendingEvent&&!game.ceremonyStage&&!game.financeCrisis&&!pendingRareNews().length;}
+  function farmUIAllowed(){return ui.page==='game'&&!ui.busy&&!storageFailure&&!game.pendingMonth&&!game.pendingReview&&!game.pendingEvent&&!game.ceremonyStage&&!game.pendingDraftReveal&&!game.financeCrisis&&!pendingRareNews().length&&!pendingMilestoneNews().length&&!foreignHasCounter();}
   document.addEventListener('click',e=>{
     const b=e.target.closest('[data-action]'),act=b?.dataset.action;if(!act?.startsWith('farm-'))return;
     e.stopImmediatePropagation();if(!farmUIAllowed()||ui.tab!=='roster'||ui.rosterMode!=='farm')return;
@@ -8348,15 +8356,36 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const f=game.infrastructureFinance?.year===game.year?game.infrastructureFinance.clubs[t.id]:null,total=infraAnnual(t),net=r2(revenue-payroll(t)-Number(t.manager?.salary||0)-total);
     return '<section class="panel"><div class="eyebrow">CLUB INFRASTRUCTURE</div><h3 class="panel-title">施設・スカウト維持費</h3>'+Object.keys(INFRA_LABELS).map(k=>'<div class="row between"><span>'+INFRA_LABELS[k]+' Lv.'+infraLevel(t,k)+'</span><b>'+fmtMoney(infraUpkeep(infraLevel(t,k)))+'/年</b></div>').join('')+'<div class="divider"></div><div class="row between"><b>年間維持費合計</b><b>'+fmtMoney(total)+'</b></div><div class="row between"><span>今季支払済み維持費</span><b>'+fmtMoney(f?.paid||0)+'</b></div><div class="row between"><span>今季強化投資（支払済）</span><b>'+fmtMoney(f?.investment||0)+'</b></div><div class="row between"><span>年間営業収支見込み（強化費除く）</span><b class="'+(net<0?'infra-warning':'')+'">'+fmtMoney(net)+'</b></div><p class="small">各日付のレベルで日割り計上し、月末に精算。縮小しても過去の支払いは返金されません。</p></section>';
   }
+
+  function infraManagementScreen(t){
+    const annual=infraAnnual(t),net=infraForecast(t),f=game.infrastructureFinance?.year===game.year?game.infrastructureFinance.clubs[t.id]:null;
+    const descriptions={...Object.fromEntries(Object.entries(FARM_FACILITIES).map(([k,v])=>[k,v[1]])),draft:'新人候補の発掘速度・調査精度・年間調査枠',foreign:'海外候補の発掘速度・調査精度・年間調査枠'};
+    const group=(title,keys)=>'<section class="panel infra-group"><h3 class="panel-title">'+title+'</h3>'+keys.map(k=>{
+      const lv=infraLevel(t,k);
+      return '<div class="farm-facility infra-item" data-infra-key="'+k+'"><div class="row between"><h3>'+h(INFRA_LABELS[k])+'</h3><b class="infra-lv'+(lv>15?' elite':'')+'">Lv.'+lv+' / 20</b></div><p class="small">'+h(descriptions[k]||'球団設備の強化')+'</p><div class="farm-level" aria-label="レベル '+lv+' / 20">'+Array.from({length:20},(_,i)=>'<i class="'+(i<lv?'on':'')+(i>=15?' elite':'')+'"></i>').join('')+'</div>'+infraControls(t,k,'infra-upgrade')+'</div>';
+    }).join('')+'</section>';
+    return '<section class="panel farm-hero infra-hero"><div class="eyebrow">CLUB INFRASTRUCTURE</div><h2>球団施設・設備管理</h2><p class="small">すべての強化設備をここで管理できます。Lv.15は高難度の到達目標、Lv.16〜20は超高難度のやり込み枠です。</p><div class="infra-metrics"><div><small>保有資金</small><b>'+fmtMoney(t.cash)+'</b></div><div><small>年間維持費合計</small><b>'+fmtMoney(annual)+'</b></div><div><small>今季の強化投資</small><b>'+fmtMoney(f?.investment||0)+'</b></div><div><small>年間営業収支見込み</small><b class="'+(net<0?'infra-warning':'')+'">'+fmtMoney(net)+'</b></div></div><p class="tiny">営業収支は強化費を除く見込み。維持費は日割り計上・月末精算。縮小は返金なし。</p><button class="btn sm outline full" data-action="business-sub" data-sub="finance">収支・予算の詳細を見る ›</button></section>'+group('育成・医療施設',Object.keys(FARM_FACILITIES))+group('スカウト体制',['draft','foreign']);
+  }
+  function infraManageAction(t,key,action){
+    if(!Object.hasOwn(INFRA_LABELS,key))return false;
+    if(action==='infra-upgrade')return infraUpgrade(t,key);
+    if(action==='infra-downgrade')return infraDowngrade(t,key);
+    return false;
+  }
+
   document.addEventListener('click',e=>{
-    const b=e.target.closest('[data-action="infra-downgrade"]');if(!b)return;
+    const b=e.target.closest('[data-action="infra-downgrade"],[data-action="infra-upgrade"]');if(!b)return;
     e.stopImmediatePropagation();if(!farmUIAllowed())return;
     const t=myTeam(),k=b.dataset.value;
-    if(!Object.hasOwn(INFRA_LABELS,k)||infraLevel(t,k)<=1)return;
+    if(!Object.hasOwn(INFRA_LABELS,k))return;
+    const lv=infraLevel(t,k),act=b.dataset.action,central=ui.tab==='business'&&ui.businessSub==='facilities';
+    if(act==='infra-upgrade'&&(!central||lv>=INFRA_MAX||t.cash<draftScoutCost(lv)))return;
+    if(act==='infra-downgrade'&&lv<=1)return;
     const inFarm=ui.tab==='roster'&&ui.rosterMode==='farm'&&Object.hasOwn(FARM_FACILITIES,k),inScout=ui.tab==='business'&&ui.businessSub===(k==='draft'?'scout':'foreign')&&(k==='draft'||k==='foreign');
-    if(!inFarm&&!inScout)return;
-    if(!window.confirm(INFRA_LABELS[k]+'をLv.'+(infraLevel(t,k)-1)+'に縮小しますか？ 強化費は返金されません。'))return;
-    if(infraDowngrade(t,k)){save();render();}
+    if(!central&&!inFarm&&!inScout)return;
+    const message=act==='infra-upgrade'?INFRA_LABELS[k]+'をLv.'+(lv+1)+'に強化しますか？ '+infraConfirmText(t,k):INFRA_LABELS[k]+'をLv.'+(lv-1)+'に縮小しますか？ 強化費は返金されません。';
+    if(!window.confirm(message))return;
+    const scroll=draftScrollY();if(infraManageAction(t,k,act)){save();draftRenderAt(null,scroll);}
   },true);
 
   const appRoot=document.querySelector('#app');
