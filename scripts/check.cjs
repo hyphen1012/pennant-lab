@@ -994,3 +994,5 @@ assert.equal(saved.pendingLottery.groups[0].winner,winners[2]);
 assert.match(html,/SCOUT_TASKS/);assert.match(html,/scout-field-report/);assert.match(html,/draft-draw-stage/);
 console.log('PASS: sealed tickets, unique winner, saved selection, scout dossier');
 }
+
+assert.match(html,/data-action="draft-report-view"/);
