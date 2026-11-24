@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.23 · RECORD BOOK/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.24 · CAREER HISTORY/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -459,6 +459,12 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(careerButton,'Completed season players are available in career archive');
   dispatch('click',{action:'career-open',id:careerButton[1]});
   assert(app.innerHTML.includes('career-total'));
+  assert(app.innerHTML.includes('選手経歴・最盛期'));
+  assert(app.innerHTML.includes('年度別の最盛期能力'));
+  const archived=store.get(1).data.players.filter(p=>p.teamId===-1);
+  assert(archived.every(p=>p.retirement&&p.appearanceSeed===p.id));
+  assert(archived.every(p=>p.retirement.recorded&&p.retirement.year===full.year));
+
   assert(app.innerHTML.includes(String(full.year)));
   dispatch('click',{action:'close-player'});
   dispatch('click',{action:'career-filter',kind:'status',value:'retired'});

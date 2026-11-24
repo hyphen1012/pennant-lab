@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.23 · RECORD BOOK/);
+assert.match(html,/VERSION 0\.9\.24 · CAREER HISTORY/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -797,4 +797,22 @@ assert.equal(api.compoundTitles(['首位打者','本塁打王'],false).join(',')
 assert.equal(api.compoundTitles(['首位打者','本塁打王','打点王','最多安打','盗塁王','最高出塁率'],false).join(','),'三冠王,打撃全六冠');
 assert.equal(api.compoundTitles(['最多勝','最多奪三振'],true).join(','),'投手二冠');
 console.log('PASS: additional special game records, season achievements and compound crowns');
+}
+
+{
+const a=inline[1].indexOf('  function snapshotAbilities('),b=inline[1].indexOf('  function captureSeason(',a);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+';return {recordAbilityPeak,peakSnapshots,abilityEvidence,bestAbilitySnapshot,captureRetirement,migrateRetirement};})()',{isPitch:p=>p.pos==='SP',rating:p=>Math.round((p.contact+p.power+p.speed+p.defense+p.arm)/5),getTeam:()=>({name:'Test Club'})});
+const p={id:1,teamId:2,pos:'OF',age:25,contact:90,power:89,speed:90,defense:90,arm:90,talent:90};
+api.recordAbilityPeak(p,2027,'2027-05-01','game-day');
+p.contact=89;p.power=90;api.recordAbilityPeak(p,2027,'2027-05-02','game-day');
+assert.equal(p.peakHistory[0].allS,null);
+p.contact=90;api.recordAbilityPeak(p,2027,'2027-05-03','game-day');
+assert.equal(p.peakHistory[0].allS.date,'2027-05-03');
+assert.equal(api.abilityEvidence(p.peakHistory[0].allS,false,90),true);
+assert.equal(api.abilityEvidence(p.peakHistory[0].allS,false,100),false);
+api.captureRetirement(p,2037,35);p.teamId=-1;api.captureRetirement(p,2038,36);
+assert.equal(p.retirement.year,2037);assert.equal(p.retirement.teamId,2);assert.equal(p.retirement.age,35);
+const old={id:2,teamId:-1,pos:'OF',seasonHistory:[{year:2031,teamId:3}]};
+api.migrateRetirement(old);assert.equal(old.retirement.year,null);assert.equal(old.retirement.lastRecordedYear,2031);
+console.log('PASS: retirement identity, same-instant peak evidence and honest legacy migration');
 }
