@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.22 · RECORD BOOK/);
+assert.match(html,/VERSION 0\.9\.23 · RECORD BOOK/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -782,4 +782,19 @@ assert.equal(api.achievementKey({recordKey:'career:bat:h'}),'record');
 assert.equal(api.achievementAttrs(null),'');
 assert.equal(api.achievementTheme('本塁打王'),null);
 console.log('PASS: distinct achievement palettes and exact LEGEND/RINNE color pairing');
+}
+
+{
+const a=inline[1].indexOf('  function detectGameFeats('),b=inline[1].indexOf('  let recordHistoryCache=',a);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+';return {detectGameFeats,seasonFeats,compoundTitles};})()');
+const game={home:1,away:2,homeScore:10,awayScore:2};
+assert.equal(api.detectGameFeats(game,[{id:1,teamId:1,h:5,hr:3,rbi:8}], [{id:2,teamId:1,k:15,g:1,outs:21}]).map(x=>x.featKey).join(','),'game3hr,game5hit,game8rbi,game15k');
+assert.equal(api.detectGameFeats(game,[{id:1,teamId:1,h:4,hr:2,rbi:7}], [{id:2,teamId:1,k:14,g:1,outs:21}]).length,0);
+assert.equal(api.seasonFeats({id:1,teamId:1,stats:{pa:500,ab:450,h:150,hr:40,sb:40}},false).map(x=>x.featKey).join(','),'fortyforty,triplethree');
+assert.equal(api.seasonFeats({id:1,teamId:1,stats:{pa:442,ab:400,h:130,hr:30,sb:30}},false).map(x=>x.featKey).join(','),'thirtythirty');
+assert.equal(api.seasonFeats({id:2,teamId:1,stats:{w:20,k:200}},true).map(x=>x.featKey).join(','),'season20w,season200k');
+assert.equal(api.compoundTitles(['首位打者','本塁打王'],false).join(','),'二冠王');
+assert.equal(api.compoundTitles(['首位打者','本塁打王','打点王','最多安打','盗塁王','最高出塁率'],false).join(','),'三冠王,打撃全六冠');
+assert.equal(api.compoundTitles(['最多勝','最多奪三振'],true).join(','),'投手二冠');
+console.log('PASS: additional special game records, season achievements and compound crowns');
 }
