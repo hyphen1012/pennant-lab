@@ -449,7 +449,11 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   const cashBeforeOffseason=window.PennantLab.getSnapshot().teams.map(t=>t.cash);
   const titles=['awards-all','settlement','draft','winter','self','camp','opening'];
   for(const key of titles){
-    if(key==='opening'&&app.innerHTML.includes('data-action="draft-reveal-close"'))dispatch('click',{action:'draft-reveal-close'});
+    if(key==='opening'&&app.innerHTML.includes('data-action="draft-reveal-close"')){
+      const reveal=app.innerHTML.match(/data-action="draft-reveal" data-id="(\d+)"/);
+      if(reveal){dispatch('click',{action:'draft-reveal',id:reveal[1]});assert(app.innerHTML.includes('基礎測定結果'));dispatch('click',{action:'draft-reveal',id:reveal[1]});assert(app.innerHTML.includes('入団時能力確定'));}
+      dispatch('click',{action:'draft-reveal-close'});dispatch('click',{action:'draft-confirm-accept'});
+    }
     assert(app.innerHTML.includes('data-event="'+key+'"'),'Milestone title: '+key);
     assert(!app.innerHTML.includes('data-action="ceremony-next"'),'No underlying transition on title');
     const before=window.PennantLab.getSnapshot();
@@ -489,11 +493,19 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
       const choice=app.innerHTML.match(/data-action="draft-choose" data-id="(\d+)"/);
       assert(choice);
       dispatch('click',{action:'draft-choose',id:choice[1]});
+      assert(app.innerHTML.includes('role="alertdialog"'));
+      dispatch('click',{action:'draft-confirm-cancel'});
+      assert(!app.innerHTML.includes('role="alertdialog"'));
+      dispatch('click',{action:'draft-choose',id:choice[1]});
+      dispatch('click',{action:'draft-confirm-accept'});
       assert(app.innerHTML.includes('指名・抽選結果'));
       dispatch('click',{action:'draft-first-next'});
       dispatch('click',{action:'draft-auto'});
+      assert(app.innerHTML.includes('role="alertdialog"'));
+      dispatch('click',{action:'draft-confirm-accept'});
       assert(app.innerHTML.includes('data-action="draft-finish"'));
       dispatch('click',{action:'draft-finish'});
+      dispatch('click',{action:'draft-confirm-accept'});
     }else dispatch('click',{action:'ceremony-next'});
   }
   assert.equal(window.PennantLab.getSnapshot().year,full.year+1);

@@ -959,3 +959,18 @@ assert(api.draftHash(2027,1,2,'lottery')>=0&&api.draftHash(2027,1,2,'lottery')<1
 assert.match(html,/function draftFirst\(/);assert.match(html,/function draftOfferResponse\(/);assert.match(html,/function draftRegisterNextSeason\(/);
 console.log('PASS: deterministic draft lottery and recruitment hooks');
 }
+
+{
+const a=inline[1].indexOf('  function draftOffer('),b=inline[1].indexOf('  function draftNegotiateCPU(',a);
+const api=vm.runInNewContext('(function(){const t={id:1,cash:10},game={year:2027},r2=n=>Math.round(n*100)/100,draftHash=()=>.5,getTeam=()=>t,own=()=>[],draftCandidate=(d,id)=>d.candidates.find(c=>c.id===id);'+inline[1].slice(a,b)+';return {t,draftOfferResponse,draftWithdraw};})()');
+const c={id:1,player:{pos:'SP'},type:'高校生',preferredTeam:1,preference:'育成',strength:3,threshold:43,overseas:false,status:'rights'};
+const p={teamId:1,candidateId:1,status:'rights'},d={year:2027,candidates:[c]};
+assert(api.draftOfferResponse(d,p,1,'develop'));assert.equal(p.status,'signed');assert.equal(api.t.cash,9.84);
+assert(!api.draftOfferResponse(d,p,1,'develop'));assert.equal(api.t.cash,9.84);
+const foreign={...c,id:2,preferredTeam:8,preference:'なし',overseas:true,threshold:69,status:'rights'};
+const rejected={teamId:1,candidateId:2,status:'rights'};d.candidates.push(foreign);
+for(let i=0;i<3;i++)assert(api.draftOfferResponse(d,rejected,2,'develop'));
+assert.equal(rejected.status,'refused');assert.equal(api.t.cash,9.84);
+assert.match(html,/function draftConfirmModal\(/);
+console.log('PASS: acceptance, refusal, no duplicate fees, and draft confirmation hooks');
+}

@@ -1499,6 +1499,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .draft-room .edition-actions{align-items:center}
 @media(prefers-reduced-motion:no-preference){.draft-stage-head{animation:room-enter .45s both}.draft-draw-result.contested{animation:room-enter .55s both}}
 @media(prefers-reduced-motion:reduce){.draft-stage-head,.draft-draw-result.contested{animation:none}}
+
+.draft-lottery-feature{position:relative;isolation:isolate;overflow:hidden;margin:10px 0 15px;padding:20px 8px;text-align:center;border:1px solid #e6c67d;border-radius:13px;background:radial-gradient(ellipse at top,#8d713a65,transparent 65%),#111e31}
+.draft-lottery-feature[data-won=false]{border-color:#71839b;background:#17253a}
+.draft-lottery-feature>small{color:#e5c579;letter-spacing:3px;font-weight:900}
+.draft-lottery-emblem{margin:15px auto;display:grid;place-items:center}
+.draft-lottery-emblem .logo{width:72px;height:72px;font-size:31px}
+.draft-lottery-feature h2{font-size:clamp(25px,7vw,36px);color:#f3d480;margin:8px 0}
+.draft-lottery-feature[data-won=false] h2{color:#e5edf8}
+.draft-lottery-name{display:flex;justify-content:center;align-items:center;gap:9px;font-size:21px;color:#fff}
+.draft-lottery-feature p{color:#cad6e5;font-size:15px}
+.draft-lottery-feature::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(115deg,transparent 25%,#f7d98b30 48%,transparent 70%);background-size:230% 100%;pointer-events:none}
+@media(prefers-reduced-motion:no-preference){.draft-lottery-feature[data-won=true]{animation:room-enter .7s both}.draft-lottery-feature[data-won=true]::after{animation:report-sheen 4s ease-in-out infinite}.draft-lottery-feature[data-won=true] .draft-lottery-emblem{animation:room-enter .9s both}}
+@media(prefers-reduced-motion:reduce){.draft-lottery-feature,.draft-lottery-feature::after,.draft-lottery-emblem{animation:none!important}}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -2704,13 +2717,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       localStorage.setItem('pennant_lab_v02_active',String(slot));
       buildFresh();ensureGameExtras();
       ui.selectedTeam=2;ui.setupLeague='E';ui.page='setup';
-      ui.playerDetail=null;ui.decadeYear=null;ui.decadeSection=null;ui.tab='hq';render();window.scrollTo(0,0);return;
+      ui.playerDetail=null;ui.decadeYear=null;ui.decadeSection=null;ui.draftConfirm=null;ui.draftFilter='all';ui.draftPage=0;ui.draftDetail=null;ui.tab='hq';render();window.scrollTo(0,0);return;
     }else{showToast('このスロットにデータがありません',true);return;}
     activeSlot=slot;
     localStorage.setItem('pennant_lab_v02_active',String(slot));
     ui.page=game.started?'game':'setup';
     ui.selectedTeam=game.selectedId??2;
-    ui.playerDetail=null;ui.decadeYear=null;ui.decadeSection=null;ui.tab='hq';render();window.scrollTo(0,0);
+    ui.playerDetail=null;ui.decadeYear=null;ui.decadeSection=null;ui.draftConfirm=null;ui.draftFilter='all';ui.draftPage=0;ui.draftDetail=null;ui.tab='hq';render();window.scrollTo(0,0);
   }
   function pushNews(message,date=calendarNextDay()?.date||null){game.news.unshift(message);game.news=game.news.slice(0,65);(game.newsArchive||(game.newsArchive=[])).push({year:game.year,day:game.day,date,text:message});}
   function lineUpOf(t){repairTeam(t);return t.lineup.map(id=>getPlayer(id)).filter(Boolean);}
@@ -3384,7 +3397,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       p.growthAptitude=Object.fromEntries(seasonSkillKeys(p).map((k,i)=>[k,.65+((p.id*37+i*53)%81)/100]));
       p.trainFocus='balanced';p.expPoints=0;p.ssEligible=[];p.injuries=[];initCondition(p);
       game.players.push(p);count++;row.playerId=p.id;
-      if(t.id===game.selectedId)reveal.push({id:p.id,report:row.report,revealed:false});
+      if(t.id===game.selectedId)reveal.push({id:p.id,report:row.report,revealStage:0});
     }
     if(!game.draftHistory.some(x=>x.year===d.year))game.draftHistory.push(draftHistorySnapshot(d));
     game.pendingDraftReveal=reveal.length?{year:d.year,entries:reveal}:null;
@@ -3420,15 +3433,40 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const role=ui.draftRole==='chance'?'chance':'develop';
     return `<section class="panel draft-negotiation"><h3>入団交渉 · ${row.round}位指名</h3>${draftCard(d,c,true,false)}<p class="small">交渉 ${row.attempts||0}/3回 · ${h(row.feedback||'本人と代理人が条件を検討しています。')}</p><p class="small">球団資金：${fmtMoney(myTeam().cash)}</p><div class="chips"><button class="chip ${role==='develop'?'active':''}" data-action="draft-role" data-value="develop">育成重視</button><button class="chip ${role==='chance'?'active':''}" data-action="draft-role" data-value="chance">出場機会重視</button></div>${['抑えた条件','標準条件','好条件'].map((label,i)=>{const o=draftOffer(c,i,role);return `<button class="draft-offer" data-action="draft-offer" data-id="${row.candidateId}" data-value="${i}" ${myTeam().cash<o.fee+o.salary?'disabled':''}><b>${label}</b><span>契約金 ${fmtMoney(o.fee)} · 年俸 ${fmtSalary(o.salary)}</span></button>`;}).join('')}<button class="btn outline full" data-action="draft-withdraw" data-id="${row.candidateId}">交渉を打ち切る</button></section>`;
   }
+  function draftLotteryFeature(d,lot){
+    const r=lot?.results.find(x=>x.teams.includes(game.selectedId));if(!r)return '';
+    const c=draftCandidate(d,r.candidateId),won=r.winner===game.selectedId;
+    return `<section class="draft-lottery-feature" data-won="${won}"><small>${r.teams.length>1?'DRAFT LOTTERY':'SOLE NOMINATION'}</small><div class="draft-lottery-emblem">${teamBadge(getTeam(r.winner),'logo')}</div><h2>${won?'交渉権獲得！':'抽選の結果'}</h2><div class="draft-lottery-name">${c?draftPortrait(c,draftReport(d,myTeam(),c)):''}<strong>${h(r.name)}</strong></div><p>${r.teams.length}球団指名 · ${h(r.winnerName)}</p></section>`;
+  }
   function draftEventView(){
     const d=game.draft;if(!d)return '';
     const active=d.phase==='first'&&d.active.includes(game.selectedId)||d.phase==='later',lot=d.lotteries.at(-1);
     const subtitle=d.phase==='scout'?'指名前の最終調査':d.phase==='first'?'1巡目 · 同時指名':d.phase==='first-result'?'競合抽選結果':d.phase==='later'?d.round+'巡目 · 順番指名':d.phase==='negotiate'?'入団交渉':'指名終了';
-    return `<section class="draft-room draft-event"><header class="draft-stage-head"><small>PENNANT LAB · ${d.year}</small><div class="draft-stage-emblem">◆</div><h1>ドラフト会議</h1><p>${subtitle}</p></header>${d.phase==='scout'?`<button class="btn primary full" data-action="draft-start">指名会議を開始 ›</button>${draftScoutScreen()}`:d.phase==='first-result'?`<section class="draft-lottery"><small>1ST ROUND · DRAW ${lot.attempt}</small><h2>指名・抽選結果</h2>${lot.results.map(r=>`<article class="draft-draw-result ${r.teams.length>1?'contested':''}" data-own-club="${r.winner===game.selectedId}"><small>${r.teams.length>1?r.teams.length+'球団競合':'単独指名'}</small><h3>${h(r.name)}</h3><p>${h(r.teamNames.join(' / '))}</p><strong>交渉権獲得　${h(r.winnerName)}</strong></article>`).join('')||'<p>指名終了</p>'}<button class="btn primary full" data-action="draft-first-next">次の指名へ ›</button></section>`:d.phase==='first'||d.phase==='later'?`<section class="panel"><h3>${active?'自球団の指名':'他球団の再指名'}</h3>${active?`<p class="small">候補を選択してください。指名は交渉権の獲得です。</p><button class="btn outline full" data-action="draft-pass">この巡の指名を見送る</button>`: '<button class="btn primary full" data-action="draft-cpu-next">他球団の再指名を見る ›</button>'}</section>${active?draftList(d,true):''}<details class="panel"><summary>ここまでの指名結果</summary>${draftPickList(d)}</details>`:draftNegotiation(d)}<details class="panel"><summary>進行を任せる</summary><p class="small">残りの指名・抽選・入団交渉を球団方針に基づき自動処理します。</p><button class="btn outline full" data-action="draft-auto">残りを自動で進める</button></details></section>`;
+    return `<section class="draft-room draft-event"><header class="draft-stage-head"><small>PENNANT LAB · ${d.year}</small><div class="draft-stage-emblem">◆</div><h1>ドラフト会議</h1><p>${subtitle}</p></header>${d.phase==='scout'?`<button class="btn primary full" data-action="draft-start">指名会議を開始 ›</button>${draftScoutScreen()}`:d.phase==='first-result'?`<section class="draft-lottery"><small>1ST ROUND · DRAW ${lot.attempt}</small><h2>指名・抽選結果</h2>${draftLotteryFeature(d,lot)}${lot.results.map(r=>`<article class="draft-draw-result ${r.teams.length>1?'contested':''}" data-own-club="${r.winner===game.selectedId}"><small>${r.teams.length>1?r.teams.length+'球団競合':'単独指名'}</small><h3>${h(r.name)}</h3><p>${h(r.teamNames.join(' / '))}</p><strong>交渉権獲得　${h(r.winnerName)}</strong></article>`).join('')||'<p>指名終了</p>'}<button class="btn primary full" data-action="draft-first-next">次の指名へ ›</button></section>`:d.phase==='first'||d.phase==='later'?`<section class="panel"><h3>${active?'自球団の指名':'他球団の再指名'}</h3>${active?`<p class="small">候補を選択してください。指名は交渉権の獲得です。</p><button class="btn outline full" data-action="draft-pass">この巡の指名を見送る</button>`: '<button class="btn primary full" data-action="draft-cpu-next">他球団の再指名を見る ›</button>'}</section>${active?draftList(d,true):''}<details class="panel"><summary>ここまでの指名結果</summary>${draftPickList(d)}</details>`:draftNegotiation(d)}<details class="panel"><summary>進行を任せる</summary><p class="small">残りの指名・抽選・入団交渉を球団方針に基づき自動処理します。</p><button class="btn outline full" data-action="draft-auto">残りを自動で進める</button></details></section>`;
+  }
+  function draftConfirmation(action,id){
+    const d=game.draft,c=draftCandidate(d,id);
+    const specs={
+      'draft-choose':['この選手を指名しますか？',c?c.player.name+'（'+positionFull(c.player.pos)+'）の交渉権獲得を目指します。競合時は抽選となります。':''],
+      'draft-pass':['指名を見送りますか？','この巡の指名権を放棄します。次の巡には参加できます。'],
+      'draft-auto':['残りの進行を任せますか？','残りの指名・抽選・入団交渉を自動で実行します。契約金を支払う場合があります。確定後は戻せません。'],
+      'draft-withdraw':['交渉を打ち切りますか？','この選手は入団しません。交渉の再開はできません。'],
+      'draft-upgrade':['スカウトを強化しますか？','球団資金から3000万円を支払います。'],
+      'draft-reveal-close':['入団発表を終了しますか？','未確認の能力は通常の選手詳細で確認できるようになります。'],
+      'draft-finish':['ドラフトを終了しますか？','指名・交渉結果を確定して次のイベントへ進みます。']
+    };
+    return specs[action]||null;
+  }
+  function draftConfirmModal(){
+    const x=ui.draftConfirm;if(!x)return '';
+    return `<div class="overlay edition-exit-overlay" data-action="draft-confirm-cancel"><div class="dialog edition-exit-dialog" role="alertdialog" aria-modal="true" aria-labelledby="draft-confirm-title" data-stop="true"><h3 id="draft-confirm-title">${h(x.title)}</h3><p>${h(x.body)}</p><div class="edition-actions"><button class="btn outline" data-action="draft-confirm-cancel">キャンセル</button><button class="btn primary" data-action="draft-confirm-accept">確定 ›</button></div></div></div>`;
   }
   function draftRevealView(){
     const batch=game.pendingDraftReveal;
-    return `<section class="draft-room"><header class="draft-stage-head"><small>ROOKIE WELCOME · ${game.year}</small><h1>新人入団発表</h1><p>入団後の能力確認</p></header>${batch.entries.map(row=>{const p=getPlayer(row.id);if(!p)return '';return `<section class="panel"><div class="recruit-player">${row.revealed?faceMini(p,{overall:true}):draftPortrait({player:p},row.report)}<div class="recruit-identity"><strong>${h(p.name)}</strong><small>${h(p.draftInfo.school)} · ${p.draftInfo.round}位</small></div></div><div class="draft-abilities">${Object.entries(row.report.values).map(([k,v])=>`<div><small>${DRAFT_LABELS[k]}</small><b>${row.revealed?gradeBrief(p[k]):gradeBrief(v.low)+'〜'+gradeBrief(v.high)}</b><small>${row.revealed?p[k]:v.low+'–'+v.high}</small></div>`).join('')}</div>${row.revealed?'<p class="small">入団時能力を確認済み</p>':`<button class="btn primary full" data-action="draft-reveal" data-id="${p.id}">入団時能力を確認 ›</button>`}</section>`;}).join('')}<button class="btn primary full" data-action="draft-reveal-close">全員の確認を終えて次へ ›</button></section>`;
+    return `<section class="draft-room"><header class="draft-stage-head"><small>ROOKIE WELCOME · ${game.year}</small><h1>新人入団発表</h1><p>入団後の能力確認</p></header>${batch.entries.map(row=>{
+      const p=getPlayer(row.id);if(!p)return '';const stage=row.revealed?2:row.revealStage||0;
+      return `<section class="panel"><div class="recruit-player">${stage===2?faceMini(p,{overall:true}):draftPortrait({player:p},row.report)}<div class="recruit-identity"><strong>${h(p.name)}</strong><small>${h(p.draftInfo.school)} · ${p.draftInfo.round}位</small></div></div><p class="small">${['スカウト報告','基礎測定結果','入団時能力確定'][stage]}</p><div class="draft-abilities">${Object.entries(row.report.values).map(([k,v],i)=>{const known=stage===2||stage===1&&i<2;return `<div><small>${DRAFT_LABELS[k]}</small><b>${known?gradeBrief(p[k]):gradeBrief(v.low)+'〜'+gradeBrief(v.high)}</b><small>${known?p[k]:v.low+'–'+v.high}</small></div>`;}).join('')}</div>${stage===2?'<p class="small">入団時能力を確認済み</p>':`<button class="btn primary full" data-action="draft-reveal" data-id="${p.id}">${stage===0?'基礎測定結果を確認':'残りの能力を確認'} ›</button>`}</section>`;
+    }).join('')}<button class="btn primary full" data-action="draft-reveal-close">入団発表を終了して次へ ›</button></section>`;
   }
   function draftHistoryScreen(){
     const history=(game.draftHistory||[]).slice().sort((a,b)=>b.year-a.year);
@@ -4755,11 +4793,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const screens={hq:frontOfficeScreen,team:teamScreen,roster:rosterScreen,business:businessScreen,records:recordScreen,home:frontOfficeScreen,standings:standingsScreen,stats:statScreen,market:marketScreen,finance:financeScreen};
     if(game.financeCrisis){app.innerHTML=`<div class="app-shell" style="${clubThemeStyle(myTeam())}">${header()}<main class="main">${financeCrisisScreen()}</main></div>`;return;}
     if(!ui.busy&&!game.pendingEvent&&!game.pendingReview&&pendingMilestoneNews().length){app.innerHTML=`<div class="app-shell" style="${clubThemeStyle(myTeam())}">${header()}<main class="main">${milestoneNewsScreen()}</main></div>${editionExitModal()}`;return;}
-    if(game.pendingDraftReveal&&!ui.busy){app.innerHTML=`<div class="app-shell" style="${clubThemeStyle(myTeam())}">${header()}<main class="main">${draftRevealView()}</main></div>`;return;}
-    if(game.ceremonyStage==='draft'&&!ui.busy&&!eventIntroInfo()){app.innerHTML=`<div class="app-shell" style="${clubThemeStyle(myTeam())}">${header()}<main class="main">${draftEventView()}</main></div>`;return;}
+    if(game.pendingDraftReveal&&!ui.busy){app.innerHTML=`<div class="app-shell" style="${clubThemeStyle(myTeam())}">${header()}<main class="main">${draftRevealView()}</main></div>${draftConfirmModal()}`;return;}
+    if(game.ceremonyStage==='draft'&&!ui.busy&&!eventIntroInfo()){app.innerHTML=`<div class="app-shell" style="${clubThemeStyle(myTeam())}">${header()}<main class="main">${draftEventView()}</main></div>${draftConfirmModal()}`;return;}
     if(game.pendingDecade!=null&&!ui.busy){app.innerHTML=`<div class="app-shell" style="${clubThemeStyle(myTeam())}">${header()}<main class="main">${decadeView(game.pendingDecade,true)}</main></div>${editionExitModal()}`;return;}
     const eventIntro=eventIntroInfo();
-    app.innerHTML=`<div class="app-shell ${ui.busy&&ui.autoDay&&!ui.dateIntro?'auto-tappable':''}" style="${clubThemeStyle(myTeam())}">${header()}<main class="main">${eventIntro?eventIntroScreen(eventIntro):game.pendingEvent?injuryAlertScreen():game.pendingReview?matchReviewScreen():ui.autoDay?(ui.dateIntro?calendarDateIntroScreen(ui.autoDay):ui.autoDay.type==='game'?dailyGameScreen(ui.autoDay):dailyNewsScreen(ui.autoDay)):game.pendingMonth?monthlyReviewScreen():ui.monthHistory?monthlyReviewScreen(true):(ui.playerDetail!=null?playerDetails():(screens[ui.tab]||frontOfficeScreen)())}</main>${eventIntro||game.pendingEvent||game.pendingReview||game.pendingMonth||ui.autoDay||ui.monthHistory?'':navbar()}</div>${ui.confirm?.type==='switch'?teamSwitchModal():confirmModal()}${game.pendingReview?'':resultModal()}${editionExitModal()}${ui.busy&&!ui.autoDay?`<div class="calendar-running"><strong>${getDayText()}</strong><small>${game.day}/143試合</small><button class="btn outline" data-action="pause-calendar">一時停止</button></div>`:''}${ui.busy&&ui.autoDay&&!ui.dateIntro&&ui.autoPaused?'<div class="auto-paused-toolbar" role="group" aria-label="一時停止中の操作"><span>⏸ 一時停止中</span><div class="auto-paused-actions"><button class="btn primary sm" data-action="pause-calendar">▶ 再開</button><button class="btn outline sm" data-action="auto-return-hq">⌂ 本部に戻る</button></div></div>':''}<input id="import-save-file" type="file" accept=".json,application/json" hidden>`;
+    app.innerHTML=`<div class="app-shell ${ui.busy&&ui.autoDay&&!ui.dateIntro?'auto-tappable':''}" style="${clubThemeStyle(myTeam())}">${header()}<main class="main">${eventIntro?eventIntroScreen(eventIntro):game.pendingEvent?injuryAlertScreen():game.pendingReview?matchReviewScreen():ui.autoDay?(ui.dateIntro?calendarDateIntroScreen(ui.autoDay):ui.autoDay.type==='game'?dailyGameScreen(ui.autoDay):dailyNewsScreen(ui.autoDay)):game.pendingMonth?monthlyReviewScreen():ui.monthHistory?monthlyReviewScreen(true):(ui.playerDetail!=null?playerDetails():(screens[ui.tab]||frontOfficeScreen)())}</main>${eventIntro||game.pendingEvent||game.pendingReview||game.pendingMonth||ui.autoDay||ui.monthHistory?'':navbar()}</div>${ui.confirm?.type==='switch'?teamSwitchModal():confirmModal()}${game.pendingReview?'':resultModal()}${editionExitModal()}${draftConfirmModal()}${ui.busy&&!ui.autoDay?`<div class="calendar-running"><strong>${getDayText()}</strong><small>${game.day}/143試合</small><button class="btn outline" data-action="pause-calendar">一時停止</button></div>`:''}${ui.busy&&ui.autoDay&&!ui.dateIntro&&ui.autoPaused?'<div class="auto-paused-toolbar" role="group" aria-label="一時停止中の操作"><span>⏸ 一時停止中</span><div class="auto-paused-actions"><button class="btn primary sm" data-action="pause-calendar">▶ 再開</button><button class="btn outline sm" data-action="auto-return-hq">⌂ 本部に戻る</button></div></div>':''}<input id="import-save-file" type="file" accept=".json,application/json" hidden>`;
   }
   function showToast(message,error=false){
     document.querySelector('.message')?.remove();
@@ -4818,7 +4856,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       if(act==='news-year'||act==='news-edition-open')ui.newsYear=Number(b.dataset.year);
       ui.newsEdition=act==='news-edition-open'?b.dataset.date:null;ui.newsMedium='news';render();window.scrollTo(0,0);return;
     }
-    if(act==='business-sub'){ui.clubDraft=null;ui.businessSub=b.dataset.sub;ui.managerEntry=b.dataset.sub==='manager';render();return}
+    if(act==='business-sub'){ui.clubDraft=null;ui.draftFilter='all';ui.draftPage=0;ui.draftDetail=null;ui.businessSub=b.dataset.sub;ui.managerEntry=b.dataset.sub==='manager';render();return}
     if(act==='player-detail'){ui.playerDetail=Number(b.dataset.id);ui.playerDetailTab='abilities';render();window.scrollTo(0,0);return}
     if(act==='book-mode'){ui.bookMode=b.dataset.mode;ui.bookPage=0;render();return;}
     if(act==='book-page'){ui.bookPage=Math.max(0,(ui.bookPage||0)+(b.dataset.step==='-1'?-1:1));render();window.scrollTo(0,0);return;}
@@ -5532,6 +5570,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   document.addEventListener('click',e=>{
     const el=e.target.closest('[data-action]');if(!el)return;
     let action=el.dataset.action;
+    let draftConfirmed=false, draftData=el.dataset;
+    if(ui.draftConfirm){
+      e.preventDefault();e.stopImmediatePropagation();
+      if(action==='draft-confirm-cancel'){if(el.classList?.contains('edition-exit-overlay')&&e.target.closest('[data-stop]'))return;ui.draftConfirm=null;render();return;}
+      if(action!=='draft-confirm-accept')return;
+      draftData=ui.draftConfirm.data;action=draftData.action;ui.draftConfirm=null;draftConfirmed=true;
+    }else if(action==='draft-confirm-cancel'||action==='draft-confirm-accept')return;
     let exitConfirmed=false;
     if(ui.editionExit){
       e.preventDefault();e.stopImmediatePropagation();
@@ -5568,22 +5613,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(ui.page==='game'&&!ui.busy&&action.startsWith('draft-')){
       e.preventDefault();e.stopImmediatePropagation();
       if(storageFailure||game.pendingEvent||game.pendingReview||game.pendingMonth||game.financeCrisis)return;
+      const confirmation=draftConfirmation(action,Number(draftData.id));
+      const atEvent=game.ceremonyStage==='draft'&&!eventIntroInfo(),atScout=ui.tab==='business'&&ui.businessSub==='scout'&&!game.ceremonyStage;
+      if(confirmation&&!draftConfirmed&&(game.pendingDraftReveal&&action==='draft-reveal-close'||atEvent||atScout&&action==='draft-upgrade')){ui.draftConfirm={title:confirmation[0],body:confirmation[1],data:{...draftData,action}};render();return;}
       if(game.pendingDraftReveal){
         const batch=game.pendingDraftReveal;
-        if(action==='draft-reveal'){const row=batch.entries.find(x=>x.id===Number(el.dataset.id));if(row)row.revealed=true;}
+        if(action==='draft-reveal'){const row=batch.entries.find(x=>x.id===Number(draftData.id));if(row)row.revealStage=Math.min(2,(row.revealStage||0)+1);}
         else if(action==='draft-reveal-close')game.pendingDraftReveal=null;else return;
         save();render();return;
       }
       const event=game.ceremonyStage==='draft'&&!eventIntroInfo(),scout=ui.tab==='business'&&ui.businessSub==='scout'&&!game.ceremonyStage;
       if(!event&&!scout)return;
-      const d=ensureDraft(),id=Number(el.dataset.id),c=draftCandidate(d,id),t=myTeam();
+      const d=ensureDraft(),id=Number(draftData.id),c=draftCandidate(d,id),t=myTeam();
       if(action==='draft-init'){}
-      else if(action==='draft-filter'){ui.draftFilter=el.dataset.value;ui.draftPage=0;ui.draftDetail=null;}
-      else if(action==='draft-page'){ui.draftPage=Math.max(0,(ui.draftPage||0)+Number(el.dataset.step));ui.draftDetail=null;}
+      else if(action==='draft-filter'){ui.draftFilter=draftData.value;ui.draftPage=0;ui.draftDetail=null;}
+      else if(action==='draft-page'){ui.draftPage=Math.max(0,(ui.draftPage||0)+Number(draftData.step));ui.draftDetail=null;}
       else if(action==='draft-detail'){ui.draftDetail=ui.draftDetail===id?null:id;}
       else if(action==='draft-research'){if(c?.status==='available'&&draftResearchUsed(d,t)<12&&draftResearchLevel(d,t,c)<3){d.research[t.id]??={};d.research[t.id][id]=draftResearchLevel(d,t,c)+1;}}
       else if(action==='draft-upgrade'){const level=draftScoutProfile(t).level;if((!event||d.phase==='scout')&&level<5&&t.cash>=.3){t.cash=r2(t.cash-.3);t.scoutLevel=level+1;}}
-      else if(action==='draft-strategy'){if(['balanced','youth','ready'].includes(el.dataset.value))t.draftStrategy=el.dataset.value;}
+      else if(action==='draft-strategy'){if(['balanced','youth','ready'].includes(draftData.value))t.draftStrategy=draftData.value;}
       else if(!event)return;
       else if(action==='draft-start'){draftStart(d);ui.draftDetail=null;ui.draftPage=0;}
       else if(action==='draft-choose'||action==='draft-pass'||action==='draft-cpu-next'){
@@ -5593,11 +5641,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         ui.draftDetail=null;ui.draftPage=0;
       }
       else if(action==='draft-first-next')draftNextFirst(d);
-      else if(action==='draft-role')ui.draftRole=el.dataset.value==='chance'?'chance':'develop';
+      else if(action==='draft-role')ui.draftRole=draftData.value==='chance'?'chance':'develop';
       else if(action==='draft-offer'||action==='draft-withdraw'){
         if(d.phase!=='negotiate')return;
         const row=d.picks.find(x=>x.teamId===t.id&&x.candidateId===id&&x.status==='rights');if(!row)return;
-        if(action==='draft-withdraw')draftWithdraw(d,row);else if([0,1,2].includes(Number(el.dataset.value)))draftOfferResponse(d,row,Number(el.dataset.value),ui.draftRole==='chance'?'chance':'develop');
+        if(action==='draft-withdraw')draftWithdraw(d,row);else if([0,1,2].includes(Number(draftData.value)))draftOfferResponse(d,row,Number(draftData.value),ui.draftRole==='chance'?'chance':'develop');
       }
       else if(action==='draft-auto')draftAuto(d);
       else if(action==='draft-finish'){
