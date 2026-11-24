@@ -1976,6 +1976,22 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .campus-stage{color:#e9c878;font-size:12px;font-weight:800;margin:10px 0 0}
 .campus-max-aura{animation:campusPulse 2.8s ease-in-out infinite}
 @media(prefers-reduced-motion:reduce){.campus-max-aura{animation:none}}
+
+.campus-map .campus-pin{border-color:var(--facility-accent,#c6bc95)!important;background:linear-gradient(145deg,#1b3146,#071926)!important;box-shadow:0 2px 5px #061a16aa}
+.campus-map .campus-pin b{color:var(--facility-accent,#e1c47e)!important}
+.campus-map .campus-pin[aria-pressed=true]{background:linear-gradient(135deg,#254d42,#132f35)!important;border:2px solid #ffe39b!important;box-shadow:0 0 12px #ffe296b0}
+.infra-stage-bar{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:3px;margin:9px 0 6px}
+.infra-stage-bar i{height:8px;border-radius:3px;background:#344759;border:1px solid #536578}
+.infra-stage-bar i:nth-child(5n){border-right:2px solid #d5c191}
+.infra-stage-bar i:nth-child(n+16){border-color:#a88a53}
+.infra-stage-bar i.on{background:var(--seg);border-color:var(--seg)}
+.infra-stage-line{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:9px 0 0;font-size:12px;color:#c5d1da}
+.infra-stage-line b{color:var(--facility-accent);font-size:12px}
+.scout-infra-link{margin-top:12px!important;border-color:var(--facility-accent,#c5a96b)!important}
+.scout-infra-summary{padding:11px 0 2px;border-top:1px solid #6f879244}
+.scout-budget-caption{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:#a9c4ce;margin-top:12px}
+.draft-scout-person .manager-portrait{border:2px solid var(--facility-accent,#9ab3bf)!important}
+.campus-detail-dialog .campus-preview{width:130px;max-width:38%}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -4513,7 +4529,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(report)return foreignReportView(m,t,report);
     const list=(m?.candidates||[]).filter(c=>scoutVisible(c)&&c.status==='available'&&(filter==='all'||(filter==='pitch'?isPitch(c.player):!isPitch(c.player))));
     const page=Math.max(0,Math.min(Math.ceil(list.length/12)-1,ui.foreignPage||0));
-    return `<section class="draft-room foreign-market"><header class="foreign-scout-hero"><small>GLOBAL SCOUTING · ${game.year}</small><div class="foreign-globe" aria-hidden="true">◎</div><h2>海外スカウト</h2><p>世界の野球市場から、新たな戦力を探す。</p></header>${conv&&c?foreignNegotiationView(m,t,c,conv):`<section class="panel scout-office">${draftScoutFace(t,'foreign')}<p class="small">海外候補の発掘速度・調査精度を強化。新人スカウトとは別育成。</p>${infraControls(t,'foreign','foreign-upgrade')}</section><section class="panel"><h3>助っ人外国人候補</h3><p class="small">国内ドラフトとは独立した獲得ルート。支配下 ${own(t).length}/${ROSTER_MAX}人 · 獲得時に空き枠が必要です。</p>${m?`<div class="foreign-market-metrics"><b>発掘済み ${m.candidates.filter(scoutVisible).length} / ${m.candidates.length}名</b><span>${new Set(m.candidates.filter(scoutVisible).map(c=>c.country)).size}か国・地域</span><span>追加調査 ${Math.max(0,foreignBudget(t)-foreignUsed(m,t))}回残り</span></div>`:'<button class="btn primary full" data-action="foreign-init">海外候補を発掘する ›</button>'}</section>${m?`<div class="draft-filters">${[['all','全員'],['pitch','投手'],['bat','野手']].map(([k,v])=>`<button class="chip ${filter===k?'active':''}" data-action="foreign-filter" data-value="${k}">${k==='pitch'?positionMarkup('P',v):h(v)}</button>`).join('')}</div><p class="small">${list.length}名 · 獲得可能候補</p><div class="recruit-list">${list.slice(page*12,page*12+12).map(c=>foreignCard(m,c,t)).join('')||'<p>候補がいません。</p>'}</div><div class="edition-actions"><button class="btn outline" data-action="foreign-page" data-step="-1" ${page===0?'disabled':''}>‹ 前へ</button><span>${page+1}/${Math.max(1,Math.ceil(list.length/12))}</span><button class="btn outline" data-action="foreign-page" data-step="1" ${(page+1)*12>=list.length?'disabled':''}>次へ ›</button></div>`:''}`}</section>`;
+    return `<section class="draft-room foreign-market"><header class="foreign-scout-hero"><small>GLOBAL SCOUTING · ${game.year}</small><div class="foreign-globe" aria-hidden="true">◎</div><h2>海外スカウト</h2><p>世界の野球市場から、新たな戦力を探す。</p></header>${conv&&c?foreignNegotiationView(m,t,c,conv):`<section class="panel scout-office">${draftScoutFace(t,'foreign')}<p class="small">海外候補の発掘速度・調査精度を強化。新人スカウトとは別育成。</p>${scoutInfraSummary(t,'foreign')}</section><section class="panel"><h3>助っ人外国人候補</h3><p class="small">国内ドラフトとは独立した獲得ルート。支配下 ${own(t).length}/${ROSTER_MAX}人 · 獲得時に空き枠が必要です。</p>${m?`<div class="foreign-market-metrics"><b>発掘済み ${m.candidates.filter(scoutVisible).length} / ${m.candidates.length}名</b><span>${new Set(m.candidates.filter(scoutVisible).map(c=>c.country)).size}か国・地域</span><span>追加調査 ${Math.max(0,foreignBudget(t)-foreignUsed(m,t))}回残り</span></div>`:'<button class="btn primary full" data-action="foreign-init">海外候補を発掘する ›</button>'}</section>${m?`<div class="draft-filters">${[['all','全員'],['pitch','投手'],['bat','野手']].map(([k,v])=>`<button class="chip ${filter===k?'active':''}" data-action="foreign-filter" data-value="${k}">${k==='pitch'?positionMarkup('P',v):h(v)}</button>`).join('')}</div><p class="small">${list.length}名 · 獲得可能候補</p><div class="recruit-list">${list.slice(page*12,page*12+12).map(c=>foreignCard(m,c,t)).join('')||'<p>候補がいません。</p>'}</div><div class="edition-actions"><button class="btn outline" data-action="foreign-page" data-step="-1" ${page===0?'disabled':''}>‹ 前へ</button><span>${page+1}/${Math.max(1,Math.ceil(list.length/12))}</span><button class="btn outline" data-action="foreign-page" data-step="1" ${(page+1)*12>=list.length?'disabled':''}>次へ ›</button></div>`:''}`}</section>`;
   }
   function draftScoutProfile(t){return {level:Math.max(1,Math.min(20,Math.round(t.scoutLevel||2))),strategy:['balanced','youth','ready'].includes(t.draftStrategy)?t.draftStrategy:['balanced','youth','ready'][t.id%3]};}
   function ensureDraft(){
@@ -4623,8 +4639,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function draftScoutCost(level){return [0,.15,.25,.40,.60,.85,1.15,1.55,2.05,2.70,3.50,4.50,5.80,7.40,9.50,15,22,32,46,65][level]||0;}
   function draftScoutBudget(t){return 9+draftScoutProfile(t).level;}
   function draftScoutFace(t,route='draft'){
-    const lv=scoutLevelFor(route,t),tier=Math.min(5,Math.ceil(lv/3)),names=route==='foreign'?['海外担当','海外地域担当','海外主任','海外統括','海外チーフスカウト']:['新人スカウト','地域担当','主任スカウト','全国統括','チーフスカウト'];
-    return `<div class="draft-scout-person" data-level="${tier}"><span class="manager-portrait">${renderFaceArtwork({id:(route==='foreign'?91000:81000)+t.id*13,age:28+tier*5,pos:'OF',teamId:t.id},{role:'manager',scoutLevel:lv})}</span><div><small>SCOUTING STAFF</small><strong>${names[tier-1]} · Lv.${lv} / 20</strong><span class="scout-stars">${'★'.repeat(tier)}${'☆'.repeat(5-tier)}${lv>15?' · ELITE':''}</span></div></div>`;
+    const lv=scoutLevelFor(route,t),tier=campusTier(lv),names=route==='foreign'?['海外担当','海外地域担当','海外主任','海外統括','国際スカウト統括','海外最高責任者']:['新人スカウト','地域担当','全国統括','国内統括','国際水準スカウト','最高責任者'];
+    return '<div class="draft-scout-person" data-level="'+(tier+1)+'" style="--facility-accent:'+CAMPUS_PALETTES[tier].accent+'"><span class="manager-portrait">'+renderFaceArtwork({id:(route==='foreign'?91000:81000)+t.id*13,age:38,pos:'OF',teamId:t.id},{role:'manager',scoutLevel:lv})+'</span><div><small>SCOUTING STAFF</small><strong>'+names[tier]+'</strong><span class="small">スカウト体制 Lv.'+lv+' / 20</span></div></div>';
   }
   function draftReport(d,t,c){
     const profile=draftScoutProfile(t),research=draftResearchLevel(d,t,c),p=c.player;
@@ -4998,7 +5014,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function draftScoutScreen(inEvent=false){
     const d=game.draft?.year===game.year?ensureScoutSchedule(game.draft,'draft'):null;if(!d)return '<section class="panel"><h3>新人スカウト</h3><button class="btn primary full" data-action="draft-init">今年の候補を調査する</button></section>';
     const t=myTeam(),profile=draftScoutProfile(t);
-    return `<section class="draft-room">${inEvent?'':`<header class="draft-stage-head"><small>SCOUTING OFFICE · ${game.year}</small><h2>新人スカウト</h2></header>`}<section class="panel scout-office"><div class="scout-office-window"><small>PLAYER DEVELOPMENT & SCOUTING</small><b>スカウト室</b><span>FIELD / VIDEO / INTERVIEW</span></div>${draftScoutFace(t)}<p class="small">発掘速度・調査精度・面談情報を強化。年間調査枠：${draftScoutBudget(t)}回（残り${draftScoutBudget(t)-draftResearchUsed(d,t)}回）</p><p class="small">発掘済み ${d.candidates.filter(scoutVisible).length}名 / 年間候補 ${d.candidates.length}名 · 日程進行で候補を追加発掘</p><div class="scout-budget-track">${Array.from({length:draftScoutBudget(t)},(_,i)=>`<i data-used="${i<draftResearchUsed(d,t)}"></i>`).join('')}</div><p class="tiny">視察・分析・面談はそれぞれ1枠。目的に応じて使い分けてください。</p>${infraControls(t,'draft','draft-upgrade')}<div class="chips">${[['balanced','バランス'],['youth','将来性'],['ready','即戦力']].map(([k,v])=>`<button class="chip ${profile.strategy===k?'active':''}" data-action="draft-strategy" data-value="${k}">${v}</button>`).join('')}</div><p class="tiny">自動指名時の球団方針。手動指名は自由です。</p></section>${draftList(d)}</section>`;
+    return `<section class="draft-room">${inEvent?'':`<header class="draft-stage-head"><small>SCOUTING OFFICE · ${game.year}</small><h2>新人スカウト</h2></header>`}<section class="panel scout-office"><div class="scout-office-window"><small>PLAYER DEVELOPMENT & SCOUTING</small><b>スカウト室</b><span>FIELD / VIDEO / INTERVIEW</span></div>${draftScoutFace(t)}<p class="small">発掘速度・調査精度・面談情報を強化。年間調査枠：${draftScoutBudget(t)}回（残り${draftScoutBudget(t)-draftResearchUsed(d,t)}回）</p><p class="small">発掘済み ${d.candidates.filter(scoutVisible).length}名 / 年間候補 ${d.candidates.length}名 · 日程進行で候補を追加発掘</p><div class="scout-budget-caption"><span>年間調査枠の残量（施設Lvとは別）</span><span>${Math.max(0,draftScoutBudget(t)-draftResearchUsed(d,t))} / ${draftScoutBudget(t)}回</span></div><div class="scout-budget-track">${Array.from({length:draftScoutBudget(t)},(_,i)=>`<i data-used="${i<draftResearchUsed(d,t)}"></i>`).join('')}</div><p class="tiny">視察・分析・面談はそれぞれ1枠。目的に応じて使い分けてください。</p>${scoutInfraSummary(t,'draft')}<div class="chips">${[['balanced','バランス'],['youth','将来性'],['ready','即戦力']].map(([k,v])=>`<button class="chip ${profile.strategy===k?'active':''}" data-action="draft-strategy" data-value="${k}">${v}</button>`).join('')}</div><p class="tiny">自動指名時の球団方針。手動指名は自由です。</p></section>${draftList(d)}</section>`;
   }
 
   function draftNegotiation(d){
@@ -8453,6 +8469,18 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const CAMPUS_LOTS={stadium:[19,48,361,245],training:[437,66,702,240],medical:[67,316,293,478],indoor:[466,316,674,478],draft:[67,556,293,722],foreign:[466,556,674,722]};
   const CAMPUS_STAGES=['小規模・最低限の設備','標準的なプロ球団施設','大規模・最新鋭設備','国内最高峰の施設','世界最高水準の施設','最高峰・専用デザイン'];
   function campusTier(lv){return lv>=20?5:lv>=16?4:lv>=15?3:lv>=10?2:lv>=5?1:0;}
+  const CAMPUS_PALETTES=[
+    {accent:'#c1ad8b',front:'#c8b69a',side:'#887e6d',roof:'#777268',hi:'#e4d3b7',glass:'#68858e',shade:'#42545a'},
+    {accent:'#79c3a7',front:'#e2e8dc',side:'#75999c',roof:'#367d78',hi:'#eff1df',glass:'#80b6bd',shade:'#244c5d'},
+    {accent:'#75b7ed',front:'#b5d4e6',side:'#416e93',roof:'#345b83',hi:'#e8f3f2',glass:'#60a5d0',shade:'#193e65'},
+    {accent:'#e3ba66',front:'#f0e6c5',side:'#344c6c',roof:'#27425f',hi:'#fff2cc',glass:'#8db5cd',shade:'#142c4b'},
+    {accent:'#bca9ed',front:'#c6c9e1',side:'#3d456d',roof:'#43466f',hi:'#eef1fc',glass:'#9ebee9',shade:'#272a52'},
+    {accent:'#ffda75',front:'#e7ca83',side:'#29374d',roof:'#ac8240',hi:'#fff3be',glass:'#a6d6e8',shade:'#122439'}
+  ];
+  function campusLevelBar(lv){return '<div class="infra-stage-bar" role="img" aria-label="施設レベル '+lv+' / 20">'+Array.from({length:20},(_,i)=>'<i class="'+(i<lv?'on':'')+'" style="--seg:'+CAMPUS_PALETTES[campusTier(i+1)].accent+'"></i>').join('')+'</div>';}
+  function campusStageLine(lv){return '<div class="infra-stage-line" style="--facility-accent:'+CAMPUS_PALETTES[campusTier(lv)].accent+'"><span>施設グレード</span><b>'+CAMPUS_STAGES[campusTier(lv)]+'</b></div>';}
+  function scoutInfraSummary(t,key){const lv=infraLevel(t,key);return '<div class="scout-infra-summary" style="--facility-accent:'+CAMPUS_PALETTES[campusTier(lv)].accent+'"><div class="infra-stage-line"><span>スカウト体制</span><b>Lv.'+lv+' / 20</b></div>'+campusLevelBar(lv)+campusStageLine(lv)+'<p class="small">年間維持費 '+fmtMoney(infraUpkeep(lv))+'</p>'+(game.pendingEvent?'':'<button class="btn outline full scout-infra-link" data-action="campus-from-scout" data-value="'+key+'">球団施設・設備管理で強化・縮小 ›</button>')+'</div>';}
+
   function campusRoadDistance(x,y){
     return Math.min(...CAMPUS_ROADS.map(([a,b])=>{const dx=b[0]-a[0],dy=b[1]-a[1],u=Math.max(0,Math.min(1,((x-a[0])*dx+(y-a[1])*dy)/(dx*dx+dy*dy)));return Math.hypot(x-a[0]-u*dx,y-a[1]-u*dy);}));
   }
@@ -8633,13 +8661,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const descriptions={...Object.fromEntries(Object.entries(FARM_FACILITIES).map(([k,v])=>[k,v[1]])),draft:'新人候補の発掘速度・調査精度・年間調査枠',foreign:'海外候補の発掘速度・調査精度・年間調査枠'};
     const preview='<svg class="campus-preview" viewBox="-170 -120 340 235" aria-hidden="true">'+campusBuilding(selected,lv||1)+'</svg>';
     let detail='<div class="row" style="align-items:center;gap:12px">'+preview+'<div style="flex:1;min-width:0"><div class="eyebrow">'+(selected==='stadium'?'HOME STADIUM':selected==='draft'||selected==='foreign'?'SCOUTING OFFICE':'PLAYER DEVELOPMENT')+'</div><h3>'+h(selected==='stadium'?'メイン球場':INFRA_LABELS[selected])+'</h3><p class="small">'+h(descriptions[selected]||'球団の本拠地。球場設備の強化は球団経営の拡張で追加予定。')+'</p>'+(lv?'<b class="infra-lv">Lv.'+lv+' / 20'+(lv<20?'　›　Lv.'+(lv+1):'　MAX')+'</b>':'')+'</div></div>';
-    if(lv){detail+='<p class="campus-stage">'+CAMPUS_STAGES[campusTier(lv)]+(lv===20?' ◆':'')+'</p><div class="farm-level" aria-label="レベル '+lv+' / 20">'+Array.from({length:20},(_,i)=>'<i class="'+(i<lv?'on':'')+(i>=15?' elite':'')+'"></i>').join('')+'</div>'+infraControls(t,selected,'infra-upgrade');}
+    if(lv){detail+=campusStageLine(lv)+campusLevelBar(lv)+infraControls(t,selected,'infra-upgrade');}
     return detail;
   }
   function infraManagementScreen(t){
     const selected=Object.hasOwn(CAMPUS_LAYOUT,campusSelected)?campusSelected:'indoor',lv=selected==='stadium'?null:infraLevel(t,selected),fx=campusEffect;
     const annual=infraAnnual(t),net=infraForecast(t),f=game.infrastructureFinance?.year===game.year?game.infrastructureFinance.clubs[t.id]:null;
-    const pin=Object.entries(CAMPUS_LAYOUT).map(([k,p])=>'<button class="campus-hit" aria-hidden="true" tabindex="-1" data-action="campus-select" data-value="'+k+'" style="left:'+p.x/7.6+'%;top:'+p.y/7.5+'%;width:'+p.w/7.6+'%;height:'+p.h/7.5+'%"></button><button class="campus-pin" data-action="campus-select" data-value="'+k+'" aria-haspopup="dialog" aria-pressed="'+(selected===k)+'" style="left:'+p.x/7.6+'%;top:'+p.labelY/7.5+'%">'+p.label+'<b>'+(k==='stadium'?'本拠地':'Lv.'+infraLevel(t,k))+'</b></button>').join('');
+    const pin=Object.entries(CAMPUS_LAYOUT).map(([k,p])=>'<button class="campus-hit" aria-hidden="true" tabindex="-1" data-action="campus-select" data-value="'+k+'" style="left:'+p.x/7.6+'%;top:'+p.y/7.5+'%;width:'+p.w/7.6+'%;height:'+p.h/7.5+'%"></button><button class="campus-pin" data-action="campus-select" data-value="'+k+'" aria-haspopup="dialog" aria-pressed="'+(selected===k)+'" style="--facility-accent:'+(k==='stadium'?'#d7bd80':CAMPUS_PALETTES[campusTier(infraLevel(t,k))].accent)+';left:'+p.x/7.6+'%;top:'+p.labelY/7.5+'%">'+p.label+'<b>'+(k==='stadium'?'本拠地':'Lv.'+infraLevel(t,k))+'</b></button>').join('');
     return '<section class="panel campus-panel"><div class="campus-head"><div class="eyebrow">CLUB CAMPUS</div><h2>球団施設・設備管理</h2><div class="small">保有資金 <b style="color:#f7cf79">'+fmtMoney(t.cash)+'</b>　年間維持費 '+fmtMoney(annual)+'</div></div><div class="campus-map">'+campusScene(t,selected,fx)+pin+(fx?'<div class="campus-map-result" role="status">'+h(INFRA_LABELS[fx.key])+'　'+(fx.to>fx.from?'LEVEL UP':'規模縮小')+'　Lv.'+fx.from+' → Lv.'+fx.to+'</div>':'')+'</div><p class="campus-legend">施設をタップして詳細・強化　｜　Lv.15 高難度 / Lv.20 最高峰</p></section><details class="panel campus-summary"><summary>投資・収支の詳細を見る</summary><div class="infra-metrics"><div><small>保有資金</small><b>'+fmtMoney(t.cash)+'</b></div><div><small>年間維持費合計</small><b>'+fmtMoney(annual)+'</b></div><div><small>今季の強化投資</small><b>'+fmtMoney(f?.investment||0)+'</b></div><div><small>年間営業収支見込み</small><b class="'+(net<0?'infra-warning':'')+'">'+fmtMoney(net)+'</b></div></div><p class="tiny">営業収支は強化費を除く見込み。維持費は日割り計上・月末精算。縮小は返金なし。</p><button class="btn sm outline full" data-action="business-sub" data-sub="finance">収支・予算の詳細を見る ›</button></details>';
   }
 
@@ -8713,6 +8741,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
 
   document.addEventListener('click',e=>{
+    const scoutLink=e.target.closest('[data-action="campus-from-scout"]');if(scoutLink){e.stopImmediatePropagation();if(!farmUIAllowed()||ui.tab!=='business'||!['scout','foreign'].includes(ui.businessSub)||!['draft','foreign'].includes(scoutLink.dataset.value))return;campusSelected=scoutLink.dataset.value;campusEffect=null;ui.businessSub='facilities';render();const map=document.querySelector('.campus-panel');if(map?.getBoundingClientRect)draftJump(draftScrollY()+map.getBoundingClientRect().top-(document.querySelector('.app-shell .top')?.getBoundingClientRect().bottom||0)-8);openCampusDetail(myTeam(),campusSelected,document.querySelector('.campus-pin[aria-pressed="true"]'));return;}
     const pick=e.target.closest('[data-action="campus-select"]');if(pick){e.stopImmediatePropagation();if(!farmUIAllowed()||ui.tab!=='business'||ui.businessSub!=='facilities'||!Object.hasOwn(CAMPUS_LAYOUT,pick.dataset.value))return;if(document.querySelector('.campus-detail-dialog,.campus-confirm'))return;campusSelected=pick.dataset.value;campusEffect=null;draftRenderAt(null,draftScrollY());openCampusDetail(myTeam(),campusSelected,document.querySelector('.campus-pin[aria-pressed="true"]'));return;}
     const b=e.target.closest('[data-action="infra-downgrade"],[data-action="infra-upgrade"]');if(!b)return;
     e.stopImmediatePropagation();if(!farmUIAllowed())return;
