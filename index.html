@@ -8034,7 +8034,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function farmBalance(t,initial=false){
     const list=farmEnsureTeam(t,initial),staff=farmClub(t);
     if(staff.mode!=='auto')return;
-    const lineup=new Set([...(t.lineup||[]),...(t.rotation||[])]);
+    const lineup=new Set(t.id===game.selectedId?[...(t.lineup||[]),...(t.rotation||[])]:[]);
     const top=()=>list.filter(p=>p.farmTier===2&&!p.injury).sort((a,b)=>farmFitScore(b)-farmFitScore(a)||a.id-b.id);
     // Maintain depth across the actual positions before filling remaining slots.
     const needs={C:2,'1B':1,'2B':1,'3B':1,SS:1,OF:4,SP:5,RP:3,CP:1};
@@ -8074,7 +8074,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function farmRng(seed){let v=seed>>>0||1;return ()=>{v=(Math.imul(v,1664525)+1013904223)>>>0;return v/4294967296;};}
   function farmSkill(p,key){return (p[key]||40)*(1-Math.max(0,80-(p.energy??100))*.003);}
   function farmOffense(bat,pitch,random){
-    const usedBat=new Set(),usedPitch=new Set(),runsBy=new Map();
+    const usedBat=new Set(),usedPitch=new Set(),xp=new Map();
+    const gain=(p,n)=>xp.set(p,(xp.get(p)||0)+n);
     let runs=0,cursor=0;
     for(let inning=0;inning<9;inning++){
       let outs=0,bases=[null,null,null],guard=0;
@@ -8082,11 +8083,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       usedPitch.add(arm);
       while(outs<3&&guard++<100){
         const p=bat[cursor++%bat.length],st=p.farmStats;
-        usedBat.add(p);st.pa++;ps.bf++;ps.pitches+=3+Math.floor(random()*3);
+        usedBat.add(p);st.pa++;ps.bf++;ps.pitches+=3+Math.floor(random()*3);gain(p,.85);
         const quality=(farmSkill(p,'contact')-farmSkill(arm,'stuff'))*.0022+(farmSkill(p,'power')-farmSkill(arm,'control'))*.0005;
         const walk=clamp(.07+(62-farmSkill(arm,'control'))*.0014,.035,.14),hit=clamp(.245+quality,.13,.39);
         const hr=clamp(.025+(farmSkill(p,'power')-farmSkill(arm,'stuff'))*.0008,.005,.075),roll=random();
-        const score=q=>{if(!q)return;q.farmStats.r++;runs++;st.rbi++;ps.er++;runsBy.set(arm,(runsBy.get(arm)||0)+1);};
+        const score=q=>{if(!q)return;q.farmStats.r++;runs++;st.rbi++;ps.er++;};
         if(roll<walk){
           st.bb++;ps.bb++;
           if(bases[0]){if(bases[1]){if(bases[2])score(bases[2]);bases[2]=bases[1];}bases[1]=bases[0];}
@@ -8094,14 +8095,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         }
         st.ab++;
         if(roll<walk+hit){
-          st.h++;ps.h++;
+          st.h++;ps.h++;gain(p,1.7);
           const x=random(),n=x<hr/hit?4:x<hr/hit+.035?3:x<hr/hit+.23?2:1;
-          if(n===4)st.hr++;else if(n===3)st.triples++;else if(n===2)st.doubles++;
+          if(n===4){st.hr++;gain(p,2);}else if(n===3)st.triples++;else if(n===2)st.doubles++;
           const next=[null,null,null];for(let i=2;i>=0;i--)if(bases[i]){if(i+n>=3)score(bases[i]);else next[i+n]=bases[i];}
           if(n===4)score(p);else next[n-1]=p;bases=next;continue;
         }
-        outs++;ps.outs++;
-        if(random()<clamp(.24+(farmSkill(arm,'stuff')-farmSkill(p,'contact'))*.003,.12,.50)){st.k++;ps.k++;}
+        outs++;ps.outs++;gain(arm,.65);
+        if(random()<clamp(.24+(farmSkill(arm,'stuff')-farmSkill(p,'contact'))*.003,.12,.50)){st.k++;ps.k++;gain(arm,.8);}
       }
       // A pathological endless inning should never silently manufacture outs.
       if(outs!==3)throw Error('Farm inning safety limit');
@@ -8109,12 +8110,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     for(const p of usedBat){p.farmStats.g++;p.energy=clamp(p.energy-8,0,100);}
     for(const p of usedPitch){p.farmStats.g++;p.energy=clamp(p.energy-24,0,100);}
     if(usedPitch.has(pitch[0]))pitch[0].farmStats.gs++;
+    for(const [p,n] of xp){const lv=farmClub(getTeam(p.teamId)).facilities.training;p.expPoints=(Number(p.expPoints)||0)+n*(1+(lv-1)*.09)*(.8+(p.talent||60)/300);}
     return {runs,bat:usedBat,pitch:usedPitch};
   }
   function farmPlay(match,entry){
     const f=farmState(),home=getTeam(match.home),away=getTeam(match.away);
     const select=t=>{
-      const list=farmPlayers(t).filter(p=>availableForGame(p)&&p.energy>=25);
+      const list=farmPlayers(t).filter(p=>availableForGame(p)&&p.energy>=25&&p.lastAppearanceDay!==game.calendarIndex-1);
       const bat=list.filter(p=>!isPitch(p)).sort((a,b)=>Number(b.age<=25)-Number(a.age<=25)||farmFitScore(b)-farmFitScore(a)).slice(0,9);
       const pitch=list.filter(isPitch).sort((a,b)=>b.energy-a.energy||Number(b.pos==='SP')-Number(a.pos==='SP')||a.id-b.id).slice(0,3);
       return {bat,pitch};
@@ -8163,7 +8165,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(entry.type==='game'&&entry.gameNo%6!==0)for(const match of game.schedule[entry.gameNo-1]||[])farmPlay(match,entry);
     for(const t of game.teams){
       for(const p of farmPlayers(t))farmTrain(t,p,entry);
-      if(idx%7===0){farmBalance(t);repairTeam(t);}
+      if(idx%7===0){
+        farmBalance(t);repairTeam(t);
+        if(t.id!==game.selectedId){initialLineup(t);t.rotation=firstPitchers(t).filter(p=>p.pos==='SP'&&availableForGame(p)).sort((a,b)=>farmFitScore(b)-farmFitScore(a)).slice(0,5).map(p=>p.id);repairTeam(t);}
+      }
+      if(idx%28===0&&t.id!==game.selectedId){
+        for(const p of farmPlayers(t))if(p.trainFocus==='balanced'&&p.age<=27){const keys=seasonSkillKeys(p);p.trainFocus=keys.slice().sort((a,b)=>(p.growthAptitude?.[b]||1)-(p.growthAptitude?.[a]||1)||p[a]-p[b])[0];}
+        const staff=farmClub(t),key=Object.keys(FARM_FACILITIES).filter(k=>staff.facilities[k]<5).sort((a,b)=>staff.facilities[a]-staff.facilities[b])[0];
+        if(key&&t.farmFacilityYear!==game.year&&t.cash>Math.max(8,payroll(t)*.65)+FARM_COST[staff.facilities[key]]&&farmUpgrade(t,key))t.farmFacilityYear=game.year;
+      }
       if(idx%28===0||game.day===143&&idx===game.calendar.days.length){
         const list=farmPlayers(t),top=list.slice().sort((a,b)=>rating(b)-(b.farmOpeningOverall??rating(b))-(rating(a)-(a.farmOpeningOverall??rating(a))))[0];
         if(top){const delta=rating(top)-(top.farmOpeningOverall??rating(top));farmReport(t,top,'monthly','育成報告：'+top.name+' 総合'+(delta>=0?'+':'')+delta+' · 二軍 '+list.length+'名',entry.date);}
