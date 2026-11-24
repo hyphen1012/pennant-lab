@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.42 · ROSTER 50/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.43 · DRAFT PRESENCE/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -499,13 +499,17 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
       dispatch('click',{action:'draft-start'});dispatch('click',{action:'draft-confirm-accept'});
       const choice=app.innerHTML.match(/data-action="draft-choose" data-id="(\d+)"/);
       assert(choice);
+      const rumor=app.innerHTML.match(/data-action="draft-rumor" data-id="(\d+)" data-value="([^"]+)"/);assert(rumor);dispatch('click',{action:'draft-rumor',id:rumor[1],value:rumor[2]});assert(app.innerHTML.includes('実際の指名を保証するものではありません'));dispatch('click',{action:'draft-confirm-cancel'});
       dispatch('click',{action:'draft-choose',id:choice[1]});
       assert(app.innerHTML.includes('role="alertdialog"'));
       dispatch('click',{action:'draft-confirm-cancel'});
       assert(!app.innerHTML.includes('role="alertdialog"'));
       dispatch('click',{action:'draft-choose',id:choice[1]});
       dispatch('click',{action:'draft-confirm-accept'});
+      const drainAnnouncements=async()=>{for(let n=0;n<80&&app.innerHTML.includes('data-draft-announcement="true"');n++){assert(app.innerHTML.includes('12球団 指名リアルタイム状況'));await flush();}};
+      assert(app.innerHTML.includes('data-draft-announcement="true"'));
       const drainDraws=async()=>{
+        await drainAnnouncements();
         for(let n=0;n<80&&app.innerHTML.includes('class="draft-draw-stage"');n++){
           if(app.innerHTML.includes('data-own-draw="false"')){
             assert(app.innerHTML.includes('自動進行'));
@@ -522,22 +526,22 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
       };
       await drainDraws();
       assert(app.innerHTML.includes('指名・抽選結果'));
-      dispatch('click',{action:'draft-first-next'});
+      dispatch('click',{action:'draft-first-next'});await drainAnnouncements();
       for(let n=0;n<40&&!app.innerHTML.includes('2巡目 · 順番指名');n++){
         if(app.innerHTML.includes('data-action="draft-cpu-next"'))dispatch('click',{action:'draft-cpu-next'});
         else if(app.innerHTML.includes('data-action="draft-pass"')){dispatch('click',{action:'draft-pass'});dispatch('click',{action:'draft-confirm-accept'});}
-        await drainDraws();if(app.innerHTML.includes('data-action="draft-first-next"'))dispatch('click',{action:'draft-first-next'});
+        await drainDraws();if(app.innerHTML.includes('data-action="draft-first-next"'))dispatch('click',{action:'draft-first-next'});await drainAnnouncements();
       }
       assert(app.innerHTML.includes('2巡目 · 順番指名'));
       const second=app.innerHTML.match(/data-action="draft-choose" data-id="(\d+)"/);assert(second);
-      dispatch('click',{action:'draft-choose',id:second[1]});dispatch('click',{action:'draft-confirm-accept'});
+      dispatch('click',{action:'draft-choose',id:second[1]});dispatch('click',{action:'draft-confirm-accept'});await drainAnnouncements();
       assert(app.innerHTML.includes('3巡目 · 順番指名'));
       const third=app.innerHTML.match(/data-action="draft-choose" data-id="(\d+)"/);assert(third);
-      dispatch('click',{action:'draft-choose',id:third[1]});dispatch('click',{action:'draft-confirm-accept'});
+      dispatch('click',{action:'draft-choose',id:third[1]});dispatch('click',{action:'draft-confirm-accept'});await drainAnnouncements();
       for(let round=4;round<=5;round++){
         assert(app.innerHTML.includes(round+'巡目 · 順番指名'));
         const later=app.innerHTML.match(/data-action="draft-choose" data-id="(\d+)"/);assert(later);
-        dispatch('click',{action:'draft-choose',id:later[1]});dispatch('click',{action:'draft-confirm-accept'});
+        dispatch('click',{action:'draft-choose',id:later[1]});dispatch('click',{action:'draft-confirm-accept'});await drainAnnouncements();
       }
       dispatch('click',{action:'draft-auto'});
       assert(app.innerHTML.includes('role="alertdialog"'));

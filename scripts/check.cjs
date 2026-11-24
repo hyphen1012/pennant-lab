@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.42 · ROSTER 50/);
+assert.match(html,/VERSION 0\.9\.43 · DRAFT PRESENCE/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1025,3 +1025,13 @@ console.log('PASS: over-cap draft, deferred cut plan, CPU balance, reversible ch
 }
 
 assert.match(html,/const ROSTER_MAX=50/);assert.match(html,/const DRAFT_ROUNDS=5/);assert.match(html,/draft-lottery-compact/);assert.match(html,/importantConfirmed/);
+
+assert.match(html,/draftQueueAnnouncements/);assert.match(html,/draft-rumor-mark/);assert.match(html,/draftLiveBoard/);
+{
+const a=inline[1].indexOf('  function draftQueueAnnouncements('),b=inline[1].indexOf('  let draftAnnouncementTimer',a);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+';return {draftQueueAnnouncements,draftAdvanceAnnouncement};})()');
+const d={order:[1,2,3],picks:[{round:2,teamId:1,candidateId:50},{round:2,teamId:2,candidateId:51}],passed:[{round:2,teamId:3}]};
+api.draftQueueAnnouncements(d,'later',2,0,0);assert.equal(d.announcement.rows.length,3);assert.equal(d.announcement.rows[0].teamId,1);assert(api.draftAdvanceAnnouncement(d));assert.equal(d.announcement.cursor,1);assert(api.draftAdvanceAnnouncement(d));assert(api.draftAdvanceAnnouncement(d));assert.equal(d.announcement,null);assert.equal(d.picks.length,2);
+const first={order:[1,2,3],picks:[],passed:[],pendingLottery:{groups:[{cid:60,ids:[1,3]},{cid:61,ids:[2]}],passed:[]}};api.draftQueueAnnouncements(first,'first',1,0,0);assert.equal(first.announcement.rows.length,3);assert.equal(first.announcement.rows[0].contested,true);assert.equal(first.announcement.rows[1].contested,false);
+console.log('PASS: saved sequential announcements, single/contested bids and unchanged picks');
+}
