@@ -3857,7 +3857,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(d.autoRequested)return;
     let rows=[];
     if(phase==='first'){
-      const p=d.pendingLottery,lot=d.lotteries.at(-1);
+      const p=d.pendingLottery,lot=d.lotteries?.at(-1);
       const groups=p?.groups||lot?.results.map(r=>({cid:r.candidateId,ids:r.teams}))||[];
       const passed=p?.passed||lot?.passed||[];
       rows=groups.flatMap(g=>g.ids.map(id=>({round:1,teamId:id,candidateId:g.cid,contested:g.ids.length>1})));
