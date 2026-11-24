@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.29 · INDEX/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.30 · READABILITY/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -395,7 +395,16 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     const page=app.innerHTML;
     const action=['injury-ack','finish-review','milestone-ack','auto-day-close','finish-month'].find(a=>page.includes('data-action="'+a+'"'));
     if(!action)break;
-    if(action==='finish-month')finishMeeting();else dispatch('click',{action});
+    if(action==='finish-month')finishMeeting();else if(action==='milestone-ack'){
+      dispatch('click',{action});
+      assert(app.innerHTML.includes('role="alertdialog"'));
+      dispatch('click',{action:'edition-exit-cancel'});
+      assert(!app.innerHTML.includes('role="alertdialog"'));
+      assert(app.innerHTML.includes('data-action="milestone-ack"'));
+      dispatch('click',{action:'milestone-close'});
+      assert(app.innerHTML.includes('role="alertdialog"'));
+      dispatch('click',{action:'edition-exit-confirm'});
+    }else dispatch('click',{action});
   }
   dispatch('click',{action:'tab',tab:'records'});
   dispatch('click',{action:'record-sub',sub:'news'});
@@ -440,6 +449,13 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
       dispatch('click',{action:'ceremony-back'});
       assert(app.innerHTML.includes('data-action="ceremony-open"'));
       dispatch('click',{action:'ceremony-close'});
+      assert(app.innerHTML.includes('role="alertdialog"'));
+      dispatch('click',{action:'edition-exit-cancel'});
+      assert(!app.innerHTML.includes('role="alertdialog"'));
+      assert(app.innerHTML.includes('data-action="ceremony-open"'));
+      dispatch('click',{action:'ceremony-next'});
+      assert(app.innerHTML.includes('role="alertdialog"'));
+      dispatch('click',{action:'edition-exit-confirm'});
     }else dispatch('click',{action:'ceremony-next'});
   }
   assert.equal(window.PennantLab.getSnapshot().year,full.year+1);

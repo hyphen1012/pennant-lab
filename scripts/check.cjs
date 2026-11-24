@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.29 · INDEX/);
+assert.match(html,/VERSION 0\.9\.30 · READABILITY/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -885,3 +885,10 @@ assert.equal(api.milestonePages(manyFeats).length,1);
 assert.equal(api.milestonePages(manyFeats)[0].items.length,20);
 console.log('PASS: rarity-first edition index, all B9/GG on single pages, consolidated records');
 }
+
+assert.match(html,/function editionExitModal\(/);
+assert.match(html,/role="alertdialog"/);
+assert.match(html,/edition-exit-confirm/);
+assert.match(html,/edition-exit-cancel/);
+assert.match(html,/\.edition-compact-row \.record-player-info b\{font-size:21px/);
+console.log('PASS: enlarged edition typography and exit confirmation hooks');
