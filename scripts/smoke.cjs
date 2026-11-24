@@ -88,7 +88,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.10 · SCHEDULE/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.11 · WEEKLY NEWS/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -306,6 +306,16 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(monthlyArchive.every(m=>m.actualFinance),'Skipped months have actual finance records');
   assert.equal(store.get(1).data.pendingMonth,null,'Season skip clears routine month prompts');
   assert.equal(store.get(1).data.pendingEvent,null,'Season skip clears routine injury prompts');
+  const weeklies=store.get(1).data.dailyBulletins.filter(p=>p.weekly);
+  assert(weeklies.length>10,'Season skip preserves weekly newspapers');
+  for(const p of weeklies){
+    assert.equal(new Date(p.date+'T00:00:00Z').getUTCDay(),1);
+    const w=p.weekly;
+    const matches=store.get(1).data.games.filter(g=>g.date>=w.start&&g.date<=w.end&&(g.home===gmOwned||g.away===gmOwned));
+    assert.equal(w.record.w+w.record.l+w.record.t,matches.length);
+    assert.equal(w.scores.length,matches.length);
+    assert.equal(w.leagues.E.length+w.leagues.W.length,12);
+  }
   const ledger=store.get(1).data.financeLedger;
   assert.equal(ledger.through,store.get(1).data.calendar.days.length);
   assert.equal(new Set(ledger.periods.map(p=>p.through)).size,ledger.periods.length);
@@ -351,6 +361,14 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     if(!action)break;
     dispatch('click',{action});
   }
+  dispatch('click',{action:'tab',tab:'records'});
+  dispatch('click',{action:'record-sub',sub:'news'});
+  assert(app.innerHTML.includes('球界ニュースの履歴'));
+  dispatch('click',{action:'news-edition-open',date:weeklies[0].date,year:String(weeklies[0].year)});
+  assert(app.innerHTML.includes('週刊 球界ニュース'));
+  assert(app.innerHTML.includes('東西リーグ · 順位と週間成績'));
+  assert(!app.innerHTML.includes('data-action="pause-calendar"'));
+  dispatch('click',{action:'news-edition-close'});
   dispatch('click',{action:'tab',tab:'hq'});
   assert(app.innerHTML.includes('data-action="ceremony-start"'));
   dispatch('click',{action:'ceremony-start'});

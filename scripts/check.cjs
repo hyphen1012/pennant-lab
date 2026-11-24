@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.10 · SCHEDULE/);
+assert.match(html,/VERSION 0\.9\.11 · WEEKLY NEWS/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -646,3 +646,19 @@ assert.equal(financeApi.game.teams[0].cash,-1.7,'Monthly settlement is idempoten
 assert.match(html,/const uninterruptedSeason=skip&&kind==='season'/);
 assert.match(html,/if\(game\.financeCrisis\)break;/);
 console.log('PASS: calendar targets, monthly cash settlement, no duplicate charge and cash crisis');
+
+const weeklyStart=inline[1].indexOf('  function isWeeklyEdition('),weeklyEnd=inline[1].indexOf('  function buildDailyNews(',weeklyStart);
+const weeklyApi=vm.runInNewContext('(function(){'+inline[1].slice(weeklyStart,weeklyEnd)+';return {isWeeklyEdition,buildWeeklySummary};})()',{
+  game:{year:2028,calendar:{days:[{type:'game',gameNo:1,date:'2028-04-02'}]},teams:[{id:1,name:'自球団',short:'自',league:'E',wins:1,losses:0,ties:0},{id:2,name:'相手',short:'相',league:'W',wins:0,losses:1,ties:0}],games:[{year:2028,day:1,home:1,away:2,homeScore:4,awayScore:2,box:{bat:[{id:10,teamId:1,ab:4,h:2,hr:1,rbi:3}],pitch:[{id:11,teamId:1,outs:27,er:2,k:8,w:1}]}},{year:2028,day:2,date:'2028-04-03',home:2,away:1,homeScore:20,awayScore:0}]},
+  calendarOffsetDate:(d,n)=>new Date(Date.parse(d)+n*86400000).toISOString().slice(0,10),
+  myTeam:()=>({id:1,name:'自球団'}),getTeam:id=>({short:id===2?'相':'自'}),getPlayer:id=>({name:'選手'+id}),
+  rankings:l=>l==='E'?[{id:1,short:'自',wins:1,losses:0,ties:0}]:[{id:2,short:'相',wins:0,losses:1,ties:0}]
+});
+assert(weeklyApi.isWeeklyEdition('2028-04-03'));
+assert(!weeklyApi.isWeeklyEdition('2028-04-02'));
+const weekly=weeklyApi.buildWeeklySummary({date:'2028-04-03'});
+assert.equal(weekly.gameCount,1);assert.equal(weekly.record.w,1);assert.equal(weekly.record.rs,4);
+assert.equal(weekly.hitter.rbi,3);assert.equal(weekly.pitcher.outs,27);
+assert.equal(weekly.leagues.W[0].week.l,1);assert.equal(weekly.scores[0].opponent,'相');
+assert.match(html,/function newsArchiveScreen\(/);
+console.log('PASS: weekly date range, real match statistics and newspaper archive');
