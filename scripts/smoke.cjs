@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.39 · DRAFT FLOW/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.40 · ROSTER WINDOW/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -447,7 +447,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(app.innerHTML.includes('class="panel season-action" data-priority="required"'));
   dispatch('click',{action:'ceremony-start'});
   const cashBeforeOffseason=window.PennantLab.getSnapshot().teams.map(t=>t.cash);
-  const titles=['awards-all','settlement','draft','winter','self','camp','opening'];
+  const titles=['awards-all','settlement','draft','roster-cut','winter','self','camp','opening'];
   for(const key of titles){
     if(key==='opening'&&app.innerHTML.includes('data-action="draft-reveal-close"')){
       const reveal=app.innerHTML.match(/data-action="draft-reveal" data-id="(\d+)"/);
@@ -535,12 +535,22 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
       assert(app.innerHTML.includes('data-action="draft-finish"'));
       dispatch('click',{action:'draft-finish'});
       dispatch('click',{action:'draft-confirm-accept'});
+    }else if(key==='roster-cut'){
+      assert(app.innerHTML.includes('戦力外通告'));
+      for(let i=0;i<8&&/data-action="draft-cut-finish" disabled/.test(app.innerHTML);i++){
+        const option=app.innerHTML.match(/data-action="draft-cut-toggle" data-id="(\d+)">放出候補にする/);assert(option);
+        dispatch('click',{action:'draft-cut-toggle',id:option[1]});
+      }
+      assert(!/data-action="draft-cut-finish" disabled/.test(app.innerHTML));
+      dispatch('click',{action:'draft-cut-finish'});assert(app.innerHTML.includes('role="alertdialog"'));
+      dispatch('click',{action:'draft-confirm-accept'});
     }else dispatch('click',{action:'ceremony-next'});
   }
   assert.equal(window.PennantLab.getSnapshot().year,full.year+1);
   await flush();
   const draft=store.get(1).data.draftHistory.find(d=>d.year===full.year);
   assert(draft&&draft.picks.length>0);
+  assert(store.get(1).data.teams.every(t=>store.get(1).data.players.filter(p=>p.teamId===t.id).length<=30));
   assert.equal(new Set(draft.picks.map(p=>p.candidateId)).size,draft.picks.length);
   assert(draft.picks.every(p=>p.status!=='rights'));
   for(const row of draft.picks.filter(p=>p.status==='signed')){const p=store.get(1).data.players.find(p=>p.id===row.playerId);assert(p&&p.teamId===row.teamId&&p.rookieSeason===full.year+1&&p.stats.g===0);}

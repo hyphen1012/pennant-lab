@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.39 · DRAFT FLOW/);
+assert.match(html,/VERSION 0\.9\.40 · ROSTER WINDOW/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -997,19 +997,18 @@ console.log('PASS: sealed tickets, unique winner, saved selection, scout dossier
 
 assert.match(html,/data-action="draft-report-view"/);
 
+
 {
 const a=inline[1].indexOf('  const DRAFT_MIN='),b=inline[1].indexOf('  const DRAFT_REGIONS=',a);
-const c=inline[1].indexOf('  function draftRights('),d=inline[1].indexOf('  function draftReleasePlayer(',c);
-const api=vm.runInNewContext('(function(){const game={selectedId:1},players=[],own=t=>players.filter(p=>p.teamId===t.id),rating=()=>60;'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {players,DRAFT_MIN,draftCanNominate,draftSigningRoom,draftReleaseOptions,draftRosterRoom};})()');
-const t={id:1},draft={picks:[]},candidate={status:'available',player:{pos:'OF'}};
-let id=0;for(const [pos,n] of Object.entries(api.DRAFT_MIN))for(let i=0;i<n;i++)api.players.push({id:++id,teamId:1,pos,age:25});
-while(api.players.length<29)api.players.push({id:++id,teamId:1,pos:'OF',age:25});
-draft.picks.push({teamId:1,status:'rights',pos:'OF'});
-assert(!api.draftRosterRoom(draft,t,'OF'));assert(api.draftCanNominate(draft,t,candidate));
-assert(api.draftSigningRoom(draft,t,'OF'));draft.picks[0].status='signed';
-assert(!api.draftSigningRoom(draft,t,'OF'));assert(api.draftCanNominate(draft,t,candidate));
-assert(api.draftReleaseOptions(t).every(p=>p.pos==='OF'));api.draftReleaseOptions(t)[0].teamId=null;
-assert(api.draftSigningRoom(draft,t,'OF'));
-assert.match(html,/draftShowReport\(id,true\)/);
-console.log('PASS: manual nominations at full roster, separate signing cap, safe release options, report scroll hook');
+const c=inline[1].indexOf('  function draftRights('),d=inline[1].indexOf('  function draftCutScreen(',c);
+const api=vm.runInNewContext('(function(){const game={selectedId:1,teams:[]},players=[],own=t=>players.filter(p=>p.teamId===t.id),rating=()=>60;'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {game,players,DRAFT_MIN,draftCanNominate,draftRosterProjection,draftCutOptions,draftToggleCut,draftPlanCPU};})()');
+const t={id:1},cpu={id:2},draft={phase:'done',picks:[]},candidate={status:'available',player:{pos:'OF'}};api.game.teams.push(t,cpu);
+let id=0;for(const team of [t,cpu]){for(const [pos,n] of Object.entries(api.DRAFT_MIN))for(let i=0;i<n;i++)api.players.push({id:++id,teamId:team.id,pos,age:25});while(api.players.filter(p=>p.teamId===team.id).length<29)api.players.push({id:++id,teamId:team.id,pos:'OF',age:25});for(let i=0;i<3;i++)draft.picks.push({teamId:team.id,status:'signed',pos:'OF'});}
+assert(api.draftCanNominate(draft,t,candidate));assert(api.draftCanNominate(draft,cpu,candidate));
+assert.equal(api.draftRosterProjection(draft,t).excess,2);
+const p=api.draftCutOptions(draft,t)[0];assert(api.draftToggleCut(draft,t,p.id));assert.equal(api.draftRosterProjection(draft,t).excess,1);assert(api.draftToggleCut(draft,t,p.id));assert.equal(api.draftRosterProjection(draft,t).excess,2);
+for(let i=0;i<2;i++){const x=api.draftCutOptions(draft,t).find(p=>!(draft.cutPlan?.[t.id]||[]).includes(p.id));assert(api.draftToggleCut(draft,t,x.id));}
+assert.equal(api.draftRosterProjection(draft,t).projected,30);assert(api.draftPlanCPU(draft));assert.equal(api.draftRosterProjection(draft,cpu).projected,30);assert.equal(api.players.length,58);
+assert.match(html,/draftShowReport\(id,true\)/);assert.match(html,/draftApplyCuts\(game.draft\)/);
+console.log('PASS: over-cap draft, deferred cut plan, CPU balance, reversible choices and report scroll hook');
 }
