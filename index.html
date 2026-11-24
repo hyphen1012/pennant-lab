@@ -8175,7 +8175,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         if(key&&t.farmFacilityYear!==game.year&&t.cash>Math.max(8,payroll(t)*.65)+FARM_COST[staff.facilities[key]]&&farmUpgrade(t,key))t.farmFacilityYear=game.year;
       }
       if(idx%28===0||game.day===143&&idx===game.calendar.days.length){
-        const list=farmPlayers(t),top=list.slice().sort((a,b)=>rating(b)-(b.farmOpeningOverall??rating(b))-(rating(a)-(a.farmOpeningOverall??rating(a))))[0];
+        const list=farmPlayers(t),recommend=list.filter(p=>!p.injury&&p.farmStats?.g>=5).sort((a,b)=>farmFitScore(b)-farmFitScore(a)).find(p=>{const peers=firstPlayers(t).filter(q=>q.pos===p.pos&&!q.injury);return !peers.length||farmFitScore(p)>=Math.min(...peers.map(farmFitScore))+3;});
+        if(recommend)farmReport(t,recommend,'recommendation','昇格推薦：'+recommend.name+' · 二軍成績と能力を評価',entry.date);
+        const top=list.slice().sort((a,b)=>rating(b)-(b.farmOpeningOverall??rating(b))-(rating(a)-(a.farmOpeningOverall??rating(a))))[0];
         if(top){const delta=rating(top)-(top.farmOpeningOverall??rating(top));farmReport(t,top,'monthly','育成報告：'+top.name+' 総合'+(delta>=0?'+':'')+delta+' · 二軍 '+list.length+'名',entry.date);}
       }
     }
@@ -8238,7 +8240,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       html+='<section class="panel"><h3 class="panel-title">育成施設</h3><p class="small">強化は任意・買い切りです。現金残高 '+fmtMoney(t.cash)+'</p>'+Object.entries(FARM_FACILITIES).map(([k,[label,desc]])=>{const lv=staff.facilities[k];return '<div class="farm-facility"><h3>'+label+' <span>Lv.'+lv+'</span></h3><p class="small">'+desc+'</p><div class="farm-level">'+Array.from({length:5},(_,i)=>'<i class="'+(i<lv?'on':'')+'"></i>').join('')+'</div><button class="btn outline full" data-action="farm-upgrade" data-value="'+k+'" '+(lv>=5||t.cash<FARM_COST[lv]?'disabled':'')+'>'+(lv===5?'最高レベル':'Lv.'+(lv+1)+'へ強化 · '+fmtMoney(FARM_COST[lv]))+'</button></div>';}).join('')+'</section>';
     }else{
       const reports=f.reports.filter(x=>x.teamId===t.id).slice(-30).reverse();
-      html+='<section class="panel"><h3 class="panel-title">二軍監督・育成担当報告</h3><p class="small">日程を中断しない任意の確認画面。昇降格・覚醒・復帰・月次育成報告。</p>'+reports.map(x=>'<div class="farm-report"><small>'+h(x.date||'')+'</small><p>'+h(x.text)+'</p></div>').join('')+(reports.length?'':'<p class="small">報告はまだありません。</p>')+'</section>';
+      html+='<section class="panel"><h3 class="panel-title">二軍監督・育成担当報告</h3><p class="small">日程を中断しない任意の確認画面。昇降格・昇格推薦・覚醒・復帰・月次育成報告。</p>'+reports.map(x=>'<div class="farm-report"><small>'+h(x.date||'')+'</small><p>'+h(x.text)+'</p></div>').join('')+(reports.length?'':'<p class="small">報告はまだありません。</p>')+'</section>';
     }
     return html;
   }
