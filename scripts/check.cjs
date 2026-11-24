@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.57 · LAST CHANCE/);
+assert.match(html,/VERSION 0\.9\.58 · RINNE/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1140,4 +1140,12 @@ const api=vm.runInNewContext('(function(){const teams=[{id:2,name:"OWN",cash:1},
 const [t,rival]=api.teams,offer={fee:.2,salary:.1,supportCost:.05},m={history:[]},c={id:5,status:'rival-pending',player:{name:'TEST'}},conv={candidateId:5,resultOpened:true,status:'rival-pending',offer,pendingRival:{teamId:3,bid:offer}};m.history.push({id:5,teamId:2,status:'rival-pending'});
 assert(!api.applyForeignRecovery(m,t,c,conv,false));assert.equal(api.players.length,0);assert(api.applyForeignRecovery(m,t,c,conv,true));assert.equal(api.players[0].teamId,2);assert.equal(t.cash,.75);assert.equal(rival.cash,1);assert.equal(m.history[0].status,'signed');assert(!api.applyForeignRecovery(m,t,c,conv,true));assert(!api.finalizeForeignRival(m,t,c,conv));
 const c2={id:6,status:'rival-pending',player:{name:'TEST2'}},v2={candidateId:6,resultOpened:true,status:'rival-pending',offer,pendingRival:{teamId:3,bid:offer}};assert(api.finalizeForeignRival(m,t,c2,v2));assert.equal(api.players[1].teamId,3);assert(!api.applyForeignRecovery(m,t,c2,v2,true));assert.equal(rival.cash,.75);console.log('PASS: foreign reversal before formal rival signing, cancellation path, exactly one registration');
+}
+
+{
+const a=inline[1].indexOf('function broadcastCutArt('),b=inline[1].indexOf('  function broadcastHeading(',a);
+const api=vm.runInNewContext('(function(){const h=String,renderFaceArtwork=()=>"<i>portrait</i>";'+inline[1].slice(a,b)+';return {rinneStadiumArt,rinneStudioArt,rinneTearScreen,broadcastFeature};})()');
+assert(api.rinneStadiumArt().includes('崩壊した架空の野球場'));assert(api.rinneStudioArt().includes('壊滅したスタジオ'));const tear=api.rinneTearScreen();assert(tear.includes('rinne-piece left')&&tear.includes('rinne-piece right')&&tear.includes('rinne-fragments'));
+for(const category of ['PARALLEL','STAR','LEGEND','IMMORTAL','再来','転生','輪廻転生'])assert.equal(api.broadcastFeature({}, {category,tournament:true,hidden:true,name:'????',role:'投手'}).includes('ruined-feature'),category==='輪廻転生');
+assert.match(html,/if\(node&&e.category!=='輪廻転生'\)/);console.log('PASS: RINNE exclusive torn cut-in, ruined stadium and ruined studio');
 }

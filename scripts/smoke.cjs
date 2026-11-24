@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.57 · LAST CHANCE/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.58 · RINNE/);
   const previewBefore=JSON.stringify(window.PennantLab.getSnapshot()),saveBefore=store.size;
   dispatch('click',{action:'rare-preview-open'});assert(app.innerHTML.includes('演出確認'));
   dispatch('click',{action:'rare-preview-start'});assert(app.innerHTML.includes('観測記録に異常を検出'));
@@ -115,6 +115,10 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   dispatch('click',{action:'rare-news-next'});assert(app.innerHTML.includes('完全試合'));assert(app.innerHTML.includes('???'));
   dispatch('click',{action:'rare-news-ack'});for(let i=0;i<4;i++)dispatch('click',{action:'rare-news-next'});
   dispatch('click',{action:'rare-preview-role',value:'OF'});dispatch('click',{action:'rare-preview-start'});dispatch('click',{action:'rare-news-next'});dispatch('click',{action:'rare-news-next'});assert(app.innerHTML.includes('14 − 2'));
+  dispatch('click',{action:'rare-preview-category',value:'輪廻転生'});dispatch('click',{action:'rare-preview-start'});assert(!app.innerHTML.includes('rinne-piece left'));
+  dispatch('click',{action:'rare-news-next'});assert(app.innerHTML.includes('rinne-piece left'));assert(app.innerHTML.includes('rinne-piece right'));assert(app.innerHTML.includes('崩壊した架空の野球場'));
+  await flush();if(app.innerHTML.includes('rinne-piece left'))dispatch('click',{action:'rare-news-next'});
+  assert(app.innerHTML.includes('壊滅したスタジオ'));dispatch('click',{action:'rare-news-next'});assert(app.innerHTML.includes('ruined-feature'));assert(app.innerHTML.includes('14 − 2'));assert(app.innerHTML.includes('????'));
   dispatch('click',{action:'rare-preview-exit'});assert.equal(JSON.stringify(window.PennantLab.getSnapshot()),previewBefore);assert.equal(store.size,saveBefore);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
