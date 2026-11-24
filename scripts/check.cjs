@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.18 · FRONT OFFICE/);
+assert.match(html,/VERSION 0\.9\.19 · FRONT OFFICE/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -714,3 +714,10 @@ assert.match(html,/class="meeting-row meeting-match-row meeting-table-head"/);
 assert.match(html,/class="meeting-row meeting-change-row meeting-table-head"/);
 assert.match(html,/@keyframes meeting-curl-9/);
 console.log('PASS: curved ten-strip page turns, fixed medical portraits and report columns');
+
+// Cover's centered contents must not inherit the strip paper's zero min-height.
+assert.match(html,/\.meeting-paper\{--meeting-sheet-min:clamp\(410px,57vh,650px\);[^}]*min-height:var\(--meeting-sheet-min\)/);
+assert.match(html,/\.meeting-cover\{display:flex;min-height:var\(--meeting-sheet-min\)/);
+assert.doesNotMatch(html,/\.meeting-cover\{[^}]*min-height:inherit/);
+assert.match(html,/\.meeting-curl-strip>\.meeting-paper\{[^}]*min-height:0/);
+console.log('PASS: cover shares intrinsic layout height across fixed and curved layers');
