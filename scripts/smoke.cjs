@@ -127,6 +127,11 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     dispatch('click',{action:'rare-news-next'});if(category==='IMMORTAL')assert(app.innerHTML.includes('???'));
     dispatch('click',{action:'rare-news-ack'});
   }
+  dispatch('click',{action:'rare-preview-route',value:'draft'});
+  dispatch('click',{action:'rare-preview-category',value:'転生'});
+  dispatch('click',{action:'rare-preview-start'});
+  dispatch('click',{action:'rare-news-next'});assert(app.innerHTML.includes('大学全国大会'));
+  dispatch('click',{action:'rare-news-next'});assert(app.innerHTML.includes('FLASHBACK'));assert(app.innerHTML.includes('見本球団'));assert(app.innerHTML.includes('39歳'));
   dispatch('click',{action:'rare-preview-exit'});assert.equal(JSON.stringify(window.PennantLab.getSnapshot()),previewBefore);assert.equal(store.size,saveBefore);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
