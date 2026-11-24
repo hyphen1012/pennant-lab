@@ -132,7 +132,7 @@ assert.match(renewed.game.managerHistory[0].text,/契約を更新/);
 assert.equal(renewed.news.length,0);
 
 assert.match(html,/GM DESK · MEDICAL INBOX/);
-assert.match(html,/GM DESK · MONTHLY INBOX/);
+assert.match(html,/MONTHLY MEETING · 球団運営スタッフ/);
 assert.match(html,/gm-medical-player/);
 assert.match(html,/class="meeting-scene gm-month-report"/);
 assert.match(html,/球団運営スタッフ/);
