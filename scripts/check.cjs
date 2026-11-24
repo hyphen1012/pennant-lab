@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.64 · REBORN/);
+assert.match(html,/VERSION 0\.9\.65 · SCOUTING FRONTIER/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1054,7 +1054,7 @@ const g={started:true,selectedId:2,seed:2027,teams:Array.from({length:12},(_,id)
 
 {
 const a=inline[1].indexOf('  function draftHash('),b=inline[1].indexOf('  function foreignMarketScreen(',a);
-const api=vm.runInNewContext('(function(){const game={year:2027,seed:1937,nextId:1000,players:[]};const POSITIONS=["C","1B","2B","3B","SS","OF","SP","RP","CP"];const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));const rand=()=>{game.seed=(Math.imul(game.seed,1664525)+1013904223)>>>0;return game.seed/4294967296;};const ri=(a,b)=>a+Math.floor(rand()*(b-a+1)),pick=a=>a[Math.floor(rand()*a.length)];const seasonSkillKeys=p=>["skill"];const createPlayer=(t,pos)=>({id:game.nextId++,teamId:t,pos,skill:60,talent:60});'+inline[1].slice(a,b)+';return {game,ensureForeignMarket};})()');
+const api=vm.runInNewContext('(function(){const game={year:2027,seed:1937,nextId:1000,players:[]};const currentReincarnationSources=()=>({draft:{},foreign:{}});const POSITIONS=["C","1B","2B","3B","SS","OF","SP","RP","CP"];const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));const rand=()=>{game.seed=(Math.imul(game.seed,1664525)+1013904223)>>>0;return game.seed/4294967296;};const ri=(a,b)=>a+Math.floor(rand()*(b-a+1)),pick=a=>a[Math.floor(rand()*a.length)];const seasonSkillKeys=p=>["skill"];const createPlayer=(t,pos)=>({id:game.nextId++,teamId:t,pos,skill:60,talent:60});'+inline[1].slice(a,b)+';return {game,ensureForeignMarket};})()');
 const m=api.ensureForeignMarket();assert.equal(m.candidates.length,36);assert.equal(new Set(m.candidates.map(c=>c.country)).size,10);assert.equal(new Set(m.candidates.map(c=>c.id)).size,36);assert.equal(new Set(m.candidates.map(c=>c.player.name)).size,36);assert(m.candidates.every(c=>c.player.teamId===null&&c.player.originMarket==="foreign"&&c.player.isForeign&&c.career.seasons<=c.player.age-18&&c.career.toYear===2026));assert.equal(api.game.seed,1937);assert.equal(api.game.players.length,0);assert.equal(api.ensureForeignMarket(),m);assert.equal(api.game.nextId,1036);api.game.year++;assert.notEqual(api.ensureForeignMarket(),m);assert.equal(api.game.nextId,1072);assert.equal(api.game.seed,1937);console.log('PASS: annual independent foreign pool, origin metadata, country variety, non-reroll and unique IDs');
 }
 
@@ -1202,4 +1202,18 @@ const empty={draft:{},foreign:{}};assert.equal(api.reincarnationBirthPlan(empty,
 const blocked=api.reincarnationBirthPlan(pools,73,2031,Object.values(pools.draft).flat().map(x=>x.playerId));assert.equal(blocked.draft.length,0);
 const c={id:999,player:{id:999,pos:'SP'},type:'大学生',school:'試験大学',region:'関東',status:'available'};const birth={ids:[]};api.applyReincarnationPool([c],[src],73,2031,'draft',birth);assert.equal(c.school,'試験大学');assert(c.nationalChampion);assert.equal(birth.ids[0],999);
 const overseas={id:1000,player:{id:1000,pos:'SP'},country:'台湾',career:{league:'東アジア'},status:'available'};api.applyReincarnationPool([overseas],[pools.foreign.RETURN[0]],73,2031,'foreign',{ids:[]});assert.equal(overseas.player.originMarket,'foreign');assert.equal(overseas.player.nationality,'台湾');assert.equal(overseas.player.specialCategory,'再来');console.log('PASS: 10,000 annual reincarnation draws, tier caps, route separation, inherited identity, fresh statistics and domestic/foreign placement');
+}
+
+{
+const a=inline[1].indexOf('  function draftHash('),b=inline[1].indexOf('  // Independent annual natural draws;',a);
+const api=vm.runInNewContext('(function(){const game={year:2030,calendarIndex:0,calendar:{days:Array(190)},selectedId:2,teams:[{id:2,scoutLevel:5,foreignScoutLevel:1}]};'+inline[1].slice(a,b)+';return {game,scoutDiscoveryDay,scoutLevelFor,ensureScoutSchedule,scoutVisible,foreignDiscoverySpeech};})()');
+const t=api.game.teams[0];assert.equal(api.scoutLevelFor('draft',t),5);assert.equal(api.scoutLevelFor('foreign',t),1);assert(api.scoutDiscoveryDay(120,5)<api.scoutDiscoveryDay(120,1));
+const mk=n=>({year:2030,phase:'scout',candidates:Array.from({length:n},(_,i)=>({id:i+1,status:'available',player:i===n-1?{specialCategory:'IMMORTAL'}:{}}))});
+const domestic=api.ensureScoutSchedule(mk(120),'draft'),foreign=api.ensureScoutSchedule(mk(36),'foreign');
+assert.equal(domestic.candidates.filter(api.scoutVisible).length,18);assert.equal(foreign.candidates.filter(api.scoutVisible).length,8);
+assert.equal(api.scoutVisible(domestic.candidates.at(-1)),false);assert.equal(api.scoutVisible(foreign.candidates.at(-1)),false);
+const snapshot=JSON.stringify(foreign);assert.equal(api.ensureScoutSchedule(foreign,'foreign'),foreign);assert.equal(JSON.stringify(foreign),snapshot);
+assert.equal(new Set(['PARALLEL','STAR','LEGEND','IMMORTAL'].map(api.foreignDiscoverySpeech)).size,4);
+assert.match(html,/scoutDiscoveryDaily\(entry\)/);assert.match(html,/foreignRate:1\/80/);assert.match(html,/data-action="foreign-upgrade"/);
+console.log('PASS: progressive fixed candidate discovery schedule and independent scout levels');
 }
