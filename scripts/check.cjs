@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.32 · CLUB IDENTITY/);
+assert.match(html,/VERSION 0\.9\.33 · LIVE PREVIEW/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -903,3 +903,8 @@ assert.match(html,/function clubIdentityEditor\(/);
 assert.match(html,/data-action="club-settings-save"/);
 assert.match(html,/data-shape=/);
 console.log('PASS: editable club identity and contextual color hooks');
+
+assert.match(html,/position:sticky;top:var\(--club-preview-top,8px\)/);
+assert.match(html,/function refreshClubEditor\(/);
+assert.match(html,/syncClubPreviewOffset\(\)/);
+console.log('PASS: scroll-following club preview and in-place design refresh');

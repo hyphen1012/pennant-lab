@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.32 · CLUB IDENTITY/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.33 · LIVE PREVIEW/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -115,10 +115,14 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   dispatch('click',{action:'tab',tab:'business'});
   dispatch('click',{action:'business-sub',sub:'club'});
   assert(app.innerHTML.includes('アイコン文字'));
+  assert(app.innerHTML.includes('LIVE PREVIEW'));
+  assert(app.innerHTML.includes('id="club-identity-preview"'));
   dispatch('change',{change:'club-field',field:'letter',value:'PL'});
   dispatch('click',{action:'team-color',color:'#dc2626'});
   dispatch('click',{action:'club-design',field:'shape',value:'shield'});
   dispatch('click',{action:'club-design',field:'pattern',value:'stripe'});
+  assert(app.innerHTML.includes('data-shape="shield" data-pattern="stripe"'));
+  assert(app.innerHTML.includes('LIVE PREVIEW'));
   dispatch('click',{action:'club-settings-save'});
   await flush();
   const club=store.get(1).data.teams.find(t=>t.id===store.get(1).data.selectedId);
