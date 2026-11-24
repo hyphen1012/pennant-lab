@@ -1001,10 +1001,10 @@ assert.match(html,/data-action="draft-report-view"/);
 {
 const a=inline[1].indexOf('  const DRAFT_MIN='),b=inline[1].indexOf('  const DRAFT_REGIONS=',a);
 const c=inline[1].indexOf('  function draftRights('),d=inline[1].indexOf('  function draftCutScreen(',c);
-const api=vm.runInNewContext('(function(){const game={selectedId:1,teams:[]},players=[],own=t=>players.filter(p=>p.teamId===t.id),rating=()=>60;'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {game,players,DRAFT_MIN,draftCanNominate,draftRosterProjection,draftCutOptions,draftToggleCut,draftPlanCPU};})()');
+const api=vm.runInNewContext('(function(){const game={selectedId:1,teams:[]},players=[],own=t=>players.filter(p=>p.teamId===t.id),rating=()=>60;'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {game,players,DRAFT_MIN,draftCanNominate,draftRosterProjection,draftCutOptions,draftToggleCut,draftPlanCPU,draftCutIds};})()');
 const t={id:1},cpu={id:2},draft={phase:'done',picks:[]},candidate={status:'available',player:{pos:'OF'}};api.game.teams.push(t,cpu);
 let id=0;for(const team of [t,cpu]){for(const [pos,n] of Object.entries(api.DRAFT_MIN))for(let i=0;i<n;i++)api.players.push({id:++id,teamId:team.id,pos,age:25});while(api.players.filter(p=>p.teamId===team.id).length<29)api.players.push({id:++id,teamId:team.id,pos:'OF',age:25});for(let i=0;i<3;i++)draft.picks.push({teamId:team.id,status:'signed',pos:'OF'});}
-assert(api.draftCanNominate(draft,t,candidate));assert(api.draftCanNominate(draft,cpu,candidate));
+assert.equal(api.draftCutIds(null,t).length,0);assert(api.draftCanNominate(draft,t,candidate));assert(api.draftCanNominate(draft,cpu,candidate));
 assert.equal(api.draftRosterProjection(draft,t).excess,2);
 const p=api.draftCutOptions(draft,t)[0];assert(api.draftToggleCut(draft,t,p.id));assert.equal(api.draftRosterProjection(draft,t).excess,1);assert(api.draftToggleCut(draft,t,p.id));assert.equal(api.draftRosterProjection(draft,t).excess,2);
 for(let i=0;i<2;i++){const x=api.draftCutOptions(draft,t).find(p=>!(draft.cutPlan?.[t.id]||[]).includes(p.id));assert(api.draftToggleCut(draft,t,x.id));}

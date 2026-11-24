@@ -3445,7 +3445,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   // Nomination and agreement are independent of the next-season registered roster.
   function draftCanNominate(d,t,c){return !!c&&c.status==='available';}
   function draftOptions(d,t){return d.candidates.filter(c=>draftCanNominate(d,t,c));}
-  function draftCutIds(d,t){return d.cutPlan?.[t.id]||[];}
+  function draftCutIds(d,t){return d?.cutPlan?.[t?.id]||[];}
   function draftRosterProjection(d,t,extra=[]){
     const cuts=new Set([...draftCutIds(d,t),...extra]),players=own(t).filter(p=>!cuts.has(p.id)&&p.age<40),signed=d.picks.filter(x=>x.teamId===t.id&&x.status==='signed');
     const counts=Object.fromEntries(Object.keys(DRAFT_MIN).map(k=>[k,players.filter(p=>p.pos===k).length+signed.filter(x=>x.pos===k).length]));
@@ -5850,7 +5850,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   };
   function offseasonExperience(phase){
     const value=phase==='winter'?25:phase==='self'?22:30;
-    for(const p of game.players.filter(p=>p.teamId!==null&&p.teamId>=0)){
+    for(const p of game.players.filter(p=>p.teamId!==null&&p.teamId>=0&&!(game.draft?.cutConfirmed&&draftCutIds(game.draft,getTeam(p.teamId)).includes(p.id)))){
       const ageFactor=p.age<=26?1.2:p.age>=34?.65:1;
       p.expPoints+=value*(.7+(p.talent||60)/180)*ageFactor;spendExperience(p);
     }
