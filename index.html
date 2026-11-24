@@ -4186,7 +4186,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(major)(game.pendingRareIds||(game.pendingRareIds=[])).push(id);
     return true;
   }
-  function pendingRareNews(){return (game.rareNews||[]).filter(e=>(game.pendingRareIds||[]).includes(e.id));}
+  function rareObsoleteCutin(e){return /:stat:\d+:(?:h:100|k:100|w:10|sv:30|hr:30|rbi:100)$/.test(e.id)||/:awards:\d+$/.test(e.id);}
+  function pendingRareNews(){return (game.rareNews||[]).filter(e=>(game.pendingRareIds||[]).includes(e.id)&&!rareObsoleteCutin(e));}
   function rareSeasonMilestones(p){return isPitch(p)?[['w',20,'20勝'],['k',200,'200奪三振'],['sv',40,'40セーブ']]:[['h',200,'200安打'],['hr',40,'40本塁打'],['rbi',120,'120打点'],['sb',50,'50盗塁']];}
   function rareDaily(entry){
     const date=entry.date;
@@ -4228,7 +4229,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       if(game.day===143){const titles=(game.awards||[]).filter(a=>a.playerId===p.id).map(a=>a.title);if(titles.length)rareQueue('awards:'+p.id,date,p,p.name+'、タイトル獲得',club.name+' · '+titles.join('／'),false);}
     }
     for(const g of game.games.slice(-6))for(const feat of g.feats||[]){
-      const p=getPlayer(feat.playerId);if(p&&playerTitleTheme(p))rareQueue('feat:'+g.id+':'+p.id+':'+feat.featKey,date,p,p.name+'、'+feat.label+'！',getTeam(p.teamId)?.name+' · '+(feat.value||feat.label),/完全試合|ノーヒット|サイクル|四冠|三冠|記録更新/.test(feat.label||''));
+      const p=getPlayer(feat.playerId);if(p&&playerTitleTheme(p))rareQueue('feat:'+g.id+':'+p.id+':'+feat.featKey,date,p,p.name+'、'+feat.label+'！',getTeam(p.teamId)?.name+' · '+(feat.value||feat.label),['perfect','nohit','fortyforty','triplethree','season50hr','season20w','season200h','season200k'].includes(feat.featKey)||/完全試合|ノーヒット|サイクル|四冠|三冠|記録更新/.test(feat.label||''));
     }
     for(const e of (game.milestoneNews||[]).filter(e=>e.date===date&&e.recordKey)){
       const p=getPlayer(e.playerId);if(p&&playerTitleTheme(p))rareQueue('record:'+p.id+':'+e.recordKey,date,p,e.title,e.body);
@@ -4293,7 +4294,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function rareNewsScreen(preview=null){
     const html=rareNewsMarkup(preview);if(!html)return html;
-    const final=html.includes('data-action="rare-news-ack"');return final?html.replace(/<button class="btn primary full" data-action="rare-news-ack">([\\s\\S]*?)<\/button>/, '<div class="rare-fixed-action"><button class="btn primary full" data-action="rare-news-ack">$1</button></div>'):html;
+    const final=html.includes('data-action="rare-news-ack"');return final?html.replace(/<button class="btn primary full" data-action="rare-news-ack">([\s\S]*?)<\/button>/, '<div class="rare-fixed-action"><button class="btn primary full" data-action="rare-news-ack">$1</button></div>'):html;
   }
   function rareNewsMarkup(preview=null){
  const events=preview?[preview.event]:pendingRareNews(),e=events[0];if(!e)return '';
@@ -4846,7 +4847,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function draftCutScreen(){
     const d=game.draft,t=myTeam();if(!d)return '';
     const p=draftRosterProjection(d,t),selected=draftCutIds(d,t),options=draftCutOptions(d,t);
-    return `<section class="draft-room roster-cut-room"><header class="draft-stage-head"><small>ROSTER MANAGEMENT · ${game.year}</small><h1>戦力外通告</h1><p>新戦力を迎えるための来季編成</p></header><section class="panel"><h3>来季登録予定</h3><div class="draft-cut-total" data-over="${p.excess>0}"><b>${p.projected}</b><span> / ${ROSTER_MAX}人</span></div><p>入団合意 ${p.signed}人 · 放出予定 ${selected.length}人 · 引退確定見込み ${p.retiring}人</p>${p.minimumFill?`<p class="small">必要ポジションの不足補充 ${p.minimumFill}人を含む</p>`:''}<p class="small">${p.excess?'あと '+p.excess+' 人の枠を空けてください。':'登録枠を確保できています。'}</p><p class="small">指名・入団合意は維持します。既存選手の放出を選択し、最後に確定してください。必要ポジションを維持できる候補を表示します。</p></section><details class="panel" ${p.excess||selected.length?'open':''}><summary>戦力外候補・選択 ${selected.length}人</summary>${options.map(x=>`<div class="draft-release-row" data-draft-card="${x.id}">${faceMini(x,{overall:true})}<span><b>${h(x.name)}</b><small>${x.age}歳 · ${positionMarkup(x.pos)} · ${gradeBrief(rating(x))}</small><small>年俸 <b class="stat-salary">${fmtSalary(x.salary)}</b></small>${statDisplayGrid(x,x.stats,true)}<small></small>${draftCutReasons(x).length?`<small class="draft-cut-important">⚠ ${h(draftCutReasons(x).join(' / '))}</small>`:''}</span><button class="btn ${selected.includes(x.id)?'primary':'outline'} sm" data-action="draft-cut-toggle" data-id="${x.id}">${selected.includes(x.id)?'選択済み ✓':'放出候補にする'}</button></div>`).join('')||'<p>対象選手なし</p>'}</details><button class="btn primary full" data-action="draft-cut-finish" ${p.excess?'disabled':''}>戦力外通告を確定して次へ ›</button></section>`;
+    return `<section class="draft-room roster-cut-room"><header class="draft-stage-head"><small>ROSTER MANAGEMENT · ${game.year}</small><h1>戦力外通告</h1><p>新戦力を迎えるための来季編成</p></header><section class="panel"><h3>来季登録予定</h3><div class="draft-cut-total" data-over="${p.excess>0}"><b>${p.projected}</b><span> / ${ROSTER_MAX}人</span></div><p>入団合意 ${p.signed}人 · 放出予定 ${selected.length}人 · 引退確定見込み ${p.retiring}人</p>${p.minimumFill?`<p class="small">必要ポジションの不足補充 ${p.minimumFill}人を含む</p>`:''}<p class="small">${p.excess?'あと '+p.excess+' 人の枠を空けてください。':'登録枠を確保できています。'}</p><p class="small">指名・入団合意は維持します。既存選手の放出を選択し、最後に確定してください。必要ポジションを維持できる候補を表示します。</p></section><details class="panel" ${p.excess||selected.length?'open':''}><summary>戦力外候補・選択 ${selected.length}人</summary>${options.map(x=>`<div class="draft-release-row" data-draft-card="${x.id}">${faceMini(x,{overall:true})}<span><b>${themedPlayerName(x)}</b><small>${x.age}歳 · ${positionMarkup(x.pos)} · ${coloredAbility(rating(x))}</small><small>年俸 <b class="stat-salary">${fmtSalary(x.salary)}</b></small>${statDisplayGrid(x,x.stats,true)}${draftCutReasons(x).length?`<small class="draft-cut-important">⚠ ${h(draftCutReasons(x).join(' / '))}</small>`:''}</span><button class="btn ${selected.includes(x.id)?'primary':'outline'} sm" data-action="draft-cut-toggle" data-id="${x.id}">${selected.includes(x.id)?'選択済み ✓':'放出候補にする'}</button></div>`).join('')||'<p>対象選手なし</p>'}</details><button class="btn primary full" data-action="draft-cut-finish" ${p.excess?'disabled':''}>戦力外通告を確定して次へ ›</button></section>`;
   }
   function draftRanked(d,t){
     const profile=draftScoutProfile(t),ownPlayers=own(t),rights=draftRights(d,t);
@@ -6226,9 +6227,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function awardPortrait(p,title){
     const styles={'本塁打王':['#e89750','HR'],'首位打者':['#68c8a4','AVG'],'最多安打':['#51c4c3','H'],'打点王':['#e99c87','RBI'],'盗塁王':['#70c7e4','SB'],'最高出塁率':['#8acb9b','OBP'],'最多勝':['#8db7e3','W'],'最多奪三振':['#9fd0eb','K'],'最多セーブ':['#6ab5b5','S'],'最優秀防御率':['#cad8ed','ERA'],'MVP':['#c5edf3','♛'],'新人王':['#e8efea','R'],'ベストナイン':['#83b3e6','9'],'守備名手賞':['#68b89b','G'],'三冠王':['#f0d399','3'],'投手三冠':['#c0d8e9','3']};
     const theme=achievementTheme(title);
-    if(theme)return `<span class="award-portrait-ring" ${achievementAttrs(title)} data-symbol="${theme.symbol}">${faceMini(p)}</span>`;
+    if(theme)return `<span class="award-portrait-ring"${faceDetailAttr(p)} ${achievementAttrs(title)} data-symbol="${theme.symbol}">${faceMini(p)}</span>`;
     const base=Object.keys(styles).find(k=>title===k||title.startsWith(k+'（')),v=styles[base]||['#c7b991','★'];
-    return `<span class="award-portrait-ring" style="--award-edge:${v[0]}" data-symbol="${v[1]}">${faceMini(p)}</span>`;
+    return `<span class="award-portrait-ring"${faceDetailAttr(p)} style="--award-edge:${v[0]}" data-symbol="${v[1]}">${faceMini(p)}</span>`;
   }
   function careerTitles(p){
     const list=[...(p.titles||[]),...(game.seasonArchive||[]).flatMap(s=>(s.awards||[]).filter(a=>a.playerId===p.id)),...(game.awards||[]).filter(a=>a.playerId===p.id)];
@@ -7024,7 +7025,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(ui.page!=='game'||ui.busy||ui.rewardBusy)return;
     const src=faceDetailSource(id);if(!src)return;
     const p=src.p;let dialog=document.querySelector('.player-face-dialog');
-    if(!dialog){dialog=document.createElement('dialog');dialog.className='player-face-dialog';dialog.setAttribute('aria-label','選手詳細');document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove());dialog.addEventListener('click',ev=>{if(ev.target===dialog||ev.target.closest('[data-face-close]')){dialog.close();return;}const next=ev.target.closest('[data-player-face],[data-action="career-open"]');if(next)openFaceDetail(Number(next.dataset.playerFace||next.dataset.id));});}
+    if(!dialog){dialog=document.createElement('dialog');dialog.className='player-face-dialog';dialog.setAttribute('aria-label','選手詳細');document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove());}
     const hidden=src.limited&&(src.hideName||secretProspect(p)),name=src.hideName?'????':p.name;
     let body='';
     if(src.limited){
@@ -7038,7 +7039,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     dialog.querySelector('.face-dialog-body').scrollTop=0;
   }
   window.addEventListener('click',e=>{
-    const el=e.target.closest('[data-player-face]');if(!el||el.closest('.player-face-dialog')||ui.page!=='game'||ui.busy||ui.rewardBusy)return;
+    const dialog=e.target.closest('.player-face-dialog');
+    if(dialog){const next=e.target.closest('[data-player-face],[data-action="career-open"]');if(e.target===dialog||e.target.closest('[data-face-close]')){e.preventDefault();e.stopImmediatePropagation();dialog.close();}else if(next){e.preventDefault();e.stopImmediatePropagation();openFaceDetail(Number(next.dataset.playerFace||next.dataset.id));}else if(e.target.closest('[data-action]')){e.preventDefault();e.stopImmediatePropagation();}return;}
+    const el=e.target.closest('[data-player-face]');if(!el||ui.page!=='game'||ui.busy||ui.rewardBusy)return;
     e.preventDefault();e.stopImmediatePropagation();openFaceDetail(Number(el.dataset.playerFace));
   },true);
   function renderFaceArtwork(p,options={}){
@@ -8120,7 +8123,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       if(action==='renewal-adjust'&&row&&row.status!=='signed'&&['-1','1'].includes(v)){row.offer=r2(clamp(row.offer+Number(v)*(row.offer>=1?.05:.01),.05,5));ui.renewalPreset=null;}
       else if(action==='renewal-offer'&&row)renewalOffer(row,row.offer);
       else if(action==='renewal-bulk'&&['assessment','middle','desired'].includes(v)){renewalBulk(d,v);ui.renewalPreset=v;}
-      else if(action==='renewal-submit-all')renewalSubmitAll(d);
+      else if(action==='renewal-submit-all'){renewalSubmitAll(d);ui.renewalPreset=null;}
       else if(action==='renewal-filter'&&['all','unoffered','pending','signed'].includes(v))ui.renewalFilter=v;
       else if(action==='renewal-sort'&&['salary','age','rating'].includes(v))ui.renewalSort=v;
       else if(action==='renewal-finish'){if(!renewalFinish(t))return;}
@@ -8174,7 +8177,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       e.preventDefault();e.stopImmediatePropagation();
       if(action==='rare-news-next'){if(!ui.rareBroadcastStage&&pendingRareNews()[0]?.category==='輪廻転生'&&pendingRareNews()[0]?.kind!=='foreign-discovery'){beginRinneTear();return;}ui.rareBroadcastStage=ui.rareBroadcastStage==='tear'?1:Math.min(2,(ui.rareBroadcastStage||0)+1);render();draftJump(0);return;}
       if(action!=='rare-news-ack'||ui.rareBroadcastStage!==2)return;
-      game.pendingRareIds.shift();ui.rareBroadcastId=null;ui.rareBroadcastStage=0;
+      const acknowledged=pendingRareNews()[0]?.id;game.pendingRareIds=(game.pendingRareIds||[]).filter(id=>id!==acknowledged&&!(game.rareNews||[]).some(e=>e.id===id&&rareObsoleteCutin(e)));ui.rareBroadcastId=null;ui.rareBroadcastStage=0;
       const resume=!pendingRareNews().length&&game.rareResume&&advanceTargetRemaining()&&!game.pendingMonth&&!document.hidden&&!storageFailure;
       if(!pendingRareNews().length&&!resume)game.rareResume=false;
       if(resume&&game.playbackMode!=='skip'&&pendingMilestoneNews().length){game.milestoneResume=true;game.rareResume=false;save();render();return;}
