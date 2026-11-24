@@ -119,6 +119,14 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   dispatch('click',{action:'rare-news-next'});assert(app.innerHTML.includes('rinne-piece left'));assert(app.innerHTML.includes('rinne-piece right'));assert(app.innerHTML.includes('崩壊した架空の野球場'));
   await flush();assert(!app.innerHTML.includes('rinne-piece left'));
   assert(app.innerHTML.includes('壊滅したスタジオ'));dispatch('click',{action:'rare-news-next'});assert(app.innerHTML.includes('ruined-feature'));assert(app.innerHTML.includes('class="rinne-smile"'));assert(app.innerHTML.includes('「また俺の時代だ...」'));assert(app.innerHTML.includes('14 − 2'));assert(app.innerHTML.includes('????'));
+  for(const category of ['PARALLEL','STAR','LEGEND','IMMORTAL']){
+    dispatch('click',{action:'rare-preview-category',value:category});
+    dispatch('click',{action:'rare-preview-route',value:'foreign'});
+    dispatch('click',{action:'rare-preview-start'});assert(app.innerHTML.includes('GLOBAL SCOUTING'));
+    dispatch('click',{action:'rare-news-next'});assert(app.innerHTML.includes('海外担当スカウト'));assert(app.innerHTML.includes('海外球場のスタンドとグラウンド'));assert(!app.innerHTML.includes('ニューススタジオのキャスター'));
+    dispatch('click',{action:'rare-news-next'});if(category==='IMMORTAL')assert(app.innerHTML.includes('???'));
+    dispatch('click',{action:'rare-news-ack'});
+  }
   dispatch('click',{action:'rare-preview-exit'});assert.equal(JSON.stringify(window.PennantLab.getSnapshot()),previewBefore);assert.equal(store.size,saveBefore);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
@@ -205,10 +213,18 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   dispatch('click',{action:'business-sub',sub:'foreign'});
   assert(app.innerHTML.includes('海外スカウト'));assert(app.innerHTML.includes('data-action="foreign-init"'));
   dispatch('click',{action:'foreign-init'});assert(app.innerHTML.includes('36名'));assert(app.innerHTML.includes('未調査'));assert.match(app.innerHTML,/class="position-word" data-position-group=/);assert(!app.innerHTML.includes('data-action="sign"'));
+  await flush();
+  const initialForeign=store.get(1).data.foreignMarket;
+  assert.equal(initialForeign.candidates.length,36);assert(initialForeign.candidates.filter(c=>c.scoutDiscovered).length<36);
+  const ownBefore=store.get(1).data.teams.find(t=>t.id===store.get(1).data.selectedId);
+  dispatch('click',{action:'foreign-upgrade'});await flush();
+  const ownAfter=store.get(1).data.teams.find(t=>t.id===store.get(1).data.selectedId);
+  assert.equal(ownAfter.foreignScoutLevel,(ownBefore.foreignScoutLevel||2)+1);
+  assert.equal(ownAfter.scoutLevel,ownBefore.scoutLevel);
   const foreignHtml=app.innerHTML;
   dispatch('click',{action:'business-sub',sub:'market'});dispatch('click',{action:'business-sub',sub:'foreign'});
   assert.equal(app.innerHTML,foreignHtml);assert.equal(window.PennantLab.getSnapshot().playerCount,beforeForeign);
-  dispatch('click',{action:'foreign-filter',value:'pitch'});assert(app.innerHTML.includes('12名'));
+  dispatch('click',{action:'foreign-filter',value:'pitch'});assert.match(app.innerHTML,/\d+名 · 獲得可能候補/);
   dispatch('click',{action:'foreign-filter',value:'all'});
   const foreignId=app.innerHTML.match(/data-action="foreign-detail" data-id="(\d+)"/)[1];
   dispatch('click',{action:'foreign-detail',id:foreignId});assert(app.innerHTML.includes('海外リーグ・昨季実績'));
@@ -318,7 +334,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     if(app.innerHTML.includes('data-action="rare-news-next"')){
       dispatch('click',{action:'rare-news-next'});
       assert(app.innerHTML.includes('data-action="rare-news-next"'));
-      assert(app.innerHTML.includes('ニューススタジオのキャスター'));
+      assert(app.innerHTML.includes('ニューススタジオのキャスター')||app.innerHTML.includes('海外担当スカウト'));
       dispatch('click',{action:'rare-news-next'});
       assert(app.innerHTML.includes('data-action="rare-news-ack"'));
     }
