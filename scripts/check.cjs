@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.1 · CALENDAR/);
+assert.match(html,/VERSION 0\.9\.2 · CALENDAR/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -572,7 +572,7 @@ console.log('PASS: pitch-count bullpen, left/right matchup, workload and no pitc
 
 // Calendar presentation must not change the persisted save schema or simulate twice.
 assert.match(html,/function calendarDateIntroScreen\(entry\)/);
-assert.match(html,/const dateIntroDelay=mode==='fast'\?320:480/);
+assert.match(html,/const dateIntroDelay=mode==='fast'\?640:960/);
 assert.match(html,/await waitForDailyDisplay\(dateIntroDelay\);\s*ui\.dateIntro=false;ui\.autoDay=null;\s*if\(ui\.pauseRequested\|\|document\.hidden\|\|storageFailure\)break;\s*}\s*const entry=processCalendarDay\(\);/);
 assert.match(html,/prefers-reduced-motion:reduce\)\{\.calendar-date-track/);
 const dateStart=inline[1].indexOf('  function calendarOffsetDate(');
@@ -586,3 +586,6 @@ const dateMarkup=dateApi.calendarDateIntroScreen({date:'2028-03-25',type:'game',
 assert(dateMarkup.includes('開幕戦')&&dateMarkup.includes('2028-03-25'));
 assert(!dateMarkup.includes('result-score-row'));
 console.log('PASS: date intro civil dates, spoiler-free markup and interruption guard');
+
+assert.match(html,/const previousIntroDelay=mode==='fast'\?320:480/);
+assert.match(html,/await waitForDailyDisplay\(\(entry.type==='game'\?baseDelay:5000\)-previousIntroDelay\)/);
