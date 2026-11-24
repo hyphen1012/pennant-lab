@@ -1297,6 +1297,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .edition-heading:is([data-edition="mythic"],[data-edition="elite"],[data-edition="compound"])::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(115deg,transparent 20%,#e7e7fc24 45%,transparent 70%);background-size:220% 100%}
 @media(prefers-reduced-motion:no-preference){.edition-heading:is([data-edition="mythic"],[data-edition="elite"],[data-edition="compound"])::after{animation:report-sheen 4.5s ease-in-out infinite}}
 @media(prefers-reduced-motion:reduce){.edition-heading::after{animation:none!important}}
+.edition-compact-event{border-bottom:1px solid #40536a}.edition-compact-event:last-child{border-bottom:0}.edition-compact-event summary{list-style:none;cursor:pointer}.edition-compact-event summary::-webkit-details-marker{display:none}.edition-expand-mark{color:#b8c7db;font-size:15px;flex:none}.edition-compact-event[open] .edition-expand-mark{transform:rotate(180deg)}.edition-event-body{color:#c8d5e5;font-size:12px;line-height:1.5;margin:0 0 10px;padding:0 4px 3px}
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -1969,7 +1970,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function compactMilestone(e){
     const key=achievementKey(e),p=e.playerId!=null?getPlayer(e.playerId):null,stat=e.finalRecord?.stat??e.stat,theme=achievementTheme(key);
-    return `<div class="edition-compact-row" ${achievementAttrs(key)}>${p?(theme?awardPortrait(p,key):faceMini(p)):''}<div class="record-player-info"><span class="edition-mini-label">${h(theme?.label||e.title)}</span><b>${h(p?e.playerName:e.title)}</b><small>${h(getTeam(e.teamId)?.short||'')} · ${formatCalendarDate(e.date,true)}${e.updateCount>1?' · '+e.updateCount+'件集約':''}</small></div>${stat? `<span class="edition-mini-stat">${h(String(stat))}</span>`:''}</div>`;
+    const title=String(e.title||''),label=e.recordKey?title.replace(/^.*?、/,'').replace(/！$/,''):theme?.label||title;
+    const body=e.finalRecord?.body??e.body;
+    return `<details class="edition-compact-event"><summary class="edition-compact-row" ${achievementAttrs(key)}>${p?(theme?awardPortrait(p,key):faceMini(p)):''}<div class="record-player-info"><span class="edition-mini-label">${h(label)}</span><b>${h(p?e.playerName:title)}</b><small>${h(getTeam(e.teamId)?.short||'')} · ${formatCalendarDate(e.date,true)}${e.updateCount>1?' · '+e.updateCount+'件集約':''}</small></div>${stat?`<span class="edition-mini-stat">${h(String(stat))}</span>`:''}<span class="edition-expand-mark" aria-hidden="true">⌄</span></summary><p class="edition-event-body">${h(body||title)}</p></details>`;
   }
   function milestoneNewsScreen(){
     const pages=milestonePages(pendingMilestoneNews()),page=pages.find(p=>p.id===game.milestoneEdition);
