@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.34 · LEGACY SCORE/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.35 · CHRONICLE/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -527,6 +527,36 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(legacy&&legacy.year===full.year+1);
   assert(legacy.entries.every(e=>e.eligibleFrom<=legacy.year&&e.score>=0&&e.score<=100&&e.route==='draft'));
   assert(legacy.entries.some(e=>e.tier),'Retired players include eligible historical figures');
+  dispatch('click',{action:'record-sub',sub:'decade'});
+  assert(app.innerHTML.includes('球界・球団10年史'));
+  dispatch('click',{action:'decade-archive-open',year:'2036'});
+  assert(app.innerHTML.includes('球界10年史'));
+  dispatch('click',{action:'decade-open',editionId:'clubs'});
+  assert(app.innerHTML.includes('最長連覇'));
+  dispatch('click',{action:'decade-back'});
+  dispatch('click',{action:'decade-close'});
+  assert(app.innerHTML.includes('球界・球団10年史'));
+  // Synthetic decade boundary fixture: preserve the normal one-season smoke above.
+  const fixture=JSON.parse(JSON.stringify(store.get(1)));
+  fixture.data.seasonArchive=Array.from({length:10},(_,i)=>({...fixture.data.seasonArchive[0],year:2027+i}));
+  fixture.data.year=2037;fixture.data.pendingDecade=2036;fixture.data.pendingCeremonyIntro='opening';
+  store.set(1,fixture);
+  dispatch('click',{action:'continue-slot',slot:'1'});await flush();
+  assert(app.innerHTML.includes('2036'));
+  assert(app.innerHTML.includes('球界10年史'));
+  dispatch('click',{action:'decade-open',editionId:'timeline'});
+  assert(app.innerHTML.includes('年度別の優勝球団'));
+  dispatch('click',{action:'decade-close'});
+  assert(app.innerHTML.includes('role="alertdialog"'));
+  dispatch('click',{action:'edition-exit-cancel'});
+  assert(app.innerHTML.includes('年度別の優勝球団'));
+  dispatch('click',{action:'decade-close'});
+  dispatch('click',{action:'edition-exit-confirm'});
+  await flush();
+  assert.equal(store.get(1).data.pendingDecade,null);
+  assert.equal(store.get(1).data.lastDecadeViewed,2036);
+  assert(app.innerHTML.includes('data-event="opening"'));
+  console.log('PASS: decade archive navigation and one-time event exit');
   console.log('PASS: six milestone titles, full offseason sequence and next-year opening');
   console.log('PASS: v0.9.7 cinematic watch, manager, personalized GM reports, save and season');
 })().catch(e=>{console.error(e);process.exitCode=1;});

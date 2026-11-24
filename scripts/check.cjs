@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.34 · LEGACY SCORE/);
+assert.match(html,/VERSION 0\.9\.35 · CHRONICLE/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -931,4 +931,22 @@ const result=api.legacyScore(Array.from({length:10},()=>({score:100})),Array.fro
 assert.equal(result.score,100);
 assert.equal(Object.keys(result.parts).length,6);
 console.log('PASS: six-part scoring, rarity weights, duplicate control and historic record value');
+}
+
+{
+const a=inline[1].indexOf('  function decadePeriods('),b=inline[1].indexOf('  function decadePlayerLeaders(',a);
+const c=inline[1].indexOf('  function decadeAwards('),d=inline[1].indexOf('  function decadeReport(',c);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {decadePeriods,decadeDue,decadeTeams,decadeAwards};})()');
+const seasons=Array.from({length:20},(_,i)=>({year:2027+i,standings:{E:[{id:1,name:'A',rank:1,wins:80,losses:60,ties:3}],W:[{id:2,name:'B',rank:1,wins:70,losses:70,ties:3}]},postseason:{championId:i%2?2:1},awards:[{playerId:7,title:'MVP',league:'E',teamId:1}]}));
+assert(!api.decadeDue(seasons.slice(0,9),2035));
+assert(api.decadeDue(seasons.slice(0,10),2036));
+assert(api.decadeDue(seasons,2046));
+assert(!api.decadeDue(seasons.filter(s=>s.year!==2030),2036));
+assert.equal(api.decadePeriods(seasons).length,2);
+const r=api.decadeTeams(seasons,2027,2036);
+assert.equal(r.teams[0].championships,5);assert.equal(r.teams[0].wins,800);assert.equal(r.teams[0].best,10);
+assert.equal(r.timeline.length,10);
+assert.equal(api.decadeAwards(r.seasons)[0].mvp,10);
+assert.equal(api.decadeTeams(seasons.filter(s=>s.year!==2030),2027,2036).teams[0].best,6);
+console.log('PASS: fixed decade windows, championship counts, streak gaps and award totals');
 }
