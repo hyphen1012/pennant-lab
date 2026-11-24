@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.56 · RARE ENCOUNTER/);
+assert.match(html,/VERSION 0\.9\.57 · LAST CHANCE/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1125,4 +1125,19 @@ const a=inline[1].indexOf('  function draftHash('),b=inline[1].indexOf('  functi
 const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {lotteryRewardAllowed,applyLotteryReward};})()');
 for(let n=2;n<=12;n++)for(let selected=0;selected<n;selected++){const draft={year:2027,round:1,phase:'lottery',pendingLottery:{attempt:1,cursor:0,stage:'choose',groups:[{cid:7,ids:Array.from({length:n},(_,i)=>i)}]}};assert(api.lotteryRewardAllowed(draft,selected));const before=JSON.stringify(draft);assert(!api.applyLotteryReward(draft,selected,false));assert.equal(JSON.stringify(draft),before);assert(!api.applyLotteryReward(draft,99,true));assert(api.applyLotteryReward(draft,selected,true));assert.equal(draft.pendingLottery.groups[0].winner,selected);assert.equal(draft.pendingLottery.stage,'sealed');assert(!api.applyLotteryReward(draft,selected,true));}
 assert.match(html,/const rewardAdProvider=null/);console.log('PASS: verified lottery reward, no failed/spectator/duplicate reward, 2–12 clubs');
+}
+
+{
+const src=inline[1],part=(a,b)=>src.slice(src.indexOf(a),src.indexOf(b,src.indexOf(a)));
+const api=vm.runInNewContext('(function(){const r2=n=>Math.round(n*100)/100;'+part('  function negotiationRewardEligible(','  function recoveryPanel(')+part('  function draftRecoveryAllowed(','  function draftAutoNegotiation(')+';return {negotiationRewardEligible,applyDraftRecovery};})()');
+const t={id:2,cash:1},d={phase:'negotiate'},c={id:8,status:'refused'},row={teamId:2,candidateId:8,status:'refused',recoveryPending:true,offers:[{fee:.2,salary:.1,accepted:false}]};
+const before=JSON.stringify({t,row,c});assert(!api.applyDraftRecovery(d,t,row,c,false));assert.equal(JSON.stringify({t,row,c}),before);assert(!api.applyDraftRecovery(d,{id:2,cash:.1},row,c,true));assert(api.applyDraftRecovery(d,t,row,c,true));assert.equal(t.cash,.8);assert.equal(row.status,'signed');assert.equal(c.status,'signed');assert(!api.applyDraftRecovery(d,t,row,c,true));assert.equal(t.cash,.8);
+assert(!api.negotiationRewardEligible({status:'rival'},{},true,true));assert(!api.negotiationRewardEligible({status:'withdrawn'},{},true,true));console.log('PASS: draft reversal verified completion, exact charge, no double reward or signed rival reversal');
+}
+{
+const src=inline[1],part=(a,b)=>src.slice(src.indexOf(a),src.indexOf(b,src.indexOf(a)));
+const api=vm.runInNewContext('(function(){const teams=[{id:2,name:"OWN",cash:1},{id:3,name:"RIVAL",cash:1}],players=[];const getTeam=id=>teams.find(t=>t.id===id),foreignRoom=(t,c)=>!players.some(p=>p.id===c.id),foreignAffordable=(t,o)=>t.cash>=o.fee+o.salary+o.supportCost,pushNews=()=>{},foreignRegister=(m,c,t,o)=>{if(c.status!=="available"||!foreignRoom(t,c)||!foreignAffordable(t,o))return false;t.cash-=o.fee+o.supportCost;players.push({id:c.id,teamId:t.id});c.status="signed";return true;};'+part('  function negotiationRewardEligible(','  function recoveryPanel(')+part('  function foreignRecoveryAllowed(','  function foreignResolve(')+';return {teams,players,applyForeignRecovery,finalizeForeignRival};})()');
+const [t,rival]=api.teams,offer={fee:.2,salary:.1,supportCost:.05},m={history:[]},c={id:5,status:'rival-pending',player:{name:'TEST'}},conv={candidateId:5,resultOpened:true,status:'rival-pending',offer,pendingRival:{teamId:3,bid:offer}};m.history.push({id:5,teamId:2,status:'rival-pending'});
+assert(!api.applyForeignRecovery(m,t,c,conv,false));assert.equal(api.players.length,0);assert(api.applyForeignRecovery(m,t,c,conv,true));assert.equal(api.players[0].teamId,2);assert.equal(t.cash,.75);assert.equal(rival.cash,1);assert.equal(m.history[0].status,'signed');assert(!api.applyForeignRecovery(m,t,c,conv,true));assert(!api.finalizeForeignRival(m,t,c,conv));
+const c2={id:6,status:'rival-pending',player:{name:'TEST2'}},v2={candidateId:6,resultOpened:true,status:'rival-pending',offer,pendingRival:{teamId:3,bid:offer}};assert(api.finalizeForeignRival(m,t,c2,v2));assert.equal(api.players[1].teamId,3);assert(!api.applyForeignRecovery(m,t,c2,v2,true));assert.equal(rival.cash,.75);console.log('PASS: foreign reversal before formal rival signing, cancellation path, exactly one registration');
 }
