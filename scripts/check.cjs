@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.66 · LEGACY ECHO/);
+assert.match(html,/VERSION 0\.9\.67 · GLOBAL TALENT/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1214,7 +1214,7 @@ assert.equal(domestic.candidates.filter(api.scoutVisible).length,18);assert.equa
 assert.equal(api.scoutVisible(domestic.candidates.at(-1)),false);assert.equal(api.scoutVisible(foreign.candidates.at(-1)),false);
 const snapshot=JSON.stringify(foreign);assert.equal(api.ensureScoutSchedule(foreign,'foreign'),foreign);assert.equal(JSON.stringify(foreign),snapshot);
 assert.equal(new Set(['PARALLEL','STAR','LEGEND','IMMORTAL'].map(api.foreignDiscoverySpeech)).size,4);
-assert.match(html,/scoutDiscoveryDaily\(entry\)/);assert.match(html,/foreignRate:1\/80/);assert.match(html,/data-action="foreign-upgrade"/);
+assert.match(html,/scoutDiscoveryDaily\(entry\)/);assert.match(html,/foreignRate:\.03/);assert.match(html,/data-action="foreign-upgrade"/);
 console.log('PASS: progressive fixed candidate discovery schedule and independent scout levels');
 }
 
@@ -1238,4 +1238,14 @@ assert.equal(lin.lineageMembers([kid,parent,{id:3,name:'同名'}],kid).map(x=>x.
 assert(lin.pastLifeSpeech({...kid,reincarnation:{...kid.reincarnation,parentId:-1}},'reply',2).includes('40'));
 assert.match(html,/universityTournamentYearChecked/);assert.match(html,/大学全国大会優勝/);assert.match(html,/前世との系譜/);
 console.log('PASS: lineage identity, record crossing and retirement-age dialogue');
+}
+
+{
+const a=inline[1].indexOf('  function draftHash('),b=inline[1].indexOf('  // Fixed annual identities;',a),d=inline[1].indexOf('  const SPECIAL_BIRTH_RULES='),e=inline[1].indexOf('  const REWARD_CATEGORIES=',d);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+inline[1].slice(d,e)+'return {specialBirthPlan,SPECIAL_BIRTH_RULES};})()');
+const expected={PARALLEL:.10,STAR:.07,LEGEND:.05,IMMORTAL:.03},counts={PARALLEL:0,STAR:0,LEGEND:0,IMMORTAL:0};
+for(const [k,v] of Object.entries(expected))assert.equal(api.SPECIAL_BIRTH_RULES[k].foreignRate,v);
+for(let y=2027;y<12027;y++){const plan=api.specialBirthPlan(1937,y,'foreign');for(const k of Object.keys(expected)){const n=plan.filter(x=>x===k).length;assert(n<=(k==='PARALLEL'?2:1));if(n)counts[k]++;}}
+for(const k of Object.keys(expected))assert(Math.abs(counts[k]/10000-expected[k])<.012);
+console.log('PASS: updated overseas annual draw rates and unchanged category caps',counts);
 }
