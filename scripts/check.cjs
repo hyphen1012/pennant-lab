@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.44 · SCOUT SIGNAL/);
+assert.match(html,/VERSION 0\.9\.45 · CLUB CRESTS/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1043,4 +1043,10 @@ const weak={overall:42,potential:55,high:58},medium={overall:55,potential:70,hig
 assert.equal(api.draftRumorRound(1,weak,strong,1),5);assert.equal(api.draftRumorRound(1,strong,weak,1),5);assert.equal(api.draftRumorRound(1,medium,medium,1),3);assert.equal(api.draftRumorRound(1,strong,strong,1),1);assert.equal(api.draftRumorRound(1,prospect,prospect,1),1);assert.equal(api.draftRumorRound(1,strong,strong,5),5);assert.equal(api.draftRumorRound(9,strong,strong,1),3);
 assert.equal(api.draftRumorEarliest({phase:'later',round:4,picks:[{teamId:1,round:4}],passed:[]},{id:1}),5);assert.equal(api.draftRumorEarliest({phase:'later',round:5,picks:[],passed:[{teamId:1,round:5}]},{id:1}),6);
 assert.match(html,/\.draft-rumor-mark\{[^}]*width:26px/);console.log('PASS: compact scouting signals, ability and round constrained forecasts');
+}
+
+{
+const hashStart=inline[1].indexOf('  function draftHash('),hashEnd=inline[1].indexOf('  function draftScoutProfile(',hashStart),a=inline[1].indexOf('  const CLUB_PALETTE='),b=inline[1].indexOf('  function clubRgb(',a);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(hashStart,hashEnd)+inline[1].slice(a,b)+';return {ensureCPUClubEmblems,clubIdentity,cpuClubEmblem,clubMotifArtwork};})()');
+const g={started:true,selectedId:2,seed:2027,teams:Array.from({length:12},(_,id)=>({id,color:'#2865aa',letter:'A'}))};g.teams[2].emblem={shape:'circle',pattern:'solid',accent:'#ffffff',font:'bold'};const own=JSON.stringify(g.teams[2]);assert(api.ensureCPUClubEmblems(g));assert.equal(JSON.stringify(g.teams[2]),own);assert.equal(g.seed,2027);assert.equal(new Set(g.teams.filter(t=>t.id!==2).map(t=>t.emblem.motif)).size,11);const saved=JSON.stringify(g);assert(!api.ensureCPUClubEmblems(g));assert.equal(JSON.stringify(g),saved);const copy=JSON.parse(saved);copy.seed=999;assert(!api.ensureCPUClubEmblems(copy));assert.equal(JSON.stringify(copy.teams),JSON.stringify(g.teams));assert.equal(api.clubIdentity(g.teams[2]).motif,'letter');for(const t of g.teams.filter(t=>t.id!==2)){assert(api.clubMotifArtwork(t.emblem.motif).includes('<svg'));assert.equal(t.color,'#2865aa');}assert.notEqual(JSON.stringify(api.cpuClubEmblem(g.teams[0],1)),JSON.stringify(api.cpuClubEmblem(g.teams[0],2)));console.log('PASS: randomized fixed CPU crests, vector art, unchanged own identity and simulation seed');
 }
