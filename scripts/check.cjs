@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.59 · RINNE FRACTURE/);
+assert.match(html,/VERSION 0\.9\.60 · RINNE AWAKENING/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1156,3 +1156,5 @@ const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+';return {rinne
 const intact=api.rinneTearScreen(false),torn=api.rinneTearScreen(true);
 assert(intact.includes('rinne-piece whole'));assert(!intact.includes('rinne-fragments'));assert(torn.includes('left upper')&&torn.includes('left lower')&&torn.includes('right upper')&&torn.includes('right lower'));assert.equal((torn.match(/<i style=/g)||[]).length,52);assert.equal((torn.match(/class="hairline"/g)||[]).length,3);assert(torn.includes('演出をスキップ'));assert.match(html,/matches\?350:4400/);console.log('PASS: RINNE continuous intact band, four-piece fracture, 52 fragments, timed transition');
 }
+
+assert.match(html,/renderFaceArtwork\(p,\{hidden:true,rinneSmile:true\}\)/);assert.match(html,/options\.rinneSmile\?/);assert.match(html,/x\.category==='輪廻転生'&&x\.tournament&&x\.hidden\?'<div class="rinne-voice">/);console.log('PASS: RINNE-only concealed smile and delayed monologue');
