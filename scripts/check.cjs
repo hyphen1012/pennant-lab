@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.68 · FARM SYSTEM/);
+assert.match(html,/VERSION 0\.9\.69 · CLUB INVESTMENT/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1067,7 +1067,7 @@ for(const [code,group] of [['SP','pitch'],['RP','pitch'],['CP','pitch'],['C','ca
 
 {
 const a=inline[1].indexOf('  const FOREIGN_TASKS='),b=inline[1].indexOf('  function foreignIdentity(',a);
-const api=vm.runInNewContext('(function(){const game={year:2027,teams:[],players:[],calendarIndex:0,calendar:{days:Array.from({length:10},(_,i)=>({date:"2027-04-"+String(i+1).padStart(2,"0")}))}};const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),r2=x=>Math.round(x*100)/100,draftHash=()=>.5,rating=p=>p.stuff||p.contact||70,seasonSkillKeys=p=>["stuff","control","stamina"],draftScoutProfile=()=>({level:2}),isPitch=()=>true,own=t=>game.players.filter(p=>p.teamId===t.id),getPlayer=id=>game.players.find(p=>p.id===id),getTeam=id=>game.teams.find(t=>t.id===id),ROSTER_MAX=50,recruitmentContext=()=>({chance:0,winning:0,growth:0}),recruitmentInitial=()=>60,recruitmentReaction=(p,c,i,k,q)=>q[i]?.options.some(o=>o[0]===k)?13:null,newStats=()=>({}),initCondition=()=>{},repairTeam=()=>{},pushNews=()=>{},positionFull=()=>"投手",fmtSalary=String;'+inline[1].slice(a,b)+';return {game,foreignLang,foreignHydrate,foreignReport,foreignResearch,foreignBegin,foreignReply,foreignHireInterpreter,foreignOffer,foreignResolve,foreignAffordable,foreignSubmit,foreignTick,foreignSettle,foreignCounterProposal,foreignCounterReply,foreignDecisionScores};})()');
+const api=vm.runInNewContext('(function(){const game={year:2027,teams:[],players:[],calendarIndex:0,calendar:{days:Array.from({length:10},(_,i)=>({date:"2027-04-"+String(i+1).padStart(2,"0")}))}};const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),r2=x=>Math.round(x*100)/100,draftHash=()=>.5,rating=p=>p.stuff||p.contact||70,seasonSkillKeys=p=>["stuff","control","stamina"],draftScoutProfile=()=>({level:2}),isPitch=()=>true,own=t=>game.players.filter(p=>p.teamId===t.id),getPlayer=id=>game.players.find(p=>p.id===id),getTeam=id=>game.teams.find(t=>t.id===id),ROSTER_MAX=50,recruitmentContext=()=>({chance:0,winning:0,growth:0}),recruitmentInitial=()=>60,recruitmentReaction=(p,c,i,k,q)=>q[i]?.options.some(o=>o[0]===k)?13:null,newStats=()=>({}),initCondition=()=>{},repairTeam=()=>{},pushNews=()=>{},positionFull=()=>"投手",fmtSalary=String;const infraEffect=l=>1+(Math.min(l,15)-1)*4/14+Math.max(0,l-15)*.12;'+inline[1].slice(a,b)+';return {game,foreignLang,foreignHydrate,foreignReport,foreignResearch,foreignBegin,foreignReply,foreignHireInterpreter,foreignOffer,foreignResolve,foreignAffordable,foreignSubmit,foreignTick,foreignSettle,foreignCounterProposal,foreignCounterReply,foreignDecisionScores};})()');
 const t={id:2,name:'東京',cash:10},c={id:100,country:'キューバ',kind:'regular',status:'available',career:{},player:{id:100,pos:'SP',stuff:70,control:70,stamina:70,talent:80,affinity:50,name:'Test'}};api.game.teams=[t];const m=api.foreignHydrate({year:2027,candidates:[c]});assert.equal(api.foreignLang(c).name,'スペイン語');const before=api.foreignReport(m,t,c);assert(api.foreignResearch(m,t,c,'field'));assert(!api.foreignResearch(m,t,c,'field'));assert(api.foreignReport(m,t,c).high-api.foreignReport(m,t,c).low<before.high-before.low);assert(api.foreignBegin(m,t,c));const v=m.negotiations[2];assert(api.foreignReply(m,t,c,v,'chance'));assert(v.answers[0].delta<13);assert(api.foreignHireInterpreter(t,v));assert(!api.foreignHireInterpreter(t,v));assert(api.foreignReply(m,t,c,v,'home'));assert.equal(v.answers[1].delta,13);assert(api.foreignReply(m,t,c,v,'growth'));v.support={interpreter:true,housing:true};const o=api.foreignOffer(m,c,2,v.support),cash=t.cash;assert.equal(o.supportCost,.2);v.interest=100;v.rivals=[];v.overseas=true;api.game.foreignMarket=m;assert(api.foreignSubmit(m,t,c,v,2));assert.equal(v.status,'waiting');assert.equal(api.game.players.length,0);assert.equal(t.cash,cash);assert(v.waitDays>=2);api.game.calendarIndex=2;api.foreignTick('2027-04-02');assert.equal(v.status,'waiting');assert(v.updates.length>=2);api.game.calendarIndex=v.dueIndex;api.foreignTick('2027-04-04');assert.equal(v.status,'signed');assert.equal(v.resultOpened,false);assert.equal(api.game.players.length,1);assert.equal(api.game.players[0].foreignContract.support.housing,true);assert.equal(t.cash,Math.round((cash-o.fee-o.supportCost)*100)/100);assert(!api.foreignResolve(m,t,c,v,2));const c2={...c,id:101,status:'available',player:{...c.player,id:101}};m.candidates.push(c2);delete m.negotiations[2];assert(api.foreignBegin(m,t,c2));const v2=m.negotiations[2];v2.answers=v.answers.slice();v2.interest=100;v2.overseas=false;v2.rivals=[];assert(api.foreignSubmit(m,t,c2,v2,2));assert.equal(v2.waitDays,0);assert.equal(v2.immediate,true);assert.equal(api.game.players.length,1);assert(api.foreignSettle(m,t,c2,v2,'2027-04-05'));assert.equal(v2.status,'signed');assert.equal(api.game.players.length,2);assert(!api.foreignSettle(m,t,c2,v2,'2027-04-05'));const c3={...c,id:102,status:'available',player:{...c.player,id:102}};const rival={id:3,name:'大阪',cash:10};api.game.teams.push(rival);m.candidates.push(c3);delete m.negotiations[2];assert(api.foreignBegin(m,t,c3));const v3=m.negotiations[2];v3.answers=v.answers.slice();v3.interpreter=true;v3.interest=65;v3.overseas=false;v3.rivals=[{teamId:3,fit:40,bid:api.foreignOffer(m,c3,2,{})}];assert(api.foreignSubmit(m,t,c3,v3,1));const score=api.foreignDecisionScores(m,t,c3,v3,v3.submittedOffer);v3.interest+=score.best.score-score.ownScore-5;assert(v3.interest>=65);assert(api.foreignCounterProposal(m,t,c3,v3));const original=v3.submittedOffer.salary,cashBefore=t.cash;assert(api.foreignSettle(m,t,c3,v3,'2027-04-06'));assert.equal(v3.status,'counter');assert.equal(t.cash,cashBefore);assert(api.foreignCounterReply(m,t,c3,v3,true,'2027-04-06'));assert(v3.submittedOffer.salary>original);assert.equal(api.game.players.length,2);assert(api.foreignSettle(m,t,c3,v3,'2027-04-06'));assert.equal(v3.status,'signed');assert.equal(api.game.players.length,3);assert(!api.foreignCounterReply(m,t,c3,v3,true,'2027-04-06'));console.log('PASS: independent foreign scouting, interpreter, support cost, registration and nonrepeatable offer');
 }
 
@@ -1216,7 +1216,7 @@ assert.equal(domestic.candidates.filter(api.scoutVisible).length,18);assert.equa
 assert.equal(api.scoutVisible(domestic.candidates.at(-1)),false);assert.equal(api.scoutVisible(foreign.candidates.at(-1)),false);
 const snapshot=JSON.stringify(foreign);assert.equal(api.ensureScoutSchedule(foreign,'foreign'),foreign);assert.equal(JSON.stringify(foreign),snapshot);
 assert.equal(new Set(['PARALLEL','STAR','LEGEND','IMMORTAL'].map(api.foreignDiscoverySpeech)).size,4);
-assert.match(html,/scoutDiscoveryDaily\(entry\)/);assert.match(html,/foreignRate:\.03/);assert.match(html,/data-action="foreign-upgrade"/);
+assert.match(html,/scoutDiscoveryDaily\(entry\)/);assert.match(html,/foreignRate:\.03/);assert.match(html,/infraControls\(t,'foreign','foreign-upgrade'\)/);
 console.log('PASS: progressive fixed candidate discovery schedule and independent scout levels');
 }
 
@@ -1259,6 +1259,17 @@ assert.match(html,/farmArchive.push/);
 assert.match(html,/farmCareerPanel\(p\)/);
 assert.match(html,/farmManualMove\(t,p\)/);
 assert.match(html,/farmGrowthFactor\(p\)/);
-assert.match(html,/data-action="farm-upgrade"/);
+assert.match(html,/infraControls\(t,k,'farm-upgrade'\)/);
 assert.match(html,/data-roster="farm"/);
 console.log('PASS: farm registration, separate statistics, age curves, investment and navigation hooks');
+
+{
+const s=inline[1],a=s.indexOf('  function draftScoutCost('),b=s.indexOf('  function draftScoutBudget(',a),d=s.indexOf('  const INFRA_NORMAL='),e=s.indexOf('  function infraLevel(',d),f=s.indexOf('  function infraUpkeep(',e),g=s.indexOf('  function infraAnnual(',f);
+const api=vm.runInNewContext('(function(){const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));'+s.slice(a,b)+s.slice(d,e)+s.slice(f,g)+'return {draftScoutCost,infraEffect,infraUpkeep,INFRA_NORMAL,INFRA_MAX};})()');
+assert.equal(api.INFRA_NORMAL,15);assert.equal(api.INFRA_MAX,20);assert.equal(api.infraUpkeep(15),.92);assert.equal(api.infraUpkeep(20),7.5);
+let normal=0,elite=0;
+for(let l=1;l<20;l++){assert(api.draftScoutCost(l)>0);assert(api.infraUpkeep(l+1)>api.infraUpkeep(l));assert(api.infraEffect(l+1)>api.infraEffect(l));if(l<15)normal+=api.draftScoutCost(l);else elite+=api.draftScoutCost(l);}
+assert(Math.abs(normal-15.11)<.001);assert.equal(elite,50);
+assert.match(html,/infraAccrueDay\(\)/);assert.match(html,/opening\+revenue-wages-maintenance/);assert.match(html,/infra-downgrade/);
+console.log('PASS: shared level 20 upgrades, escalating elite costs, diminishing effects and maintenance accounting hooks');
+}
