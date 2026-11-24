@@ -3789,8 +3789,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const add=(cid,entry)=>{if(!board.has(cid))board.set(cid,[]);board.get(cid).push(entry);};
     for(const t of game.teams.filter(t=>t.id!==viewer.id)){
       // A noisy public forecast, not a disclosure of the CPU's actual choice.
-      const ranking=draftRanked(d,t).map(({c,value})=>({c,score:value+(draftHash(d.year,t.id,c.id,'public-rumor')-.5)*20})).sort((a,b)=>b.score-a.score||a.c.id-b.c.id).slice(0,14);
-      ranking.forEach(({c},i)=>add(c.id,{key:String(t.id),rank:i+1}));
+      const ranked=draftRanked(d,t).map(({c,value})=>({c,value,noise:draftHash(d.year,t.id,c.id,'public-rumor')-.5}));
+      const initial=ranked.slice().sort((a,b)=>(b.value+b.noise*20)-(a.value+a.noise*20)||a.c.id-b.c.id).slice(0,14);
+      const refined=ranked.map(x=>({c:x.c,score:x.value+x.noise*(20-4*draftResearchLevel(d,viewer,x.c))})).sort((a,b)=>b.score-a.score||a.c.id-b.c.id);
+      const ranks=new Map(refined.map((x,i)=>[x.c.id,i+1]));
+      initial.forEach(({c})=>add(c.id,{key:String(t.id),rank:ranks.get(c.id)}));
     }
     for(const c of d.candidates.filter(c=>c.status==='available'))if(c.overseas||draftHash(d.year,c.id,'international-rumor')<.045)add(c.id,{key:'overseas',rank:c.overseas?1:2});
     return board;
@@ -3799,7 +3802,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(entry.key==='overseas')return entry.rank===1?'海外リーグが関心を示している模様。国内球団との交渉に影響する可能性があります。':'海外スカウトによる視察の噂があります。';
     const rank=entry.rank;
     const forecast=rank<=2?'1位指名濃厚':rank<=5?'上位指名候補（1〜2位）':rank<=9?'中位指名候補（2〜3位）':'下位で狙っている模様（4〜5位）';
-    return forecast+'。'+(research>=2?'追加調査で情報の裏付けが進みましたが、球団方針や他球団の指名次第で変動します。':research===1?'追加調査で関心を確認。順位は推測です。':'初期スカウト情報による予測です。');
+    return forecast+'。'+(research>=2?'追加調査による精度の高い予測です。ただし球団方針や他球団の指名次第で変動します。':research===1?'追加調査で予測を更新しました。順位は推測です。':'初期スカウト情報による予測です。');
   }
   function draftRumorMarks(c,entries){
     if(!entries?.length)return '';
