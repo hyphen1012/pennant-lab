@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.21 · RECORD BOOK/);
+assert.match(html,/VERSION 0\.9\.22 · RECORD BOOK/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -765,4 +765,21 @@ assert.equal(api.recordRankRows(players,2029,'season','h','all','2027').length,1
 assert.equal(api.recordEligible({g:143,pa:442,ab:400,h:150},'avg'),false);
 assert.equal(api.recordEligible({g:143,pa:443,ab:400,h:150},'avg'),true);
 console.log('PASS: historical ranking filters, retired players and qualification');
+}
+
+{
+const start=inline[1].indexOf('  const SPECIAL_PLAYER_THEMES='),end=inline[1].indexOf('  function playerTitleTheme(',start);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(start,end)+';return {achievementTheme,achievementAttrs,achievementKey,SPECIAL_PLAYER_THEMES};})()',{h:String});
+for(const [key,category] of [['nohit','LEGEND'],['perfect','RINNE']]){
+  const theme=api.achievementTheme(key),special=api.SPECIAL_PLAYER_THEMES[category];
+  assert.equal(theme.ring,special.ring);assert.equal(theme.accent,special.accent);
+}
+const keys=['三冠王','投手三冠','cycle','record'];
+const reserved=Object.values(api.SPECIAL_PLAYER_THEMES).flatMap(x=>[x.ring,x.accent]);
+assert.equal(new Set(keys.map(k=>api.achievementTheme(k).ring)).size,4);
+for(const k of keys){assert(!reserved.includes(api.achievementTheme(k).ring));assert(api.achievementAttrs(k).includes('data-achievement="'+k+'"'));}
+assert.equal(api.achievementKey({recordKey:'career:bat:h'}),'record');
+assert.equal(api.achievementAttrs(null),'');
+assert.equal(api.achievementTheme('本塁打王'),null);
+console.log('PASS: distinct achievement palettes and exact LEGEND/RINNE color pairing');
 }

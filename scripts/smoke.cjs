@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.21 · RECORD BOOK/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.22 · RECORD BOOK/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -451,6 +451,8 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(app.innerHTML.includes('award-portrait-ring'));
   dispatch('click',{action:'book-mode',mode:'feats'});
   assert(app.innerHTML.includes('特殊記録・更新'));
+  for(const key of ['三冠王','投手三冠','cycle','nohit','perfect','record'])assert(app.innerHTML.includes('data-achievement="'+key+'"'));
+  assert(app.innerHTML.includes('実績には加算されません'));
   dispatch('click',{action:'record-sub',sub:'career'});
   assert(app.innerHTML.includes('歴代選手・通算記録'));
   const careerButton=app.innerHTML.match(/data-action="career-open" data-id="(\d+)"/);
