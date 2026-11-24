@@ -1136,7 +1136,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   :is(strong,b,td,span,div,i)[data-rank="SS"],.themed-player-name:is([data-special="IMMORTAL"],[data-special="輪廻転生"]),.lustre-sample-name:is([data-special="IMMORTAL"],[data-special="輪廻転生"]){animation:rarity-sheen 4.8s ease-in-out infinite}
   :is(.player-portrait,.face-mini,.lustre-sample-ring):is([data-lustre="SS"],[data-special="IMMORTAL"],[data-special="輪廻転生"]){animation:rarity-aura 4.8s ease-in-out infinite}
   :is(.special-name-tag,.legacy-tier):is([data-special="IMMORTAL"],[data-special="輪廻転生"]){animation:rarity-aura 5.4s ease-in-out infinite}
-  :is(.news-flash-card,.achievement-preview .achievement-surface,.award-portrait-ring)[data-ach-lustre]::before{animation:achievement-aura 4s ease-in-out infinite}
+  :is(.news-flash-card,.achievement-preview .achievement-surface,.award-portrait-ring):is([data-ach-lustre="elite"],[data-ach-lustre="mythic"])::before{animation:achievement-aura 4s ease-in-out infinite}
   :is(.news-flash-card,.achievement-preview .achievement-surface)[data-ach-lustre="mythic"] .achievement-emblem{animation:rarity-aura 4s ease-in-out infinite}
 }
 @media(prefers-reduced-motion:reduce){
