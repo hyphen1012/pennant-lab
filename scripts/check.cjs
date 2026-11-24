@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.69 · CLUB INVESTMENT/);
+assert.match(html,/VERSION 0\.9\.70 · CLUB INVESTMENT/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1266,10 +1266,10 @@ console.log('PASS: farm registration, separate statistics, age curves, investmen
 {
 const s=inline[1],a=s.indexOf('  function draftScoutCost('),b=s.indexOf('  function draftScoutBudget(',a),d=s.indexOf('  const INFRA_NORMAL='),e=s.indexOf('  function infraLevel(',d),f=s.indexOf('  function infraUpkeep(',e),g=s.indexOf('  function infraAnnual(',f);
 const api=vm.runInNewContext('(function(){const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));'+s.slice(a,b)+s.slice(d,e)+s.slice(f,g)+'return {draftScoutCost,infraEffect,infraUpkeep,INFRA_NORMAL,INFRA_MAX};})()');
-assert.equal(api.INFRA_NORMAL,15);assert.equal(api.INFRA_MAX,20);assert.equal(api.infraUpkeep(15),.92);assert.equal(api.infraUpkeep(20),7.5);
+assert.equal(api.INFRA_NORMAL,15);assert.equal(api.INFRA_MAX,20);assert.equal(api.infraUpkeep(15),2.2);assert.equal(api.infraUpkeep(20),18);
 let normal=0,elite=0;
 for(let l=1;l<20;l++){assert(api.draftScoutCost(l)>0);assert(api.infraUpkeep(l+1)>api.infraUpkeep(l));assert(api.infraEffect(l+1)>api.infraEffect(l));if(l<15)normal+=api.draftScoutCost(l);else elite+=api.draftScoutCost(l);}
-assert(Math.abs(normal-15.11)<.001);assert.equal(elite,50);
+assert(Math.abs(normal-40.4)<.001);assert.equal(elite,180);
 assert.match(html,/infraAccrueDay\(\)/);assert.match(html,/opening\+revenue-wages-maintenance/);assert.match(html,/infra-downgrade/);
 console.log('PASS: shared level 20 upgrades, escalating elite costs, diminishing effects and maintenance accounting hooks');
 }
