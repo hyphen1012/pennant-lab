@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.67 · GLOBAL TALENT/);
+assert.match(html,/VERSION 0\.9\.68 · FARM SYSTEM/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -410,6 +410,7 @@ const benchV088=vm.runInNewContext('(function(){'+inline[1].slice(pitStart,pitEn
   managerRatings:()=>({field:84,pitch:80}),
   clamp:(n,lo,hi)=>Math.max(lo,Math.min(hi,n)),
   pitchers:team=>team.pitchers,
+  firstPitchers:team=>team.pitchers,
   availableForGame:p=>!p.injury,
   effectiveSkill:(p,key)=>p[key]*(p.energy??100)/100,
   fieldingTier:(p,role)=>p.pos===role?'main':'off',
@@ -539,6 +540,7 @@ const midAPI=vm.runInNewContext('(function(){'+inline[1].slice(noHitStart,noHitE
   managerDecision:()=>76,managerRatings:()=>({pitch:72}),
   clamp:(x,a,b)=>Math.max(a,Math.min(b,x)),
   pitchers:team=>team.pitchers,
+  firstPitchers:team=>team.pitchers,
   availableForGame:p=>!p.injury,
   effectiveSkill:(p,key)=>p[key]*(p.energy??100)/100,
   derivedBatHand:()=> '左'
@@ -1249,3 +1251,14 @@ for(let y=2027;y<12027;y++){const plan=api.specialBirthPlan(1937,y,'foreign');fo
 for(const k of Object.keys(expected))assert(Math.abs(counts[k]/10000-expected[k])<.012);
 console.log('PASS: updated overseas annual draw rates and unchanged category caps',counts);
 }
+
+assert.match(html,/const FARM_LIMIT=26,FARM_TARGET=24/);
+assert.match(html,/firstPlayers=t=>own\(t\).filter\(p=>p.farmTier!==2\)/);
+assert.match(html,/farmDaily\(e\)/);
+assert.match(html,/farmArchive.push/);
+assert.match(html,/farmCareerPanel\(p\)/);
+assert.match(html,/farmManualMove\(t,p\)/);
+assert.match(html,/farmGrowthFactor\(p\)/);
+assert.match(html,/data-action="farm-upgrade"/);
+assert.match(html,/data-roster="farm"/);
+console.log('PASS: farm registration, separate statistics, age curves, investment and navigation hooks');
