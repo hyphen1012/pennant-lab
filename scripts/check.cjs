@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.7 · EVENTS/);
+assert.match(html,/VERSION 0\.9\.8 · EVENTS/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -616,3 +616,8 @@ eventApi.game.ceremonyStage='camp';eventApi.game.pendingCeremonyIntro='camp';ass
 eventApi.game.day=0;eventApi.game.year=2029;eventApi.game.pendingCeremonyIntro='opening';assert.equal(eventApi.eventIntroInfo().title,'新シーズン開幕');
 eventApi.game.day=1;assert.equal(eventApi.eventIntroInfo(),null);
 console.log('PASS: milestone titles, correct season years and pending-report priority');
+
+assert.match(html,/const tone=phase==='camp'\?'spring':'winter';return `<section class="panel ceremony-panel" data-tone="\$\{tone\}"/);
+assert.match(html,/\.ceremony-panel\[data-tone="winter"\]\{--event-accent:#9ac8ef\}/);
+assert.match(html,/\.ceremony-panel\[data-tone="spring"\]\{--event-accent:#95d7b2\}/);
+console.log('PASS: matching seasonal palettes for title and training panels');

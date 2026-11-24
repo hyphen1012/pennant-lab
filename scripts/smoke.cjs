@@ -88,7 +88,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.7 · EVENTS/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.8 · EVENTS/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -364,6 +364,10 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     const before=window.PennantLab.getSnapshot();
     dispatch('click',{action:'event-intro-continue',event:key});
     assert(!app.innerHTML.includes('data-event="'+key+'"'));
+    if(['winter','self','camp'].includes(key)){
+      const tone=key==='camp'?'spring':'winter';
+      assert(app.innerHTML.includes('class="panel ceremony-panel" data-tone="'+tone+'"'),'Training panel palette must match title: '+key);
+    }
     assert.equal(window.PennantLab.getSnapshot().year,before.year);
     assert.equal(window.PennantLab.getSnapshot().day,before.day);
     if(key==='opening')break;
