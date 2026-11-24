@@ -983,7 +983,7 @@ console.log('PASS: shared conversation, club fit, acceptance, refusal, fee safet
 {
 const a=inline[1].indexOf('  function draftHash('),b=inline[1].indexOf('  function draftScoutProfile(',a);
 const c=inline[1].indexOf('  function draftWinningTicket('),d=inline[1].indexOf('  function draftResolveLottery(',c);
-const api=vm.runInNewContext('(function(){const game={selectedId:2};'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {draftLotteryWinner,draftDraw,draftOpenTicket};})()');
+const api=vm.runInNewContext('(function(){const game={selectedId:2};'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {draftLotteryWinner,draftDraw,draftOpenTicket,draftSpectatorDelay,draftSpectatorStep};})()');
 const ids=[2,3,4,5],winners=ids.map((_,i)=>api.draftLotteryWinner(2027,1,88,ids,i));
 assert.equal(new Set(winners).size,4);
 let draft={year:2027,phase:'lottery',pendingLottery:{attempt:1,stage:'choose',cursor:0,groups:[{cid:88,ids}]}};
@@ -991,6 +991,17 @@ assert(api.draftDraw(draft,2,'manual'));const saved=JSON.parse(JSON.stringify(dr
 assert(!api.draftDraw(saved,1,'manual'));assert.equal(saved.pendingLottery.groups[0].chosen,2);
 assert(api.draftOpenTicket(saved));assert(!api.draftOpenTicket(saved));
 assert.equal(saved.pendingLottery.groups[0].winner,winners[2]);
+assert.equal(api.draftSpectatorDelay(saved,2),0);
+assert(!api.draftSpectatorStep(saved,2));
+const spectator={year:2027,phase:'lottery',pendingLottery:{attempt:1,stage:'choose',cursor:0,groups:[{cid:89,ids:[3,4]},{cid:90,ids:[2,5]}]}};
+assert.equal(api.draftSpectatorDelay(spectator,2),1900);
+assert(api.draftSpectatorStep(spectator,2));assert.equal(spectator.pendingLottery.stage,'sealed');
+const spectatorSaved=JSON.parse(JSON.stringify(spectator));
+assert(api.draftSpectatorStep(spectatorSaved,2));assert.equal(spectatorSaved.pendingLottery.stage,'revealed');
+assert.equal(api.draftSpectatorDelay(spectatorSaved,2),2400);
+assert(api.draftSpectatorStep(spectatorSaved,2));assert.equal(spectatorSaved.pendingLottery.cursor,1);
+assert.equal(api.draftSpectatorDelay(spectatorSaved,2),0);assert(!api.draftSpectatorStep(spectatorSaved,2));
+assert.match(html,/data-own-draw=/);assert.match(html,/draft-finish-actions/);
 assert.match(html,/SCOUT_TASKS/);assert.match(html,/scout-field-report/);assert.match(html,/draft-draw-stage/);
 console.log('PASS: sealed tickets, unique winner, saved selection, scout dossier');
 }

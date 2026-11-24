@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.40 · ROSTER WINDOW/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.41 · CLUB LOTTERY/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -505,8 +505,14 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
       assert(!app.innerHTML.includes('role="alertdialog"'));
       dispatch('click',{action:'draft-choose',id:choice[1]});
       dispatch('click',{action:'draft-confirm-accept'});
-      const drainDraws=()=>{
-        for(let n=0;n<40&&app.innerHTML.includes('data-action="draft-draw-delegate"');n++){
+      const drainDraws=async()=>{
+        for(let n=0;n<80&&app.innerHTML.includes('class="draft-draw-stage"');n++){
+          if(app.innerHTML.includes('data-own-draw="false"')){
+            assert(app.innerHTML.includes('自動進行'));
+            assert(!app.innerHTML.includes('data-action="draft-draw-delegate"'));
+            await flush();continue;
+          }
+          assert(app.innerHTML.includes('自球団の競合抽選'));
           dispatch('click',{action:'draft-draw-delegate'});
           assert(app.innerHTML.includes('data-action="draft-draw-open"'));
           dispatch('click',{action:'draft-draw-open'});
@@ -514,13 +520,13 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
           dispatch('click',{action:'draft-draw-next'});
         }
       };
-      drainDraws();
+      await drainDraws();
       assert(app.innerHTML.includes('指名・抽選結果'));
       dispatch('click',{action:'draft-first-next'});
       for(let n=0;n<40&&!app.innerHTML.includes('2巡目 · 順番指名');n++){
         if(app.innerHTML.includes('data-action="draft-cpu-next"'))dispatch('click',{action:'draft-cpu-next'});
         else if(app.innerHTML.includes('data-action="draft-pass"')){dispatch('click',{action:'draft-pass'});dispatch('click',{action:'draft-confirm-accept'});}
-        drainDraws();if(app.innerHTML.includes('data-action="draft-first-next"'))dispatch('click',{action:'draft-first-next'});
+        await drainDraws();if(app.innerHTML.includes('data-action="draft-first-next"'))dispatch('click',{action:'draft-first-next'});
       }
       assert(app.innerHTML.includes('2巡目 · 順番指名'));
       const second=app.innerHTML.match(/data-action="draft-choose" data-id="(\d+)"/);assert(second);
@@ -531,7 +537,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
       dispatch('click',{action:'draft-auto'});
       assert(app.innerHTML.includes('role="alertdialog"'));
       dispatch('click',{action:'draft-confirm-accept'});
-      for(let n=0;n<40&&!app.innerHTML.includes('data-action="draft-finish"');n++){drainDraws();if(app.innerHTML.includes('data-action="draft-first-next"'))dispatch('click',{action:'draft-first-next'});else break;}
+      for(let n=0;n<40&&!app.innerHTML.includes('data-action="draft-finish"');n++){await drainDraws();if(app.innerHTML.includes('data-action="draft-first-next"'))dispatch('click',{action:'draft-first-next'});else break;}
       assert(app.innerHTML.includes('data-action="draft-finish"'));
       dispatch('click',{action:'draft-finish'});
       dispatch('click',{action:'draft-confirm-accept'});
