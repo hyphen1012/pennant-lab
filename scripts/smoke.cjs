@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.27 · ASTRAL/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.28 · CEREMONY/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -391,7 +391,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   console.log('PASS: full 143-game season, 858 games, all 12 clubs, monthly and injury interruptions');
 
   // Resolve final required reports before the existing offseason sequence.
-  for(let i=0;i<8;i++){
+  for(let i=0;i<240;i++){
     const page=app.innerHTML;
     const action=['injury-ack','finish-review','milestone-ack','auto-day-close','finish-month'].find(a=>page.includes('data-action="'+a+'"'));
     if(!action)break;
@@ -431,8 +431,10 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     assert.equal(window.PennantLab.getSnapshot().year,before.year);
     assert.equal(window.PennantLab.getSnapshot().day,before.day);
     if(key==='opening')break;
-    dispatch('click',{action:'ceremony-next'});
-    if(key==='awards-all')dispatch('click',{action:'ceremony-next'});
+    if(key==='awards-all'){
+      assert(app.innerHTML.includes('東リーグ · 野手部門'));
+      for(let i=0;i<100&&app.innerHTML.includes('data-action="ceremony-next"');i++)dispatch('click',{action:'ceremony-next'});
+    }else dispatch('click',{action:'ceremony-next'});
   }
   assert.equal(window.PennantLab.getSnapshot().year,full.year+1);
   assert.deepEqual(window.PennantLab.getSnapshot().teams.map(t=>t.cash),cashBeforeOffseason,'No second annual wage or revenue settlement');

@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.27 · ASTRAL/);
+assert.match(html,/VERSION 0\.9\.28 · CEREMONY/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -862,3 +862,18 @@ assert.match(html,/@keyframes astral-spin/);
 assert.match(html,/@keyframes desk-beacon/);
 assert.match(html,/legacyArchive=\{version:2/);
 console.log('PASS: astral motion hooks and legacy cache migration');
+
+{
+const a=inline[1].indexOf('  function consolidateRecordEvents('),b=inline[1].indexOf('  function editionHeading(',a);
+const c=inline[1].indexOf('  function awardEditionPages('),d=inline[1].indexOf('  function ceremonyPages(',c);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {consolidateRecordEvents,milestonePages,awardEditionPages};})()');
+const events=[{id:'a',year:2028,day:1,recordKey:'career:pitch:outs',playerId:1,recordOld:'190.0',recordPreviousName:'Former'},{id:'b',year:2028,day:2,recordKey:'career:pitch:outs',playerId:2},{id:'c',year:2028,day:3,recordKey:'career:pitch:outs',playerId:1},{id:'d',year:2028,day:4,featKey:'perfect'}];
+const list=api.consolidateRecordEvents(events);
+assert.equal(list.length,2);assert.equal(list.find(e=>e.recordKey).id,'c');assert.equal(list.find(e=>e.recordKey).updateCount,3);assert.equal(list.find(e=>e.recordKey).recordOld,'190.0');assert.equal(events.length,4);
+assert.equal(api.milestonePages(events).map(p=>p.title).join(','),'歴代記録更新,最高難度記録');
+const awards=[{league:'E',title:'本塁打王'},{league:'E',title:'最多勝'},{league:'W',title:'守備名手賞（一塁）'},{league:'W',title:'ベストナイン（二塁）'},{league:'W',title:'三冠王'}];
+const pages=api.awardEditionPages(awards,events,false);
+assert.equal(pages.flatMap(p=>p.items).length,6);
+assert.equal(pages.map(p=>p.title).join(','),'東リーグ · 野手部門,東リーグ · 投手部門,西リーグ · 守備名手賞（GG）,西リーグ · ベストナイン,複合タイトル特別表彰,最高難度記録 特別表彰');
+console.log('PASS: seasonal record consolidation and separate news and award editions');
+}
