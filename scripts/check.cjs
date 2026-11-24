@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.8 · EVENTS/);
+assert.match(html,/VERSION 0\.9\.9 · SCHEDULE/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -621,3 +621,25 @@ assert.match(html,/const tone=phase==='camp'\?'spring':'winter';return `<section
 assert.match(html,/\.ceremony-panel\[data-tone="winter"\]\{--event-accent:#9ac8ef\}/);
 assert.match(html,/\.ceremony-panel\[data-tone="spring"\]\{--event-accent:#95d7b2\}/);
 console.log('PASS: matching seasonal palettes for title and training panels');
+
+// Calendar target dates are inclusive and stop on the requested civil boundary.
+const goalStart=inline[1].indexOf('  function calendarGoalFor('),goalEnd=inline[1].indexOf('  function dailyPlaybackControls(',goalStart);
+const goalFor=vm.runInNewContext('(function(){'+inline[1].slice(goalStart,goalEnd)+';return calendarGoalFor;})()',{monthKey:s=>s.slice(0,7)});
+const civilDays=['2028-03-30','2028-03-31','2028-04-01','2028-04-02','2028-04-03','2028-04-04'].map(date=>({date}));
+assert.equal(goalFor('weekend',civilDays,0),4);
+assert.equal(goalFor('weekly',civilDays,0),5);
+assert.equal(goalFor('month',civilDays,0),2);
+assert.equal(goalFor('season',civilDays,0),6);
+assert.equal(goalFor('date',civilDays,0),1);
+const financeStart=inline[1].indexOf('  function closeFinancePeriod('),financeEnd=inline[1].indexOf('  function finalizeMonth(',financeStart);
+const financeApi=vm.runInNewContext('(function(){let game={year:2028,day:40,calendarIndex:25,calendar:{days:Array(100),endDate:"2028-09-30"},teams:[{id:1,league:"E",wins:10,cash:1,manager:{salary:1}}]};const myTeam=()=>game.teams[0],rankings=()=>game.teams;'+inline[1].slice(financeStart,financeEnd)+';return {game,closeFinancePeriod,checkFinanceCrisis};})()',{r2:n=>Math.round(n*100)/100,payroll:()=>20});
+const fp=financeApi.closeFinancePeriod('2028-04-30');
+assert.equal(fp.clubs[1].revenue,2.55);
+assert.equal(fp.clubs[1].payroll,5.25);
+assert.equal(financeApi.game.teams[0].cash,-1.7);
+assert.equal(financeApi.game.financeCrisis.shortfall,1.7);
+financeApi.closeFinancePeriod('2028-04-30');
+assert.equal(financeApi.game.teams[0].cash,-1.7,'Monthly settlement is idempotent');
+assert.match(html,/const uninterruptedSeason=skip&&kind==='season'/);
+assert.match(html,/if\(game\.financeCrisis\)break;/);
+console.log('PASS: calendar targets, monthly cash settlement, no duplicate charge and cash crisis');

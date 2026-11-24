@@ -88,7 +88,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.8 · EVENTS/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.9 · SCHEDULE/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -210,28 +210,18 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   await flush();
   assert(store.get(1)?.data,'Game save should be persisted');
 
-  // Play a complete season with skip mode, acknowledging month-end and injury reports.
+  // Play a complete season in skip mode without routine monthly/injury stops.
   dispatch('click',{action:'auto-day-close'});
   const dateCountBeforeSkip=dateRenders.length;
   dispatch('click',{action:'playback-mode',mode:'skip'});
-  let done=false;
-  for(let attempt=0;attempt<120;attempt++){
-    const before=window.PennantLab.getSnapshot().day;
-    if(before===143){done=true;break;}
-    const page=app.innerHTML;
-    if(page.includes('data-action="injury-ack"'))dispatch('click',{action:'injury-ack'});
-    else if(page.includes('data-action="finish-month"'))dispatch('click',{action:'finish-month'});
-    else if(page.includes('data-action="finish-review"'))dispatch('click',{action:'finish-review'});
-    await window.PennantLab.advance(attempt===0?143:'resume');
-    const now=window.PennantLab.getSnapshot().day;
-    if(now===before&&!app.innerHTML.includes('data-action="injury-ack"')&&
-      !app.innerHTML.includes('data-action="finish-month"')&&
-      !app.innerHTML.includes('data-action="finish-review"')){
-      throw new Error('Season made no progress at game '+now);
-    }
-  }
+  // A new explicit season skip must finish in one invocation.
+  const pageBeforeSkip=app.innerHTML;
+  if(pageBeforeSkip.includes('data-action="injury-ack"'))dispatch('click',{action:'injury-ack'});
+  if(app.innerHTML.includes('data-action="finish-month"'))dispatch('click',{action:'finish-month'});
+  if(app.innerHTML.includes('data-action="finish-review"'))dispatch('click',{action:'finish-review'});
+  await window.PennantLab.advance('season');
   const full=window.PennantLab.getSnapshot();
-  assert(done||full.day===143,'The full 143-game schedule must complete');
+  assert.equal(full.day,143,'Season skip must finish without routine report interruption');
   assert.equal(full.games,858,'12 teams × 143 games should result in 858 games');
 
   // The IndexedDB writes are serialized; read only after pending writes settle.
@@ -311,8 +301,15 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     pitchMoves.length+' pitching changes, '+runnerMoves.length+
     ' pinch runners, '+defenseMoves.length+' defensive replacements');
   assert.equal(dateRenders.length,dateCountBeforeSkip,'Batch skip must not render date intros');
-  assert(monthlyRenders.length>0,'Month-end reports must show the GM inbox');
-  assert(monthlyRenders.some(v=>v.includes('球団運営スタッフ')));
+  const monthlyArchive=store.get(1)?.data?.monthlyArchive||[];
+  assert(monthlyArchive.length>=6,'Skipped months remain archived');
+  assert(monthlyArchive.every(m=>m.actualFinance),'Skipped months have actual finance records');
+  assert.equal(store.get(1).data.pendingMonth,null,'Season skip clears routine month prompts');
+  assert.equal(store.get(1).data.pendingEvent,null,'Season skip clears routine injury prompts');
+  const ledger=store.get(1).data.financeLedger;
+  assert.equal(ledger.through,store.get(1).data.calendar.days.length);
+  assert.equal(new Set(ledger.periods.map(p=>p.through)).size,ledger.periods.length);
+  assert(ledger.clubs[gmOwned].revenue>=8.5,'Actual season revenue includes the base amount');
   if(medicalRenders.length)assert(medicalRenders.every(v=>v.includes('チーム医療スタッフ')));
   for(const team of full.teams)assert.equal(team.w+team.l+team.t,143,'Every club plays 143 games');
 
@@ -357,6 +354,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   dispatch('click',{action:'tab',tab:'hq'});
   assert(app.innerHTML.includes('data-action="ceremony-start"'));
   dispatch('click',{action:'ceremony-start'});
+  const cashBeforeOffseason=window.PennantLab.getSnapshot().teams.map(t=>t.cash);
   const titles=['awards-all','settlement','winter','self','camp','opening'];
   for(const key of titles){
     assert(app.innerHTML.includes('data-event="'+key+'"'),'Milestone title: '+key);
@@ -375,6 +373,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     if(key==='awards-all')dispatch('click',{action:'ceremony-next'});
   }
   assert.equal(window.PennantLab.getSnapshot().year,full.year+1);
+  assert.deepEqual(window.PennantLab.getSnapshot().teams.map(t=>t.cash),cashBeforeOffseason,'No second annual wage or revenue settlement');
   assert.equal(window.PennantLab.getSnapshot().day,0);
   assert(app.innerHTML.includes('data-action="advance-day"'));
   await flush();
