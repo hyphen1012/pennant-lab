@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.12 · WEEKLY NEWS/);
+assert.match(html,/VERSION 0\.9\.13 · NEWS FLASH/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -665,3 +665,12 @@ console.log('PASS: weekly date range, real match statistics and newspaper archiv
 
 assert(!/#DE58BB/i.test(html),'Former magenta rank A color must not appear in the app');
 console.log('PASS: warm pink rank A; reserved PARALLEL purple unchanged');
+
+const streakStart=inline[1].indexOf('  function matchStreak('),streakEnd=inline[1].indexOf('  function collectMilestoneNews(',streakStart);
+const streakFn=vm.runInNewContext('(function(){'+inline[1].slice(streakStart,streakEnd)+';return matchStreak;})()');
+const losses=Array.from({length:4},()=>({home:1,away:2,homeScore:0,awayScore:3}));
+assert.equal(streakFn(losses,1).count,4);assert.equal(streakFn(losses,1).result,'loss');
+assert.equal(streakFn([...losses,{home:1,away:2,homeScore:1,awayScore:1}],1).count,0);
+assert.equal(streakFn([...losses,{home:2,away:1,homeScore:0,awayScore:3}],1).result,'win');
+assert.match(html,/if\(oneDay\|\|game\.pendingMonth\|\|\(!skip&&freshNews\.length\)\)break;/);
+console.log('PASS: streak counting, ties, home/away and skip-compatible news');

@@ -88,7 +88,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.12 · WEEKLY NEWS/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.13 · NEWS FLASH/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -226,6 +226,10 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 
   // The IndexedDB writes are serialized; read only after pending writes settle.
   await flush();
+  const specialNews=store.get(1).data.milestoneNews;
+  assert.equal(specialNews.filter(e=>e.type==='champion').length,2,'Both league champions have news');
+  assert.equal(new Set(specialNews.map(e=>e.id)).size,specialNews.length,'No duplicate events');
+  assert(store.get(1).data.pendingMilestoneIds.length>0,'Skipped news awaits review only after season');
   const archivedMatches=store.get(1)?.data?.games||[];
   const gmOwned=full.selectedId;
   const watchedMatches=archivedMatches.filter(g=>g.home===gmOwned||g.away===gmOwned);
@@ -357,7 +361,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   // Resolve final required reports before the existing offseason sequence.
   for(let i=0;i<8;i++){
     const page=app.innerHTML;
-    const action=['injury-ack','finish-review','auto-day-close','finish-month'].find(a=>page.includes('data-action="'+a+'"'));
+    const action=['injury-ack','finish-review','milestone-ack','auto-day-close','finish-month'].find(a=>page.includes('data-action="'+a+'"'));
     if(!action)break;
     dispatch('click',{action});
   }
