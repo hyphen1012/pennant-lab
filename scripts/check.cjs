@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.20 · CAREER/);
+assert.match(html,/VERSION 0\.9\.21 · RECORD BOOK/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -737,4 +737,18 @@ assert.equal(careerApi.careerCrossings({h:1001},{h:2},false)[0][1],1000);
 assert.equal(careerApi.careerCrossings({h:1001},{h:1},false).length,0);
 console.log('PASS: career totals, weighted rates, retired players and threshold crossing');
 
+}
+
+{
+const start=inline[1].indexOf('  function detectGameFeats('),end=inline[1].indexOf('  let recordHistoryCache=',start);
+const detect=vm.runInNewContext('(function(){'+inline[1].slice(start,end)+';return detectGameFeats;})()');
+const game={home:1,away:2,homeScore:1,awayScore:0};
+assert.equal(detect(game,[{id:7,teamId:1,h:4,hr:1,doubles:1,triples:1}],[{id:8,teamId:1,g:1,outs:27,h:0,bb:0,bf:27}]).map(x=>x.featKey).join(','),'cycle,perfect');
+assert.equal(detect(game,[],[{id:8,teamId:1,g:1,outs:27,h:0,bb:1,bf:28}])[0].featKey,'nohit');
+assert.equal(detect(game,[],[{id:8,teamId:1,g:1,outs:27,h:0,bb:0,bf:27},{id:9,teamId:1,g:1,outs:1,h:0,bb:0,bf:1}]).length,0);
+assert.equal(detect({...game,awayScore:1},[],[{id:8,teamId:1,g:1,outs:27,h:0,bb:3,bf:30}]).length,0);
+assert.match(html,/data-action="book-mode"/);assert.match(html,/function recordRankRows/);
+assert.match(html,/function recordBreakingEvents/);assert.match(html,/function preserveNoHitStart/);
+assert.match(html,/p\.stats\.fieldQuality/);
+console.log('PASS: actual-game special feats, record book and fielding contribution');
 }

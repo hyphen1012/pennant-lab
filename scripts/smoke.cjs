@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.20 · CAREER/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.21 · RECORD BOOK/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -441,6 +441,16 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   await flush();
   assert.equal(store.get(1).data.pendingCeremonyIntro,null);
   dispatch('click',{action:'tab',tab:'records'});
+  dispatch('click',{action:'record-sub',sub:'recordbook'});
+  assert(app.innerHTML.includes('PENNANT RECORD BOOK'));
+  assert(app.innerHTML.includes('class="record-leader"'));
+  dispatch('click',{action:'book-mode',mode:'season'});
+  dispatch('change',{change:'book-scope',value:'E'});
+  assert(app.innerHTML.includes('class="record-leader"'));
+  dispatch('click',{action:'book-mode',mode:'awards'});
+  assert(app.innerHTML.includes('award-portrait-ring'));
+  dispatch('click',{action:'book-mode',mode:'feats'});
+  assert(app.innerHTML.includes('特殊記録・更新'));
   dispatch('click',{action:'record-sub',sub:'career'});
   assert(app.innerHTML.includes('歴代選手・通算記録'));
   const careerButton=app.innerHTML.match(/data-action="career-open" data-id="(\d+)"/);
