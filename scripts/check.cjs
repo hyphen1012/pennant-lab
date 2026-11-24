@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.31 · CLUB RED/);
+assert.match(html,/VERSION 0\.9\.32 · CLUB IDENTITY/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -893,7 +893,13 @@ assert.match(html,/edition-exit-cancel/);
 assert.match(html,/\.edition-compact-row \.record-player-info b\{font-size:18px/);
 console.log('PASS: enlarged edition typography and exit confirmation hooks');
 
-assert.match(html,/--own-club-red:#ff6666/);
+assert.match(html,/--own-club-color:#ff6666/);
 assert.match(html,/\.league-box\.league-east \.stand-line\.mine/);
 assert.match(html,/data-own-club=/);
 console.log('PASS: independent red club emphasis and 1.3x edition typography');
+
+assert.match(html,/function clubThemeStyle\(/);
+assert.match(html,/function clubIdentityEditor\(/);
+assert.match(html,/data-action="club-settings-save"/);
+assert.match(html,/data-shape=/);
+console.log('PASS: editable club identity and contextual color hooks');

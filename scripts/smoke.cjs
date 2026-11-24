@@ -107,11 +107,28 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.31 · CLUB RED/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.32 · CLUB IDENTITY/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
   dispatch('click',{action:'finish-setup'});
+  dispatch('click',{action:'tab',tab:'business'});
+  dispatch('click',{action:'business-sub',sub:'club'});
+  assert(app.innerHTML.includes('アイコン文字'));
+  dispatch('change',{change:'club-field',field:'letter',value:'PL'});
+  dispatch('click',{action:'team-color',color:'#dc2626'});
+  dispatch('click',{action:'club-design',field:'shape',value:'shield'});
+  dispatch('click',{action:'club-design',field:'pattern',value:'stripe'});
+  dispatch('click',{action:'club-settings-save'});
+  await flush();
+  const club=store.get(1).data.teams.find(t=>t.id===store.get(1).data.selectedId);
+  assert.equal(club.color,'#dc2626');assert.equal(club.letter,'PL');assert.equal(club.emblem.shape,'shield');assert.equal(club.emblem.pattern,'stripe');
+  assert(app.innerHTML.includes('--own-club-color:'));
+  dispatch('click',{action:'business-sub',sub:'club'});
+  dispatch('change',{change:'club-field',field:'letter',value:'NO'});
+  dispatch('click',{action:'club-settings-cancel'});
+  await flush();
+  assert.equal(store.get(1).data.teams.find(t=>t.id===store.get(1).data.selectedId).letter,'PL');
 
   dispatch('click',{action:'tab',tab:'team'});
   assert.match(app.innerHTML,/チームメンバー/);
