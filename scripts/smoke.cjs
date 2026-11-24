@@ -85,6 +85,19 @@ function dispatch(type,data={}){
   }
 }
 function finishMeeting(){
+  if(app.innerHTML.includes('aria-label="1/5ページ"')){
+    assert(!app.innerHTML.includes('data-turn="forward"'),'Initial cover is stationary');
+    dispatch('click',{action:'meeting-page',step:'1'});
+    assert(app.innerHTML.includes('data-turn="forward"'));
+    assert(app.innerHTML.includes('meeting-paper meeting-current'));
+    assert(app.innerHTML.includes('meeting-paper meeting-fixed'));
+    assert(app.innerHTML.includes('class="meeting-flap"'));
+    assert(app.innerHTML.includes('01 月例会議資料'));
+    assert(app.innerHTML.includes('02 今月の戦績'));
+    dispatch('click',{action:'meeting-page',step:'-1'});
+    assert(app.innerHTML.includes('data-turn="back"'));
+    assert(app.innerHTML.includes('aria-label="1/5ページ"'));
+  }
   for(let i=0;i<4;i++)dispatch('click',{action:'meeting-page',step:'1'});
   dispatch('click',{action:'finish-month'});
 }
@@ -92,7 +105,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.16 · FRONT OFFICE/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.17 · FRONT OFFICE/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
