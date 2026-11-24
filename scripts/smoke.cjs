@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.35 · CHRONICLE/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.36 · DRAFT/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -447,8 +447,9 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(app.innerHTML.includes('class="panel season-action" data-priority="required"'));
   dispatch('click',{action:'ceremony-start'});
   const cashBeforeOffseason=window.PennantLab.getSnapshot().teams.map(t=>t.cash);
-  const titles=['awards-all','settlement','winter','self','camp','opening'];
+  const titles=['awards-all','settlement','draft','winter','self','camp','opening'];
   for(const key of titles){
+    if(key==='opening'&&app.innerHTML.includes('data-action="draft-reveal-close"'))dispatch('click',{action:'draft-reveal-close'});
     assert(app.innerHTML.includes('data-event="'+key+'"'),'Milestone title: '+key);
     assert(!app.innerHTML.includes('data-action="ceremony-next"'),'No underlying transition on title');
     const before=window.PennantLab.getSnapshot();
@@ -477,10 +478,33 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
       dispatch('click',{action:'ceremony-next'});
       assert(app.innerHTML.includes('role="alertdialog"'));
       dispatch('click',{action:'edition-exit-confirm'});
+    }else if(key==='draft'){
+      assert(app.innerHTML.includes('新人スカウト'));
+      const candidate=app.innerHTML.match(/data-action="draft-detail" data-id="(\d+)"/);
+      assert(candidate);
+      dispatch('click',{action:'draft-detail',id:candidate[1]});
+      assert(app.innerHTML.includes('推定には誤差'));
+      dispatch('click',{action:'draft-research',id:candidate[1]});
+      dispatch('click',{action:'draft-start'});
+      const choice=app.innerHTML.match(/data-action="draft-choose" data-id="(\d+)"/);
+      assert(choice);
+      dispatch('click',{action:'draft-choose',id:choice[1]});
+      assert(app.innerHTML.includes('指名・抽選結果'));
+      dispatch('click',{action:'draft-first-next'});
+      dispatch('click',{action:'draft-auto'});
+      assert(app.innerHTML.includes('data-action="draft-finish"'));
+      dispatch('click',{action:'draft-finish'});
     }else dispatch('click',{action:'ceremony-next'});
   }
   assert.equal(window.PennantLab.getSnapshot().year,full.year+1);
-  assert.deepEqual(window.PennantLab.getSnapshot().teams.map(t=>t.cash),cashBeforeOffseason,'No second annual wage or revenue settlement');
+  await flush();
+  const draft=store.get(1).data.draftHistory.find(d=>d.year===full.year);
+  assert(draft&&draft.picks.length>0);
+  assert.equal(new Set(draft.picks.map(p=>p.candidateId)).size,draft.picks.length);
+  assert(draft.picks.every(p=>p.status!=='rights'));
+  for(const row of draft.picks.filter(p=>p.status==='signed')){const p=store.get(1).data.players.find(p=>p.id===row.playerId);assert(p&&p.teamId===row.teamId&&p.rookieSeason===full.year+1&&p.stats.g===0);}
+  for(const row of draft.picks.filter(p=>p.status!=='signed'))assert(!store.get(1).data.players.some(p=>p.id===row.candidateId));
+  assert.deepEqual(window.PennantLab.getSnapshot().teams.map((t,i)=>t.cash),cashBeforeOffseason.map((cash,i)=>Math.round((cash-draft.picks.filter(p=>p.teamId===i&&p.status==='signed').reduce((n,p)=>n+p.contract.fee,0))*100)/100),'Only signed draft fees change cash');
   assert.equal(window.PennantLab.getSnapshot().day,0);
   assert(app.innerHTML.includes('data-action="advance-day"'));
   await flush();

@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.35 · CHRONICLE/);
+assert.match(html,/VERSION 0\.9\.36 · DRAFT/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -949,4 +949,13 @@ assert.equal(r.timeline.length,10);
 assert.equal(api.decadeAwards(r.seasons)[0].mvp,10);
 assert.equal(api.decadeTeams(seasons.filter(s=>s.year!==2030),2027,2036).teams[0].best,6);
 console.log('PASS: fixed decade windows, championship counts, streak gaps and award totals');
+}
+
+{
+const a=inline[1].indexOf('  function draftHash('),b=inline[1].indexOf('  function draftScoutProfile(',a);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+';return {draftHash};})()');
+assert.equal(api.draftHash(2027,1,2,'lottery'),api.draftHash(2027,1,2,'lottery'));
+assert(api.draftHash(2027,1,2,'lottery')>=0&&api.draftHash(2027,1,2,'lottery')<1);
+assert.match(html,/function draftFirst\(/);assert.match(html,/function draftOfferResponse\(/);assert.match(html,/function draftRegisterNextSeason\(/);
+console.log('PASS: deterministic draft lottery and recruitment hooks');
 }
