@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.4 · CALENDAR/);
+assert.match(html,/VERSION 0\.9\.5 · CALENDAR/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -594,3 +594,7 @@ assert(!dateMarkup.includes('data-action='),'Date interstitial is display-only')
 assert.match(html,/function toggleAutoPause\(\)\{\s*if\(!ui\.busy\|\|ui\.dateIntro\)return;/);
 assert.match(html,/if\(ui\.dateIntro\)return;\s*if\(ui\.autoDay\.type==='game'\)/);
 console.log('PASS: date interstitial has no pause controls or tap-to-pause');
+
+assert.match(html,/\.calendar-date-track\{animation:calendar-date-slide \.95s /);
+assert.match(html,/\.calendar-date-track\.fast\{animation-duration:\.4s\}/);
+console.log('PASS: calendar scroll and fade duration match the longer display window');
