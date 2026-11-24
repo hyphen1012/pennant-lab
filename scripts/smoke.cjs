@@ -84,11 +84,15 @@ function dispatch(type,data={}){
     l.callback(event);
   }
 }
+function finishMeeting(){
+  for(let i=0;i<4;i++)dispatch('click',{action:'meeting-page',step:'1'});
+  dispatch('click',{action:'finish-month'});
+}
 async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout(resolve,0));}
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.14 · CLUBHOUSE/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.15 · FRONT OFFICE/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -154,6 +158,9 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(!app.innerHTML.includes('data-priority="required"'),'Regular duties do not invent mandatory restrictions');
   assert(!app.innerHTML.includes('class="panel manager-home"'),'Manager must appear in GM desk, not a separate panel');
   dispatch('click',{action:'mgr-open'});
+  assert(app.innerHTML.includes('data-action="mgr-enter"'));
+  dispatch('click',{action:'mgr-enter'});
+  assert(app.innerHTML.includes('MANAGER\'S OFFICE'));
   assert.match(app.innerHTML,/監督・GM方針/);
   assert.match(app.innerHTML,/data-action="mgr-offer"/);
   const oldCash=window.PennantLab.getSnapshot().teams.find(t=>t.id===2).cash;
@@ -182,7 +189,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   // The day action must show the simulated inning-by-inning watch before the final score.
   for(let tries=0;tries<12&&watchRenders.length===0;tries++){
     if(app.innerHTML.includes('data-action="auto-day-close"'))dispatch('click',{action:'auto-day-close'});
-    if(app.innerHTML.includes('data-action="finish-month"'))dispatch('click',{action:'finish-month'});
+    if(app.innerHTML.includes('data-action="finish-month"'))finishMeeting();
     if(app.innerHTML.includes('data-action="injury-ack"'))dispatch('click',{action:'injury-ack'});
     await window.PennantLab.advance('day');
   }
@@ -222,7 +229,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   // A new explicit season skip must finish in one invocation.
   const pageBeforeSkip=app.innerHTML;
   if(pageBeforeSkip.includes('data-action="injury-ack"'))dispatch('click',{action:'injury-ack'});
-  if(app.innerHTML.includes('data-action="finish-month"'))dispatch('click',{action:'finish-month'});
+  if(app.innerHTML.includes('data-action="finish-month"'))finishMeeting();
   if(app.innerHTML.includes('data-action="finish-review"'))dispatch('click',{action:'finish-review'});
   await window.PennantLab.advance('season');
   const full=window.PennantLab.getSnapshot();
@@ -368,12 +375,13 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     const page=app.innerHTML;
     const action=['injury-ack','finish-review','milestone-ack','auto-day-close','finish-month'].find(a=>page.includes('data-action="'+a+'"'));
     if(!action)break;
-    dispatch('click',{action});
+    if(action==='finish-month')finishMeeting();else dispatch('click',{action});
   }
   dispatch('click',{action:'tab',tab:'records'});
   dispatch('click',{action:'record-sub',sub:'news'});
   assert(app.innerHTML.includes('球界ニュースの履歴'));
   dispatch('click',{action:'news-edition-open',date:weeklies[0].date,year:String(weeklies[0].year)});
+  assert(app.innerHTML.includes('data-medium="news"'));
   assert(app.innerHTML.includes('週刊 球界ニュース'));
   assert(app.innerHTML.includes('東西リーグ · 順位と週間成績'));
   assert(!app.innerHTML.includes('data-action="pause-calendar"'));
