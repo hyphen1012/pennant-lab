@@ -530,7 +530,8 @@ assert.match(html,/pitchLoad=pitched/);
 const midStart=inline[1].indexOf('  /* v0.9.0 — Pitch counts');
 const midEnd=inline[1].indexOf('  /* v0.8.7:',midStart);
 assert(midStart>=0&&midEnd>midStart);
-const midAPI=vm.runInNewContext('(function(){'+inline[1].slice(midStart,midEnd)+
+const noHitStart=inline[1].indexOf('  function preserveNoHitStart('),noHitEnd=inline[1].indexOf('  function managerPitcherChoice(',noHitStart);
+const midAPI=vm.runInNewContext('(function(){'+inline[1].slice(noHitStart,noHitEnd)+inline[1].slice(midStart,midEnd)+
   '\nreturn managerMidInningPitcherChoice;})()',{
   managerDecision:()=>76,managerRatings:()=>({pitch:72}),
   clamp:(x,a,b)=>Math.max(a,Math.min(b,x)),
