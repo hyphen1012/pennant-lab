@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.58 · RINNE/);
+assert.match(html,/VERSION 0\.9\.59 · RINNE FRACTURE/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1148,4 +1148,11 @@ const api=vm.runInNewContext('(function(){const h=String,renderFaceArtwork=()=>"
 assert(api.rinneStadiumArt().includes('崩壊した架空の野球場'));assert(api.rinneStudioArt().includes('壊滅したスタジオ'));const tear=api.rinneTearScreen();assert(tear.includes('rinne-piece left')&&tear.includes('rinne-piece right')&&tear.includes('rinne-fragments'));
 for(const category of ['PARALLEL','STAR','LEGEND','IMMORTAL','再来','転生','輪廻転生'])assert.equal(api.broadcastFeature({}, {category,tournament:true,hidden:true,name:'????',role:'投手'}).includes('ruined-feature'),category==='輪廻転生');
 assert.match(html,/if\(node&&e.category!=='輪廻転生'\)/);console.log('PASS: RINNE exclusive torn cut-in, ruined stadium and ruined studio');
+}
+
+{
+const a=inline[1].indexOf('function broadcastCutArt('),b=inline[1].indexOf('  function broadcastStudio(',a);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+';return {rinneTearScreen};})()');
+const intact=api.rinneTearScreen(false),torn=api.rinneTearScreen(true);
+assert(intact.includes('rinne-piece whole'));assert(!intact.includes('rinne-fragments'));assert(torn.includes('left upper')&&torn.includes('left lower')&&torn.includes('right upper')&&torn.includes('right lower'));assert.equal((torn.match(/<i style=/g)||[]).length,52);assert.equal((torn.match(/class="hairline"/g)||[]).length,3);assert(torn.includes('演出をスキップ'));assert.match(html,/matches\?350:4400/);console.log('PASS: RINNE continuous intact band, four-piece fracture, 52 fragments, timed transition');
 }

@@ -64,7 +64,7 @@ const localStorage={
   setItem:(key,value)=>local.set(key,String(value)),
   removeItem:key=>local.delete(key)
 };
-const fakeTimeout=(fn,ms,...args)=>ms>=3000?0:setTimeout(fn,ms>=300?0:ms,...args);
+const fakeTimeout=(fn,ms,...args)=>ms>=3000&&ms!==4400?0:setTimeout(fn,ms>=300?0:ms,...args);
 const context={window,document,localStorage,console,setTimeout:fakeTimeout,
   clearTimeout,Date,Math,JSON,Number,String,Array,Object,Set,Map,
   Promise,Blob:global.Blob,URL:global.URL};
@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.58 · RINNE/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.59 · RINNE FRACTURE/);
   const previewBefore=JSON.stringify(window.PennantLab.getSnapshot()),saveBefore=store.size;
   dispatch('click',{action:'rare-preview-open'});assert(app.innerHTML.includes('演出確認'));
   dispatch('click',{action:'rare-preview-start'});assert(app.innerHTML.includes('観測記録に異常を検出'));
@@ -115,9 +115,9 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   dispatch('click',{action:'rare-news-next'});assert(app.innerHTML.includes('完全試合'));assert(app.innerHTML.includes('???'));
   dispatch('click',{action:'rare-news-ack'});for(let i=0;i<4;i++)dispatch('click',{action:'rare-news-next'});
   dispatch('click',{action:'rare-preview-role',value:'OF'});dispatch('click',{action:'rare-preview-start'});dispatch('click',{action:'rare-news-next'});dispatch('click',{action:'rare-news-next'});assert(app.innerHTML.includes('14 − 2'));
-  dispatch('click',{action:'rare-preview-category',value:'輪廻転生'});dispatch('click',{action:'rare-preview-start'});assert(!app.innerHTML.includes('rinne-piece left'));
+  dispatch('click',{action:'rare-preview-category',value:'輪廻転生'});dispatch('click',{action:'rare-preview-start'});assert(!app.innerHTML.includes('rinne-piece left'));assert(app.innerHTML.includes('rinne-piece whole'));
   dispatch('click',{action:'rare-news-next'});assert(app.innerHTML.includes('rinne-piece left'));assert(app.innerHTML.includes('rinne-piece right'));assert(app.innerHTML.includes('崩壊した架空の野球場'));
-  await flush();if(app.innerHTML.includes('rinne-piece left'))dispatch('click',{action:'rare-news-next'});
+  await flush();assert(!app.innerHTML.includes('rinne-piece left'));
   assert(app.innerHTML.includes('壊滅したスタジオ'));dispatch('click',{action:'rare-news-next'});assert(app.innerHTML.includes('ruined-feature'));assert(app.innerHTML.includes('14 − 2'));assert(app.innerHTML.includes('????'));
   dispatch('click',{action:'rare-preview-exit'});assert.equal(JSON.stringify(window.PennantLab.getSnapshot()),previewBefore);assert.equal(store.size,saveBefore);
   const snap=window.PennantLab.getSnapshot();
