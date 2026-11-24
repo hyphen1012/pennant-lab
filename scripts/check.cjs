@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.37 · NEGOTIATION/);
+assert.match(html,/VERSION 0\.9\.38 · SCOUT THEATRE/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -978,4 +978,19 @@ assert(api.recruitmentInitial({priorities:['winning']},{winning:20},1,false)>api
 assert(api.recruitmentReaction(profile,{},0,profile.preferred[0])>api.recruitmentReaction(profile,{},0,'winning'));
 assert(api.draftScoutCost(4)>api.draftScoutCost(2));
 console.log('PASS: shared conversation, club fit, acceptance, refusal, fee safety and scout costs');
+}
+
+{
+const a=inline[1].indexOf('  function draftHash('),b=inline[1].indexOf('  function draftScoutProfile(',a);
+const c=inline[1].indexOf('  function draftWinningTicket('),d=inline[1].indexOf('  function draftResolveLottery(',c);
+const api=vm.runInNewContext('(function(){const game={selectedId:2};'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {draftLotteryWinner,draftDraw,draftOpenTicket};})()');
+const ids=[2,3,4,5],winners=ids.map((_,i)=>api.draftLotteryWinner(2027,1,88,ids,i));
+assert.equal(new Set(winners).size,4);
+let draft={year:2027,phase:'lottery',pendingLottery:{attempt:1,stage:'choose',cursor:0,groups:[{cid:88,ids}]}};
+assert(api.draftDraw(draft,2,'manual'));const saved=JSON.parse(JSON.stringify(draft));
+assert(!api.draftDraw(saved,1,'manual'));assert.equal(saved.pendingLottery.groups[0].chosen,2);
+assert(api.draftOpenTicket(saved));assert(!api.draftOpenTicket(saved));
+assert.equal(saved.pendingLottery.groups[0].winner,winners[2]);
+assert.match(html,/SCOUT_TASKS/);assert.match(html,/scout-field-report/);assert.match(html,/draft-draw-stage/);
+console.log('PASS: sealed tickets, unique winner, saved selection, scout dossier');
 }
