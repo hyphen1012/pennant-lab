@@ -1680,6 +1680,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .position-word[data-position-group="outfield"]{--position-tone:#80d69e;--position-ink:#187344}
 .position-word[data-position-group="dh"]{--position-tone:#c5cbd6;--position-ink:#515b69}
 .device-content .position-word,.meeting-paper .position-word,.chip.active .position-word,.subtab.active .position-word,.btn.primary .position-word{color:var(--position-ink)!important}
+/* v0.9.48 global recruitment */
+.foreign-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:8px 0}.foreign-stats>div{padding:7px;background:#122334;border:1px solid #486779;border-radius:6px;text-align:center}.foreign-stats small,.foreign-stats b{display:block}.foreign-stats b{color:#a5e3dc;font-size:19px}.foreign-detail h3{margin:12px 0 5px}.foreign-scene{background:radial-gradient(ellipse at 75% 0,#4a8c9a77,transparent 70%),linear-gradient(120deg,#142b3c,#102030)}.foreign-scene-art{text-align:center;font-size:45px;padding:12px}.foreign-competition,.foreign-language{padding:10px;margin:9px 0;border:1px solid #587c89;border-radius:8px;background:#102536}.foreign-competition>div{display:flex;gap:7px;align-items:center;margin:5px 0}.foreign-competition .mini-logo{width:24px;height:24px}.foreign-language p{font-size:12px;color:#b5d8df}.foreign-result{text-align:center;border:1px solid #657789}.foreign-result[data-success=true]{border:2px solid var(--own-club-color);background:radial-gradient(ellipse at 50% 0,var(--own-club-color-bg),transparent 70%),#142538}.foreign-result>.logo{display:inline-flex;width:64px;height:64px;margin:12px auto}.foreign-result h2{font-size:26px}.foreign-result[data-success=true] h2{color:var(--own-club-color)}.foreign-talk .draft-offer[aria-pressed=true]{border-color:#89d4c8;background:#204b4b}.foreign-card .draft-rumor-marks .mini-logo{width:18px;height:18px}.foreign-talk .draft-question h3{overflow-wrap:anywhere}
+@media(prefers-reduced-motion:no-preference){.foreign-result[data-success=true]>.logo{animation:club-lottery-entry .8s both,club-lottery-glow 1.5s .2s both}}
 /* v0.9.46 overseas scouting foundation */
 .foreign-scout-hero{position:relative;isolation:isolate;overflow:hidden;border:1px solid #527e8d;border-radius:14px;padding:20px 16px;background:radial-gradient(ellipse at 90% 10%,#39738788,transparent 65%),linear-gradient(135deg,#173747,#101c2c);margin:10px 0 12px}
 .foreign-scout-hero small{font-size:11px;color:#9dd9d6;letter-spacing:2px;font-weight:800}.foreign-scout-hero h2{font-size:26px;margin:8px 0 4px}.foreign-scout-hero p{font-size:13px;color:#c3d5df;margin:0}
@@ -3490,12 +3493,130 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     game.foreignMarket={year:game.year,candidates,research:{},history:[]};
     return game.foreignMarket;
   }
+  const FOREIGN_TASKS={field:['海外現地視察',.05,'現在能力を重点調査'],analysis:['映像・実績分析',.02,'技術・将来性を重点調査'],interview:['代理人・本人面談',.03,'来日希望・価値観を確認']};
+  const FOREIGN_LANG={
+    en:{name:'英語',q:['What role do you see for me in Japan?','What about my family and life in Japan?','What if I struggle to adapt?'],yes:'That sounds promising.',no:'That is not quite what I am looking for.'},
+    es:{name:'スペイン語',q:['¿Qué papel tendría en Japón?','¿Qué pasará con mi familia y mi vida en Japón?','¿Y si me cuesta adaptarme?'],yes:'Eso me parece prometedor.',no:'No es exactamente lo que busco.'},
+    ko:{name:'韓国語',q:['일본에서 제 역할은 무엇인가요?','가족과 일본 생활은 어떻게 되나요?','적응에 어려움을 겪으면 어떻게 하나요?'],yes:'긍정적으로 생각하겠습니다.',no:'제가 원하는 것과는 조금 다릅니다.'},
+    zh:{name:'中国語（繁体字）',q:['我在日本會扮演什麼角色？','我的家人和在日本的生活怎麼安排？','如果我難以適應，該怎麼辦？'],yes:'我會認真考慮。',no:'這和我期待的不太一樣。'}
+  };
+  const FOREIGN_QUESTIONS=[
+    {q:'日本でプレーするなら、どんな役割を期待されていますか？',gist:'起用について質問しているようだ。',options:[['chance','実戦で競争する機会を大切にしたい。'],['winning','優勝を狙う戦力として力を貸してほしい。'],['growth','長期的に成長できる環境を整えたい。'],['trust','君の希望を聞いて役割を決めよう。']]},
+    {q:'家族や日本での生活について、どのような支援がありますか？',gist:'家族や生活の話をしているようだ。',options:[['home','住居や生活面を球団で支えよう。'],['money','待遇や生活の安定も考慮したい。'],['manager','監督や指導スタッフと話す機会を作ろう。'],['trust','文化や言葉の違いを尊重しよう。']]},
+    {q:'もし日本での適応に苦労したらどうなりますか？',gist:'適応への不安があるようだ。',options:[['growth','練習と育成で支えたい。'],['chance','実力で再挑戦する機会を作りたい。'],['overseas','将来の海外復帰も本人の希望を尊重しよう。'],['trust','状況を率直に共有して話し合おう。']]}
+  ];
+  const FOREIGN_HINTS={growth:'技術を磨きたい',chance:'実戦で力を証明したい',winning:'優勝を争いたい',home:'家族・住居・生活面が気になる',money:'待遇を重視',manager:'指導者との相性を重視',trust:'率直に話せる関係を希望',overseas:'海外復帰の選択肢を残したい'};
+  const FOREIGN_SUPPORT={interpreter:{label:'専属通訳（初年度）',cost:.12},housing:{label:'日本での住居手配（初年度）',cost:.08}};
+  const FOREIGN_INTERPRETER_COST=.02;
+  function foreignLang(c){return FOREIGN_LANG[c.country==='韓国'?'ko':c.country==='台湾'?'zh':['ドミニカ共和国','ベネズエラ','プエルトリコ','キューバ','メキシコ'].includes(c.country)?'es':'en'];}
+  function foreignHydrate(m){m.scoutTasks||={};m.negotiations||={};m.history||=[];return m;}
+  function foreignProfile(m,c){
+    if(c.personality)return c.personality;
+    const priorities=Object.keys(FOREIGN_HINTS).sort((a,b)=>draftHash(m.year,c.id,a,'foreign-value')-draftHash(m.year,c.id,b,'foreign-value')).slice(0,3);
+    const rank=(k,i)=>priorities.includes(k)?priorities.indexOf(k):3+draftHash(c.id,i,k);
+    return {priorities,preferred:FOREIGN_QUESTIONS.map((q,i)=>q.options.map(o=>o[0]).sort((a,b)=>rank(a,i)-rank(b,i))[0]),admiredManagerId:null};
+  }
+  function foreignBudget(t){return 6+2*draftScoutProfile(t).level;}
+  function foreignUsed(m,t){return Object.values(m.scoutTasks?.[t.id]||{}).reduce((n,v)=>n+v.length,0);}
+  function foreignTasks(m,t,c){return m.scoutTasks?.[t.id]?.[c.id]||[];}
+  function foreignReport(m,t,c){
+    const tasks=foreignTasks(m,t,c),p=c.player,lv=draftScoutProfile(t).level,width=Math.max(4,22-lv*2-tasks.length*3),values={};
+    for(const k of [...seasonSkillKeys(p),'talent']){
+      const focus=(tasks.includes('field')&&k!=='talent'?3:0)+(tasks.includes('analysis')&&['talent','contact','control','defense','stamina'].includes(k)?3:0);
+      const bias=(draftHash(m.year,t.id,c.id,k,'foreign-estimate')*2-1)*Math.max(3,18-lv*2);
+      const estimate=clamp(Math.round(p[k]+bias/(1+tasks.length*.6+focus*.3)),20,99),range=Math.max(3,width-focus);
+      values[k]={estimate,low:Math.max(20,estimate-range),high:Math.min(99,estimate+range)};
+    }
+    const overall=rating({pos:p.pos,...Object.fromEntries(Object.entries(values).map(([k,v])=>[k,v.estimate]))});
+    return {overall,low:Math.max(20,overall-width),high:Math.min(99,overall+width),values,confidence:tasks.length===3?'高':tasks.length||lv>=4?'中':'低'};
+  }
+  function foreignResearch(m,t,c,key){
+    const x=FOREIGN_TASKS[key];if(!x||c.status!=='available'||foreignTasks(m,t,c).includes(key)||foreignUsed(m,t)>=foreignBudget(t)||t.cash<x[1])return false;
+    const all=m.scoutTasks[t.id]||(m.scoutTasks[t.id]={});(all[c.id]||(all[c.id]=[])).push(key);t.cash=r2(t.cash-x[1]);return true;
+  }
+  function foreignStats(m,c){
+    const p=c.player,n=k=>draftHash(m.year,c.id,k,'overseas-record'),quality=rating(p),v=(n('form')-.5)*16;
+    if(isPitch(p)){const g=Math.round((p.pos==='SP'?15:25)+n('g')*(p.pos==='SP'?15:43)),ip=Math.round(g*(p.pos==='SP'?4.8+n('ip')*1.7:1+n('ip')*.45));return [['登板',g],['防御率',clamp(4.7-(quality-55)*.075+v*.06,1.15,7.2).toFixed(2)],['投球回',ip],['奪三振',Math.round(ip*clamp(.62+(p.stuff-50)*.012,.4,1.5))],p.pos==='CP'?['セーブ',Math.round(g*(.3+n('sv')*.35))]:['勝利',Math.round(g*(p.pos==='SP'?.35:.1)*clamp(quality/65,.6,1.3))]];}
+    const g=Math.round(62+n('g')*76),ab=Math.round(g*(3+n('ab')*.8)),avg=clamp(.235+(p.contact-55)*.0022+v*.0018,.15,.37),hr=Math.round(ab*clamp(.018+(p.power-48)*.001,.004,.08));return [['試合',g],['打率',avg.toFixed(3).replace(/^0/,'')],['本塁打',hr],['打点',Math.round(hr*1.8+ab*.065)],['盗塁',Math.round(g*clamp((p.speed-35)*.003,0,.4))]];
+  }
+  function foreignOffer(m,c,level,support={}){
+    const base=clamp(.16+Math.pow(rating(c.player)/70,3)*.45+(c.kind==='elite'?.35:c.kind==='prospect'?-.12:0),.18,2.5),factor=[.8,1,1.45][level];
+    const benefits={interpreter:!!support.interpreter,housing:!!support.housing},supportCost=r2(Object.entries(FOREIGN_SUPPORT).reduce((n,[k,x])=>n+(benefits[k]?x.cost:0),0));
+    return {level,fee:r2(base*.45*factor),salary:r2(base*factor),benefits,supportCost};
+  }
+  function foreignRoom(t,c){return own(t).length<ROSTER_MAX&&!getPlayer(c.id);}
+  function foreignAffordable(t,o){return t.cash+1e-8>=o.fee+o.salary+o.supportCost;}
+  function foreignContext(m,c,t,profile){
+    const ctx=recruitmentContext(c,t,profile),same=own(t).filter(p=>p.isForeign&&p.nationality===c.country).length;
+    return {...ctx,home:Math.min(15,same*9),overseas:0,manager:t.manager?Math.round(((managerRatings(t.manager).development||60)-60)*.4):0};
+  }
+  function foreignRivals(m,c,t){
+    const profile=foreignProfile(m,c),q=rating(c.player);
+    return game.teams.filter(x=>x.id!==t.id&&foreignRoom(x,c)).map(x=>{
+      const ctx=foreignContext(m,c,x,profile),fit=ctx.chance+ctx.winning*.3+ctx.home*.4+(q-60)*.45+draftHash(m.year,c.id,x.id,'rival-demand')*22-12;
+      const bid=foreignOffer(m,c,fit>29?2:1,{interpreter:fit>23,housing:fit>30});return {teamId:x.id,fit,bid};
+    }).filter(x=>x.fit>12&&foreignAffordable(getTeam(x.teamId),x.bid)).sort((a,b)=>b.fit-a.fit).slice(0,3);
+  }
+  function foreignBegin(m,t,c){
+    if(c.status!=='available'||!foreignRoom(t,c)||m.negotiations[t.id])return false;
+    const profile=foreignProfile(m,c),context=foreignContext(m,c,t,profile);
+    m.negotiations[t.id]={candidateId:c.id,status:'talk',interest:recruitmentInitial(profile,context,1,false),context,answers:[],rivals:foreignRivals(m,c,t),overseas:c.kind==='elite'||draftHash(m.year,c.id,'overseas-offer')<.4,interpreter:false,support:{interpreter:false,housing:false},offerLevel:null};return true;
+  }
+  function foreignHireInterpreter(t,conv){if(conv.status!=='talk'||conv.interpreter||t.cash<FOREIGN_INTERPRETER_COST)return false;t.cash=r2(t.cash-FOREIGN_INTERPRETER_COST);conv.interpreter=true;return true;}
+  function foreignReply(m,t,c,conv,key){
+    if(conv.status!=='talk'||c.status!=='available')return false;
+    const step=conv.answers.length;let delta=recruitmentReaction(foreignProfile(m,c),conv.context,step,key,FOREIGN_QUESTIONS);if(delta==null)return false;
+    if(!conv.interpreter)delta=clamp(Math.round(delta*.5)-3,-12,18);
+    conv.interest=clamp(conv.interest+delta,0,100);conv.answers.push({key,delta,interpreted:conv.interpreter});return true;
+  }
+  function foreignSupportValue(profile,offer){
+    return (offer.benefits.interpreter?(profile.priorities.includes('trust')||profile.priorities.includes('home')?9:5):0)+(offer.benefits.housing?(profile.priorities.includes('home')||profile.priorities.includes('money')?9:4):0);
+  }
+  function foreignRegister(m,c,t,offer){
+    if(c.status!=='available'||!foreignRoom(t,c)||!foreignAffordable(t,offer))return false;
+    const p=JSON.parse(JSON.stringify(c.player));p.teamId=t.id;p.lastClubId=t.id;p.salary=offer.salary;p.rookieSeason=null;p.originMarket='foreign';p.isForeign=true;p.recruitmentRoute='foreign';
+    p.stats=newStats(isPitch(p));p.seasonHistory=[];p.overallHistory=[{year:game.year,overall:rating(p)}];p.abilityHistory=[];p.peakHistory=[];p.titles=[];
+    p.growthAptitude=Object.fromEntries(seasonSkillKeys(p).map((k,i)=>[k,.65+((p.id*37+i*53)%81)/100]));p.trainFocus='balanced';p.expPoints=0;p.ssEligible=[];p.injuries=[];initCondition(p);
+    p.affinity=clamp(p.affinity+foreignSupportValue(foreignProfile(m,c),offer),0,100);
+    p.foreignContract={year:m.year,fee:offer.fee,salary:offer.salary,teamId:t.id,support:{...offer.benefits},supportCost:offer.supportCost,language:foreignLang(c).name};p.foreignCareer={...c.career,stats:foreignStats(m,c)};
+    game.players.push(p);t.cash=r2(t.cash-offer.fee-offer.supportCost);c.status='signed';c.signedTeam=t.id;repairTeam(t);
+    pushNews('【外国人入団】'+t.name+'が'+p.name+'（'+positionFull(p.pos)+'）を獲得。'+p.nationality+'出身・年俸'+fmtSalary(p.salary)+'。');return true;
+  }
+  function foreignResolve(m,t,c,conv,level){
+    if(conv.status!=='talk'||conv.answers.length!==3||c.status!=='available'||![0,1,2].includes(level)||!foreignRoom(t,c))return false;
+    const offer=foreignOffer(m,c,level,conv.support);if(!foreignAffordable(t,offer))return false;
+    const profile=foreignProfile(m,c),money=profile.priorities.includes('money')?17:9;
+    const ownScore=conv.interest+(level-1)*money+foreignSupportValue(profile,offer)+draftHash(m.year,c.id,t.id,'foreign-decision')*10-5;
+    const best=conv.rivals.filter(r=>{const x=getTeam(r.teamId);return x&&foreignRoom(x,c)&&foreignAffordable(x,r.bid);}).map(r=>({...r,score:46+r.fit*.65+(r.bid.level-1)*money+foreignSupportValue(profile,r.bid)})).sort((a,b)=>b.score-a.score)[0];
+    const abroad=conv.overseas?58+(c.kind==='elite'?13:0)+draftHash(m.year,c.id,'overseas-decision')*12:0;
+    let winner=null,status='refused';
+    if(ownScore>=Math.max(49,best?.score||0,abroad)&&foreignRegister(m,c,t,offer)){winner=t.id;status='signed';}
+    else if(best&&best.score>=Math.max(49,abroad)&&foreignRegister(m,c,getTeam(best.teamId),best.bid)){winner=best.teamId;status='rival';}
+    else {c.status='refused';status=abroad>=49?'overseas':'refused';}
+    Object.assign(conv,{status,winner,offer,revealStage:0,report:foreignReport(m,t,c)});m.history.push({id:c.id,teamId:t.id,winner,status,offer,year:m.year});
+    if(status==='overseas')pushNews('【海外補強】'+c.player.name+'は海外でのプレー継続を選択しました。');return true;
+  }
+  function foreignIdentity(c,r,known=false){
+    const p=c.player;return `<div class="recruit-player">${known?faceMini(p,{overall:true}):draftPortrait(c,r)}<div class="recruit-identity"><strong>${themedPlayerName(p)}</strong><small>${p.age}歳 · ${positionMarkup(p.pos)} · ${throwBat(p)}</small><small>${h(c.country)} · ${h(c.career.league)} · ${foreignLang(c).name}</small></div><div class="draft-rank">${known?gradeBrief(rating(p)):gradeBrief(r.low)+'〜'+gradeBrief(r.high)}<small>${known?'総合':'推定総合'}</small></div></div>`;
+  }
+  function foreignAbilityGrid(c,r,stage=0){return '<div class="draft-abilities">'+Object.entries(r.values).map(([k,v],i)=>{const known=stage===2||stage===1&&i<2;return '<div><small>'+DRAFT_LABELS[k]+'</small><b>'+(known?gradeBrief(c.player[k]):gradeBrief(v.low)+'〜'+gradeBrief(v.high))+'</b><small>'+(known?c.player[k]:v.low+'–'+v.high)+'</small></div>';}).join('')+'</div>';}
+  function foreignCard(m,c,t){
+    const r=foreignReport(m,t,c),tasks=foreignTasks(m,t,c),detail=ui.foreignDetail===c.id,latest=tasks.at(-1),rivals=foreignRivals(m,c,t);
+    return `<article class="recruit-candidate foreign-card" data-draft-card="${c.id}">${foreignIdentity(c,r)}<div class="draft-hints"><span>${h(FOREIGN_PROFILES[c.kind].label)}</span><span>${h(c.career.level)}</span><span>海外経験 ${c.career.seasons}年</span><span>${tasks.length?'調査 '+tasks.length+'/3':'未調査'}</span></div>${rivals.length?`<div class="draft-rumor-marks"><small>国内注目球団（予測）</small><div>${rivals.map(x=>`<span title="${h(getTeam(x.teamId).name)}">${teamBadge(getTeam(x.teamId))}</span>`).join('')}</div></div>`:''}<div class="edition-actions"><button class="btn outline" data-action="foreign-detail" data-id="${c.id}">${detail?'詳細を閉じる':'詳細・調査'}</button><button class="btn primary" data-action="foreign-begin" data-id="${c.id}" ${foreignRoom(t,c)?'':'disabled'}>獲得交渉 ›</button></div>${detail?`<section class="foreign-detail"><h3>海外リーグ・昨季実績</h3><p class="tiny">${m.year-1}年 · 架空海外リーグの記録。国内成績を保証しません。</p><div class="foreign-stats">${foreignStats(m,c).map(([k,v])=>`<div><small>${h(k)}</small><b>${h(v)}</b></div>`).join('')}</div><h3>能力推定 · 確度 ${r.confidence}</h3>${foreignAbilityGrid(c,r)}<h3>追加調査</h3>${Object.entries(FOREIGN_TASKS).map(([k,x])=>`<button class="draft-offer" data-action="foreign-research" data-id="${c.id}" data-value="${k}" ${tasks.includes(k)||foreignUsed(m,t)>=foreignBudget(t)||t.cash<x[1]?'disabled':''}><b>${tasks.includes(k)?'✓ ':''}${x[0]}</b><span>${x[2]} · ${fmtMoney(x[1])}</span></button>`).join('')}${latest?`<section class="scout-field-report foreign-report" data-scout-report="${c.id}" data-task="${latest}" data-new="false"><div class="scout-scene foreign-scene"><small>OVERSEAS SCOUT REPORT</small><div class="foreign-scene-art" aria-hidden="true">${latest==='field'?'⚾':latest==='analysis'?'▥':'✈'}</div><div class="scout-scan"></div><b>${h(c.country)} · ${h(c.career.league)}</b></div><div class="scout-report-content"><h3>${FOREIGN_TASKS[latest][0]} 完了</h3>${tasks.includes('interview')?'<p>面談メモ：'+h(foreignProfile(m,c).priorities.map(k=>FOREIGN_HINTS[k]).join(' ／ '))+'</p>':''}<p>推定精度：${r.confidence} · 調査 ${tasks.length}/3</p></div></section>`:''}</section>`:''}</article>`;
+  }
+  function foreignNegotiationView(m,t,c,conv){
+    const r=foreignReport(m,t,c),step=conv.answers.length,q=FOREIGN_QUESTIONS[step],last=conv.answers.at(-1),lang=foreignLang(c);
+    if(conv.status!=='talk'){
+      const success=conv.status==='signed',stage=conv.revealStage||0;
+      return `<section class="panel foreign-result" data-success="${success}"><small>GLOBAL RECRUITMENT · ${success?'WELCOME TO JAPAN':'RESULT'}</small>${success?teamBadge(t,'logo'):conv.winner!=null?teamBadge(getTeam(conv.winner),'logo'):''}<h2>${success?'入団合意！':conv.status==='rival'?'他球団と契約':conv.status==='overseas'?'海外でのプレーを継続':'交渉終了'}</h2>${foreignIdentity(c,r,success&&stage===2)}<p>${success?h(t.name)+'へようこそ。 契約金 '+fmtMoney(conv.offer.fee)+' · 年俸 '+fmtSalary(conv.offer.salary):conv.winner!=null?h(getTeam(conv.winner).name)+'が獲得しました。':'入団には至りませんでした。'}</p>${success?`<p>初年度支援：${Object.keys(FOREIGN_SUPPORT).filter(k=>conv.offer.benefits[k]).map(k=>FOREIGN_SUPPORT[k].label).join(' ／ ')||'追加支援なし'}</p><h3>${['スカウト報告','来日後の基礎測定','入団時能力確定'][stage]}</h3>${foreignAbilityGrid(c,conv.report,stage)}${stage<2?`<button class="btn primary full" data-action="foreign-reveal">${stage===0?'来日・基礎測定結果を確認':'残りの能力を確認'} ›</button>`:''}<p class="small">所属選手に登録済みです。編成から起用できます。</p>`:''}<button class="btn outline full" data-action="foreign-close">海外スカウトへ戻る ›</button></section>`;
+    }
+    return `<section class="panel draft-negotiation foreign-talk"><div class="draft-talk-heading"><small>INTERNATIONAL NEGOTIATION</small><h2>外国人入団交渉</h2><div class="talk-office-art"><span></span><i></i><span></span></div></div>${foreignIdentity(c,r)}<div class="recruit-interest"><div><b>来日・入団への気持ち</b><strong>${conv.interest>=80?'かなり前向き':conv.interest>=60?'前向き':conv.interest>=40?'検討中':'慎重'}</strong></div><div class="recruit-meter" role="meter" aria-valuenow="${conv.interest}" aria-valuemin="0" aria-valuemax="100"><i style="width:${conv.interest}%"></i></div></div><div class="foreign-competition"><b>獲得競争</b>${conv.rivals.map(x=>`<div>${teamBadge(getTeam(x.teamId))} ${h(getTeam(x.teamId).name)}</div>`).join('')}${conv.overseas?'<div>🌐 海外球団からもオファーの可能性</div>':''}${!conv.rivals.length&&!conv.overseas?'<p>有力な競合情報なし</p>':''}<small>他球団の条件は不確定です。</small></div><section class="foreign-language"><b>使用言語：${lang.name}</b><p>${conv.interpreter?'交渉通訳を手配済み · 正確な日本語訳を表示':'通訳なし · 簡易的な意思疎通では誤解が生じます。'}</p>${!conv.interpreter?`<button class="btn outline full" data-action="foreign-interpreter" ${t.cash<FOREIGN_INTERPRETER_COST?'disabled':''}>交渉通訳を手配 · ${fmtMoney(FOREIGN_INTERPRETER_COST)}</button>`:''}</section>${last?`<div class="draft-reaction" data-positive="${last.delta>0}"><b>${h(last.delta>0?lang.yes:lang.no)}</b><p>${last.interpreted?(last.delta>0?'通訳：前向きに考えたいそうです。':'通訳：希望とは少し違うそうです。'):'通訳なし：反応の細かい意味は不明です。'}</p></div>`:''}<details class="scout-memos"><summary>事前面談メモ</summary><p>${foreignTasks(m,t,c).includes('interview')?h(foreignProfile(m,c).priorities.map(k=>FOREIGN_HINTS[k]).join(' ／ ')):'面談調査なし'}</p></details>${q?`<div class="draft-question"><small>QUESTION ${step+1} / 3 · ${lang.name}</small><h3>${h(lang.q[step])}</h3><p>${conv.interpreter?'通訳：'+h(q.q):h(q.gist)}</p></div><div class="draft-choices">${q.options.map(([k,label],i)=>`<button class="draft-offer" data-action="foreign-reply" data-value="${k}"><b>${i+1}. ${h(label)}</b></button>`).join('')}</div>`:`<h3>契約条件・来日支援</h3><p class="small">資金 ${fmtMoney(t.cash)} · 初年度の支援費は契約時に支払います。</p>${Object.entries(FOREIGN_SUPPORT).map(([k,x])=>`<button class="draft-offer" data-action="foreign-support" data-value="${k}" aria-pressed="${!!conv.support[k]}"><b>${conv.support[k]?'☑':'☐'} ${x.label}</b><span>${fmtMoney(x.cost)} · 選手の価値観により交渉に影響</span></button>`).join('')}${['抑えた条件','標準条件','好条件'].map((label,i)=>{const o=foreignOffer(m,c,i,conv.support);return `<button class="draft-offer" data-action="foreign-offer" data-value="${i}" ${foreignAffordable(t,o)?'':'disabled'}><b>${conv.offerLevel===i?'● ':''}${label}</b><span>契約金 ${fmtMoney(o.fee)} · 年俸 ${fmtSalary(o.salary)} · 支援費 ${fmtMoney(o.supportCost)}</span></button>`;}).join('')}${conv.offerLevel!=null?`<button class="btn primary full" data-action="foreign-submit" ${foreignAffordable(t,foreignOffer(m,c,conv.offerLevel,conv.support))?'':'disabled'}>この条件で最終提示する ›</button><p class="tiny">提示後は結果が確定し、やり直せません。不成立時は契約金・支援費を支払いません。</p>`:''}`}<button class="btn outline full" data-action="foreign-suspend">交渉を中断して本部へ</button></section>`;
+  }
   function foreignMarketScreen(){
-    const m=game.foreignMarket?.year===game.year?game.foreignMarket:null;
-    const filter=ui.foreignFilter||'all';
+    const m=game.foreignMarket?.year===game.year?foreignHydrate(game.foreignMarket):null,t=myTeam(),filter=ui.foreignFilter||'all',conv=m?.negotiations[t.id],c=conv&&m.candidates.find(x=>x.id===conv.candidateId);
     const list=(m?.candidates||[]).filter(c=>c.status==='available'&&(filter==='all'||(filter==='pitch'?isPitch(c.player):!isPitch(c.player))));
     const page=Math.max(0,Math.min(Math.ceil(list.length/12)-1,ui.foreignPage||0));
-    return `<section class="draft-room foreign-market"><header class="foreign-scout-hero"><small>GLOBAL SCOUTING · ${game.year}</small><div class="foreign-globe" aria-hidden="true">◎</div><h2>海外スカウト</h2><p>世界の野球市場から、新たな戦力を探す。</p></header><section class="panel"><h3>助っ人外国人候補</h3><p class="small">国内ドラフトとは別の獲得ルートです。今は候補の発掘・プロフィールの確認が可能です。能力推定・追加調査・獲得交渉は次の更新で実装します。</p>${m?`<div class="foreign-market-metrics"><b>${m.candidates.length}名</b><span>${new Set(m.candidates.map(c=>c.country)).size}か国・地域</span><span>年度内固定</span></div>`:'<button class="btn primary full" data-action="foreign-init">海外候補を発掘する ›</button>'}</section>${m?`<div class="draft-filters">${[['all','全員'],['pitch','投手'],['bat','野手']].map(([k,v])=>`<button class="chip ${filter===k?'active':''}" data-action="foreign-filter" data-value="${k}">${k==='pitch'?positionMarkup('P',v):h(v)}</button>`).join('')}</div><p class="small">${list.length}名 · プロフィール確認</p><div class="recruit-list">${list.slice(page*12,page*12+12).map(c=>`<article class="recruit-candidate foreign-card"><div class="recruit-player"><span class="face-mini draft-portrait" style="--avatar-color:#83aebf;--avatar-accent:#83aebf">${renderFaceArtwork(c.player)}</span><div class="recruit-identity"><strong>${h(c.player.name)}</strong><small>${c.player.age}歳 · ${positionMarkup(c.player.pos)} · ${throwBat(c.player)}</small><small>${h(c.country)} · ${h(c.career.league)}</small></div><div class="foreign-unknown">未調査</div></div><div class="draft-hints"><span>${h(FOREIGN_PROFILES[c.kind].label)}</span><span>${h(c.career.level)}</span><span>海外経験 ${c.career.seasons}年</span></div></article>`).join('')}</div><div class="edition-actions"><button class="btn outline" data-action="foreign-page" data-step="-1" ${page===0?'disabled':''}>‹ 前へ</button><span>${page+1}/${Math.max(1,Math.ceil(list.length/12))}</span><button class="btn outline" data-action="foreign-page" data-step="1" ${(page+1)*12>=list.length?'disabled':''}>次へ ›</button></div>`:''}</section>`;
+    return `<section class="draft-room foreign-market"><header class="foreign-scout-hero"><small>GLOBAL SCOUTING · ${game.year}</small><div class="foreign-globe" aria-hidden="true">◎</div><h2>海外スカウト</h2><p>世界の野球市場から、新たな戦力を探す。</p></header>${conv&&c?foreignNegotiationView(m,t,c,conv):`<section class="panel"><h3>助っ人外国人候補</h3><p class="small">国内ドラフトとは独立した獲得ルート。支配下 ${own(t).length}/${ROSTER_MAX}人 · 獲得時に空き枠が必要です。</p>${m?`<div class="foreign-market-metrics"><b>${m.candidates.length}名</b><span>${new Set(m.candidates.map(c=>c.country)).size}か国・地域</span><span>追加調査 ${Math.max(0,foreignBudget(t)-foreignUsed(m,t))}回残り</span></div>`:'<button class="btn primary full" data-action="foreign-init">海外候補を発掘する ›</button>'}</section>${m?`<div class="draft-filters">${[['all','全員'],['pitch','投手'],['bat','野手']].map(([k,v])=>`<button class="chip ${filter===k?'active':''}" data-action="foreign-filter" data-value="${k}">${k==='pitch'?positionMarkup('P',v):h(v)}</button>`).join('')}</div><p class="small">${list.length}名 · 獲得可能候補</p><div class="recruit-list">${list.slice(page*12,page*12+12).map(c=>foreignCard(m,c,t)).join('')||'<p>候補がいません。</p>'}</div><div class="edition-actions"><button class="btn outline" data-action="foreign-page" data-step="-1" ${page===0?'disabled':''}>‹ 前へ</button><span>${page+1}/${Math.max(1,Math.ceil(list.length/12))}</span><button class="btn outline" data-action="foreign-page" data-step="1" ${(page+1)*12>=list.length?'disabled':''}>次へ ›</button></div>`:''}`}</section>`;
   }
   function draftScoutProfile(t){return {level:Math.max(1,Math.min(5,Math.round(t.scoutLevel||2))),strategy:['balanced','youth','ready'].includes(t.draftStrategy)?t.draftStrategy:['balanced','youth','ready'][t.id%3]};}
   function ensureDraft(){
@@ -4563,7 +4684,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function appLogo(){return `<div class="app-brand"><span class="brand-mark">⚾</span><span><b>PENNANT<span class="brand-gold"> LAB</span></b><small>BASEBALL GENERAL MANAGER</small></span></div>`}
   function slotData(i){try{const raw=localStorage.getItem(SLOT_PREFIX+i);if(!raw)return null;const d=JSON.parse(raw);return d&&Array.isArray(d.teams)&&d.teams.length===12?d:null}catch(e){return null}}
   function titleScreen(){
-    return `<div class="title-screen"><div class="title-hero"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.9.47 · POSITION COLORS</span></div><div class="title-slot-title">セーブデータを選択</div><div class="title-slots">${[1,2,3].map(i=>{
+    return `<div class="title-screen"><div class="title-hero"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.9.48 · GLOBAL RECRUITMENT</span></div><div class="title-slot-title">セーブデータを選択</div><div class="title-slots">${[1,2,3].map(i=>{
       const d=slotData(i),t=d?.teams?.find(t=>t.id===d.selectedId);
       return `<button class="save-slot ${d?.started?'has-game':'empty-slot'} ${t?leagueClass(t.league):''}" data-action="${d?.started?'continue-slot':'new-slot'}" data-slot="${i}">${d?.started?teamBadge(t,'slot-emblem'):'<span class="slot-emblem">＋</span>'}<span class="slot-label">${d?.started?`<strong>${h(t.name)}</strong><small>${leagueTag(t.league)}　${d.year}年 · ${d.day}/143試合 · ${h(d.gmName||'GM')}</small><small>${d.teams.find(t=>t.id===d.selectedId)?.wins||0}勝　${fmtMoney(t.cash)}</small>`:`<strong>新しい球団で始める</strong><small>空きデータ ${i}</small>`}</span><span class="slot-index">DATA ${i} ›</span></button>`;
     }).join('')}</div><div class="title-info">本体データは端末内データベースに保存されます。バックアップは「経営」からJSON形式で書き出せます。<br>v0.3以前のテストセーブは引き継がれません。</div></div>`;
@@ -5507,12 +5628,29 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       if(act==='news-year'||act==='news-edition-open')ui.newsYear=Number(b.dataset.year);
       ui.newsEdition=act==='news-edition-open'?b.dataset.date:null;ui.newsMedium='news';render();window.scrollTo(0,0);return;
     }
-    if(['foreign-init','foreign-filter','foreign-page'].includes(act)){
-      if(ui.page!=='game'||ui.tab!=='business'||ui.businessSub!=='foreign'||ui.busy||storageFailure)return;
-      if(act==='foreign-init'){ensureForeignMarket();ui.foreignPage=0;ui.foreignFilter='all';save();}
-      if(act==='foreign-filter'&&['all','pitch','bat'].includes(b.dataset.value)){ui.foreignFilter=b.dataset.value;ui.foreignPage=0;}
-      if(act==='foreign-page')ui.foreignPage=Math.max(0,(ui.foreignPage||0)+(Number(b.dataset.step)||0));
-      render();return;
+    if(act.startsWith('foreign-')){
+      if(ui.page!=='game'||ui.tab!=='business'||ui.businessSub!=='foreign'||ui.busy||storageFailure||game.ceremonyStage||game.pendingDraftReveal)return;
+      const t=myTeam(),scroll=draftScrollY(),id=Number(b.dataset.id),anchor=id?draftCardAnchor(id):null;
+      if(act==='foreign-init'){foreignHydrate(ensureForeignMarket());ui.foreignPage=0;ui.foreignFilter='all';ui.foreignDetail=null;save();render();return;}
+      const m=game.foreignMarket?.year===game.year?foreignHydrate(game.foreignMarket):null;if(!m)return;
+      const conv=m.negotiations[t.id],c=m.candidates.find(x=>x.id===(conv?conv.candidateId:id));
+      if(act==='foreign-filter'&&!conv&&['all','pitch','bat'].includes(b.dataset.value)){ui.foreignFilter=b.dataset.value;ui.foreignPage=0;ui.foreignDetail=null;render();return;}
+      if(act==='foreign-page'&&!conv){ui.foreignPage=Math.max(0,(ui.foreignPage||0)+(Number(b.dataset.step)||0));ui.foreignDetail=null;render();draftJump(0);return;}
+      if(!c)return;
+      if(act==='foreign-detail'&&!conv){ui.foreignDetail=ui.foreignDetail===id?null:id;draftRenderAt(anchor,scroll);return;}
+      if(act==='foreign-research'&&!conv){if(!foreignResearch(m,t,c,b.dataset.value))return;ui.foreignDetail=id;save();draftRenderAt(anchor,scroll);draftShowReport(id,true);return;}
+      if(act==='foreign-begin'&&!conv){if(!foreignBegin(m,t,c))return;save();render();draftJump(0);return;}
+      if(!conv)return;
+      if(act==='foreign-suspend'){ui.tab='hq';save();render();draftJump(0);return;}
+      if(act==='foreign-interpreter'){if(!foreignHireInterpreter(t,conv))return;}
+      else if(act==='foreign-reply'){if(!foreignReply(m,t,c,conv,b.dataset.value))return;}
+      else if(act==='foreign-support'){if(conv.status!=='talk'||conv.answers.length!==3||!Object.hasOwn(FOREIGN_SUPPORT,b.dataset.value))return;conv.support[b.dataset.value]=!conv.support[b.dataset.value];conv.offerLevel=null;}
+      else if(act==='foreign-offer'){const level=Number(b.dataset.value);if(conv.status!=='talk'||conv.answers.length!==3||![0,1,2].includes(level)||!foreignAffordable(t,foreignOffer(m,c,level,conv.support)))return;conv.offerLevel=level;}
+      else if(act==='foreign-submit'){if(conv.offerLevel==null||!foreignResolve(m,t,c,conv,conv.offerLevel))return;}
+      else if(act==='foreign-reveal'){if(conv.status!=='signed'||conv.revealStage>=2)return;conv.revealStage++;}
+      else if(act==='foreign-close'){if(conv.status==='talk')return;delete m.negotiations[t.id];ui.foreignDetail=null;}
+      else return;
+      save();render();draftJump(act==='foreign-support'||act==='foreign-offer'?scroll:0);return;
     }
     if(act==='business-sub'){ui.clubDraft=null;ui.draftFilter='all';ui.draftPage=0;ui.draftDetail=null;ui.businessSub=b.dataset.sub;ui.managerEntry=b.dataset.sub==='manager';render();return}
     if(act==='player-detail'){ui.playerDetail=Number(b.dataset.id);ui.playerDetailTab='abilities';render();window.scrollTo(0,0);return}
@@ -5949,6 +6087,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const oldPlayerDetails03=playerDetails;
   playerDetails=function(){
     let base=oldPlayerDetails03();const p=getPlayer(ui.playerDetail);
+    if(p?.foreignContract){const x=p.foreignContract;base+='<section class="panel"><h3>海外経歴・来日契約</h3><p>'+h(p.nationality)+' · '+h(p.foreignCareer?.league||'')+' · '+h(x.language||'')+'</p><p>'+x.year+'年入団 · 年俸 '+fmtSalary(x.salary)+'</p><p>初年度支援：'+(Object.keys(FOREIGN_SUPPORT).filter(k=>x.support?.[k]).map(k=>FOREIGN_SUPPORT[k].label).join(' ／ ')||'なし')+'</p></section>';}
     if(p?.draftInfo)base=base+'<section class="panel"><h3>ドラフト経歴</h3><p class="small">'+p.draftInfo.year+'年 '+p.draftInfo.round+'位 · '+h(p.draftInfo.school)+' · '+h(p.draftInfo.type)+'</p></section>';
     if(!p||p.teamId===-1||ui.playerDetailTab==='stats')return base;
     const skills=seasonSkillKeys(p);
