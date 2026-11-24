@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.25 · LEGACY/);
+assert.match(html,/VERSION 0\.9\.26 · LUSTRE/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -841,3 +841,9 @@ assert.equal(api.legacyScore([],[],[],null).score,0);
 assert(api.legacyScore(Array.from({length:10},()=>({score:100})),[],[],100).score<=100);
 console.log('PASS: role-normalized legacy evaluation, retirement eligibility and independent foreign market route');
 }
+
+assert.match(html,/data-rank="SS"/);
+assert.match(html,/data-ach-lustre="mythic"/);
+assert.match(html,/prefers-reduced-motion:reduce/);
+assert.match(html,/function lustrePreview\(/);
+console.log('PASS: lustre and reduced-motion presentation hooks');
