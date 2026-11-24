@@ -801,7 +801,8 @@ console.log('PASS: additional special game records, season achievements and comp
 
 {
 const a=inline[1].indexOf('  function snapshotAbilities('),b=inline[1].indexOf('  function captureSeason(',a);
-const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+';return {recordAbilityPeak,peakSnapshots,abilityEvidence,bestAbilitySnapshot,captureRetirement,migrateRetirement};})()',{isPitch:p=>p.pos==='SP',rating:p=>Math.round((p.contact+p.power+p.speed+p.defense+p.arm)/5),getTeam:()=>({name:'Test Club'})});
+const routeStart=inline[1].indexOf('  function legacyOriginMarket('),routeEnd=inline[1].indexOf('  function legacySeasonValue(',routeStart);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(routeStart,routeEnd)+inline[1].slice(a,b)+';return {recordAbilityPeak,peakSnapshots,abilityEvidence,bestAbilitySnapshot,captureRetirement,migrateRetirement};})()',{isPitch:p=>p.pos==='SP',rating:p=>Math.round((p.contact+p.power+p.speed+p.defense+p.arm)/5),getTeam:()=>({name:'Test Club'})});
 const p={id:1,teamId:2,pos:'OF',age:25,contact:90,power:89,speed:90,defense:90,arm:90,talent:90};
 api.recordAbilityPeak(p,2027,'2027-05-01','game-day');
 p.contact=89;p.power=90;api.recordAbilityPeak(p,2027,'2027-05-02','game-day');
