@@ -1,0 +1,46 @@
+name: 100-season endurance
+
+on:
+  workflow_dispatch:
+    inputs:
+      years:
+        description: Completed regular seasons (100 recommended)
+        default: '100'
+        required: true
+      seed:
+        description: Deterministic simulation seed
+        default: '1937'
+        required: true
+  push:
+    paths:
+      - 'scripts/long-run.cjs'
+      - '.github/workflows/long-run.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  endurance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      YEARS: ${{ inputs.years || '100' }}
+      SEED: ${{ inputs.seed || '1937' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Full engine endurance
+        shell: bash
+        run: |
+          mkdir -p test-results
+          set -o pipefail
+          node scripts/long-run.cjs "$YEARS" "$SEED" | tee test-results/endurance.log
+      - name: Upload results and progress even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: endurance-results
+          path: test-results/
