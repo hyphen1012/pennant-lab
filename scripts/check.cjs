@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.70 · CLUB INVESTMENT/);
+assert.match(html,/VERSION 0\.9\.71 · CLUB FACILITIES/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1273,3 +1273,12 @@ assert(Math.abs(normal-40.4)<.001);assert.equal(elite,180);
 assert.match(html,/infraAccrueDay\(\)/);assert.match(html,/opening\+revenue-wages-maintenance/);assert.match(html,/infra-downgrade/);
 console.log('PASS: shared level 20 upgrades, escalating elite costs, diminishing effects and maintenance accounting hooks');
 }
+
+assert.match(html,/球団施設・設備管理/);
+assert.doesNotMatch(html,/予算・年俸をチェック/);
+assert.match(html,/data-sub="facilities"/);
+assert.match(html,/function infraManagementScreen\(t\)/);
+assert.match(html,/function infraManageAction\(t,key,action\)/);
+assert.match(html,/\.farm-person>\.face-mini,\.farm-stat-person>\.face-mini\{width:44px;height:44px/);
+assert.doesNotMatch(html,/\.farm-person>span:not\(\.avatar\)/);
+console.log('PASS: central facilities navigation and compact farm portrait rules');
