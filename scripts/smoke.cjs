@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.28 · CEREMONY/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.29 · INDEX/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -432,8 +432,14 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     assert.equal(window.PennantLab.getSnapshot().day,before.day);
     if(key==='opening')break;
     if(key==='awards-all'){
-      assert(app.innerHTML.includes('東リーグ · 野手部門'));
-      for(let i=0;i<100&&app.innerHTML.includes('data-action="ceremony-next"');i++)dispatch('click',{action:'ceremony-next'});
+      assert(app.innerHTML.includes('data-action="ceremony-open"'));
+      assert(app.innerHTML.includes('data-action="ceremony-close"'));
+      dispatch('click',{action:'ceremony-open',editionId:'E-nine'});
+      assert(app.innerHTML.includes('東リーグ · ベストナイン'));
+      assert(app.innerHTML.includes('edition-compact'));
+      dispatch('click',{action:'ceremony-back'});
+      assert(app.innerHTML.includes('data-action="ceremony-open"'));
+      dispatch('click',{action:'ceremony-close'});
     }else dispatch('click',{action:'ceremony-next'});
   }
   assert.equal(window.PennantLab.getSnapshot().year,full.year+1);
