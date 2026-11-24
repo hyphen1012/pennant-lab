@@ -4530,7 +4530,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const tasks=scoutTasks(d,t,c),n=tasks.includes('interview')?3:Math.min(2,draftResearchLevel(d,t,c)),p=draftPersonality(d,c);
     return Array.from({length:n},(_,i)=>{const key=p.preferred[i],v=RECRUIT_VALUES[key];return {topic:i+1,quote:key==='manager'&&p.admiredManagerName?'「'+p.admiredManagerName+'監督に昔から憧れているんです。」':'「'+v[1]+'」'};});
   }
-  function draftScoutCost(level){return [0,.15,.22,.32,.42,.55,.70,.85,1,1.20,1.40,1.60,1.90,2.20,2.60,4,6,9,13,18][level]||0;}
+  function draftScoutCost(level){return [0,.15,.25,.40,.60,.85,1.15,1.55,2.05,2.70,3.50,4.50,5.80,7.40,9.50,15,22,32,46,65][level]||0;}
   function draftScoutBudget(t){return 9+draftScoutProfile(t).level;}
   function draftScoutFace(t,route='draft'){
     const lv=scoutLevelFor(route,t),tier=Math.min(5,Math.ceil(lv/3)),names=route==='foreign'?['海外担当','海外地域担当','海外主任','海外統括','海外チーフスカウト']:['新人スカウト','地域担当','主任スカウト','全国統括','チーフスカウト'];
@@ -5540,7 +5540,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function appLogo(){return `<div class="app-brand"><span class="brand-mark">⚾</span><span><b>PENNANT<span class="brand-gold"> LAB</span></b><small>BASEBALL GENERAL MANAGER</small></span></div>`}
   function slotData(i){try{const raw=localStorage.getItem(SLOT_PREFIX+i);if(!raw)return null;const d=JSON.parse(raw);return d&&Array.isArray(d.teams)&&d.teams.length===12?d:null}catch(e){return null}}
   function titleScreen(){
-    return `<div class="title-screen"><div class="title-hero"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.9.69 · CLUB INVESTMENT</span></div><div class="title-slot-title">セーブデータを選択</div><div class="title-slots">${[1,2,3].map(i=>{
+    return `<div class="title-screen"><div class="title-hero"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.9.70 · CLUB INVESTMENT</span></div><div class="title-slot-title">セーブデータを選択</div><div class="title-slots">${[1,2,3].map(i=>{
       const d=slotData(i),t=d?.teams?.find(t=>t.id===d.selectedId);
       return `<button class="save-slot ${d?.started?'has-game':'empty-slot'} ${t?leagueClass(t.league):''}" data-action="${d?.started?'continue-slot':'new-slot'}" data-slot="${i}">${d?.started?teamBadge(t,'slot-emblem'):'<span class="slot-emblem">＋</span>'}<span class="slot-label">${d?.started?`<strong>${h(t.name)}</strong><small>${leagueTag(t.league)}　${d.year}年 · ${d.day}/143試合 · ${h(d.gmName||'GM')}</small><small>${d.teams.find(t=>t.id===d.selectedId)?.wins||0}勝　${fmtMoney(t.cash)}</small>`:`<strong>新しい球団で始める</strong><small>空きデータ ${i}</small>`}</span><span class="slot-index">DATA ${i} ›</span></button>`;
     }).join('')}</div><button class="btn outline full" data-action="rare-preview-open">特殊選手の演出確認モード ›</button><div class="title-info">本体データは端末内データベースに保存されます。バックアップは「経営」からJSON形式で書き出せます。<br>v0.3以前のテストセーブは引き継がれません。</div></div>`;
@@ -8241,7 +8241,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const rank=game.teams.filter(x=>x.league===t.league).map(x=>({team:x,...data.clubs[x.id]})).sort((a,b)=>(b.w/Math.max(1,b.w+b.l))-(a.w/Math.max(1,a.w+a.l))||b.w-a.w||a.team.id-b.team.id);
       html+='<section class="panel"><h3 class="panel-title">二軍 '+leagueTag(t.league)+' 順位</h3><label>年度<select class="select" data-change="farm-year">'+[game.year,...game.farmArchive.map(x=>x.year).reverse()].map(v=>'<option '+(v===data.year?'selected':'')+'>'+v+'</option>').join('')+'</select></label><p class="small">一軍143戦中、6戦に1戦を除いた独立日程（年間120試合枠）。育成登録不足時は不成立。</p><div class="table-wrap"><table class="data-table"><thead><tr><th>球団</th><th>勝</th><th>敗</th><th>分</th><th>不成立</th></tr></thead><tbody>'+rank.map(x=>'<tr data-own-club="'+(x.team.id===t.id)+'"><td>'+h(x.team.short)+'</td><td>'+x.w+'</td><td>'+x.l+'</td><td>'+x.t+'</td><td>'+x.nc+'</td></tr>').join('')+'</tbody></table></div><h3 class="panel-title">試合結果</h3>'+data.games.filter(g=>g.home===t.id||g.away===t.id).slice(-20).reverse().map(g=>'<div class="farm-match"><small>'+h(g.date)+'</small><b>'+h(getTeam(g.home).short)+' '+(g.noContest?'不成立':g.homeScore+' – '+g.awayScore)+' '+h(getTeam(g.away).short)+'</b></div>').join('')+'</section>';
     }else if(sub==='facilities'){
-      html+='<section class="panel"><h3 class="panel-title">育成施設</h3><p class="small">強化費と毎月の維持費が必要です。Lv.15が通常の到達目標、Lv.16〜20はやり込み枠です。現金残高 '+fmtMoney(t.cash)+'</p>'+Object.entries(FARM_FACILITIES).map(([k,[label,desc]])=>{const lv=staff.facilities[k];return '<div class="farm-facility"><h3>'+label+' <span>Lv.'+lv+'</span></h3><p class="small">'+desc+'</p><div class="farm-level">'+Array.from({length:20},(_,i)=>'<i class="'+(i<lv?'on':'')+(i>=15?' elite':'')+'"></i>').join('')+'</div>'+infraControls(t,k,'farm-upgrade')+'</div>';}).join('')+'</section>';
+      html+='<section class="panel"><h3 class="panel-title">育成施設</h3><p class="small">強化費と毎月の維持費が必要です。Lv.15は一流球団の高難度到達目標、Lv.16〜20はやり込み枠です。現金残高 '+fmtMoney(t.cash)+'</p>'+Object.entries(FARM_FACILITIES).map(([k,[label,desc]])=>{const lv=staff.facilities[k];return '<div class="farm-facility"><h3>'+label+' <span>Lv.'+lv+'</span></h3><p class="small">'+desc+'</p><div class="farm-level">'+Array.from({length:20},(_,i)=>'<i class="'+(i<lv?'on':'')+(i>=15?' elite':'')+'"></i>').join('')+'</div>'+infraControls(t,k,'farm-upgrade')+'</div>';}).join('')+'</section>';
     }else{
       const reports=f.reports.filter(x=>x.teamId===t.id).slice(-30).reverse();
       html+='<section class="panel"><h3 class="panel-title">二軍監督・育成担当報告</h3><p class="small">日程を中断しない任意の確認画面。昇降格・昇格推薦・覚醒・復帰・月次育成報告。</p>'+reports.map(x=>'<div class="farm-report"><small>'+h(x.date||'')+'</small><p>'+h(x.text)+'</p></div>').join('')+(reports.length?'':'<p class="small">報告はまだありません。</p>')+'</section>';
@@ -8303,7 +8303,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 
   const INFRA_NORMAL=15,INFRA_MAX=20;
-  const INFRA_UPKEEP=[0,.04,.06,.08,.11,.14,.18,.22,.27,.33,.40,.48,.57,.67,.79,.92,1.50,2.40,3.60,5.20,7.50];
+  const INFRA_UPKEEP=[0,.04,.06,.09,.13,.18,.24,.32,.43,.56,.72,.90,1.12,1.40,1.75,2.20,3.50,5.50,8.50,12.50,18.00];
   const INFRA_LABELS={training:'トレーニング施設',indoor:'室内練習場',medical:'医療施設',draft:'新人スカウト',foreign:'海外スカウト'};
   function infraEffect(level){const n=clamp(Number(level)||1,1,20);return 1+(Math.min(n,15)-1)*4/14+Math.max(0,n-15)*.12;}
   function infraLevel(t,key){return key==='draft'||key==='foreign'?scoutLevelFor(key,t):farmClub(t).facilities[key];}
@@ -8342,7 +8342,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function infraControls(t,key,action){
     const lv=infraLevel(t,key),cost=draftScoutCost(lv),upkeep=infraUpkeep(lv),next=infraUpkeep(lv+1),net=infraForecast(t);
-    return '<div class="infra-controls"><p class="small">年間維持費 <b>'+fmtMoney(upkeep)+'</b> · '+(lv>15?'ELITE / やり込み領域':lv===15?'通常強化の到達目標':'通常強化')+'</p>'+(lv<20?'<p class="tiny">次Lv.の年間維持費 '+fmtMoney(next)+'（+'+fmtMoney(r2(next-upkeep))+'）</p>':'')+'<button class="btn outline full" data-action="'+action+'" data-value="'+key+'" '+(lv>=20||t.cash<cost?'disabled':'')+'>'+(lv===20?'最高レベル Lv.20':'Lv.'+(lv+1)+'へ強化 · '+fmtMoney(cost))+'</button>'+(lv>1?'<button class="btn sm outline full" data-action="infra-downgrade" data-value="'+key+'">Lv.'+(lv-1)+'へ縮小（返金なし）</button>':'')+(lv>=15&&lv<20?'<p class="infra-warning">Lv.16以降は強化費・維持費が大幅上昇します。</p>':'')+(net-(lv<20?next-upkeep:0)<0?'<p class="infra-warning">年間収支見込みは赤字です。強化による資金不足に注意。</p>':'')+'</div>';
+    return '<div class="infra-controls"><p class="small">年間維持費 <b>'+fmtMoney(upkeep)+'</b> · '+(lv>15?'ELITE / やり込み領域':lv===15?'一流球団の到達目標':lv>=10?'高難度強化':'通常強化')+'</p>'+(lv<20?'<p class="tiny">次Lv.の年間維持費 '+fmtMoney(next)+'（+'+fmtMoney(r2(next-upkeep))+'）</p>':'')+'<button class="btn outline full" data-action="'+action+'" data-value="'+key+'" '+(lv>=20||t.cash<cost?'disabled':'')+'>'+(lv===20?'最高レベル Lv.20':'Lv.'+(lv+1)+'へ強化 · '+fmtMoney(cost))+'</button>'+(lv>1?'<button class="btn sm outline full" data-action="infra-downgrade" data-value="'+key+'">Lv.'+(lv-1)+'へ縮小（返金なし）</button>':'')+(lv>=15&&lv<20?'<p class="infra-warning">Lv.16以降は強化費・維持費が大幅上昇します。</p>':'')+(net-(lv<20?next-upkeep:0)<0?'<p class="infra-warning">年間収支見込みは赤字です。強化による資金不足に注意。</p>':'')+'</div>';
   }
   function infraFinancePanel(t,revenue){
     const f=game.infrastructureFinance?.year===game.year?game.infrastructureFinance.clubs[t.id]:null,total=infraAnnual(t),net=r2(revenue-payroll(t)-Number(t.manager?.salary||0)-total);
