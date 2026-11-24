@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.41 · CLUB LOTTERY/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.42 · ROSTER 50/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -534,6 +534,11 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
       assert(app.innerHTML.includes('3巡目 · 順番指名'));
       const third=app.innerHTML.match(/data-action="draft-choose" data-id="(\d+)"/);assert(third);
       dispatch('click',{action:'draft-choose',id:third[1]});dispatch('click',{action:'draft-confirm-accept'});
+      for(let round=4;round<=5;round++){
+        assert(app.innerHTML.includes(round+'巡目 · 順番指名'));
+        const later=app.innerHTML.match(/data-action="draft-choose" data-id="(\d+)"/);assert(later);
+        dispatch('click',{action:'draft-choose',id:later[1]});dispatch('click',{action:'draft-confirm-accept'});
+      }
       dispatch('click',{action:'draft-auto'});
       assert(app.innerHTML.includes('role="alertdialog"'));
       dispatch('click',{action:'draft-confirm-accept'});
@@ -546,6 +551,9 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
       for(let i=0;i<8&&/data-action="draft-cut-finish" disabled/.test(app.innerHTML);i++){
         const option=app.innerHTML.match(/data-action="draft-cut-toggle" data-id="(\d+)">放出候補にする/);assert(option);
         dispatch('click',{action:'draft-cut-toggle',id:option[1]});
+        assert(app.innerHTML.includes('本当にこの選手に戦力外通告しますか？'));
+        dispatch('click',{action:'draft-confirm-accept'});
+        if(app.innerHTML.includes('重要選手への戦力外通告'))dispatch('click',{action:'draft-confirm-accept'});
       }
       assert(!/data-action="draft-cut-finish" disabled/.test(app.innerHTML));
       dispatch('click',{action:'draft-cut-finish'});assert(app.innerHTML.includes('role="alertdialog"'));
@@ -555,8 +563,8 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert.equal(window.PennantLab.getSnapshot().year,full.year+1);
   await flush();
   const draft=store.get(1).data.draftHistory.find(d=>d.year===full.year);
-  assert(draft&&draft.picks.length>0);
-  assert(store.get(1).data.teams.every(t=>store.get(1).data.players.filter(p=>p.teamId===t.id).length<=30));
+  assert(draft&&draft.picks.length>0);assert(draft.picks.some(p=>p.round===5));
+  assert(store.get(1).data.teams.every(t=>store.get(1).data.players.filter(p=>p.teamId===t.id).length<=50));
   assert.equal(new Set(draft.picks.map(p=>p.candidateId)).size,draft.picks.length);
   assert(draft.picks.every(p=>p.status!=='rights'));
   for(const row of draft.picks.filter(p=>p.status==='signed')){const p=store.get(1).data.players.find(p=>p.id===row.playerId);assert(p&&p.teamId===row.teamId&&p.rookieSeason===full.year+1&&p.stats.g===0);}
