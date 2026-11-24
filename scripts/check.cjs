@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.53 · SPECIAL BROADCAST/);
+assert.match(html,/VERSION 0\.9\.54 · SPECIAL BROADCAST/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1090,4 +1090,14 @@ for(const category of ['IMMORTAL','輪廻転生','LEGEND','転生','STAR','PARAL
  assert(api.broadcastStudio(x.mood).includes('<svg'));assert(api.broadcastCutArt().includes('<svg'));
 }
 assert.match(html,/action==='draft-page'\)\{render\(\);draftJump\(0\);\}/);console.log('PASS: category broadcast, concealed identity, pitcher/batter result, artwork and draft pagination');
+}
+
+{
+const a=inline[1].indexOf('  function broadcastHeading('),b=inline[1].indexOf('  function rareNewsScreen(',a);
+const heading=vm.runInNewContext('(function(){const h=v=>String(v).replaceAll("&","&amp;").replaceAll("<","&lt;");'+inline[1].slice(a,b)+';return broadcastHeading;})()');
+const markup=heading({title:'test'},{tournament:true,hidden:false,school:'甲信越・青嶺学園高校'});
+assert(markup.includes('甲信越・青嶺学園高校</span><span class="broadcast-title-champion">全国大会優勝🏅</span>'));
+assert(!heading({title:'test'},{tournament:true,hidden:true,school:'秘密高校'},true).includes('秘密高校'));
+assert.match(html,/\.broadcast-identity>strong\{color:var\(--bc\)/);
+console.log('PASS: fixed two-line tournament headline and category-colored player name');
 }
