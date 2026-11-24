@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.3 · CALENDAR/);
+assert.match(html,/VERSION 0\.9\.4 · CALENDAR/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -589,3 +589,8 @@ console.log('PASS: date intro civil dates, spoiler-free markup and interruption 
 
 assert.match(html,/const previousIntroDelay=mode==='fast'\?320:480/);
 assert.match(html,/await waitForDailyDisplay\(\(entry.type==='game'\?baseDelay:5000\)-previousIntroDelay\)/);
+
+assert(!dateMarkup.includes('data-action='),'Date interstitial is display-only');
+assert.match(html,/function toggleAutoPause\(\)\{\s*if\(!ui\.busy\|\|ui\.dateIntro\)return;/);
+assert.match(html,/if\(ui\.dateIntro\)return;\s*if\(ui\.autoDay\.type==='game'\)/);
+console.log('PASS: date interstitial has no pause controls or tap-to-pause');

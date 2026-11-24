@@ -88,7 +88,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.3 · CALENDAR/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.4 · CALENDAR/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -182,6 +182,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     await window.PennantLab.advance('day');
   }
   assert(dateRenders.length>0,'One-day progression shows a calendar date intro');
+  assert(dateRenders.every(v=>!v.includes('data-action="pause-calendar"')&&!v.includes('data-action="auto-return-hq"')),'Date interstitial has no pause or return controls');
   assert(dateRenders.every(v=>!v.includes('result-score-row')&&!v.includes('game-cinematic-intro')),'Date intro must not show a score or game cinematic');
   assert(introRenders.length>0,'One-day game starts with a PLAY BALL introduction');
   assert(introRenders[0].includes('PLAY BALL'));
