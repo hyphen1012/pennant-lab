@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.54 · SPECIAL BROADCAST/);
+assert.match(html,/VERSION 0\.9\.55 · IMMORTAL/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1074,8 +1074,8 @@ assert.match(html,/foreign-talk-pin/);assert.match(html,/foreignReportView/);ass
 {
 const a=inline[1].indexOf('  function draftHash('),b=inline[1].indexOf('  // Foreign recruitment is a separate',a);
 const api=vm.runInNewContext('(function(){const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));const seasonSkillKeys=p=>["contact","power","speed","defense","arm"];'+inline[1].slice(a,b)+';return {specialBirthPlan,specialApplyPool,specialGrowthAptitude,applySpecialTalent};})()');
-const counts={PARALLEL:0,STAR:0,LEGEND:0};let empty=0;for(let year=2027;year<12027;year++){const p=api.specialBirthPlan(1937,year,'draft');assert(p.filter(x=>x==='PARALLEL').length<=2);assert(p.filter(x=>x==='STAR').length<=1);assert(p.filter(x=>x==='LEGEND').length<=1);if(!p.length)empty++;for(const k of Object.keys(counts))if(p.includes(k))counts[k]++;assert.equal(JSON.stringify(p),JSON.stringify(api.specialBirthPlan(1937,year,'draft')));}
-assert(Math.abs(counts.PARALLEL/10000-1/3)<.02);assert(Math.abs(counts.STAR/10000-1/7)<.02);assert(Math.abs(counts.LEGEND/10000-.1)<.02);assert(empty>4000);let year=2027;while(api.specialBirthPlan(1937,year,'draft').length<2)year++;const candidates=Array.from({length:120},(_,i)=>({id:i+1,type:i%2?'高校生':'大学生',school:'学校'+i,region:'地域'+i,player:{id:i+1,contact:50,power:50,speed:50,defense:50,arm:50,talent:55}}));const result=api.specialApplyPool(candidates,1937,year,'draft');const selected=candidates.filter(x=>x.player.specialCategory);assert.equal(selected.length,result.ids.length);assert(selected.every(x=>x.type==='高校生'&&x.school===result.school&&x.nationalChampion&&x.player.talent>=84&&x.player.growthAptitude));assert.equal(candidates.length,120);assert(candidates.every(x=>!x.player.ssEligible));console.log('PASS: 10000 annual rare-talent draws, stable categories, shared champion school, roster count and no SS grant',counts);
+const counts={PARALLEL:0,STAR:0,LEGEND:0,IMMORTAL:0};let empty=0;for(let year=2027;year<12027;year++){const p=api.specialBirthPlan(1937,year,'draft');assert(p.filter(x=>x==='PARALLEL').length<=2);assert(p.filter(x=>x==='STAR').length<=1);assert(p.filter(x=>x==='LEGEND').length<=1);assert(p.filter(x=>x==='IMMORTAL').length<=1);if(!p.length)empty++;for(const k of Object.keys(counts))if(p.includes(k))counts[k]++;assert.equal(JSON.stringify(p),JSON.stringify(api.specialBirthPlan(1937,year,'draft')));}
+assert(Math.abs(counts.PARALLEL/10000-1/3)<.02);assert(Math.abs(counts.STAR/10000-1/7)<.02);assert(Math.abs(counts.LEGEND/10000-.1)<.02);assert(Math.abs(counts.IMMORTAL/10000-.05)<.012);assert(empty>4000);let year=2027;while(api.specialBirthPlan(1937,year,'draft').length<2)year++;const candidates=Array.from({length:120},(_,i)=>({id:i+1,type:i%2?'高校生':'大学生',school:'学校'+i,region:'地域'+i,player:{id:i+1,contact:50,power:50,speed:50,defense:50,arm:50,talent:55}}));const result=api.specialApplyPool(candidates,1937,year,'draft');const selected=candidates.filter(x=>x.player.specialCategory);assert.equal(selected.length,result.ids.length);assert(selected.every(x=>x.type==='高校生'&&x.school===result.school&&x.nationalChampion&&x.player.talent>=84&&x.player.growthAptitude));assert.equal(candidates.length,120);assert(candidates.every(x=>!x.player.ssEligible));console.log('PASS: 10000 annual rare-talent draws, stable categories, shared champion school, roster count and no SS grant',counts);
 }
 
 assert.match(html,/rareDaily\(entry\)/);assert.match(html,/if\(pendingRareNews\(\)\.length\)\{game\.rareResume/);assert.match(html,/rare-draft-continue/);assert.match(html,/rarePanel\(c.player,'scout'\)/);console.log('PASS: special news checkpoint and category scene hooks');
@@ -1100,4 +1100,14 @@ assert(markup.includes('甲信越・青嶺学園高校</span><span class="broadc
 assert(!heading({title:'test'},{tournament:true,hidden:true,school:'秘密高校'},true).includes('秘密高校'));
 assert.match(html,/\.broadcast-identity>strong\{color:var\(--bc\)/);
 console.log('PASS: fixed two-line tournament headline and category-colored player name');
+}
+
+{
+const a=inline[1].indexOf('  function secretProspect('),b=inline[1].indexOf('  const RARE_SCENES=',a);
+const api=vm.runInNewContext('(function(){const DRAFT_LABELS={stuff:"球威",control:"制球",stamina:"体力",talent:"将来性"};const seasonSkillKeys=p=>["stuff","control","stamina"],gradeBrief=v=>String(v);'+inline[1].slice(a,b)+';return {secretProspect,secretAbilityGrid};})()');
+const p={specialCategory:'IMMORTAL',stuff:97,control:95,stamina:93,talent:99};
+assert(api.secretProspect(p));assert(api.secretProspect({originCategory:'輪廻転生'}));assert(!api.secretProspect({specialCategory:'LEGEND'}));
+const zero=api.secretAbilityGrid(p,null),one=api.secretAbilityGrid(p,null,1),two=api.secretAbilityGrid(p,null,2);
+assert.equal((zero.match(/\?\?\?/g)||[]).length,4);assert(!zero.includes('97'));assert(one.includes('97')&&!one.includes('93'));assert(two.includes('93')&&two.includes('99'));
+assert.match(html,/secretProspect\(p\)/);assert.match(html,/immortal-omen/);console.log('PASS: IMMORTAL concealment and staged reveal');
 }
