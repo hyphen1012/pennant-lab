@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.24 · CAREER HISTORY/);
+assert.match(html,/VERSION 0\.9\.25 · LEGACY/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -815,4 +815,28 @@ assert.equal(p.retirement.year,2037);assert.equal(p.retirement.teamId,2);assert.
 const old={id:2,teamId:-1,pos:'OF',seasonHistory:[{year:2031,teamId:3}]};
 api.migrateRetirement(old);assert.equal(old.retirement.year,null);assert.equal(old.retirement.lastRecordedYear,2031);
 console.log('PASS: retirement identity, same-instant peak evidence and honest legacy migration');
+}
+
+{
+const a=inline[1].indexOf('  function legacyOriginMarket('),b=inline[1].indexOf('  function refreshLegacyArchive(',a);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+';return {legacyOriginMarket,legacyPeerScores,legacyScore,legacyMajorRecord,legacyQualification,legacyTierPools};})()');
+assert.equal(api.legacyOriginMarket({originMarket:'foreign'}),'foreign');
+assert.equal(api.legacyOriginMarket({retirement:{originMarket:'foreign'}}),'foreign');
+assert.equal(api.legacyOriginMarket({teamId:4}),'domestic');
+const rows=Array.from({length:6},(_,i)=>({id:i+1,pos:'OF',teamId:i===0?-1:4,seasonHistory:[{year:2027,stats:{g:143,pa:500,h:100+i*20}}]}));
+const peers=api.legacyPeerScores(rows,2028);
+assert.equal(peers.get(1)[0].score,0);assert.equal(peers.get(6)[0].score,100);
+assert.equal(api.legacyQualification({allSS:true},false).tier,'RINNE');
+assert.equal(api.legacyQualification({multiCrown:true},false).tier,'REBIRTH');
+assert.equal(api.legacyQualification({},true).tier,'RETURN');
+assert.equal(api.legacyQualification({},false).tier,null);
+assert.equal(api.legacyMajorRecord({year:2027,recordKey:'season:bat:hr'},[{year:2027,stats:{hr:50}}]),true);
+assert.equal(api.legacyMajorRecord({year:2027,recordKey:'season:bat:hr'},[{year:2027,stats:{hr:49}}]),false);
+const pool=[{playerId:1,eligibleFrom:2028,tier:'RETURN',route:'draft'},{playerId:2,eligibleFrom:2028,tier:'RINNE',route:'foreign'},{playerId:3,eligibleFrom:2029,tier:'REBIRTH',route:'foreign'}];
+assert.equal(api.legacyTierPools(pool,2028).length,2);assert.equal(api.legacyTierPools(pool,2028,'foreign')[0].playerId,2);
+assert.equal(api.legacyTierPools(pool,2028,'draft')[0].playerId,1);
+assert.equal(api.legacyTierPools(pool,2027).length,0);
+assert.equal(api.legacyScore([],[],[],null).score,0);
+assert(api.legacyScore(Array.from({length:10},()=>({score:100})),[],[],100).score<=100);
+console.log('PASS: role-normalized legacy evaluation, retirement eligibility and independent foreign market route');
 }

@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.24 · CAREER HISTORY/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.25 · LEGACY/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -471,6 +471,17 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(app.innerHTML.includes('歴代選手・通算記録'));
   const retiredButton=app.innerHTML.match(/data-action="career-open" data-id="(\d+)"/);
   if(retiredButton){dispatch('click',{action:'career-open',id:retiredButton[1]});assert(app.innerHTML.includes('引退選手'));}
+  dispatch('click',{action:'close-player'});
+  dispatch('click',{action:'record-sub',sub:'legacy'});
+  assert(app.innerHTML.includes('HALL OF FAME'));
+  assert(app.innerHTML.includes('全12球団の引退選手'));
+  assert(app.innerHTML.includes('助っ人外国人'));
+  dispatch('click',{action:'legacy-filter',kind:'route',value:'foreign'});
+  assert(app.innerHTML.includes('該当する引退選手はまだいません'));
+  const legacy=store.get(1).data.legacyArchive;
+  assert(legacy&&legacy.year===full.year+1);
+  assert(legacy.entries.every(e=>e.eligibleFrom<=legacy.year&&e.score>=0&&e.score<=100&&e.route==='draft'));
+  assert(legacy.entries.some(e=>e.tier),'Retired players include eligible historical figures');
   console.log('PASS: six milestone titles, full offseason sequence and next-year opening');
   console.log('PASS: v0.9.7 cinematic watch, manager, personalized GM reports, save and season');
 })().catch(e=>{console.error(e);process.exitCode=1;});
