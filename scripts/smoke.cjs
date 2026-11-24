@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.48 · GLOBAL RECRUITMENT/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.49 · GLOBAL DECISION/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -200,16 +200,15 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   dispatch('click',{action:'foreign-filter',value:'all'});
   const foreignId=app.innerHTML.match(/data-action="foreign-detail" data-id="(\d+)"/)[1];
   dispatch('click',{action:'foreign-detail',id:foreignId});assert(app.innerHTML.includes('海外リーグ・昨季実績'));
-  dispatch('click',{action:'foreign-research',id:foreignId,value:'interview'});assert(app.innerHTML.includes('面談メモ'));
+  dispatch('click',{action:'foreign-research',id:foreignId,value:'interview'});assert(app.innerHTML.includes('面談メモ'));assert(app.innerHTML.includes('対象選手の調査報告'));assert(!app.innerHTML.includes('data-action="foreign-begin"'));dispatch('click',{action:'foreign-report-back',id:foreignId});
   dispatch('click',{action:'foreign-begin',id:foreignId});assert(app.innerHTML.includes('QUESTION 1 / 3'));assert(app.innerHTML.includes('通訳なし'));
   dispatch('click',{action:'foreign-interpreter'});assert(app.innerHTML.includes('通訳：'));
   for(let n=0;n<3;n++){const q=app.innerHTML.match(/data-action="foreign-reply" data-value="([^"]+)"/);assert(q);dispatch('click',{action:'foreign-reply',value:q[1]});}
   assert(app.innerHTML.includes('専属通訳（初年度）'));assert(app.innerHTML.includes('日本での住居手配（初年度）'));
   dispatch('click',{action:'foreign-support',value:'interpreter'});dispatch('click',{action:'foreign-support',value:'housing'});dispatch('click',{action:'foreign-offer',value:'2'});assert(app.innerHTML.includes('data-action="foreign-submit"'));dispatch('click',{action:'foreign-submit'});
-  assert(app.innerHTML.includes('data-action="foreign-close"'));
-  if(app.innerHTML.includes('data-action="foreign-reveal"')){dispatch('click',{action:'foreign-reveal'});dispatch('click',{action:'foreign-reveal'});assert(app.innerHTML.includes('入団時能力確定'));}
-  dispatch('click',{action:'foreign-close'});
-  dispatch('click',{action:'tab',tab:'hq'});
+  assert(app.innerHTML.includes('foreign-waiting'));assert(!app.innerHTML.includes('data-action="foreign-close"'));
+  if(app.innerHTML.includes('data-action="foreign-reply-open"')){dispatch('click',{action:'foreign-reply-open'});assert(app.innerHTML.includes('data-action="foreign-close"'));dispatch('click',{action:'foreign-close'});}
+  dispatch('click',{action:'tab',tab:'hq'});assert(app.innerHTML.includes('新人スカウト'));assert(app.innerHTML.includes('海外スカウト'));
 
   assert.match(app.innerHTML,/data-action="mgr-open"/);
   assert.match(app.innerHTML,/class="desk-task" data-action="mgr-open" data-priority="(?:optional|recommended)"/);
