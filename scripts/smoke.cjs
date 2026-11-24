@@ -92,7 +92,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.15 · FRONT OFFICE/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.16 · FRONT OFFICE/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -387,6 +387,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(!app.innerHTML.includes('data-action="pause-calendar"'));
   dispatch('click',{action:'news-archive-medium',medium:'mail'});
   assert(app.innerHTML.includes('data-medium="mail"'));
+  for(const outcome of ['win','loss','draw'])assert(app.innerHTML.includes('data-outcome="'+outcome+'"'));
   assert(!app.innerHTML.includes('data-action="pause-calendar"'));
   dispatch('click',{action:'news-archive-medium',medium:'news'});
   assert(app.innerHTML.includes('data-medium="news"'));
