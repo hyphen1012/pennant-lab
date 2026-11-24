@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.19 · FRONT OFFICE/);
+assert.match(html,/VERSION 0\.9\.20 · CAREER/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -721,3 +721,17 @@ assert.match(html,/\.meeting-cover\{display:flex;min-height:var\(--meeting-sheet
 assert.doesNotMatch(html,/\.meeting-cover\{[^}]*min-height:inherit/);
 assert.match(html,/\.meeting-curl-strip>\.meeting-paper\{[^}]*min-height:0/);
 console.log('PASS: cover shares intrinsic layout height across fixed and curved layers');
+
+const careerStart=inline[1].indexOf('  function careerRows('),careerEnd=inline[1].indexOf('  function careerTitles(',careerStart);
+const careerApi=vm.runInNewContext('(function(){'+inline[1].slice(careerStart,careerEnd)+';return {careerRows,careerTotals,careerRate,careerInnings,careerCrossings};})()',{newStats:p=>p?{g:0,outs:0,er:0,w:0,k:0,sv:0}:{g:0,ab:0,h:0,hr:0,rbi:0,sb:0}});
+const cp={teamId:1,seasonHistory:[{year:2027,stats:{g:100,ab:400,h:120,hr:10}},{year:2027,stats:{g:100,ab:400,h:120,hr:10}}],stats:{g:20,ab:50,h:10,hr:2}};
+const ct=careerApi.careerTotals(careerApi.careerRows(cp,2028),false);
+assert.equal(ct.h,130);assert.equal(ct.ab,450);assert.equal(careerApi.careerRate(ct,false),'.289');
+cp.teamId=-1;assert.equal(careerApi.careerTotals(careerApi.careerRows(cp,2028),false).h,120);
+assert.equal(careerApi.careerRows(cp,2028).length,1);
+cp.teamId=1;cp.seasonHistory.push({year:2028,stats:cp.stats});assert.equal(careerApi.careerTotals(careerApi.careerRows(cp,2028),false).h,130);
+const pt=careerApi.careerTotals([{stats:{outs:300,er:30}},{stats:{outs:2,er:1}}],true);
+assert.equal(careerApi.careerRate(pt,true),'2.77');assert.equal(careerApi.careerInnings(pt.outs),'100.2');
+assert.equal(careerApi.careerCrossings({h:1001},{h:2},false)[0][1],1000);
+assert.equal(careerApi.careerCrossings({h:1001},{h:1},false).length,0);
+console.log('PASS: career totals, weighted rates, retired players and threshold crossing');

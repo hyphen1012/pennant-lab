@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.19 · FRONT OFFICE/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.20 · CAREER/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -128,6 +128,11 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert.match(app.innerHTML,/class="profile-row"/);
   assert.match(app.innerHTML,/class="avatar player-portrait/);
   assert.match(app.innerHTML,/class="face-artwork"/);
+  dispatch('click',{action:'detail-tab',sub:'stats'});
+  assert(app.innerHTML.includes('通算成績'));
+  assert(app.innerHTML.includes('年度別成績'));
+  assert(app.innerHTML.includes('タイトル獲得歴'));
+  assert(app.innerHTML.includes('記録達成履歴'));
 
   // Both starting lineup and starting rotation show the same player overall badge
   // on top of the five-stat ring; the swap list must use it too.
@@ -435,6 +440,19 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(app.innerHTML.includes('data-action="advance-day"'));
   await flush();
   assert.equal(store.get(1).data.pendingCeremonyIntro,null);
+  dispatch('click',{action:'tab',tab:'records'});
+  dispatch('click',{action:'record-sub',sub:'career'});
+  assert(app.innerHTML.includes('歴代選手・通算記録'));
+  const careerButton=app.innerHTML.match(/data-action="career-open" data-id="(\d+)"/);
+  assert(careerButton,'Completed season players are available in career archive');
+  dispatch('click',{action:'career-open',id:careerButton[1]});
+  assert(app.innerHTML.includes('career-total'));
+  assert(app.innerHTML.includes(String(full.year)));
+  dispatch('click',{action:'close-player'});
+  dispatch('click',{action:'career-filter',kind:'status',value:'retired'});
+  assert(app.innerHTML.includes('歴代選手・通算記録'));
+  const retiredButton=app.innerHTML.match(/data-action="career-open" data-id="(\d+)"/);
+  if(retiredButton){dispatch('click',{action:'career-open',id:retiredButton[1]});assert(app.innerHTML.includes('引退選手'));}
   console.log('PASS: six milestone titles, full offseason sequence and next-year opening');
   console.log('PASS: v0.9.7 cinematic watch, manager, personalized GM reports, save and season');
 })().catch(e=>{console.error(e);process.exitCode=1;});
