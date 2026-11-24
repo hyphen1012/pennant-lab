@@ -7215,6 +7215,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       'roster-cut':['ROSTER MANAGEMENT','戦力外通告','新しいシーズンへ向けた編成判断','◆','gold'],
       draft:['DRAFT CONFERENCE','ドラフト会議','未来の戦力を見極める','◆','gold'],
       settlement:['ANNUAL FINANCE','年間収支の確認','一年間の球団経営を振り返る','¥','gold'],
+      booking:['CAMP BOOKING','春季キャンプ地','来季のキャンプ地を決定','◆','spring'],
+      'winter-return':['WINTER RETURN','ウインターリーグ帰国','派遣選手の成長報告','✦','winter'],
       autumn:['AUTUMN CAMP','秋季キャンプ','次の飛躍に向けた基礎強化','◆','spring'],
       exhibition:['PRESEASON GAMES','オープン戦','新戦力と起用を見極める','⚾','spring'],
       winter:['WINTER LEAGUE','ウインターリーグ','さらなる成長を求めて','✦','winter'],
@@ -7223,7 +7225,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       opening:['SEASON OPENING','新シーズン開幕','新たなペナントレースが始まる','⚾','opening']
     };
     if(!Object.prototype.hasOwnProperty.call(specs,key))return null;
-    if(key==='opening'?game.day!==0:game.ceremonyStage!==key||!(game.day===143||game.day===0&&ANNUAL_PRE.includes(key)))return null;
+    if(key==='opening'?game.day!==0:game.ceremonyStage!==key||!(game.day===143||game.day===0&&(ANNUAL_PRE.includes(key)||key==='winter-return')))return null;
     const [english,title,subtitle,symbol,tone]=specs[key];
     return {key,english,title,subtitle,symbol,tone,year:annualStage()===key?annualPhaseYear(key):game.year};
   }
@@ -7484,7 +7486,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   // and pre-season exhibition statistics never share official/farm stat objects.
   const ANNUAL_PHASES={
     autumn:{name:'秋季キャンプ',english:'AUTUMN CAMP',month:11,start:5,end:24,xp:30,tone:'spring',desc:'若手の基礎強化・課題克服。主力は休養を選択できます。'},
-    winter:{name:'ウインターリーグ',english:'WINTER LEAGUE',month:12,start:1,end:22,xp:65,tone:'winter',desc:'プロ5年目以内・最大4名。派遣先を選択し1月第2週に帰国。'},
+    winter:{name:'ウインターリーグ',english:'WINTER LEAGUE',month:11,start:23,end:23,xp:65,tone:'winter',desc:'プロ5年目以内・最大4名。派遣先を選択し1月第2週に帰国。'},
+    booking:{name:'春季キャンプ地',english:'CAMP BOOKING',month:12,start:28,end:28,xp:0,tone:'spring',desc:'一軍と二軍のキャンプ地を決定。'},
+    'winter-return':{name:'ウインターリーグ帰国',english:'WINTER RETURN',month:1,start:11,end:11,xp:0,tone:'winter',desc:'派遣選手の帰国報告。'},
     self:{name:'自主トレ',english:'SELF TRAINING',month:1,start:10,end:30,xp:25,tone:'winter',desc:'個人別に伸ばす能力や練習強度を選びます。'},
     camp:{name:'春季キャンプ',english:'SPRING CAMP',month:2,start:1,end:24,xp:48,tone:'spring',desc:'一軍・二軍別のキャンプ地、班分け、視察、結果報告。'},
     exhibition:{name:'オープン戦',english:'PRESEASON GAMES',month:3,start:4,end:19,xp:0,tone:'spring',desc:'全12球団で6試合ずつ。公式戦とは独立した実戦記録です。'}
@@ -7543,7 +7547,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function campCost(sites){return campSite(sites.first)[2]+campSite(sites.farm)[2];}
   function winterScreen(){
     const t=myTeam(),plan=winterPlan(t),report=annualReport('winter'),n=Object.keys(plan).length;
-    if(report)return '<section class="panel annual-phase"><div class="eyebrow">WINTER LEAGUE</div><h2>派遣手配完了</h2><p>1月第2週に帰国予定。派遣費用 '+fmtMoney(report.cost||0)+'</p><button class="btn primary full" data-action="ceremony-next">次へ ›</button></section>';
+    if(report)return '<section class="panel annual-phase"><div class="eyebrow">WINTER LEAGUE</div><h2>派遣手配完了</h2><p>1月第2週に帰国予定。派遣費用 '+Math.round((report.cost||0)*10000)+'万円</p><button class="btn primary full" data-action="ceremony-next">春季キャンプ地の決定へ ›</button></section>';
     const sort=ui.winterSort||'rating',list=winterEligible(t).sort((a,b)=>sort==='age'?a.age-b.age:sort==='salary'?b.salary-a.salary:rating(b)-rating(a));
     const cards=list.map(p=>{
       const st=p.stats||{},fs=p.farmStats||{},picked=plan[p.id],pitch=isPitch(p),stat=x=>pitch?'登板 '+(x.g||0)+'　奪三振 '+(x.k||0):'試合 '+(x.g||0)+'　安打 '+(x.h||0)+'　HR '+(x.hr||0);
@@ -7617,7 +7621,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
   const ANNUAL_PRE=['self','camp','exhibition'];
   function annualPhaseYear(phase){return game.year+(game.day===143&&ANNUAL_PRE.includes(phase)?1:0);}
-  function annualDate(phase,last=false){const x=ANNUAL_PHASES[phase];return annualPhaseYear(phase)+'-'+String(x.month).padStart(2,'0')+'-'+String(last?x.end:x.start).padStart(2,'0');}
+  function annualDate(phase,last=false){if(phase==='camp'&&last)return annualPhaseYear(phase)+'-03-01';if(phase==='winter'&&last)return game.day===0?game.year+'-01-11':(game.year+1)+'-01-11';const x=ANNUAL_PHASES[phase];return annualPhaseYear(phase)+'-'+String(x.month).padStart(2,'0')+'-'+String(last?x.end:x.start).padStart(2,'0');}
   function annualStage(){const k=game?.ceremonyStage;return Object.hasOwn(ANNUAL_PHASES,k)?k:null;}
   function annualData(){return game.annualTraining??={plans:{},results:{},allstars:{},awakenings:[]};}
   function annualKey(phase){return annualPhaseYear(phase)+':'+phase;}
@@ -7658,7 +7662,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(xp){const prev=p.trainFocus;p.trainFocus=keys.includes(menu.focus)?menu.focus:'balanced';spendExperience(p);p.trainFocus=prev;}
     const change=mode==='rest'?26:mode==='light'?17:mode==='hard'?-12:phase==='winter'?-9:5;
     p.energy=clamp(Math.round(energy+change+(med-1)*2),0,100);
-    if(p.injury){p.injury.daysLeft=Math.max(0,p.injury.daysLeft-(ANNUAL_PHASES[phase].end-ANNUAL_PHASES[phase].start+1));if(!p.injury.daysLeft)p.injury=null;}
+    if(p.injury){p.injury.daysLeft=Math.max(0,p.injury.daysLeft-(phase==='winter'?22:ANNUAL_PHASES[phase].end-ANNUAL_PHASES[phase].start+1));if(!p.injury.daysLeft)p.injury=null;}
     const deltas=keys.filter(k=>p[k]!==before[k]).map(k=>({key:k,from:before[k],to:p[k]}));
     if(deltas.length)recordAbilityPeak(p,annualPhaseYear(phase),annualDate(phase,true),'annual-'+phase);
     return {id:p.id,name:p.name,teamId:t.id,xp,mode,focus:menu.focus,energyBefore:energy,energyAfter:p.energy,deltas};
@@ -7781,6 +7785,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function annualPhaseScreen(phase){
     if(phase==='winter')return winterScreen();
+    if(phase==='booking'&&annualPlan(myTeam(),'camp').paid)return '<section class="panel annual-phase"><h2>キャンプ地決定済み</h2><p>年越しを再試行してください。</p><button class="btn primary full" data-action="ref-camp-next">次年度へ</button></section>';if(phase==='booking')return campScreen();
+    if(phase==='winter-return'){const r=game.annualTraining?.results?.[(game.year-1)+':winter'];return '<section class="panel annual-phase"><div class="eyebrow">WINTER RETURN</div><h2>ウインターリーグ帰国報告</h2><p>1月第2週</p>'+(r?.rows?.length?annualReportHTML(r):'<p>帰国選手なし</p>')+'<button class="btn primary full" data-action="ref-return-next">自主トレへ ›</button></section>';}
     if(phase==='camp'&&!annualReport('camp')?.rows?.some(p=>p.before==null))return campScreen();
     const spec=ANNUAL_PHASES[phase],t=myTeam(),report=annualReport(phase),plan=annualPlan(t,phase),list=annualPlayers(t,phase).slice().sort((a,b)=>a.age-b.age||a.id-b.id);
     const next={autumn:'ウインターリーグへ',winter:'自主トレへ',self:'春季キャンプへ',camp:'オープン戦へ',exhibition:'新シーズン開幕へ'}[phase];
@@ -8075,14 +8081,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       if(phase==='winter'&&!annualReport(phase)){
         if(action==='ref-sort'&&['rating','age','salary'].includes(v))ui.winterSort=v;
         if(action==='ref-winter'){const id=Number(el.dataset.id),plan=winterPlan(t,true);if(!winterEligible(t).some(p=>p.id===id))return;if(v==='none')delete plan[id];else if(winterDest(v)&&(plan[id]||Object.keys(plan).length<4))plan[id]=v;else return;annualPlan(t,'winter',true).destinations=plan;}
-      }else if(phase==='camp'){
+      }else if(phase==='winter-return'&&action==='ref-return-next'){
+        game.ceremonyStage='self';game.pendingCeremonyIntro='self';
+      }else if(phase==='camp'||phase==='booking'){
         const plan=annualPlan(t,'camp',true),sites=campChoice(t,true),step=plan.step||0;
         if(action==='ref-report'&&annualReport('camp'))ui.campReportTab=v;
         else if(!annualReport('camp')){
           if(action==='ref-group'&&step===0&&['first','farm'].includes(v))ui.campGroup=v;
           else if(action==='ref-site'&&step===0&&CAMP_SITES.some(x=>x[0]===v)){
             const group=ui.campGroup||'first';if(group==='farm'&&CAMP_SITES.indexOf(campSite(v))<CAMP_SITES.indexOf(campSite(sites.first)))return;sites[group]=v;if(CAMP_SITES.indexOf(campSite(sites.farm))<CAMP_SITES.indexOf(campSite(sites.first)))sites.farm=sites.first;
-          }else if(action==='ref-camp-next'&&step===0){const cost=campCost(sites);if(!refCharge(t,cost))return;plan.paid=true;plan.cost=cost;plan.step=1;}
+          }else if(action==='ref-camp-next'&&(step===0||phase==='booking'&&plan.paid)){const cost=campCost(sites);if(!plan.paid&&!refCharge(t,cost))return;plan.paid=true;plan.cost=cost;plan.step=1;if(phase==='booking'){
+            const y=game.year,condition=new Map(game.players.filter(p=>p.teamId!=null&&p.teamId>=0).map(p=>[p.id,{energy:p.energy,injury:p.injury?{...p.injury}:null}]));game.ceremonyStage=null;nextSeason();if(game.year!==y+1){game.ceremonyStage='booking';save();render();return;}
+            for(const p of game.players){const prev=condition.get(p.id);if(!prev||p.teamId==null||p.teamId<0)continue;p.energy=clamp((prev.energy??100)+8,0,100);if(prev.injury&&prev.injury.daysLeft>8)p.injury={...prev.injury,daysLeft:prev.injury.daysLeft-8};}
+            winterReturn();game.ceremonyStage=game.annualTraining?.results?.[y+':winter']?.entries?.length?'winter-return':'self';game.pendingCeremonyIntro=game.ceremonyStage;
+          }}
           else if(action==='ref-camp-next'&&step===1)plan.step=2;
           else if(action==='ref-visit'&&step===2&&['inside','outside','rest','meeting'].includes(v)){plan.visit=v;plan.step=3;if(v==='inside'||v==='outside')game.fans+=v==='inside'?250:500;if(v==='meeting')game.fieldRating=clamp(game.fieldRating+2,0,100);if(v==='outside')game.fieldRating=clamp(game.fieldRating-2,0,100);}
           else return;
@@ -8108,7 +8120,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const phase=annualStage();if(ui.busy||storageFailure||game.pendingMonth||game.pendingReview||game.pendingEvent||game.financeCrisis||game.pendingDraftReveal||game.pendingDecade!=null||eventIntroInfo()||!annualReport(phase))return;
       if(game.day===143&&!ensureSeasonFinanceClosed()){save();render();return;}
       if(phase==='autumn')game.ceremonyStage='winter';
-      else if(phase==='winter'||phase==='camp'&&game.day===143){
+      else if(phase==='winter'&&game.day===143){game.ceremonyStage='booking';}
+      else if(phase==='camp'&&game.day===143){
         const y=game.year,condition=new Map(game.players.filter(p=>p.teamId!=null&&p.teamId>=0).map(p=>[p.id,{energy:p.energy,injury:p.injury?{...p.injury}:null}]));game.ceremonyStage=null;nextSeason();
         if(game.year!==y+1){game.ceremonyStage=phase;save();render();return;}
         for(const p of game.players){const prev=condition.get(p.id);if(!prev||p.teamId==null||p.teamId<0)continue;p.energy=clamp((prev.energy??100)+8,0,100);if(prev.injury&&prev.injury.daysLeft>8)p.injury={...prev.injury,daysLeft:prev.injury.daysLeft-8};}
