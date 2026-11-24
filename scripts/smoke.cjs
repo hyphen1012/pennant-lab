@@ -284,14 +284,21 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(store.get(1)?.data,'Game save should be persisted');
 
   // Play a complete season in skip mode without routine monthly/injury stops.
-  dispatch('click',{action:'auto-day-close'});
+  // Daily progression can have pending milestone/rare news even on opening day.
+  for(let i=0;i<80;i++){
+    const page=app.innerHTML;
+    if(page.includes('data-action="rare-news-next"'))dispatch('click',{action:'rare-news-next'});
+    else if(page.includes('data-action="rare-news-ack"'))dispatch('click',{action:'rare-news-ack'});
+    else if(page.includes('data-action="milestone-ack"')){dispatch('click',{action:'milestone-ack'});dispatch('click',{action:'edition-exit-confirm'});}
+    else if(page.includes('data-action="injury-ack"'))dispatch('click',{action:'injury-ack'});
+    else if(page.includes('data-action="finish-month"'))finishMeeting();
+    else if(page.includes('data-action="finish-review"'))dispatch('click',{action:'finish-review'});
+    else if(page.includes('data-action="auto-day-close"'))dispatch('click',{action:'auto-day-close'});
+    else break;
+    await flush();
+  }
   const dateCountBeforeSkip=dateRenders.length;
   dispatch('click',{action:'playback-mode',mode:'skip'});
-  // A new explicit season skip must finish in one invocation.
-  const pageBeforeSkip=app.innerHTML;
-  if(pageBeforeSkip.includes('data-action="injury-ack"'))dispatch('click',{action:'injury-ack'});
-  if(app.innerHTML.includes('data-action="finish-month"'))finishMeeting();
-  if(app.innerHTML.includes('data-action="finish-review"'))dispatch('click',{action:'finish-review'});
   await window.PennantLab.advance('season');
   // An actionable counter-offer deliberately interrupts a season skip.
   for(let n=0;n<30&&window.PennantLab.getSnapshot().day<143;n++){
@@ -457,7 +464,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   // Resolve final required reports before the existing offseason sequence.
   for(let i=0;i<240;i++){
     const page=app.innerHTML;
-    const action=['injury-ack','finish-review','milestone-ack','auto-day-close','finish-month'].find(a=>page.includes('data-action="'+a+'"'));
+    const action=['rare-news-next','rare-news-ack','injury-ack','finish-review','milestone-ack','auto-day-close','finish-month'].find(a=>page.includes('data-action="'+a+'"'));
     if(!action)break;
     if(action==='finish-month')finishMeeting();else if(action==='milestone-ack'){
       dispatch('click',{action});
