@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.33 · LIVE PREVIEW/);
+assert.match(html,/VERSION 0\.9\.34 · LEGACY SCORE/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -860,7 +860,7 @@ console.log('PASS: lustre and reduced-motion presentation hooks');
 
 assert.match(html,/@keyframes astral-spin/);
 assert.match(html,/@keyframes desk-beacon/);
-assert.match(html,/legacyArchive=\{version:2/);
+assert.match(html,/legacyArchive=\{version:3/);
 console.log('PASS: astral motion hooks and legacy cache migration');
 
 {
@@ -908,3 +908,27 @@ assert.match(html,/position:sticky;top:var\(--club-preview-top,8px\)/);
 assert.match(html,/function refreshClubEditor\(/);
 assert.match(html,/syncClubPreviewOffset\(\)/);
 console.log('PASS: scroll-following club preview and in-place design refresh');
+
+{
+const a=inline[1].indexOf('  const LEGACY_FEAT_POINTS'),b=inline[1].indexOf('  function legacyMajorRecord(',a);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+';return {legacyScore,legacyRecordNumber,legacyRecordEvidence};})()');
+const score=(titles=[],feats=[],year=2027)=>api.legacyScore([],titles,feats,null,year);
+const perfect={id:'p',year:2037,featKey:'perfect'},nohit={id:'n',year:2037,featKey:'nohit'};
+assert.equal(score([],[perfect]).parts.achievements,12);
+assert.equal(score([],[nohit]).parts.achievements,7);
+assert.equal(score([],[perfect,perfect]).parts.achievements,12);
+assert.equal(score([{year:2037,title:'打撃全六冠'},{year:2037,title:'三冠王'}],[{year:2037,featKey:'打撃全六冠'}]).parts.achievements,15);
+assert.equal(score([{year:2037,title:'打撃全六冠'}],[]).parts.awards,0);
+const record={year:2037,recordKey:'career:bat:hr',recordOld:'500',stat:'550'};
+assert.equal(score([],[record]).parts.records,6);
+assert.equal(score([],[record,record]).parts.records,6);
+assert.equal(score([],[record]).parts.achievements,0);
+assert(score([],[{...record,year:2028}]).parts.records<score([],[record]).parts.records);
+assert.equal(api.legacyRecordNumber('194.2','outs'),584);
+assert.equal(api.legacyRecordEvidence([{year:2028,recordKey:'career:bat:hr'},{year:2038,recordKey:'career:bat:hr'}])[1].recordAge,10);
+assert.equal(score([],[{year:2037,recordKey:'season:pitch:era',recordOld:'2.00',stat:'1.80'}]).parts.records,5);
+const result=api.legacyScore(Array.from({length:10},()=>({score:100})),Array.from({length:20},(_,i)=>({year:i,title:'MVP'})),[perfect,nohit,...['hr','h','rbi','sb'].map(metric=>({...record,recordKey:'career:bat:'+metric}))],100,2027);
+assert.equal(result.score,100);
+assert.equal(Object.keys(result.parts).length,6);
+console.log('PASS: six-part scoring, rarity weights, duplicate control and historic record value');
+}
