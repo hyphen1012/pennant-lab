@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.43 · DRAFT PRESENCE/);
+assert.match(html,/VERSION 0\.9\.44 · SCOUT SIGNAL/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1034,4 +1034,13 @@ const d={order:[1,2,3],picks:[{round:2,teamId:1,candidateId:50},{round:2,teamId:
 api.draftQueueAnnouncements(d,'later',2,0,0);assert.equal(d.announcement.rows.length,3);assert.equal(d.announcement.rows[0].teamId,1);assert(api.draftAdvanceAnnouncement(d));assert.equal(d.announcement.cursor,1);assert(api.draftAdvanceAnnouncement(d));assert(api.draftAdvanceAnnouncement(d));assert.equal(d.announcement,null);assert.equal(d.picks.length,2);
 const first={order:[1,2,3],picks:[],passed:[],pendingLottery:{groups:[{cid:60,ids:[1,3]},{cid:61,ids:[2]}],passed:[]}};api.draftQueueAnnouncements(first,'first',1,0,0);assert.equal(first.announcement.rows.length,3);assert.equal(first.announcement.rows[0].contested,true);assert.equal(first.announcement.rows[1].contested,false);
 console.log('PASS: saved sequential announcements, single/contested bids and unchanged picks');
+}
+
+{
+const a=inline[1].indexOf('  function draftRumorRound('),b=inline[1].indexOf('  function draftRumorBoard(',a);
+const api=vm.runInNewContext('(function(){const DRAFT_ROUNDS=5;'+inline[1].slice(a,b)+';return {draftRumorRound,draftRumorEarliest};})()');
+const weak={overall:42,potential:55,high:58},medium={overall:55,potential:70,high:65},strong={overall:76,potential:84,high:89},prospect={overall:66,potential:90,high:78};
+assert.equal(api.draftRumorRound(1,weak,strong,1),5);assert.equal(api.draftRumorRound(1,strong,weak,1),5);assert.equal(api.draftRumorRound(1,medium,medium,1),3);assert.equal(api.draftRumorRound(1,strong,strong,1),1);assert.equal(api.draftRumorRound(1,prospect,prospect,1),1);assert.equal(api.draftRumorRound(1,strong,strong,5),5);assert.equal(api.draftRumorRound(9,strong,strong,1),3);
+assert.equal(api.draftRumorEarliest({phase:'later',round:4,picks:[{teamId:1,round:4}],passed:[]},{id:1}),5);assert.equal(api.draftRumorEarliest({phase:'later',round:5,picks:[],passed:[{teamId:1,round:5}]},{id:1}),6);
+assert.match(html,/\.draft-rumor-mark\{[^}]*width:26px/);console.log('PASS: compact scouting signals, ability and round constrained forecasts');
 }
