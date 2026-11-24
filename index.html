@@ -1529,7 +1529,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     for(const id of [g.home,g.away]){
       const rows=pitch.filter(p=>p.teamId===id&&p.g>0);
       const runs=id===g.home?g.awayScore:g.homeScore;
-      if(rows.length!==1)continue;const p=rows[0];
+      const ownRuns=id===g.home?g.homeScore:g.awayScore;
+      if(rows.length!==1||ownRuns<=runs)continue;const p=rows[0];
       if(p.outs<27||p.h!==0)continue;
       const perfect=p.bb===0&&runs===0&&p.bf===p.outs;
       out.push({playerId:p.id,teamId:id,featKey:perfect?'perfect':'nohit',label:perfect?'完全試合':'ノーヒットノーラン'});
@@ -2183,8 +2184,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   /* v0.8.8: inning-by-inning pitching staff. No pitcher re-enters after removal. */
   function preserveNoHitStart(p,team,inning,lead,context){
     const s=context.preStats?.get(p.id),state=context.pitching[team.id];
-    const count=context.pitchCounts[team.id].get(p.id)||0;
-    return !!(s&&p.pos==='SP'&&state.used.size===1&&inning>=5&&inning<=9&&lead>=0&&p.energy>=55&&count<125&&p.stats.h===s.h&&p.stats.outs-s.outs>=12);
+    const count=context.pitchCounts?.[team.id]?.get(p.id);
+    return !!(s&&Number.isFinite(count)&&p.pos==='SP'&&state.used.size===1&&inning>=5&&inning<=9&&lead>=0&&p.energy>=55&&count<125&&p.stats.h===s.h&&p.stats.outs-s.outs>=12);
   }
   function managerPitcherChoice(team,inning,lead,context){
     const state=context.pitching[team.id];
@@ -3240,7 +3241,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function recordSort(a,b,key){return (key==='era'?a.value-b.value:b.value-a.value)||a.p.id-b.p.id||a.year-b.year}
   function recordRankRows(players,year,mode,key,scope='all',yearFilter='all'){
-    const pitch=RECORD_CATS.pitch.some(c=>c[0]===key)&&!RECORD_CATS.bat.some(c=>c[0]===key);
     const rows=[];
     const matches=r=>scope==='all'||(r.teamId!=null&&r.teamId>=0&&(scope==='E'||scope==='W'?getTeam(r.teamId)?.league===scope:r.teamId===Number(scope)));
     for(const p of players){
@@ -3258,9 +3258,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const years=[...new Set([game.year,...(game.seasonArchive||[]).map(s=>s.year),...game.players.flatMap(p=>(p.seasonHistory||[]).map(s=>s.year))])].sort((a,b)=>b-a);
     const scopes=[['all','全12球団'],['E','東リーグ'],['W','西リーグ'],...game.teams.map(t=>[String(t.id),t.name])];
     const select=(name,caption,opts,value)=>`<label>${caption}<select class="select" data-change="${name}">${opts.map(([v,l])=>`<option value="${h(String(v))}" ${String(v)===String(value)?'selected':''}>${h(String(l))}</option>`).join('')}</select></label>`;
-    const records=mode==='feats'?[]:recordRankRows(game.players.filter(p=>isPitch(p)===pitch),game.year,mode,key,scope,yearFilter);
+    const records=mode==='feats'||mode==='awards'?[]:recordRankRows(game.players.filter(p=>isPitch(p)===pitch),game.year,mode,key,scope,yearFilter);
     const feats=(game.milestoneNews||[]).filter(e=>e.featKey||e.recordKey).slice().reverse().filter(e=>(scope==='all'||(scope==='E'||scope==='W'?getTeam(e.teamId)?.league===scope:e.teamId===Number(scope)))&&(ui.bookYear==='all'||!ui.bookYear||e.year===Number(ui.bookYear)));
-    const awards=[...(game.seasonArchive||[]).flatMap(s=>s.awards||[]),...(game.seasonArchive||[]).some(s=>s.year===game.year)?[]:(game.day===143?game.awards||[]:[])].filter(a=>(scope==='all'||(scope==='E'||scope==='W'?a.league===scope:a.teamId===Number(scope)))&&(!ui.bookYear||ui.bookYear==='all'||a.year===Number(ui.bookYear)));
+    const awards=[...(game.seasonArchive||[]).flatMap(s=>s.awards||[]),...((game.seasonArchive||[]).some(s=>s.year===game.year)?[]:(game.day===143?game.awards||[]:[]))].filter(a=>(scope==='all'||(scope==='E'||scope==='W'?a.league===scope:a.teamId===Number(scope)))&&(!ui.bookYear||ui.bookYear==='all'||a.year===Number(ui.bookYear)));
     const total=mode==='feats'?feats.length:mode==='awards'?awards.length:records.length;
     const size=30,pages=Math.max(1,Math.ceil(total/size)),page=Math.max(0,Math.min(pages-1,ui.bookPage||0));
     let lastValue=null,rank=0;

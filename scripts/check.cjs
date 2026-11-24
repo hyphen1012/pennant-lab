@@ -752,3 +752,16 @@ assert.match(html,/function recordBreakingEvents/);assert.match(html,/function p
 assert.match(html,/p\.stats\.fieldQuality/);
 console.log('PASS: actual-game special feats, record book and fielding contribution');
 }
+
+{
+const a=inline[1].indexOf('  function careerRows('),b=inline[1].indexOf('  function recordBookScreen(',a);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+';return {recordRankRows,recordValue,recordEligible};})()',{newStats:()=>({g:0,pa:0,ab:0,h:0,bb:0,hr:0,doubles:0,triples:0}),isPitch:()=>false,getTeam:id=>({league:id<6?'E':'W'})});
+const players=[{id:1,teamId:-1,seasonHistory:[{year:2027,teamId:1,stats:{g:100,pa:450,ab:400,h:100,bb:50,hr:20}},{year:2028,teamId:7,stats:{g:100,pa:450,ab:400,h:150,bb:50,hr:30}}]},{id:2,teamId:2,seasonHistory:[],stats:{g:100,pa:450,ab:400,h:140,bb:50,hr:25}}];
+assert.equal(api.recordRankRows(players,2029,'career','h')[0].value,250);
+assert.equal(api.recordRankRows(players,2029,'career','h','E')[0].p.id,2);
+assert.equal(api.recordRankRows(players,2029,'season','h','W','2028')[0].value,150);
+assert.equal(api.recordRankRows(players,2029,'season','h','all','2027').length,1);
+assert.equal(api.recordEligible({g:143,pa:442,ab:400,h:150},'avg'),false);
+assert.equal(api.recordEligible({g:143,pa:443,ab:400,h:150},'avg'),true);
+console.log('PASS: historical ranking filters, retired players and qualification');
+}
