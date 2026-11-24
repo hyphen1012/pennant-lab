@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.63 · LEGACY ORIGINS/);
+assert.match(html,/VERSION 0\.9\.64 · REBORN/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1184,4 +1184,22 @@ const before=JSON.stringify({entries,players});const pools=api.reincarnationSour
 assert.equal(pools.draft.RETURN.length,1);assert.equal(pools.foreign.PARADOX.length,1);assert.equal(pools.foreign.PARADOX[0].pastLifeAppearance.seed,888);assert.equal(pools.draft.REBIRTH[0].retirementYear,null);assert.equal(pools.draft.REBIRTH[0].peak.abilities.stuff,85);assert.equal(pools.draft.SUPERNOVA[0].pastLifeAppearance.seed,777);assert.equal(pools.draft.SUPERNOVA[0].rootId,9);assert.equal(pools.draft.SUPERNOVA[0].generation,2);assert.equal(pools.draft.RINNE.length,0);assert.equal(pools.foreign.MYTH.length,0);assert.equal(JSON.stringify({entries,players}),before);
 pools.draft.REBIRTH[0].peak.abilities.stuff=1;assert.equal(players[4].peaks[0].abilities.stuff,85);
 assert.equal(api.reincarnationSourcePools(entries,players,2030).draft.RETURN.length,0);assert(api.reincarnationSourceSummary(pools).includes('転生元候補の内訳'));console.log('PASS: retired source extraction, next-year gate, domestic/foreign separation, deduplication, legacy unknown dates, inherited appearance, immutable snapshots');
+}
+
+{
+const a=inline[1].indexOf('  function draftHash('),b=inline[1].indexOf('  // Independent annual natural draws',a),c=inline[1].indexOf('  function specialGrowthAptitude('),d=inline[1].indexOf('  function applySpecialTalent(',c),e=inline[1].indexOf('  const REINCARNATION_BANDS='),f=inline[1].indexOf('  // Conceal presentation',e);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+inline[1].slice(c,d)+inline[1].slice(e,f)+';return {reincarnationBirthPlan,applyReincarnationTalent,applyReincarnationPool};})()',{
+clamp:(x,a,b)=>Math.max(a,Math.min(b,x)),isPitch:p=>['SP','RP','CP'].includes(p.pos),seasonSkillKeys:p=>['SP','RP','CP'].includes(p.pos)?['stuff','control','stamina']:['contact','power','speed','defense','arm'],newStats:()=>({g:0}),derivedBatHand:()=> '右',derivedSubPos:()=>[],initCondition:()=>{},FOREIGN_COUNTRIES:[{country:'台湾',region:'アジア',league:'東アジア'}]
+});
+const tiers=['RETURN','REBIRTH','PARADOX','SUPERNOVA','MYTH','RINNE'],pools={draft:{},foreign:{}};
+let id=0;for(const route of ['draft','foreign'])for(const tier of tiers)pools[route][tier]=Array.from({length:7},()=>({playerId:++id,rootId:id,generation:0,tier,route,name:'前世'+id,pos:'SP',nationality:'台湾',pastLifeAppearance:{seed:77+id,baseCategory:null},peak:{abilities:{stuff:98,control:70,stamina:89}},reasons:['実績']}));
+const sample=JSON.stringify(pools),counts={RETURN:0,REBIRTH:0,RINNE:0};
+for(let year=2030;year<12030;year++){const plan=api.reincarnationBirthPlan(pools,73,year),all=[...plan.draft,...plan.foreign];assert.equal(new Set(all.map(x=>x.playerId)).size,all.length);assert.equal(new Set(all.map(x=>x.rootId)).size,all.length);assert(all.filter(x=>x.tier==='RETURN').length<=5);assert(all.filter(x=>!['RETURN','RINNE'].includes(x.tier)).length<=2);assert(all.filter(x=>x.tier==='RINNE').length<=1);if(plan.draft.some(x=>x.tier==='RETURN'))counts.RETURN++;if(plan.draft.some(x=>!['RETURN','RINNE'].includes(x.tier)))counts.REBIRTH++;if(plan.draft.some(x=>x.tier==='RINNE'))counts.RINNE++;}
+assert(Math.abs(counts.RETURN/10000-.8)<.025);assert(Math.abs(counts.REBIRTH/10000-1/3)<.025);assert(Math.abs(counts.RINNE/10000-1/15)<.015);assert.equal(JSON.stringify(pools),sample);
+const src=pools.draft.RINNE[0],p={id:999,teamId:null,pos:'OF',hand:'右',ssEligible:['stuff'],stats:{g:999}};
+api.applyReincarnationTalent(p,src,2031,'draft',73);assert.equal(p.id,999);assert.equal(p.name,src.name);assert.equal(p.pos,'SP');assert.equal(p.age,22);assert.equal(p.appearanceSeed,src.pastLifeAppearance.seed);assert.equal(p.reincarnation.parentId,src.playerId);assert.equal(p.reincarnation.generation,1);assert.equal(p.specialCategory,'輪廻転生');assert.equal(p.originCategory,'RINNE');assert.equal(p.ssEligible.length,0);assert.equal(p.stats.g,0);assert(p.stuff<=98);assert(p.talent<=99);
+const empty={draft:{},foreign:{}};assert.equal(api.reincarnationBirthPlan(empty,73,2031).draft.length,0);
+const blocked=api.reincarnationBirthPlan(pools,73,2031,Object.values(pools.draft).flat().map(x=>x.playerId));assert.equal(blocked.draft.length,0);
+const c={id:999,player:{id:999,pos:'SP'},type:'大学生',school:'試験大学',region:'関東',status:'available'};const birth={ids:[]};api.applyReincarnationPool([c],[src],73,2031,'draft',birth);assert.equal(c.school,'試験大学');assert(c.nationalChampion);assert.equal(birth.ids[0],999);
+const overseas={id:1000,player:{id:1000,pos:'SP'},country:'台湾',career:{league:'東アジア'},status:'available'};api.applyReincarnationPool([overseas],[pools.foreign.RETURN[0]],73,2031,'foreign',{ids:[]});assert.equal(overseas.player.originMarket,'foreign');assert.equal(overseas.player.nationality,'台湾');assert.equal(overseas.player.specialCategory,'再来');console.log('PASS: 10,000 annual reincarnation draws, tier caps, route separation, inherited identity, fresh statistics and domestic/foreign placement');
 }
