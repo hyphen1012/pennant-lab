@@ -478,7 +478,8 @@ console.log('PASS: manager-controlled bullpen, runner, defensive specialist and 
 const reportStart=inline[1].indexOf('  function managerMoveLabel(move){');
 const reportEnd=inline[1].indexOf('  function matchReportBody(g){',reportStart);
 assert(reportStart>=0&&reportEnd>reportStart);
-const reportApi=vm.runInNewContext('(function(){'+inline[1].slice(reportStart,reportEnd)+
+const reportPosStart=inline[1].indexOf('  const namePos='),reportPosEnd=inline[1].indexOf('\n',inline[1].indexOf('  function positionRole(',reportPosStart));
+const reportApi=vm.runInNewContext('(function(){'+inline[1].slice(reportPosStart,reportPosEnd)+'\n'+inline[1].slice(reportStart,reportEnd)+
   '\nreturn {managerMoveReport,managerMoveLabel};})()',{
   getPlayer:id=>({id,name:'控え'+id}),
   getTeam:id=>({id,short:'東京'}),
