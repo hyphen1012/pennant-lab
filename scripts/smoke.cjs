@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.62 · RARE PORTRAITS/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.63 · LEGACY ORIGINS/);
   const previewBefore=JSON.stringify(window.PennantLab.getSnapshot()),saveBefore=store.size;
   dispatch('click',{action:'rare-preview-open'});assert(app.innerHTML.includes('演出確認'));assert(app.innerHTML.includes('特殊選手の顔デザイン'));assert(app.innerHTML.includes('data-permanent-mask="true"'));assert(app.innerHTML.includes('data-portrait-inherited="異界転生"'));
   dispatch('click',{action:'rare-preview-start'});assert(app.innerHTML.includes('観測記録に異常を検出'));

@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.62 · RARE PORTRAITS/);
+assert.match(html,/VERSION 0\.9\.63 · LEGACY ORIGINS/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1167,4 +1167,21 @@ const special=['PARALLEL','STAR','LEGEND','IMMORTAL'].map(specialCategory=>ident
 const reincarnated=identity.renderFaceArtwork({...base,id:654321,appearanceSeed:654321,originCategory:'REBIRTH',pastLifeAppearance:{seed:12345,baseCategory:null}});assert(reincarnated.includes('data-portrait-inherited="転生"'));
 const strip=s=>s.replace(/ data-portrait-category="[^"]*"/,'').replace(/<g data-portrait-inherited="[^"]*">.*?<\/g>/s,'').trim();assert.equal(strip(reincarnated),strip(normal));
 const paradox=identity.renderFaceArtwork({...base,id:654321,originCategory:'PARADOX',pastLifeAppearance:{seed:12345,baseCategory:'PARALLEL'}});assert(paradox.includes('data-portrait-base="PARALLEL"'));assert(paradox.includes('data-portrait-inherited="異界転生"'));assert(!paradox.includes('data-permanent-mask'));console.log('PASS: distinctive rare faces, inherited geometry, original special style and permanent IMMORTAL mist');
+}
+
+{
+const a=inline[1].indexOf('  const REINCARNATION_TIERS='),b=inline[1].indexOf('  function refreshLegacyArchive(',a);
+const src=inline[1].slice(a,b);
+const api=vm.runInNewContext('(function(){'+src+';return {reincarnationSourcePools,reincarnationSourceSummary};})()',{
+ legacyOriginMarket:p=>p.retirement?.originMarket==='foreign'||p.originMarket==='foreign'?'foreign':'domestic',
+ isPitch:p=>p.pos==='SP',peakSnapshots:p=>p.peaks||[],bestAbilitySnapshot:rows=>rows[0]||null
+});
+const p=(id,extra={})=>({id,name:'選手'+id,teamId:-1,pos:'SP',appearanceSeed:id+100,retirement:{year:2030,age:39,teamId:3},...extra});
+const players=[p(1),p(2,{originMarket:'foreign',specialCategory:'PARALLEL',retirement:{year:2030,originMarket:'foreign',appearanceSeed:888}}),p(3,{teamId:4}),p(4,{retirement:{year:2031}}),p(5,{retirement:{year:null},peaks:[{year:2030,abilities:{stuff:85}}]}),p(6,{pastLifeAppearance:{seed:777,baseCategory:'STAR'},reincarnation:{rootId:9,generation:2}}),p(7),p(8),p(9)];
+const e=(id,tier='RETURN',route='draft',extra={})=>({playerId:id,tier,route,eligibleFrom:2031,seasons:8,score:80,reasons:['実績'],...extra});
+const entries=[e(1),e(1),e(2,'PARADOX','foreign'),e(3,'RINNE'),e(4),e(5,'REBIRTH'),e(6,'SUPERNOVA'),e(7,'MYTH','foreign'),e(8,'RINNE','draft',{eligibleFrom:2032}),e(9,'RETURN','draft',{seasons:0}),e(999)];
+const before=JSON.stringify({entries,players});const pools=api.reincarnationSourcePools(entries,players,2031);
+assert.equal(pools.draft.RETURN.length,1);assert.equal(pools.foreign.PARADOX.length,1);assert.equal(pools.foreign.PARADOX[0].pastLifeAppearance.seed,888);assert.equal(pools.draft.REBIRTH[0].retirementYear,null);assert.equal(pools.draft.REBIRTH[0].peak.abilities.stuff,85);assert.equal(pools.draft.SUPERNOVA[0].pastLifeAppearance.seed,777);assert.equal(pools.draft.SUPERNOVA[0].rootId,9);assert.equal(pools.draft.SUPERNOVA[0].generation,2);assert.equal(pools.draft.RINNE.length,0);assert.equal(pools.foreign.MYTH.length,0);assert.equal(JSON.stringify({entries,players}),before);
+pools.draft.REBIRTH[0].peak.abilities.stuff=1;assert.equal(players[4].peaks[0].abilities.stuff,85);
+assert.equal(api.reincarnationSourcePools(entries,players,2030).draft.RETURN.length,0);assert(api.reincarnationSourceSummary(pools).includes('転生元候補の内訳'));console.log('PASS: retired source extraction, next-year gate, domestic/foreign separation, deduplication, legacy unknown dates, inherited appearance, immutable snapshots');
 }
