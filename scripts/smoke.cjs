@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.51 · RARE TALENTS/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.52 · RARE CHRONICLE/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -294,8 +294,13 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   if(app.innerHTML.includes('data-action="finish-review"'))dispatch('click',{action:'finish-review'});
   await window.PennantLab.advance('season');
   // An actionable counter-offer deliberately interrupts a season skip.
-  for(let n=0;n<3&&window.PennantLab.getSnapshot().day<143;n++){
-    await flush();const pending=store.get(1)?.data?.foreignMarket?.negotiations?.[2];
+  for(let n=0;n<30&&window.PennantLab.getSnapshot().day<143;n++){
+    await flush();
+    if(app.innerHTML.includes('data-action="rare-news-ack"')){
+      dispatch('click',{action:'rare-news-ack'});
+      await new Promise(r=>setTimeout(r,70));continue;
+    }
+    const pending=store.get(1)?.data?.foreignMarket?.negotiations?.[2];
     if(pending?.status!=='counter')break;
     if(app.innerHTML.includes('data-action="finish-review"'))dispatch('click',{action:'finish-review'});
     dispatch('click',{action:'tab',tab:'business',sub:'foreign'});
@@ -528,6 +533,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
       dispatch('click',{action:'draft-report-view',id:candidate[1],value:'field'});
       assert(app.innerHTML.includes('現地視察 完了'));
       dispatch('click',{action:'draft-start'});dispatch('click',{action:'draft-confirm-accept'});
+      if(app.innerHTML.includes('data-action="rare-draft-continue"'))dispatch('click',{action:'rare-draft-continue'});
       const choice=app.innerHTML.match(/data-action="draft-choose" data-id="(\d+)"/);
       assert(choice);
       const rumor=app.innerHTML.match(/data-action="draft-rumor" data-id="(\d+)" data-value="([^"]+)"/);assert(rumor);dispatch('click',{action:'draft-rumor',id:rumor[1],value:rumor[2]});assert(app.innerHTML.includes('実際の指名を保証するものではありません'));dispatch('click',{action:'draft-confirm-cancel'});

@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.51 · RARE TALENTS/);
+assert.match(html,/VERSION 0\.9\.52 · RARE CHRONICLE/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1077,3 +1077,5 @@ const api=vm.runInNewContext('(function(){const clamp=(x,a,b)=>Math.max(a,Math.m
 const counts={PARALLEL:0,STAR:0,LEGEND:0};let empty=0;for(let year=2027;year<12027;year++){const p=api.specialBirthPlan(1937,year,'draft');assert(p.filter(x=>x==='PARALLEL').length<=2);assert(p.filter(x=>x==='STAR').length<=1);assert(p.filter(x=>x==='LEGEND').length<=1);if(!p.length)empty++;for(const k of Object.keys(counts))if(p.includes(k))counts[k]++;assert.equal(JSON.stringify(p),JSON.stringify(api.specialBirthPlan(1937,year,'draft')));}
 assert(Math.abs(counts.PARALLEL/10000-1/3)<.02);assert(Math.abs(counts.STAR/10000-1/7)<.02);assert(Math.abs(counts.LEGEND/10000-.1)<.02);assert(empty>4000);let year=2027;while(api.specialBirthPlan(1937,year,'draft').length<2)year++;const candidates=Array.from({length:120},(_,i)=>({id:i+1,type:i%2?'高校生':'大学生',school:'学校'+i,region:'地域'+i,player:{id:i+1,contact:50,power:50,speed:50,defense:50,arm:50,talent:55}}));const result=api.specialApplyPool(candidates,1937,year,'draft');const selected=candidates.filter(x=>x.player.specialCategory);assert.equal(selected.length,result.ids.length);assert(selected.every(x=>x.type==='高校生'&&x.school===result.school&&x.nationalChampion&&x.player.talent>=84&&x.player.growthAptitude));assert.equal(candidates.length,120);assert(candidates.every(x=>!x.player.ssEligible));console.log('PASS: 10000 annual rare-talent draws, stable categories, shared champion school, roster count and no SS grant',counts);
 }
+
+assert.match(html,/rareDaily\(entry\)/);assert.match(html,/if\(pendingRareNews\(\)\.length\)\{game\.rareResume/);assert.match(html,/rare-draft-continue/);assert.match(html,/rarePanel\(c.player,'scout'\)/);console.log('PASS: special news checkpoint and category scene hooks');
