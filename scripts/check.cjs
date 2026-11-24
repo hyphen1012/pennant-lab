@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.46 · OVERSEAS BASE/);
+assert.match(html,/VERSION 0\.9\.47 · POSITION COLORS/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1055,4 +1055,9 @@ const g={started:true,selectedId:2,seed:2027,teams:Array.from({length:12},(_,id)
 const a=inline[1].indexOf('  const FOREIGN_COUNTRIES='),b=inline[1].indexOf('  function foreignMarketScreen(',a);
 const api=vm.runInNewContext('(function(){const game={year:2027,seed:1937,nextId:1000,players:[]};const POSITIONS=["C","1B","2B","3B","SS","OF","SP","RP","CP"];const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));const rand=()=>{game.seed=(Math.imul(game.seed,1664525)+1013904223)>>>0;return game.seed/4294967296;};const ri=(a,b)=>a+Math.floor(rand()*(b-a+1)),pick=a=>a[Math.floor(rand()*a.length)];const seasonSkillKeys=p=>["skill"];const createPlayer=(t,pos)=>({id:game.nextId++,teamId:t,pos,skill:60,talent:60});'+inline[1].slice(a,b)+';return {game,ensureForeignMarket};})()');
 const m=api.ensureForeignMarket();assert.equal(m.candidates.length,36);assert.equal(new Set(m.candidates.map(c=>c.country)).size,10);assert.equal(new Set(m.candidates.map(c=>c.id)).size,36);assert.equal(new Set(m.candidates.map(c=>c.player.name)).size,36);assert(m.candidates.every(c=>c.player.teamId===null&&c.player.originMarket==="foreign"&&c.player.isForeign&&c.career.seasons<=c.player.age-18&&c.career.toYear===2026));assert.equal(api.game.seed,1937);assert.equal(api.game.players.length,0);assert.equal(api.ensureForeignMarket(),m);assert.equal(api.game.nextId,1036);api.game.year++;assert.notEqual(api.ensureForeignMarket(),m);assert.equal(api.game.nextId,1072);assert.equal(api.game.seed,1937);console.log('PASS: annual independent foreign pool, origin metadata, country variety, non-reroll and unique IDs');
+}
+
+{
+const a=inline[1].indexOf('  const namePos='),b=inline[1].indexOf('  function positionRole(',a);const end=inline[1].indexOf('\n',b);const api=vm.runInNewContext('(function(){const h=v=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");'+inline[1].slice(a,end)+';return {namePos,positionFull,positionMarkup,positionWord,positionText,positionRole};})()');
+for(const [code,group] of [['SP','pitch'],['RP','pitch'],['CP','pitch'],['C','catch'],['1B','infield'],['2B','infield'],['3B','infield'],['SS','infield'],['OF','outfield'],['LF','outfield'],['CF','outfield'],['RF','outfield']]){assert(api.positionMarkup(code).includes('data-position-group="'+group+'"'));assert(api.positionMarkup(code,api.namePos(code)).includes('>'+api.namePos(code)+'</span>'));}assert.equal(api.positionFull('RF'),'右翼手');assert.equal(api.namePos('RF'),'右');assert(api.positionMarkup('RP','中').includes('group="pitch"'));assert(api.positionMarkup('CF','中').includes('group="outfield"'));assert.equal(api.positionText('右投左打・右田 遊一・20歳'),'右投左打・右田 遊一・20歳');assert(api.positionText('右田（遊撃手）').includes('group="infield"'));assert.equal(api.positionText('<img>'),'&lt;img&gt;');assert.equal(api.positionWord('野手'),'野手');console.log('PASS: position-only colors and plain-text labels');
 }
