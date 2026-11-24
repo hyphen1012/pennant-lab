@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.11 · WEEKLY NEWS/);
+assert.match(html,/VERSION 0\.9\.12 · WEEKLY NEWS/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -237,7 +237,7 @@ const identity=vm.runInNewContext('(function(){'+portraitSource+
   h:s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
 });
 const hexMap={
-  SS:'#DCE3EB','S+':'#F6D46A',S:'#F1C54B',A:'#DE58BB',
+  SS:'#DCE3EB','S+':'#F6D46A',S:'#F1C54B',A:'#F5B1B8',
   B:'#E85062',C:'#E8AA3F',D:'#A1CF47',E:'#43C86B',F:'#41B6E6'
 };
 for(const [num,rank] of [[100,'SS'],[99,'S+'],[90,'S'],[80,'A'],
@@ -662,3 +662,6 @@ assert.equal(weekly.hitter.rbi,3);assert.equal(weekly.pitcher.outs,27);
 assert.equal(weekly.leagues.W[0].week.l,1);assert.equal(weekly.scores[0].opponent,'相');
 assert.match(html,/function newsArchiveScreen\(/);
 console.log('PASS: weekly date range, real match statistics and newspaper archive');
+
+assert(!/#DE58BB/i.test(html),'Former magenta rank A color must not appear in the app');
+console.log('PASS: warm pink rank A; reserved PARALLEL purple unchanged');
