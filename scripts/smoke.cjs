@@ -385,6 +385,11 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(app.innerHTML.includes('週刊 球界ニュース'));
   assert(app.innerHTML.includes('東西リーグ · 順位と週間成績'));
   assert(!app.innerHTML.includes('data-action="pause-calendar"'));
+  dispatch('click',{action:'news-archive-medium',medium:'mail'});
+  assert(app.innerHTML.includes('data-medium="mail"'));
+  assert(!app.innerHTML.includes('data-action="pause-calendar"'));
+  dispatch('click',{action:'news-archive-medium',medium:'news'});
+  assert(app.innerHTML.includes('data-medium="news"'));
   dispatch('click',{action:'news-edition-close'});
   dispatch('click',{action:'tab',tab:'hq'});
   assert(app.innerHTML.includes('data-action="ceremony-start"'));

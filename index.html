@@ -1704,9 +1704,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(paper.weekly&&ui.weeklyPaperDate!==paper.date)return weeklyMailView(paper);
     return newspaperView(paper,false);
   }
-  function weeklyMailView(paper){
+  function weeklyMailView(paper,history=false){
     const w=paper.weekly,r=w.record;
-    return deviceFrame('mail','球団業務 · 受信メール',`<div class="mail-head"><div class="eyebrow">WEEKLY CLUB BRIEFING</div><h2>${formatCalendarDate(w.start)} ～ ${formatCalendarDate(w.end)} のチーム状況</h2><div class="mail-sender">${faceMini({id:30127,name:'球団運営スタッフ',pos:'OF'})}<div><b>球団運営スタッフ</b><small>宛先：${h(w.recipient||game.gmName||'GM')} GM</small><small>${formatCalendarDate(paper.date,true)}</small></div></div></div><div class="mail-body"><p>先週の球団業務についてご報告します。</p><h3>01 今週の戦績</h3><div class="meeting-record">${[['勝',r.w],['敗',r.l],['分',r.t]].map(([s,v])=>`<div><strong>${v}</strong><small>${s}</small></div>`).join('')}</div><p>得点 ${r.rs} ／ 失点 ${r.ra}</p><h3>02 期間内の月次精算</h3>${w.finance?financePaper(w.finance):'<p>この期間の月次精算記録はありません。</p>'}${Number.isFinite(w.cash)?`<p>報告時の球団資金：<b>${fmtMoney(w.cash)}</b></p>`:''}<h3>03 今週の球団動向</h3>${w.updates?.map(v=>`<div class="meeting-row"><span>${h(v)}</span></div>`).join('')||'<p>この期間の追加報告はありません。</p>'}</div><button class="btn primary full" data-action="weekly-paper-open">球界ニュースへ ›</button>${dailyPlaybackControls()}`);
+    return deviceFrame('mail','球団業務 · 受信メール',`<div class="mail-head"><div class="eyebrow">WEEKLY CLUB BRIEFING</div><h2>${formatCalendarDate(w.start)} ～ ${formatCalendarDate(w.end)} のチーム状況</h2><div class="mail-sender">${faceMini({id:30127,name:'球団運営スタッフ',pos:'OF'})}<div><b>球団運営スタッフ</b><small>宛先：${h(w.recipient||game.gmName||'GM')} GM</small><small>${formatCalendarDate(paper.date,true)}</small></div></div></div><div class="mail-body"><p>先週の球団業務についてご報告します。</p><h3>01 今週の戦績</h3><div class="meeting-record">${[['勝',r.w],['敗',r.l],['分',r.t]].map(([s,v])=>`<div><strong>${v}</strong><small>${s}</small></div>`).join('')}</div><p>得点 ${r.rs} ／ 失点 ${r.ra}</p><h3>02 期間内の月次精算</h3>${w.finance?financePaper(w.finance):'<p>この期間の月次精算記録はありません。</p>'}${Number.isFinite(w.cash)?`<p>報告時の球団資金：<b>${fmtMoney(w.cash)}</b></p>`:''}<h3>03 今週の球団動向</h3>${w.updates?.map(v=>`<div class="meeting-row"><span>${h(v)}</span></div>`).join('')||'<p>この期間の追加報告はありません。</p>'}</div>${history?'<button class="btn primary full" data-action="news-archive-medium" data-medium="news">球界ニュースへ ›</button><button class="btn outline full" data-action="news-edition-close">新聞一覧へ戻る</button>':`<button class="btn primary full" data-action="weekly-paper-open">球界ニュースへ ›</button>${dailyPlaybackControls()}`}`);
   }
   function newspaperView(paper,history=false){
     const entry={date:paper.date,type:paper.kind,reason:paper.reason};
@@ -1730,7 +1730,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       ${paper.weekly?weeklyPaperBody(paper.weekly):''}
       <div class="paper-next"><strong>NEXT GAME</strong><span>${paper.nextDate?`${formatCalendarDate(paper.nextDate)}　vs ${h(paper.nextOpponent||'未定')}`:'全日程終了'}</span></div>
       ${entry.type==='midseason'?'<p class="paper-note">大会の実試合は今後実装予定です。</p>':''}
-      ${history?'<button class="btn outline full" data-action="news-edition-close">新聞一覧へ戻る</button>':dailyPlaybackControls()}</section>`);
+      ${history?(paper.weekly?'<button class="btn outline full" data-action="news-archive-medium" data-medium="mail">週次業務メールを読む</button>':'')+'<button class="btn outline full" data-action="news-edition-close">新聞一覧へ戻る</button>':dailyPlaybackControls()}</section>`);
   }
 
   /* v0.7.1: precomputed inning-by-inning replay for the one-day watch action. */
@@ -2969,7 +2969,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const years=[...new Set([...papers,...flashes].map(v=>v.year))].sort((a,b)=>b-a);
     const year=years.includes(ui.newsYear)?ui.newsYear:years[0];
     const selected=papers.find(p=>p.year===year&&p.date===ui.newsEdition);
-    if(selected)return newspaperView(selected,true);
+    if(selected)return selected.weekly&&ui.newsMedium==='mail'?weeklyMailView(selected,true):newspaperView(selected,true);
     return `<section class="panel"><div class="eyebrow">NEWS ARCHIVE</div><h3 class="panel-title">球界ニュースの履歴</h3><p class="small">日程スキップ中も発行済みの新聞を保存しています。</p>
       <div class="chips">${years.map(y=>`<button class="chip ${y===year?'active':''}" data-action="news-year" data-year="${y}">${y}年</button>`).join('')}</div>
       ${flashes.some(e=>e.year===year)?`<details class="weekly-section"><summary>重要ニュース（${flashes.filter(e=>e.year===year).length}件）</summary>${flashes.filter(e=>e.year===year).map(milestoneCard).join('')}</details>`:''}
@@ -3214,7 +3214,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function resultModal(){
     if(ui.detail==null)return '';
     const g=game.games.find(x=>x.id===ui.detail);if(!g)return '';
-    return `<div class="overlay" data-action="close-overlay"><div class="dialog" style="max-width:690px;max-height:91vh;overflow-y:auto" role="dialog" aria-modal="true" aria-label="試合結果" data-stop="true"><div class="panel-head"><h3 class="panel-title">${g.year}年 第${g.day}戦 試合結果</h3><button class="btn sm outline" data-action="close-modal">閉じる ✕</button></div>${resultHeroCard(g)}${matchReportBody(g)}</div></div>`;
+    return `<div class="overlay" data-action="close-overlay"><div class="dialog" style="max-width:690px;max-height:91vh;overflow-y:auto" role="dialog" aria-modal="true" aria-label="試合結果" data-stop="true"><div class="panel-head"><h3 class="panel-title">${g.year}年 第${g.day}戦 試合結果</h3><button class="btn sm outline" data-action="close-modal">閉じる ✕</button></div>${deviceFrame('scores','PENNANT LIVE · 試合結果',resultHeroCard(g)+matchReportBody(g))}</div></div>`;
   }
   function confirmModal(){
     const c=ui.confirm;if(!c)return '';
@@ -3286,10 +3286,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(act==='team-sub'){ui.teamSub=b.dataset.sub;render();return}
     if(act==='record-sub'){ui.recordSub=b.dataset.sub;ui.newsEdition=null;render();return}
     if(act==='news-archive'){ui.tab='records';ui.recordSub='news';ui.newsEdition=null;ui.newsYear=null;render();window.scrollTo(0,0);return;}
+    if(act==='news-archive-medium'){
+      if(ui.tab==='records'&&ui.recordSub==='news'&&ui.newsEdition){ui.newsMedium=b.dataset.medium==='mail'?'mail':'news';render();window.scrollTo(0,0);}return;
+    }
     if(act==='news-year'||act==='news-edition-open'||act==='news-edition-close'){
       if(ui.tab!=='records'||ui.recordSub!=='news')return;
       if(act==='news-year'||act==='news-edition-open')ui.newsYear=Number(b.dataset.year);
-      ui.newsEdition=act==='news-edition-open'?b.dataset.date:null;render();window.scrollTo(0,0);return;
+      ui.newsEdition=act==='news-edition-open'?b.dataset.date:null;ui.newsMedium='news';render();window.scrollTo(0,0);return;
     }
     if(act==='business-sub'){ui.businessSub=b.dataset.sub;ui.managerEntry=b.dataset.sub==='manager';render();return}
     if(act==='player-detail'){ui.playerDetail=Number(b.dataset.id);ui.playerDetailTab='abilities';render();window.scrollTo(0,0);return}
@@ -3622,7 +3625,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const oldMatchReview03=matchReviewScreen;
   matchReviewScreen=function(){
     const r=game.pendingReview;
-    if(r?.mode==='season')return seasonSummary();
+    if(r?.mode==='season')return deviceFrame('scores','PENNANT LIVE · シーズン最終成績',seasonSummary());
     return deviceFrame('scores','PENNANT LIVE · 試合結果',oldMatchReview03().replace('<section class="game-result-hero',`${r?.gameIds?.length>1?batchSummary(r):''}<section class="game-result-hero`));
   };
   const oldReport03=matchReportBody;

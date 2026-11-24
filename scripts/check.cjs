@@ -87,7 +87,7 @@ assert.match(html,/const watchOneDay=oneDay&&entry\.type==='game'/);
 assert.match(html,/result-table-wrap/);
 assert.match(html,/watch-table result-table/);
 assert.match(html,/watch-extra-table/);
-assert.match(html,/return oldMatchReview03\(\)\.replace\('<section class="game-result-hero'/);
+assert.match(html,/oldMatchReview03\(\)\.replace\('<section class="game-result-hero'/);
 
 assert.match(html,/function managerPortrait\(manager,teamId\)/);
 assert.match(html,/function managerGradeStrip\(m\)/);
@@ -134,7 +134,7 @@ assert.equal(renewed.news.length,0);
 assert.match(html,/GM DESK · MEDICAL INBOX/);
 assert.match(html,/GM DESK · MONTHLY INBOX/);
 assert.match(html,/gm-medical-player/);
-assert.match(html,/gm-month-head/);
+assert.match(html,/class="meeting-scene gm-month-report"/);
 assert.match(html,/球団運営スタッフ/);
 assert.match(html,/チーム医療スタッフ/);
 assert.match(html,/data-action="injury-ack"/);
