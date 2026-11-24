@@ -7,12 +7,13 @@ const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
 assert(script);
 const listeners=[];
 const store=new Map(), local=new Map(), overlays=[];
-const watchRenders=[],introRenders=[],gameSetRenders=[],resultRenders=[],medicalRenders=[],monthlyRenders=[];
+const dateRenders=[],watchRenders=[],introRenders=[],gameSetRenders=[],resultRenders=[],medicalRenders=[],monthlyRenders=[];
 const app={
   _html:'',
   get innerHTML(){return this._html;},
   set innerHTML(markup){
     this._html=markup;
+    if(markup.includes('class="calendar-date-intro'))dateRenders.push(markup);
     if(markup.includes('watch-game-screen'))watchRenders.push(markup);
     if(markup.includes('game-cinematic-intro'))introRenders.push(markup);
     if(markup.includes('game-cinematic-outro'))gameSetRenders.push(markup);
@@ -180,6 +181,8 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     if(app.innerHTML.includes('data-action="injury-ack"'))dispatch('click',{action:'injury-ack'});
     await window.PennantLab.advance('day');
   }
+  assert(dateRenders.length>0,'One-day progression shows a calendar date intro');
+  assert(dateRenders.every(v=>!v.includes('result-score-row')&&!v.includes('game-cinematic-intro')),'Date intro must not show a score or game cinematic');
   assert(introRenders.length>0,'One-day game starts with a PLAY BALL introduction');
   assert(introRenders[0].includes('PLAY BALL'));
   assert(!introRenders[0].includes('result-score-row'),'Pregame must not reveal the result');
@@ -208,6 +211,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 
   // Play a complete season with skip mode, acknowledging month-end and injury reports.
   dispatch('click',{action:'auto-day-close'});
+  const dateCountBeforeSkip=dateRenders.length;
   dispatch('click',{action:'playback-mode',mode:'skip'});
   let done=false;
   for(let attempt=0;attempt<120;attempt++){
@@ -305,6 +309,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   console.log('PASS: bench AI: '+pinchMoves.length+' pinch hitters, '+
     pitchMoves.length+' pitching changes, '+runnerMoves.length+
     ' pinch runners, '+defenseMoves.length+' defensive replacements');
+  assert.equal(dateRenders.length,dateCountBeforeSkip,'Batch skip must not render date intros');
   assert(monthlyRenders.length>0,'Month-end reports must show the GM inbox');
   assert(monthlyRenders.some(v=>v.includes('球団運営スタッフ')));
   if(medicalRenders.length)assert(medicalRenders.every(v=>v.includes('チーム医療スタッフ')));

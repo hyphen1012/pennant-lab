@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.0 · BULLPEN/);
+assert.match(html,/VERSION 0\.9\.1 · CALENDAR/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -569,3 +569,20 @@ const earlyCtx={...ctx,managerMoves:[],pitching:{7:{current:starter,used:new Set
 assert.equal(midAPI(club,4,0,[null,null,null],0,leftBatter,earlyCtx).id,starter.id,
   'No premature early-inning mid-inning pitching replacement');
 console.log('PASS: pitch-count bullpen, left/right matchup, workload and no pitcher reentry');
+
+// Calendar presentation must not change the persisted save schema or simulate twice.
+assert.match(html,/function calendarDateIntroScreen\(entry\)/);
+assert.match(html,/const dateIntroDelay=mode==='fast'\?320:480/);
+assert.match(html,/await waitForDailyDisplay\(dateIntroDelay\);\s*ui\.dateIntro=false;ui\.autoDay=null;\s*if\(ui\.pauseRequested\|\|document\.hidden\|\|storageFailure\)break;\s*}\s*const entry=processCalendarDay\(\);/);
+assert.match(html,/prefers-reduced-motion:reduce\)\{\.calendar-date-track/);
+const dateStart=inline[1].indexOf('  function calendarOffsetDate(');
+const dateEnd=inline[1].indexOf('  function dailyNewsScreen(',dateStart);
+const dateApi=vm.runInNewContext('(function(){'+inline[1].slice(dateStart,dateEnd)+'\nreturn {calendarOffsetDate,calendarDateIntroScreen};})()',{
+  game:{year:2028,playbackMode:'normal'},ui:{autoPaused:false},h:String,formatCalendarDate:String
+});
+assert.equal(dateApi.calendarOffsetDate('2028-03-01',-1),'2028-02-29');
+assert.equal(dateApi.calendarOffsetDate('2027-12-31',1),'2028-01-01');
+const dateMarkup=dateApi.calendarDateIntroScreen({date:'2028-03-25',type:'game',gameNo:1});
+assert(dateMarkup.includes('開幕戦')&&dateMarkup.includes('2028-03-25'));
+assert(!dateMarkup.includes('result-score-row'));
+console.log('PASS: date intro civil dates, spoiler-free markup and interruption guard');
