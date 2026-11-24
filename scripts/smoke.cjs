@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.36 · DRAFT/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.37 · NEGOTIATION/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -483,13 +483,14 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
       assert(app.innerHTML.includes('role="alertdialog"'));
       dispatch('click',{action:'edition-exit-confirm'});
     }else if(key==='draft'){
-      assert(app.innerHTML.includes('新人スカウト'));
+      assert(app.innerHTML.includes('SCOUTING STAFF'));
       const candidate=app.innerHTML.match(/data-action="draft-detail" data-id="(\d+)"/);
       assert(candidate);
       dispatch('click',{action:'draft-detail',id:candidate[1]});
       assert(app.innerHTML.includes('推定には誤差'));
       dispatch('click',{action:'draft-research',id:candidate[1]});
-      dispatch('click',{action:'draft-start'});
+      assert(app.innerHTML.includes('スカウト面談メモ'));
+      dispatch('click',{action:'draft-start'});dispatch('click',{action:'draft-confirm-accept'});
       const choice=app.innerHTML.match(/data-action="draft-choose" data-id="(\d+)"/);
       assert(choice);
       dispatch('click',{action:'draft-choose',id:choice[1]});

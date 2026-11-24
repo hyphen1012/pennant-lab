@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.36 · DRAFT/);
+assert.match(html,/VERSION 0\.9\.37 · NEGOTIATION/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -960,17 +960,22 @@ assert.match(html,/function draftFirst\(/);assert.match(html,/function draftOffe
 console.log('PASS: deterministic draft lottery and recruitment hooks');
 }
 
+
 {
-const a=inline[1].indexOf('  function draftOffer('),b=inline[1].indexOf('  function draftNegotiateCPU(',a);
-const api=vm.runInNewContext('(function(){const t={id:1,cash:10},game={year:2027},r2=n=>Math.round(n*100)/100,draftHash=()=>.5,getTeam=()=>t,own=()=>[],draftCandidate=(d,id)=>d.candidates.find(c=>c.id===id);'+inline[1].slice(a,b)+';return {t,draftOfferResponse,draftWithdraw};})()');
-const c={id:1,player:{pos:'SP'},type:'高校生',preferredTeam:1,preference:'育成',strength:3,threshold:43,overseas:false,status:'rights'};
-const p={teamId:1,candidateId:1,status:'rights'},d={year:2027,candidates:[c]};
-assert(api.draftOfferResponse(d,p,1,'develop'));assert.equal(p.status,'signed');assert.equal(api.t.cash,9.84);
-assert(!api.draftOfferResponse(d,p,1,'develop'));assert.equal(api.t.cash,9.84);
-const foreign={...c,id:2,preferredTeam:8,preference:'なし',overseas:true,threshold:69,status:'rights'};
-const rejected={teamId:1,candidateId:2,status:'rights'};d.candidates.push(foreign);
-for(let i=0;i<3;i++)assert(api.draftOfferResponse(d,rejected,2,'develop'));
-assert.equal(rejected.status,'refused');assert.equal(api.t.cash,9.84);
-assert.match(html,/function draftConfirmModal\(/);
-console.log('PASS: acceptance, refusal, no duplicate fees, and draft confirmation hooks');
+const a=inline[1].indexOf('  const RECRUIT_VALUES='),b=inline[1].indexOf('  function draftReport(',a);
+const c=inline[1].indexOf('  function draftOffer('),d=inline[1].indexOf('  function draftNegotiateCPU(',c);
+const api=vm.runInNewContext('(function(){const t={id:1,cash:10,wins:90,losses:50},r2=n=>Math.round(n*100)/100,clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),draftHash=()=>.5,getTeam=()=>t,own=()=>[],draftCandidate=(d,id)=>d.candidates.find(c=>c.id===id);'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {t,recruitmentProfile,recruitmentInitial,recruitmentReaction,draftReply,draftOfferResponse,draftScoutCost};})()');
+const profile=api.recruitmentProfile('a','育成',false,null);
+const c1={id:1,player:{pos:'SP'},type:'高校生',preferredTeam:1,preference:'育成',strength:3,threshold:43,overseas:false,status:'rights',personality:profile};
+const row={teamId:1,candidateId:1,status:'rights'},draft={year:2027,candidates:[c1]};
+assert(!api.draftOfferResponse(draft,row,1,'develop'));
+for(const key of profile.preferred)assert(api.draftReply(draft,row,key));
+assert(!api.draftReply(draft,row,'growth'));assert(api.draftOfferResponse(draft,row,1,'develop'));assert.equal(row.status,'signed');assert.equal(api.t.cash,9.84);
+assert(!api.draftOfferResponse(draft,row,1,'develop'));assert.equal(api.t.cash,9.84);
+const c2={...c1,id:2,threshold:69,overseas:true,status:'rights'},bad={teamId:1,candidateId:2,status:'rights',conversation:{context:{},interest:15,answers:[{}, {}, {}]}};draft.candidates.push(c2);
+assert(api.draftOfferResponse(draft,bad,2,'develop'));assert.equal(bad.status,'refused');assert.equal(api.t.cash,9.84);
+assert(api.recruitmentInitial({priorities:['winning']},{winning:20},1,false)>api.recruitmentInitial({priorities:['winning']},{winning:-20},1,false));
+assert(api.recruitmentReaction(profile,{},0,profile.preferred[0])>api.recruitmentReaction(profile,{},0,'winning'));
+assert(api.draftScoutCost(4)>api.draftScoutCost(2));
+console.log('PASS: shared conversation, club fit, acceptance, refusal, fee safety and scout costs');
 }
