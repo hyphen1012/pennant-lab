@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.55 · IMMORTAL/);
+assert.match(html,/VERSION 0\.9\.56 · RARE ENCOUNTER/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1110,4 +1110,19 @@ assert(api.secretProspect(p));assert(api.secretProspect({originCategory:'輪廻�
 const zero=api.secretAbilityGrid(p,null),one=api.secretAbilityGrid(p,null,1),two=api.secretAbilityGrid(p,null,2);
 assert.equal((zero.match(/\?\?\?/g)||[]).length,4);assert(!zero.includes('97'));assert(one.includes('97')&&!one.includes('93'));assert(two.includes('93')&&two.includes('99'));
 assert.match(html,/secretProspect\(p\)/);assert.match(html,/immortal-omen/);console.log('PASS: IMMORTAL concealment and staged reveal');
+}
+
+{
+const a=inline[1].indexOf('  function draftHash('),b=inline[1].indexOf('  // Foreign recruitment is a separate',a);
+const api=vm.runInNewContext('(function(){const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));const seasonSkillKeys=p=>["contact","power","speed","defense","arm"];'+inline[1].slice(a,b)+';return {specialBirthPlan,rewardBirthPlan,rewardAllowed,fillRewardCandidates,rareScoutingBonus,hiddenScoutEstimate};})()');
+for(let y=2027;y<12027;y++){const natural=api.specialBirthPlan(1937,y,'draft'),a=api.rewardBirthPlan(natural,{A:true,B:true});for(const k of ['PARALLEL','STAR','LEGEND'])assert(a.includes(k));assert.equal(a.filter(k=>k==='IMMORTAL').length,natural.filter(k=>k==='IMMORTAL').length);assert.equal(a.filter(k=>k==='PARALLEL').length,Math.max(1,natural.filter(k=>k==='PARALLEL').length));}
+assert(api.rewardAllowed({year:2027,day:0},'A'));assert(!api.rewardAllowed({year:2027,day:1},'A'));assert(!api.rewardAllowed({year:2027,day:0,seasonRewards:{2027:{A:true}}},'A'));assert(!api.rewardAllowed({year:2027,day:0},'C'));
+const d={year:2027,candidates:Array.from({length:10},(_,i)=>({id:i+1,type:'高校生',school:'学校'+i,region:'地域'+i,status:'available',player:{id:i+1,contact:50,power:50,speed:50,defense:50,arm:50,talent:50}}))};assert(api.fillRewardCandidates(d,'A',1));assert(api.fillRewardCandidates(d,'A',1));assert(api.fillRewardCandidates(d,'B',1));assert.equal(d.candidates.filter(c=>c.player.specialCategory).length,3);assert.equal(new Set(d.candidates.filter(c=>c.nationalChampion).map(c=>c.school)).size,1);
+assert.equal(api.rareScoutingBonus({id:1},'youth',2027,2),0);assert(api.rareScoutingBonus({id:1,specialCategory:'IMMORTAL'},'youth',2027,2)>0);assert.equal(api.hiddenScoutEstimate({id:1,stuff:20},2027,2,'stuff'),api.hiddenScoutEstimate({id:1,stuff:99},2027,2,'stuff'));console.log('PASS: 10000 reward years, category caps, unchanged IMMORTAL rate, candidate fill, CPU observation');
+}
+{
+const a=inline[1].indexOf('  function draftHash('),b=inline[1].indexOf('  function specialBirthPlan(',a),c=inline[1].indexOf('  function draftWinningTicket('),d=inline[1].indexOf('  function draftOpenTicket(',c);
+const api=vm.runInNewContext('(function(){'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {lotteryRewardAllowed,applyLotteryReward};})()');
+for(let n=2;n<=12;n++)for(let selected=0;selected<n;selected++){const draft={year:2027,round:1,phase:'lottery',pendingLottery:{attempt:1,cursor:0,stage:'choose',groups:[{cid:7,ids:Array.from({length:n},(_,i)=>i)}]}};assert(api.lotteryRewardAllowed(draft,selected));const before=JSON.stringify(draft);assert(!api.applyLotteryReward(draft,selected,false));assert.equal(JSON.stringify(draft),before);assert(!api.applyLotteryReward(draft,99,true));assert(api.applyLotteryReward(draft,selected,true));assert.equal(draft.pendingLottery.groups[0].winner,selected);assert.equal(draft.pendingLottery.stage,'sealed');assert(!api.applyLotteryReward(draft,selected,true));}
+assert.match(html,/const rewardAdProvider=null/);console.log('PASS: verified lottery reward, no failed/spectator/duplicate reward, 2–12 clubs');
 }
