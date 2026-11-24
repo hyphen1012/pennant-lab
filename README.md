@@ -5,7 +5,7 @@
 ## プレイする
 
 - [PENNANT LAB 公開版](https://hyphen1012.github.io/pennant-lab/)
-- GitHub `main` の実装バージョン：**v0.9.60（RINNE AWAKENING）**。GitHub Pagesの公開反映には時間差が生じる場合があります。
+- GitHub `main` の実装バージョン：**v0.9.61（RINNE AWAKENING）**。GitHub Pagesの公開反映には時間差が生じる場合があります。
 
 ## 主な実装済み機能
 
@@ -143,3 +143,7 @@
 
 ### v0.9.60 RINNE AWAKENING
 輪廻転生の全国大会特集で顔の秘匿を維持したまま口元だけ不敵な笑みが遅れて浮かび、本人の独白「また俺の時代だ...」を表示。演出確認と本番共通。IMMORTALと他肩書は変更なし。
+
+
+### v0.9.61
+輪廻転生の専用笑顔を歯の見えない閉じた口の不敵な笑みに変更。専用独白・遅延表示は維持。

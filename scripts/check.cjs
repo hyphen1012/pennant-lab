@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.60 · RINNE AWAKENING/);
+assert.match(html,/VERSION 0\.9\.61 · RINNE AWAKENING/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -1158,3 +1158,5 @@ assert(intact.includes('rinne-piece whole'));assert(!intact.includes('rinne-frag
 }
 
 assert.match(html,/renderFaceArtwork\(p,\{hidden:true,rinneSmile:true\}\)/);assert.match(html,/options\.rinneSmile\?/);assert.match(html,/x\.category==='輪廻転生'&&x\.tournament&&x\.hidden\?'<div class="rinne-voice">/);console.log('PASS: RINNE-only concealed smile and delayed monologue');
+
+{const smile=html.match(/<g class="rinne-smile"[^>]*>(.*?)<\/g>/s)?.[1];assert(smile);assert(!smile.includes('#e9deed'));assert.equal((smile.match(/fill="none"/g)||[]).length,2);assert(smile.includes('stroke="#19131f"'));console.log('PASS: RINNE closed-mouth smirk, no exposed teeth');}
