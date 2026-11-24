@@ -88,7 +88,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.13 · NEWS FLASH/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.14 · CLUBHOUSE/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -146,7 +146,12 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   dispatch('click',{action:'tab',tab:'hq'});
 
   assert.match(app.innerHTML,/data-action="mgr-open"/);
-  assert.match(app.innerHTML,/class="desk-task" data-action="mgr-open"/);
+  assert.match(app.innerHTML,/class="desk-task" data-action="mgr-open" data-priority="(?:optional|recommended)"/);
+  assert(app.innerHTML.includes('GM DESK · FRONT OFFICE'));
+  assert(app.innerHTML.includes('class="hero-context"'));
+  assert(app.innerHTML.includes('data-priority="recommended"'));
+  assert(app.innerHTML.includes('data-priority="optional"'));
+  assert(!app.innerHTML.includes('data-priority="required"'),'Regular duties do not invent mandatory restrictions');
   assert(!app.innerHTML.includes('class="panel manager-home"'),'Manager must appear in GM desk, not a separate panel');
   dispatch('click',{action:'mgr-open'});
   assert.match(app.innerHTML,/監督・GM方針/);
@@ -375,6 +380,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   dispatch('click',{action:'news-edition-close'});
   dispatch('click',{action:'tab',tab:'hq'});
   assert(app.innerHTML.includes('data-action="ceremony-start"'));
+  assert(app.innerHTML.includes('class="panel season-action" data-priority="required"'));
   dispatch('click',{action:'ceremony-start'});
   const cashBeforeOffseason=window.PennantLab.getSnapshot().teams.map(t=>t.cash);
   const titles=['awards-all','settlement','winter','self','camp','opening'];

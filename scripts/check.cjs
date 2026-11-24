@@ -6,7 +6,7 @@ const html=fs.readFileSync('index.html','utf8');
 const inline=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(inline,'Game script must exist');
 new vm.Script(inline[1],{filename:'pennant-lab-inline.js'});
-assert.match(html,/VERSION 0\.9\.13 · NEWS FLASH/);
+assert.match(html,/VERSION 0\.9\.14 · CLUBHOUSE/);
 assert.match(html,/const VERSION = 2;/);
 assert.match(html,/managerDecision\(team,'bullpen'\)/);
 assert.match(html,/managerDecision\(batTeam,'bunt'\)/);
@@ -674,3 +674,9 @@ assert.equal(streakFn([...losses,{home:1,away:2,homeScore:1,awayScore:1}],1).cou
 assert.equal(streakFn([...losses,{home:2,away:1,homeScore:0,awayScore:3}],1).result,'win');
 assert.match(html,/if\(oneDay\|\|game\.pendingMonth\|\|\(!skip&&freshNews\.length\)\)break;/);
 console.log('PASS: streak counting, ties, home/away and skip-compatible news');
+
+assert.match(html,/function deskTask\(priority,icon,title,description,attrs\)/);
+assert.match(html,/assets\/scenes\/home-ballpark\.svg/);
+assert.match(html,/assets\/scenes\/front-office\.svg/);
+assert.match(html,/padding-box,linear-gradient\(135deg,var\(--duty-edge\)/);
+console.log('PASS: location-based clubhouse and semantic duty cards');
