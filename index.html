@@ -1881,6 +1881,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(prefers-reduced-motion:no-preference){.scout-field-report[data-new=true] .scout-scan{animation:scout-scan-motion 1.8s ease-out both}.scout-field-report[data-new=true] .scout-report-content{animation:room-enter .7s .4s both}}
 
 .draft-cut-total{text-align:center;padding:15px;background:#102034;border:1px solid #58748a;border-radius:10px;color:#9ed8b8}.draft-cut-total b{font-size:38px}.draft-cut-total span{font-size:20px;color:#c7d6e4}.draft-cut-total[data-over=true] b{color:#f2b47a}.roster-cut-room .draft-release-row button{flex:0 0 auto;max-width:42%;white-space:normal;min-height:42px}.roster-cut-room .draft-release-row>span:first-child{flex:0 0 auto}
+
+.farm-hero{background:linear-gradient(150deg,#153b39,#142235 72%);border-color:#416b67}.farm-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0}.farm-summary>div{background:#101f2c;border:1px solid #405562;border-radius:9px;padding:9px 7px}.farm-summary small,.farm-summary b{display:block}.farm-summary small{font-size:11px;color:#a2b5c0}.farm-summary b{font-size:16px;color:#dce8e7;white-space:nowrap}.farm-player{border:1px solid #34485b;border-radius:10px;padding:10px;margin-top:9px;background:#142538}.farm-person{display:flex;align-items:center;gap:10px;width:100%;border:0;color:inherit;background:none;text-align:left;padding:0}.farm-person>span:not(.avatar){flex:1;min-width:0}.farm-person b,.farm-person small{display:block;line-height:1.4}.farm-person small{font-size:11px;color:#a9b9ca}.farm-person>strong{font-size:22px}.farm-meta{display:flex;justify-content:space-between;font-size:11px;color:#a7b8c7;margin:7px 0}.farm-controls{display:flex;align-items:end;gap:8px;margin-top:8px}.farm-controls label{display:grid;gap:4px;flex:1;min-width:0;font-size:11px;color:#b1bfcd}.farm-controls select{width:100%}.farm-controls .btn{flex-shrink:0}.farm-facility,.farm-report,.farm-match{border-top:1px solid #3b4b5e;padding:12px 0}.farm-facility h3{display:flex;justify-content:space-between;font-size:15px}.farm-facility h3 span{color:#84cdb4}.farm-level{display:flex;gap:5px;margin:9px 0}.farm-level i{flex:1;height:7px;border-radius:4px;background:#35475b}.farm-level i.on{background:#77bdab}.farm-match{display:flex;justify-content:space-between;gap:8px;font-size:13px}.farm-report small{color:#a8b7c8}.farm-report p{margin:5px 0}.farm-growth svg{width:100%;max-height:145px}.roster-screen .control-bar{flex-wrap:wrap}.roster-screen .control-bar .chips{flex-wrap:wrap}
+
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -2046,6 +2049,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const own=team=>game.players.filter(p=>p.teamId===team.id);
   const hitters=team=>own(team).filter(p=>!isPitch(p));
   const pitchers=team=>own(team).filter(isPitch);
+  // Roster ownership stays independent from first-team registration.
+  const firstPlayers=t=>own(t).filter(p=>p.farmTier!==2);
+  const firstHitters=t=>firstPlayers(t).filter(p=>!isPitch(p));
+  const firstPitchers=t=>firstPlayers(t).filter(isPitch);
   const freeAgents=()=>game.players.filter(p=>p.teamId===null);
   const myTeam=()=>getTeam(game.selectedId);
   function leagueTeams(league){return game.teams.filter(t=>t.league===league);}
@@ -2055,7 +2062,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   });}
 
   function initialLineup(team){
-    const p=hitters(team).slice();const used=new Set();const result=[];
+    const p=firstHitters(team).slice();const used=new Set();const result=[];
     const order=['OF','SS','OF','1B','3B','2B','OF','C','DH'];
     for(const pos of order){
       const options=p.filter(x=>!used.has(x.id)&&(pos==='DH'||x.pos===pos)).sort((a,b)=>btrRating(b)-btrRating(a));
@@ -2067,8 +2074,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     syncLineupFielding(team);
   }
   function repairTeam(team){
-    const allHit=hitters(team).filter(availableForGame).sort((a,b)=>btrRating(b)-btrRating(a));
-    const allSP=pitchers(team).filter(p=>p.pos==='SP'&&availableForGame(p)).sort((a,b)=>rating(b)-rating(a));
+    const allHit=firstHitters(team).filter(availableForGame).sort((a,b)=>btrRating(b)-btrRating(a));
+    const allSP=firstPitchers(team).filter(p=>p.pos==='SP'&&availableForGame(p)).sort((a,b)=>rating(b)-rating(a));
     const validHit=new Set(allHit.map(p=>p.id));
     const validSP=new Set(allSP.map(p=>p.id));
     let l=[...new Set((team.lineup||[]).filter(id=>validHit.has(id)))];
@@ -3135,7 +3142,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const change=overworked||exhausted||(inning>desired&&(tiring||(outs>=3&&latePressure)))
       ||(incumbent.pos==='SP'&&inning>=desired&&tiring);
     if(!change||preserveNoHitStart(incumbent,team,inning,lead,context))return incumbent;
-    const available=pitchers(team).filter(p=>p.id!==incumbent.id
+    const available=firstPitchers(team).filter(p=>p.id!==incumbent.id
       &&['RP','CP'].includes(p.pos)&&availableForGame(p)&&!state.used.has(p.id));
     if(!available.length)return incumbent;
     const preferCloser=inning>=9&&lead>=1&&lead<=3;
@@ -3175,7 +3182,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(preserveNoHitStart(incumbent,team,inning,lead,context))return incumbent;
     if(count<limit && !(pressure&&count>=limit-12))return incumbent;
     if(incumbent.pos==='SP'&&inning<=5&&count<105)return incumbent;
-    const pool=pitchers(team).filter(p=>p.id!==incumbent.id
+    const pool=firstPitchers(team).filter(p=>p.id!==incumbent.id
       &&['RP','CP'].includes(p.pos)&&availableForGame(p)&&!state.used.has(p.id));
     if(!pool.length)return incumbent;
     const batterHand=batter?.batHand|| (batter?derivedBatHand(batter):'右');
@@ -3476,7 +3483,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const readyStarter=t=>{
       repairTeam(t);
       const pool=t.rotation.map(getPlayer).filter(availableForGame);
-      const backup=pitchers(t).filter(availableForGame).sort((a,b)=>rating(b)-rating(a));
+      const backup=firstPitchers(t).filter(availableForGame).sort((a,b)=>rating(b)-rating(a));
       return pool.length?pool[t.starterIndex%pool.length]:backup[0];
     };
     const spHome=readyStarter(home),spAway=readyStarter(away);
@@ -3484,11 +3491,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     home.starterIndex++;away.starterIndex++;
     const watchBox=(home.id===game.selectedId||away.id===game.selectedId);
     // Pinch hitters must appear in the game-specific box score and receive fatigue.
-    const participants=[...hitters(home),...hitters(away),...pitchers(home),...pitchers(away)];
+    const participants=[...firstHitters(home),...firstHitters(away),...firstPitchers(home),...firstPitchers(away)];
     const watchPlayers=[...new Map(participants.map(p=>[p.id,p])).values()];
     const preStats=new Map(watchPlayers.map(p=>[p.id,{...p.stats}]));
     const startOutsH=spHome.stats.outs,startOutsA=spAway.stats.outs;
-    const outsBefore=new Map([...pitchers(home),...pitchers(away)].map(p=>[p.id,p.stats.outs]));
+    const outsBefore=new Map([...firstPitchers(home),...firstPitchers(away)].map(p=>[p.id,p.stats.outs]));
     spHome.stats.gs++;spAway.stats.gs++;
     const appear={bat:new Set(),pitch:new Set(),run:new Set(),def:new Set()};
     const indexes={[home.id]:0,[away.id]:0};
@@ -3498,8 +3505,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const context={
       awayId:away.id,activeLineups:{[home.id]:lineupH,[away.id]:lineupA},
       bench:{
-        [home.id]:hitters(home).filter(p=>availableForGame(p)&&!home.lineup.includes(p.id)),
-        [away.id]:hitters(away).filter(p=>availableForGame(p)&&!away.lineup.includes(p.id))
+        [home.id]:firstHitters(home).filter(p=>availableForGame(p)&&!home.lineup.includes(p.id)),
+        [away.id]:firstHitters(away).filter(p=>availableForGame(p)&&!away.lineup.includes(p.id))
       },
       changed:{[home.id]:new Set(),[away.id]:new Set()},
       pinchUsed:{[home.id]:0,[away.id]:0},
@@ -3543,7 +3550,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(outcome!=='draw'){
       const winner=outcome==='home'?home:away,loser=outcome==='home'?away:home;
       const wSP=outcome==='home'?spHome:spAway,lSP=outcome==='home'?spAway:spHome;
-      const reliever=pitchers(winner).find(p=>p.pos==='RP'&&appear.pitch.has(p.id));
+      const reliever=firstPitchers(winner).find(p=>p.pos==='RP'&&appear.pitch.has(p.id));
       const wPitch=(wSP.stats.outs-(outcome==='home'?startOutsH:startOutsA)>=15 ? wSP : reliever)||wSP;
       wPitch.stats.w++;lSP.stats.l++;
       const clos=outcome==='home'?closerH:closerA;
@@ -5058,8 +5065,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       // Offseason ageing is restrained; ongoing experience + player-specific aptitudes drive improvement.
       const skills=isPitch(p)?['stuff','control','stamina']:['contact','power','speed','defense','arm'];
       skills.forEach(k=>{
-        const ageing=p.age<=25?ri(-1,1):p.age<=30?ri(-1,1):p.age<=34?ri(-2,0):ri(-3,0);
-        const bonus=p.age<=27&&p.growthAptitude?.[k]>1.25&&rand()<.12?1:0;
+        const developmentalAge=p.age-(farmPeakAge(p)-28);const ageing=developmentalAge<=25?ri(-1,1):developmentalAge<=30?ri(-1,1):developmentalAge<=34?ri(-2,0):ri(-3,0);
+        const bonus=developmentalAge<=27&&p.growthAptitude?.[k]>1.25&&rand()<.12?1:0;
         p[k]=clamp(p[k]+ageing+bonus,22,p.ssEligible?.includes(k)?100:99);
       });
       p.salary=r2(clamp(p.salary*.72+Math.pow(rating(p)/70,3)*.095,.05,2.5));
@@ -5364,7 +5371,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(p.injury||p.teamId==null||p.teamId<0)return;
     const t=getTeam(p.teamId);
     // Never strand the lineup or leave a club entirely without pitchers.
-    const healthy=(isPitch(p)?pitchers(t):hitters(t)).filter(availableForGame).length;
+    const healthy=(isPitch(p)?firstPitchers(t):firstHitters(t)).filter(availableForGame).length;
     if(healthy<=(isPitch(p)?3:9))return;
     const risk=(isPitch(p)?.0021:.00075)*(1+(100-p.energy)/39)*(p.age>=33?1.28:1);
     if(rand()>=risk)return;
@@ -5526,7 +5533,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function appLogo(){return `<div class="app-brand"><span class="brand-mark">⚾</span><span><b>PENNANT<span class="brand-gold"> LAB</span></b><small>BASEBALL GENERAL MANAGER</small></span></div>`}
   function slotData(i){try{const raw=localStorage.getItem(SLOT_PREFIX+i);if(!raw)return null;const d=JSON.parse(raw);return d&&Array.isArray(d.teams)&&d.teams.length===12?d:null}catch(e){return null}}
   function titleScreen(){
-    return `<div class="title-screen"><div class="title-hero"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.9.67 · GLOBAL TALENT</span></div><div class="title-slot-title">セーブデータを選択</div><div class="title-slots">${[1,2,3].map(i=>{
+    return `<div class="title-screen"><div class="title-hero"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.9.68 · FARM SYSTEM</span></div><div class="title-slot-title">セーブデータを選択</div><div class="title-slots">${[1,2,3].map(i=>{
       const d=slotData(i),t=d?.teams?.find(t=>t.id===d.selectedId);
       return `<button class="save-slot ${d?.started?'has-game':'empty-slot'} ${t?leagueClass(t.league):''}" data-action="${d?.started?'continue-slot':'new-slot'}" data-slot="${i}">${d?.started?teamBadge(t,'slot-emblem'):'<span class="slot-emblem">＋</span>'}<span class="slot-label">${d?.started?`<strong>${h(t.name)}</strong><small>${leagueTag(t.league)}　${d.year}年 · ${d.day}/143試合 · ${h(d.gmName||'GM')}</small><small>${d.teams.find(t=>t.id===d.selectedId)?.wins||0}勝　${fmtMoney(t.cash)}</small>`:`<strong>新しい球団で始める</strong><small>空きデータ ${i}</small>`}</span><span class="slot-index">DATA ${i} ›</span></button>`;
     }).join('')}</div><button class="btn outline full" data-action="rare-preview-open">特殊選手の演出確認モード ›</button><div class="title-info">本体データは端末内データベースに保存されます。バックアップは「経営」からJSON形式で書き出せます。<br>v0.3以前のテストセーブは引き継がれません。</div></div>`;
@@ -5549,7 +5556,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const stats=isPitch(p)?[['球威',p.stuff],['制球',p.control],['変化',Math.round((p.stuff+p.control)/2)],['体力',p.stamina],['精神',p.talent]]:[['巧打',p.contact],['長打',p.power],['走力',p.speed],['守備',p.defense],['精神',p.talent]];
     const rosterGrading=ui.tab==='roster';
     const abilityCards=stats.map(([label,num])=>rosterGrading?`<div class="ability-cell"><small>${label}</small><strong data-rank="${gradeBrief(num)}" style="color:${gradeBriefColor(num)}">${gradeBrief(num)}</strong></div>`:statBadge(num,label)).join('');
-    return `<div class="player-card"><button class="player-row" data-action="player-detail" data-id="${p.id}">${portrait(p)}<span class="player-main"><span class="player-name">${themedPlayerName(p)} <small>(${p.age})</small></span><span class="player-caption">${positionMarkup(p.pos)} · ${throwBat(p)}　${fmtSalary(p.salary)}</span></span><span class="player-affinity">♥ ${p.affinity}</span><span class="chev">›</span></button>${conditionBar(p)}<button class="abilities" data-action="player-detail" data-id="${p.id}">${abilityCards}</button>${actions?`<div class="player-card-action"><button class="btn sm outline" data-action="player-detail" data-id="${p.id}">詳細・成績</button><button class="btn sm danger" data-action="ask-release" data-id="${p.id}">戦力外</button></div>`:''}</div>`;
+    return `<div class="player-card"><button class="player-row" data-action="player-detail" data-id="${p.id}">${portrait(p)}<span class="player-main"><span class="player-name">${themedPlayerName(p)} <small>(${p.age})</small></span><span class="player-caption">${positionMarkup(p.pos)} · ${throwBat(p)}　${fmtSalary(p.salary)}${p.teamId>=0&&p.teamId!==null?' · '+(p.farmTier===2?'二軍':'一軍'):''}</span></span><span class="player-affinity">♥ ${p.affinity}</span><span class="chev">›</span></button>${conditionBar(p)}<button class="abilities" data-action="player-detail" data-id="${p.id}">${abilityCards}</button>${actions?`<div class="player-card-action"><button class="btn sm outline" data-action="player-detail" data-id="${p.id}">詳細・成績</button><button class="btn sm danger" data-action="ask-release" data-id="${p.id}">戦力外</button></div>`:''}</div>`;
   }
   function teamScreen(){
     const t=myTeam(),position=rankings(t.league).findIndex(x=>x.id===t.id)+1;
@@ -5576,6 +5583,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const duties=[
       ['recommended','⚾','スタメン・先発の確認','打順とローテーションを組む','data-action="tab" data-tab="roster" data-roster="lineup"'],
       [managerPriority,'♟','監督・GM方針',(t.manager?.name||'監督')+'監督の采配と契約を確認する','data-action="mgr-open"'],
+      ['optional','⚾','二軍・育成',farmDutyText(t),'data-action="tab" data-tab="roster" data-roster="farm"'],
       ['optional','✦','自由契約選手の獲得',freeAgents().length+'名が所属先を探しています','data-action="tab" data-tab="market"'],
       ['optional','⌕','新人スカウト',game.draft?.year===game.year?'ドラフト候補の調査・発掘':'今年の新人候補を調査する','data-action="tab" data-tab="business" data-sub="scout"'],
       [conv&&conv.status!=='waiting'?'recommended':'optional','◎','海外スカウト',overseasDuty,'data-action="tab" data-tab="business" data-sub="foreign"'],
@@ -6276,11 +6284,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function rosterActions(){return `<div class="roster-fast-actions"><button class="btn outline" data-action="back-to-hq">‹ 本部に戻る</button><button class="btn primary" data-action="advance-day" ${game.day>=143?'disabled':''}>▶ この編成で次の日へ</button></div>`}
   function rosterScreen(){
     const t=myTeam();repairTeam(t);
-    const menus=[['lineup','打順'],['rotation','先発'],['players','全選手']];
-    return `<div class="roster-screen"><div class="roster-intro"><div><h2 class="page-title">選手・チーム編成</h2><p class="page-sub">${game.year}年 · ${game.day}試合終了時点の今季成績</p></div><button class="btn sm outline" data-action="back-to-hq">‹ 戻る</button></div><div class="control-bar"><div class="chips">${menus.map(([tab,label])=>`<button class="chip ${ui.rosterMode===tab?'active':''}" data-action="roster-mode" data-mode="${tab}">${tab==='rotation'?positionMarkup('SP',label):h(label)}</button>`).join('')}</div><span class="pill">所属 ${own(t).length}/${ROSTER_MAX}人</span></div>${ui.rosterMode==='lineup'?lineupScreen(t):ui.rosterMode==='rotation'?rotationScreen(t):playersScreen(t)}${rosterActions()}</div>`;
+    const menus=[['lineup','打順'],['rotation','先発'],['players','全選手'],['farm','二軍・育成']];
+    return `<div class="roster-screen"><div class="roster-intro"><div><h2 class="page-title">選手・チーム編成</h2><p class="page-sub">${game.year}年 · ${game.day}試合終了時点の今季成績</p></div><button class="btn sm outline" data-action="back-to-hq">‹ 戻る</button></div><div class="control-bar"><div class="chips">${menus.map(([tab,label])=>`<button class="chip ${ui.rosterMode===tab?'active':''}" data-action="roster-mode" data-mode="${tab}">${tab==='rotation'?positionMarkup('SP',label):h(label)}</button>`).join('')}</div><span class="pill">所属 ${own(t).length}/${ROSTER_MAX}人</span></div>${ui.rosterMode==='lineup'?lineupScreen(t):ui.rosterMode==='rotation'?rotationScreen(t):ui.rosterMode==='farm'?farmScreen(t):playersScreen(t)}${rosterActions()}</div>`;
   }
   function lineupScreen(t){
-    const arr=hitters(t).filter(availableForGame).sort((a,b)=>rating(b)-rating(a));
+    const arr=firstHitters(t).filter(availableForGame).sort((a,b)=>rating(b)-rating(a));
     const fielding=syncLineupFielding(t);
     return `<section class="panel lineup-wrap"><div class="panel-head"><h3 class="panel-title">スターティングメンバー</h3><span class="small">DH制・9人</span></div><p class="small">名前を押すと選手入れ替え、番号横の守備位置を押すと守備変更、▲ ▼で打順変更。能力はS〜F表示。</p>${t.lineup.map((id,i)=>{
       const p=getPlayer(id);
@@ -6290,7 +6298,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }).join('')}<p class="tiny" style="margin:13px 0 0">※守備適性はメイン100%・サブ82%・適性外55%。DHは守備しません。守備力は相手の安打確率に影響します。</p></section>`;
   }
   function rotationScreen(t){
-    const all=pitchers(t).filter(p=>p.pos==='SP'&&availableForGame(p)).sort((a,b)=>rating(b)-rating(a));
+    const all=firstPitchers(t).filter(p=>p.pos==='SP'&&availableForGame(p)).sort((a,b)=>rating(b)-rating(a));
     return `${nextStarterInfo(t)}<section class="panel lineup-wrap"><div class="panel-head"><h3 class="panel-title">${positionMarkup('SP','先発')}ローテーション</h3><span class="pill">5人制</span></div><p class="small">投手ごとの今季防御率・登板・勝敗を確認しながら、登板順を変更できます。</p>${t.rotation.map((id,i)=>{
       const p=getPlayer(id);if(!p)return '';
       const active=i===t.starterIndex%t.rotation.length;
@@ -6887,7 +6895,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       else if(p.stats.g>b.g)xp=2+Math.max(0,p.stats.h-b.h)*2+Math.max(0,p.stats.hr-b.hr)*4;
       if(xp){const team=getTeam(p.teamId);const youth=team&&p.age<=26?.85+managerDecision(team,'youth')*.003:1;
         p.expPoints+=xp*Math.max(.7,1+(p.talent-60)/250)*youth;spendExperience(p);}
-      if(p.age<=30&&p.awakeningYear!==game.year&&rand()<.000016){
+      if(p.farmTier!==2&&p.age<=30&&p.awakeningYear!==game.year&&rand()<.000016){
         p.awakeningYear=game.year;
         const k=seasonSkillKeys(p).sort((a,b)=>(p.growthAptitude[b]||1)-(p.growthAptitude[a]||1))[0];
         p[k]=clamp(p[k]+3,1,p.ssEligible.includes(k)?100:99);
@@ -6952,8 +6960,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }
   }
   function playoffStrength(t){
-    const h=hitters(t).sort((a,b)=>btrRating(b)-btrRating(a)).slice(0,9);
-    const p=pitchers(t).filter(x=>x.pos==='SP').sort((a,b)=>rating(b)-rating(a)).slice(0,5);
+    const h=firstHitters(t).sort((a,b)=>btrRating(b)-btrRating(a)).slice(0,9);
+    const p=firstPitchers(t).filter(x=>x.pos==='SP').sort((a,b)=>rating(b)-rating(a)).slice(0,5);
     const offense=h.reduce((s,x)=>s+btrRating(x),0)/Math.max(1,h.length);
     const pitching=p.reduce((s,x)=>s+rating(x),0)/Math.max(1,p.length);
     return offense*.54+pitching*.46+(teamDefenseScore(t)-60)*.22;
@@ -7164,7 +7172,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       if(html)document.body.insertAdjacentHTML('beforeend',html);
     }
     if(ui.swap&&ui.page==='game'&&!game.pendingReview){
-    const t=myTeam(),kind=ui.swap.kind,players=kind==='lineup'?hitters(t).filter(availableForGame):pitchers(t).filter(p=>p.pos==='SP'&&availableForGame(p));
+    const t=myTeam(),kind=ui.swap.kind,players=kind==='lineup'?firstHitters(t).filter(availableForGame):firstPitchers(t).filter(p=>p.pos==='SP'&&availableForGame(p));
     players.sort((a,b)=>rating(b)-rating(a));
     const box=`<div class="overlay" data-action="swap-close"><div class="swap-dialog" role="dialog" aria-modal="true" data-stop="true"><div class="swap-head"><h3>選手を入れ替える</h3><button class="btn sm outline" data-action="swap-close">閉じる ✕</button></div><p class="small">能力と今季成績を見比べて選択してください。</p><div class="swap-list">${players.map(p=>`<button class="swap-candidate" data-action="swap-select" data-id="${p.id}">${faceMini(p,{overall:true})}<span class="swap-data"><b>${h(p.name)} <small>(${positionMarkup(p.pos,namePos(p.pos))}・${throwBat(p)})</small></b><span>${isPitch(p)?`防御率 ${era(p)} · ${p.stats.w}勝 · K${p.stats.k}`:`打率 ${avg(p)} · ${p.stats.hr}本 · ${p.stats.rbi}点`}</span></span><span class="swap-ability" data-rank="${gradeBrief(rating(p))}" style="color:${gradeBriefColor(rating(p))}">${gradeBrief(rating(p))}</span></button>`).join('')}</div></div></div>`;
     document.body.insertAdjacentHTML('beforeend',box);
@@ -7554,7 +7562,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(action==='swap-open'){ui.fielding=null;ui.swap={kind:el.dataset.kind,slot:Number(el.dataset.slot)};render();return;}
     if(action==='swap-close'){ui.swap=null;document.querySelector('.overlay:has(.swap-dialog)')?.remove();return;}
     if(action==='swap-select'){
-      if(!ui.swap||!availableForGame(getPlayer(el.dataset.id)))return;
+      if(!ui.swap||!availableForGame(getPlayer(el.dataset.id))||getPlayer(el.dataset.id).teamId!==game.selectedId||getPlayer(el.dataset.id).farmTier===2)return;
       const arr=ui.swap.kind==='lineup'?myTeam().lineup:myTeam().rotation,slot=ui.swap.slot,id=Number(el.dataset.id),old=arr[slot],other=arr.indexOf(id);
       if(other>=0)arr[other]=old;
       arr[slot]=id;if(ui.swap.kind==='lineup')syncLineupFielding(myTeam());ui.swap=null;save();render();return;
@@ -7938,6 +7946,345 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     e.stopImmediatePropagation();
     ui.watchSkip=true;ui.autoWait?.skip();
   },true);
+
+  /* FARM SYSTEM — first-team registration, independent developmental games,
+     optional GM control, persistent growth/medical investment and reports. */
+  const FARM_LIMIT=26,FARM_TARGET=24,FARM_GROWTH={early:['早熟',25],normal:['普通',28],late:['晩成',31],verylate:['超晩成',34]};
+  const FARM_FACILITIES={training:['トレーニング施設','基礎・試合経験値への育成補正'],indoor:['室内練習場','休養日と練習日の育成補正'],medical:['医療施設','二軍の疲労回復と負傷予防・復帰支援']};
+  const FARM_COST=[0,.15,.30,.60,1.00];
+  const FARM_SKILL={balanced:'バランス',contact:'巧打',power:'長打',speed:'走力',defense:'守備',arm:'肩力',stuff:'球威',control:'制球',stamina:'体力'};
+  function farmGrowthType(p){
+    if(FARM_GROWTH[p.growthType])return p.growthType;
+    const n=draftHash(p.appearanceSeed??p.id,'growth-curve',p.id);
+    return n<.20?'early':n<.68?'normal':n<.94?'late':'verylate';
+  }
+  function farmPeakAge(p){return FARM_GROWTH[farmGrowthType(p)][1];}
+  function farmGrowthFactor(p){
+    const age=p.age,peak=farmPeakAge(p),d=age-peak;
+    return d<=-9?.70:d<=-5?.95:d<=0?1.20:d<=3?.82:d<=7?.50:.30;
+  }
+  function farmPlayers(t){return own(t).filter(p=>p.farmTier===2);}
+  function farmClub(t){
+    if(!t.farmStaff||typeof t.farmStaff!=='object')t.farmStaff={mode:'auto',facilities:{training:1,indoor:1,medical:1}};
+    if(!['auto','manual'].includes(t.farmStaff.mode)||t.id!==game.selectedId)t.farmStaff.mode='auto';
+    t.farmStaff.facilities??={};
+    for(const k of Object.keys(FARM_FACILITIES))t.farmStaff.facilities[k]=clamp(Math.round(Number(t.farmStaff.facilities[k])||1),1,5);
+    return t.farmStaff;
+  }
+  function farmState(){
+    if(game.farm?.year!==game.year)game.farm={year:game.year,games:[],reports:[],lastIndex:-1,clubs:{}};
+    for(const t of game.teams)game.farm.clubs[t.id]??={w:0,l:0,t:0,rs:0,ra:0,nc:0};
+    game.farmArchive??=[];
+    return game.farm;
+  }
+  function farmPlayer(p,initial=false){
+    p.growthType=farmGrowthType(p);
+    if(p.teamId===null||p.teamId<0)return;
+    if(p.farmClubId!==p.teamId||![1,2].includes(p.farmTier)){
+      p.farmClubId=p.teamId;p.farmTier=initial?1:2;
+    }
+    if(p.farmYear!==game.year){p.farmYear=game.year;p.farmStats=newStats(isPitch(p));p.farmOpeningOverall=rating(p);p.farmTrainingDays=0;}
+    p.farmStats??=newStats(isPitch(p));p.farmHistory??=[];
+  }
+  function farmReport(t,p,kind,message,date){
+    const f=farmState();
+    f.reports.push({date:date||calendarNextDay()?.date||game.calendar?.endDate,teamId:t.id,playerId:p?.id??null,kind,text:message});
+  }
+  function farmAssign(t,p,tier,reason='',quiet=false){
+    if(!p||p.teamId!==t.id||p.farmTier===tier)return false;
+    p.farmTier=tier;p.farmClubId=t.id;
+    if(!quiet)farmReport(t,p,tier===1?'promotion':'demotion',p.name+'：'+(tier===1?'一軍昇格':'二軍降格')+(reason?' · '+reason:''));
+    return true;
+  }
+  function farmFitScore(p){
+    const s=p.farmStats||{},games=s.g||0,form=isPitch(p)?(s.outs>=54?clamp(4-(s.er||0)*27/s.outs,-4,4):0):(s.ab>=30?clamp(((s.h||0)/s.ab-.26)*30,-4,4):0);
+    return rating(p)+form+Math.min(3,Math.max(0,26-p.age)*.25)-(p.injury?40:0)-Math.max(0,65-(p.energy??100))*.10;
+  }
+  function farmCanDemote(t,p){
+    if(!p||p.teamId!==t.id||p.farmTier!==1)return false;
+    const remain=firstPlayers(t).filter(q=>q.id!==p.id&&availableForGame(q));
+    return remain.filter(q=>!isPitch(q)).length>=9&&remain.filter(isPitch).length>=3;
+  }
+  function farmEnsureTeam(t,initial=false){
+    farmClub(t);
+    const list=own(t);
+    list.forEach(p=>farmPlayer(p,initial));
+    const protect=new Set([...(t.lineup||[]),...(t.rotation||[])]);
+    // Migration keeps existing lineups and registrations whenever possible.
+    let first=list.filter(p=>p.farmTier===1);
+    while(first.length>FARM_LIMIT){
+      const q=first.slice().sort((a,b)=>Number(protect.has(a.id))-Number(protect.has(b.id))||farmFitScore(a)-farmFitScore(b))[0];
+      farmAssign(t,q,2,'登録枠調整',true);first=first.filter(p=>p!==q);
+    }
+    // Emergency call-ups only when the first team would otherwise be unable to play.
+    for(const pitch of [false,true]){
+      const minimum=pitch?3:9;
+      let healthy=first.filter(p=>isPitch(p)===pitch&&availableForGame(p)).length;
+      const options=list.filter(p=>p.farmTier===2&&isPitch(p)===pitch&&availableForGame(p)).sort((a,b)=>farmFitScore(b)-farmFitScore(a));
+      while(healthy<minimum&&options.length){
+        if(first.length>=FARM_LIMIT){
+          const out=first.filter(p=>p.injury||isPitch(p)!==pitch&&farmCanDemote(t,p)).sort((a,b)=>Number(!!b.injury)-Number(!!a.injury)||farmFitScore(a)-farmFitScore(b))[0];
+          if(!out)break;farmAssign(t,out,2,'緊急登録枠');first=first.filter(p=>p!==out);
+        }
+        const p=options.shift();farmAssign(t,p,1,'一軍の欠員補充',initial);first.push(p);healthy++;
+      }
+    }
+    return list;
+  }
+  function farmBalance(t,initial=false){
+    const list=farmEnsureTeam(t,initial),staff=farmClub(t);
+    if(staff.mode!=='auto')return;
+    const lineup=new Set([...(t.lineup||[]),...(t.rotation||[])]);
+    const top=()=>list.filter(p=>p.farmTier===2&&!p.injury).sort((a,b)=>farmFitScore(b)-farmFitScore(a)||a.id-b.id);
+    // Maintain depth across the actual positions before filling remaining slots.
+    const needs={C:2,'1B':1,'2B':1,'3B':1,SS:1,OF:4,SP:5,RP:3,CP:1};
+    for(const [pos,n] of Object.entries(needs)){
+      let have=firstPlayers(t).filter(p=>p.pos===pos&&!p.injury).length;
+      while(have<n&&firstPlayers(t).length<FARM_TARGET){
+        const p=top().find(q=>q.pos===pos);if(!p)break;farmAssign(t,p,1,'自動補強',initial);have++;
+      }
+    }
+    while(firstPlayers(t).length<FARM_TARGET){const p=top()[0];if(!p)break;farmAssign(t,p,1,'自動補強',initial);}
+    if(initial)return;
+    // At most one discretionary exchange per weekly review. Never displace
+    // a GM's chosen healthy starter or rotation member automatically.
+    for(const p of top()){
+      const out=firstPlayers(t).filter(q=>q.pos===p.pos&&!lineup.has(q.id)&&farmCanDemote(t,q)).sort((a,b)=>farmFitScore(a)-farmFitScore(b))[0];
+      if(out&&farmFitScore(p)>=farmFitScore(out)+5){
+        farmAssign(t,out,2,'自動運用・戦力比較');farmAssign(t,p,1,'二軍成績・能力を評価');break;
+      }
+    }
+  }
+  function farmInit(fresh=false){
+    const initial=game.farmVersion!==1;game.farmVersion=1;farmState();
+    for(const t of game.teams)farmEnsureTeam(t,initial);
+    if(fresh){
+      // Real developmental roster, not invented box-score participants.
+      const positions=['C','1B','2B','3B','SS','OF','OF','OF','OF','SP','SP','RP','RP','CP'];
+      for(const t of game.teams)for(const pos of positions){
+        if(own(t).length>=ROSTER_MAX)break;
+        const p=addPlayer(t.id,pos,true);
+        for(const k of seasonSkillKeys(p))p[k]=clamp(p[k]-7,24,98);
+        p.salary=r2(.06+draftHash(p.id,'farm-start-salary')*.06);
+        p.overallHistory=[{year:game.year,overall:rating(p)}];farmPlayer(p);p.farmTier=2;
+      }
+    }
+    for(const t of game.teams)farmBalance(t,true);
+  }
+  function farmRng(seed){let v=seed>>>0||1;return ()=>{v=(Math.imul(v,1664525)+1013904223)>>>0;return v/4294967296;};}
+  function farmSkill(p,key){return (p[key]||40)*(1-Math.max(0,80-(p.energy??100))*.003);}
+  function farmOffense(bat,pitch,random){
+    const usedBat=new Set(),usedPitch=new Set(),runsBy=new Map();
+    let runs=0,cursor=0;
+    for(let inning=0;inning<9;inning++){
+      let outs=0,bases=[null,null,null],guard=0;
+      const arm=pitch[Math.min(pitch.length-1,Math.floor(inning*pitch.length/9))],ps=arm.farmStats;
+      usedPitch.add(arm);
+      while(outs<3&&guard++<100){
+        const p=bat[cursor++%bat.length],st=p.farmStats;
+        usedBat.add(p);st.pa++;ps.bf++;ps.pitches+=3+Math.floor(random()*3);
+        const quality=(farmSkill(p,'contact')-farmSkill(arm,'stuff'))*.0022+(farmSkill(p,'power')-farmSkill(arm,'control'))*.0005;
+        const walk=clamp(.07+(62-farmSkill(arm,'control'))*.0014,.035,.14),hit=clamp(.245+quality,.13,.39);
+        const hr=clamp(.025+(farmSkill(p,'power')-farmSkill(arm,'stuff'))*.0008,.005,.075),roll=random();
+        const score=q=>{if(!q)return;q.farmStats.r++;runs++;st.rbi++;ps.er++;runsBy.set(arm,(runsBy.get(arm)||0)+1);};
+        if(roll<walk){
+          st.bb++;ps.bb++;
+          if(bases[0]){if(bases[1]){if(bases[2])score(bases[2]);bases[2]=bases[1];}bases[1]=bases[0];}
+          bases[0]=p;continue;
+        }
+        st.ab++;
+        if(roll<walk+hit){
+          st.h++;ps.h++;
+          const x=random(),n=x<hr/hit?4:x<hr/hit+.035?3:x<hr/hit+.23?2:1;
+          if(n===4)st.hr++;else if(n===3)st.triples++;else if(n===2)st.doubles++;
+          const next=[null,null,null];for(let i=2;i>=0;i--)if(bases[i]){if(i+n>=3)score(bases[i]);else next[i+n]=bases[i];}
+          if(n===4)score(p);else next[n-1]=p;bases=next;continue;
+        }
+        outs++;ps.outs++;
+        if(random()<clamp(.24+(farmSkill(arm,'stuff')-farmSkill(p,'contact'))*.003,.12,.50)){st.k++;ps.k++;}
+      }
+      // A pathological endless inning should never silently manufacture outs.
+      if(outs!==3)throw Error('Farm inning safety limit');
+    }
+    for(const p of usedBat){p.farmStats.g++;p.energy=clamp(p.energy-8,0,100);}
+    for(const p of usedPitch){p.farmStats.g++;p.energy=clamp(p.energy-24,0,100);}
+    if(usedPitch.has(pitch[0]))pitch[0].farmStats.gs++;
+    return {runs,bat:usedBat,pitch:usedPitch};
+  }
+  function farmPlay(match,entry){
+    const f=farmState(),home=getTeam(match.home),away=getTeam(match.away);
+    const select=t=>{
+      const list=farmPlayers(t).filter(p=>availableForGame(p)&&p.energy>=25);
+      const bat=list.filter(p=>!isPitch(p)).sort((a,b)=>Number(b.age<=25)-Number(a.age<=25)||farmFitScore(b)-farmFitScore(a)).slice(0,9);
+      const pitch=list.filter(isPitch).sort((a,b)=>b.energy-a.energy||Number(b.pos==='SP')-Number(a.pos==='SP')||a.id-b.id).slice(0,3);
+      return {bat,pitch};
+    };
+    const H=select(home),A=select(away),hs=f.clubs[home.id],as=f.clubs[away.id];
+    const row={date:entry.date,home:home.id,away:away.id,homeScore:null,awayScore:null};
+    if(H.bat.length<5||A.bat.length<5||!H.pitch.length||!A.pitch.length){row.noContest=true;hs.nc++;as.nc++;f.games.push(row);return;}
+    const random=farmRng(Math.floor(draftHash(game.clubLogoSeed??1937,game.year,entry.gameNo,match.home,match.away,'farm-game')*4294967296));
+    const h=farmOffense(H.bat,A.pitch,random),a=farmOffense(A.bat,H.pitch,random);
+    row.homeScore=h.runs;row.awayScore=a.runs;hs.rs+=h.runs;hs.ra+=a.runs;as.rs+=a.runs;as.ra+=h.runs;
+    if(h.runs>a.runs){hs.w++;as.l++;H.pitch[0].farmStats.w++;A.pitch[0].farmStats.l++;}
+    else if(a.runs>h.runs){as.w++;hs.l++;A.pitch[0].farmStats.w++;H.pitch[0].farmStats.l++;}
+    else{hs.t++;as.t++;}
+    f.games.push(row);
+  }
+  function farmTrain(t,p,entry){
+    const fac=farmClub(t).facilities;
+    if(p.injury){
+      if(fac.medical>1&&draftHash(game.year,entry.date,p.id,'farm-rehab')<(fac.medical-1)*.13){
+        p.injury.daysLeft--;if(p.injury.daysLeft<=0){p.injury=null;farmReport(t,p,'rehab',p.name+'：リハビリ完了・練習復帰',entry.date);}
+      }
+      return;
+    }
+    if(p.energy<35){p.energy=clamp(p.energy+3+(fac.medical-1)*2,0,100);return;}
+    const before=rating(p),keys=seasonSkillKeys(p);
+    const xp=(entry.type==='game'?2.5:3.5)*(1+(fac.training-1)*.09+(entry.type==='game'?0:(fac.indoor-1)*.12))*(.8+(p.talent||60)/300);
+    p.expPoints=(Number(p.expPoints)||0)+xp;spendExperience(p);p.farmTrainingDays=(p.farmTrainingDays||0)+1;
+    p.energy=clamp(p.energy+(fac.medical-1)*2,0,100);
+    const risk=.00045*(1+Math.max(0,65-p.energy)/30)*(1-(fac.medical-1)*.10);
+    if(draftHash(game.year,entry.date,p.id,'farm-injury')<risk){
+      const days=3+Math.floor(draftHash(game.year,entry.date,p.id,'farm-injury-duration')*8);
+      p.injury={label:'二軍練習中の負傷',daysLeft:days,totalDays:days,date:entry.date,level:'minor'};
+      (game.injuryArchive??=[]).push({year:game.year,day:game.day,date:entry.date,playerId:p.id,teamId:t.id,label:p.injury.label,days,level:'minor',tier:2});
+      farmReport(t,p,'injury',p.name+'：二軍練習中の負傷・約'+days+'日',entry.date);
+    }
+    if(p.age<=30&&p.awakeningYear!==game.year&&draftHash(game.year,entry.date,p.id,'farm-awakening')<.000045){
+      const k=keys.slice().sort((a,b)=>(p.growthAptitude?.[b]||1)-(p.growthAptitude?.[a]||1))[0],limit=p.ssEligible?.includes(k)?100:99;
+      if(p[k]<limit){p[k]=Math.min(limit,p[k]+3);p.awakeningYear=game.year;farmReport(t,p,'awakening',p.name+'：二軍で覚醒！ '+FARM_SKILL[k]+'が成長',entry.date);}
+    }
+    if(rating(p)!==before)recordAbilityPeak(p,game.year,entry.date,'farm-training');
+  }
+  function farmDaily(entry){
+    const f=farmState(),idx=game.calendarIndex;
+    if(f.lastIndex>=idx)return;
+    f.lastIndex=idx;
+    if(entry.type==='game'&&entry.gameNo%6!==0)for(const match of game.schedule[entry.gameNo-1]||[])farmPlay(match,entry);
+    for(const t of game.teams){
+      for(const p of farmPlayers(t))farmTrain(t,p,entry);
+      if(idx%7===0){farmBalance(t);repairTeam(t);}
+      if(idx%28===0||game.day===143&&idx===game.calendar.days.length){
+        const list=farmPlayers(t),top=list.slice().sort((a,b)=>rating(b)-(b.farmOpeningOverall??rating(b))-(rating(a)-(a.farmOpeningOverall??rating(a))))[0];
+        if(top){const delta=rating(top)-(top.farmOpeningOverall??rating(top));farmReport(t,top,'monthly','育成報告：'+top.name+' 総合'+(delta>=0?'+':'')+delta+' · 二軍 '+list.length+'名',entry.date);}
+      }
+    }
+  }
+  function farmCapture(){
+    const f=farmState();
+    if(game.farmArchive.some(x=>x.year===game.year))return;
+    for(const p of game.players)if(p.farmYear===game.year&&(p.farmStats?.g||p.farmTrainingDays)){
+      p.farmHistory??=[];if(!p.farmHistory.some(x=>x.year===game.year))p.farmHistory.push({year:game.year,teamId:p.farmClubId,stats:{...p.farmStats},trainingDays:p.farmTrainingDays||0,overall:rating(p)});
+    }
+    game.farmArchive.push({year:game.year,games:f.games.slice(),clubs:JSON.parse(JSON.stringify(f.clubs)),reports:f.reports.slice()});
+  }
+  function farmManualMove(t,p){
+    if(!p||p.teamId!==t.id)return false;
+    if(p.farmTier===2){if(firstPlayers(t).length>=FARM_LIMIT||p.injury)return false;farmAssign(t,p,1,'GM指示');}
+    else{if(!farmCanDemote(t,p))return false;farmAssign(t,p,2,'GM指示');}
+    farmClub(t).mode='manual';repairTeam(t);return true;
+  }
+  function farmUpgrade(t,key){
+    const f=farmClub(t).facilities;if(!Object.hasOwn(FARM_FACILITIES,key)||f[key]>=5)return false;
+    const cost=FARM_COST[f[key]];if(t.cash<cost)return false;
+    t.cash=r2(t.cash-cost);f[key]++;farmReport(t,null,'facility',FARM_FACILITIES[key][0]+' Lv.'+f[key]+'へ強化');return true;
+  }
+  function farmDutyText(t){return (farmClub(t).mode==='auto'?'自動運用中':'手動運用中')+' · 二軍 '+farmPlayers(t).length+'名（任意の確認）';}
+  function farmStatLine(p){
+    const s=p.farmStats||newStats(isPitch(p));
+    return isPitch(p)?'登板 '+s.g+' · '+careerRate(s,true)+' · '+s.w+'勝 '+s.k+'奪三振':'試合 '+s.g+' · 打率 '+careerRate(s,false)+' · '+s.hr+'本 '+s.rbi+'打点';
+  }
+  function farmGrowthPanel(p){
+    const peak=farmPeakAge(p),type=FARM_GROWTH[farmGrowthType(p)][0],points=Array.from({length:25},(_,i)=>{const age=18+i;return (25+i*12)+','+(105-farmGrowthFactor({...p,age})*63);}).join(' ');
+    return '<section class="panel farm-growth"><div class="eyebrow">DEVELOPMENT CURVE</div><h3 class="panel-title">'+type+'型 · 成長適性</h3><p class="small">成長の目安 '+peak+'歳前後。能力の将来値を保証するものではありません。</p><svg viewBox="0 0 330 125" role="img" aria-label="年齢別成長効率の目安"><path d="M25 10V105H313" stroke="#64748b" fill="none"/><polyline points="'+points+'" stroke="#79cdb0" stroke-width="3" fill="none" stroke-linejoin="round"/>'+[18,24,30,36,42].map(a=>'<text x="'+(25+(a-18)*12)+'" y="121" font-size="10" fill="#aebbc9" text-anchor="middle">'+a+'歳</text>').join('')+'<path d="M'+clamp(25+(p.age-18)*12,25,313)+' 10V105" stroke="#e7bc65" stroke-dasharray="3 3"/></svg><p class="tiny">緑線：成長効率の傾向 · 金線：現在年齢</p></section>';
+  }
+  function farmCareerPanel(p){
+    const rows=(p.farmHistory||[]).slice();
+    if(p.teamId!==-1&&p.farmYear===game.year&&!rows.some(x=>x.year===game.year)&&(p.farmStats?.g||p.farmTrainingDays))rows.push({year:game.year,teamId:p.farmClubId,stats:p.farmStats,trainingDays:p.farmTrainingDays});
+    if(!rows.length)return '';
+    const pitch=isPitch(p),total=careerTotals(rows,pitch);
+    const cells=s=>'<td>'+s.g+'</td><td>'+careerRate(s,pitch)+'</td><td>'+(pitch?s.w:s.h)+'</td><td>'+(pitch?s.k:s.hr)+'</td>';
+    return '<section class="panel"><div class="eyebrow">FARM CAREER · 二軍記録</div><h3 class="panel-title">二軍年度別・通算成績</h3><p class="small">一軍公式戦・殿堂評価とは別集計。</p><div class="table-wrap"><table class="data-table"><thead><tr><th>年度</th><th>球団</th><th>試合</th><th>'+(pitch?'防御率':'打率')+'</th><th>'+(pitch?'勝':'安打')+'</th><th>'+(pitch?'奪三振':'本塁打')+'</th><th>育成日</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+x.year+'</td><td>'+h(getTeam(x.teamId)?.short||'—')+'</td>'+cells(x.stats)+'<td>'+(x.trainingDays||0)+'</td></tr>').join('')+'<tr class="career-total"><td>通算</td><td>—</td>'+cells(total)+'<td>'+rows.reduce((n,x)=>n+(x.trainingDays||0),0)+'</td></tr></tbody></table></div></section>';
+  }
+  function farmRosterCard(t,p){
+    const tier=p.farmTier===2?'二軍':'一軍',disabled=p.farmTier===2?firstPlayers(t).length>=FARM_LIMIT||!!p.injury:!farmCanDemote(t,p);
+    const change=rating(p)-(p.farmOpeningOverall??rating(p)),skills=['balanced',...seasonSkillKeys(p)];
+    return '<div class="farm-player"><button class="farm-person" data-action="player-detail" data-id="'+p.id+'">'+faceMini(p,{overall:true})+'<span><b>'+themedPlayerName(p)+' <small>('+p.age+')</small></b><small>'+positionMarkup(p.pos)+' · '+FARM_GROWTH[farmGrowthType(p)][0]+' · '+tier+'</small><small>'+farmStatLine(p)+'</small></span><strong style="color:'+gradeBriefColor(rating(p))+'">'+gradeBrief(rating(p))+'</strong></button><div class="farm-meta"><span>総合変化 '+(change>=0?'+':'')+change+'</span><span>育成 '+(p.farmTrainingDays||0)+'日</span></div>'+conditionBar(p)+'<div class="farm-controls"><label>重点育成<select class="select" data-change="farm-focus" data-id="'+p.id+'">'+skills.map(k=>'<option value="'+k+'" '+(p.trainFocus===k?'selected':'')+'>'+FARM_SKILL[k]+'</option>').join('')+'</select></label><button class="btn sm outline" data-action="farm-move" data-id="'+p.id+'" '+(disabled?'disabled':'')+'>'+(p.farmTier===2?'一軍へ昇格':'二軍へ降格')+'</button></div></div>';
+  }
+  function farmScreen(t){
+    const f=farmState(),staff=farmClub(t),one=firstPlayers(t),two=farmPlayers(t),sub=ui.farmSub||'manage',filter=ui.farmFilter||'farm',mode=ui.farmMode||'bat',current=f.clubs[t.id];
+    let html='<section class="panel farm-hero"><div class="eyebrow">FARM CLUB · DEVELOPMENT</div><h2>二軍・育成センター</h2><div class="farm-summary"><div><small>一軍登録</small><b>'+one.length+' / '+FARM_LIMIT+'</b></div><div><small>二軍</small><b>'+two.length+'名</b></div><div><small>二軍勝敗</small><b>'+current.w+'勝 '+current.l+'敗</b></div></div><p class="small">自動運用なら日程を進めるだけで二軍試合・育成・昇降格が進みます。手動でも一軍欠員時のみ緊急補充します。</p><div class="chips">'+['auto','manual'].map(k=>'<button class="chip '+(staff.mode===k?'active':'')+'" data-action="farm-mode" data-value="'+k+'">'+(k==='auto'?'自動運用':'手動運用')+'</button>').join('')+'</div></section><div class="subtabs">'+[['manage','選手・育成'],['stats','二軍成績'],['schedule','順位・日程'],['facilities','施設'],['reports','報告']].map(([k,v])=>'<button class="subtab '+(sub===k?'active':'')+'" data-action="farm-sub" data-value="'+k+'">'+v+'</button>').join('')+'</div>';
+    if(sub==='manage'){
+      const list=(filter==='first'?one:two).slice().sort((a,b)=>farmFitScore(b)-farmFitScore(a)||a.id-b.id);
+      html+='<section class="panel"><h3 class="panel-title">登録・育成方針</h3><p class="small">手動の昇降格を行うと手動運用へ切り替わります。先に降格して登録枠を空けることができます。</p><div class="chips">'+[['farm','二軍 '+two.length],['first','一軍 '+one.length]].map(([k,v])=>'<button class="chip '+(filter===k?'active':'')+'" data-action="farm-filter" data-value="'+k+'">'+v+'</button>').join('')+'</div>'+list.map(p=>farmRosterCard(t,p)).join('')+(list.length?'':'<p class="small">所属選手はいません。ドラフトや昇降格で補充できます。</p>')+'</section>';
+    }else if(sub==='stats'){
+      const list=game.players.filter(p=>p.teamId===t.id&&p.farmYear===game.year&&isPitch(p)===(mode==='pitch')&&p.farmStats?.g).sort((a,b)=>mode==='pitch'?b.farmStats.k-a.farmStats.k:b.farmStats.h-a.farmStats.h);
+      html+='<section class="panel"><h3 class="panel-title">今季二軍個人成績</h3><div class="chips">'+[['bat','野手'],['pitch','投手']].map(([k,v])=>'<button class="chip '+(mode===k?'active':'')+'" data-action="farm-stats-mode" data-value="'+k+'">'+v+'</button>').join('')+'</div>'+list.map(p=>'<button class="career-person" data-action="player-detail" data-id="'+p.id+'">'+faceMini(p)+'<span><b>'+themedPlayerName(p)+'</b><small>'+farmStatLine(p)+'</small></span><em>'+(p.farmTier===1?'一軍':'二軍')+'</em></button>').join('')+(list.length?'':'<p class="small">試合記録はまだありません。</p>')+'</section>';
+    }else if(sub==='schedule'){
+      const y=Number(ui.farmArchiveYear||game.year),data=y===game.year?f:game.farmArchive.find(x=>x.year===y)||f;
+      const rank=game.teams.filter(x=>x.league===t.league).map(x=>({team:x,...data.clubs[x.id]})).sort((a,b)=>(b.w/Math.max(1,b.w+b.l))-(a.w/Math.max(1,a.w+a.l))||b.w-a.w||a.team.id-b.team.id);
+      html+='<section class="panel"><h3 class="panel-title">二軍 '+leagueTag(t.league)+' 順位</h3><label>年度<select class="select" data-change="farm-year">'+[game.year,...game.farmArchive.map(x=>x.year).reverse()].map(v=>'<option '+(v===data.year?'selected':'')+'>'+v+'</option>').join('')+'</select></label><p class="small">一軍143戦中、6戦に1戦を除いた独立日程（年間120試合枠）。育成登録不足時は不成立。</p><div class="table-wrap"><table class="data-table"><thead><tr><th>球団</th><th>勝</th><th>敗</th><th>分</th><th>不成立</th></tr></thead><tbody>'+rank.map(x=>'<tr data-own-club="'+(x.team.id===t.id)+'"><td>'+h(x.team.short)+'</td><td>'+x.w+'</td><td>'+x.l+'</td><td>'+x.t+'</td><td>'+x.nc+'</td></tr>').join('')+'</tbody></table></div><h3 class="panel-title">試合結果</h3>'+data.games.filter(g=>g.home===t.id||g.away===t.id).slice(-20).reverse().map(g=>'<div class="farm-match"><small>'+h(g.date)+'</small><b>'+h(getTeam(g.home).short)+' '+(g.noContest?'不成立':g.homeScore+' – '+g.awayScore)+' '+h(getTeam(g.away).short)+'</b></div>').join('')+'</section>';
+    }else if(sub==='facilities'){
+      html+='<section class="panel"><h3 class="panel-title">育成施設</h3><p class="small">強化は任意・買い切りです。現金残高 '+fmtMoney(t.cash)+'</p>'+Object.entries(FARM_FACILITIES).map(([k,[label,desc]])=>{const lv=staff.facilities[k];return '<div class="farm-facility"><h3>'+label+' <span>Lv.'+lv+'</span></h3><p class="small">'+desc+'</p><div class="farm-level">'+Array.from({length:5},(_,i)=>'<i class="'+(i<lv?'on':'')+'"></i>').join('')+'</div><button class="btn outline full" data-action="farm-upgrade" data-value="'+k+'" '+(lv>=5||t.cash<FARM_COST[lv]?'disabled':'')+'>'+(lv===5?'最高レベル':'Lv.'+(lv+1)+'へ強化 · '+fmtMoney(FARM_COST[lv]))+'</button></div>';}).join('')+'</section>';
+    }else{
+      const reports=f.reports.filter(x=>x.teamId===t.id).slice(-30).reverse();
+      html+='<section class="panel"><h3 class="panel-title">二軍監督・育成担当報告</h3><p class="small">日程を中断しない任意の確認画面。昇降格・覚醒・復帰・月次育成報告。</p>'+reports.map(x=>'<div class="farm-report"><small>'+h(x.date||'')+'</small><p>'+h(x.text)+'</p></div>').join('')+(reports.length?'':'<p class="small">報告はまだありません。</p>')+'</section>';
+    }
+    return html;
+  }
+  const farmBaseRepair=repairTeam;
+  repairTeam=function(t){if(game.farmVersion===1)farmEnsureTeam(t);return farmBaseRepair(t);};
+  const farmBaseEnsure=ensureGameExtras;
+  ensureGameExtras=function(){farmBaseEnsure();if(game.farmVersion!==1)farmInit(false);else{farmState();for(const t of game.teams)farmEnsureTeam(t);}};
+  const farmBaseBuild=buildFresh;
+  buildFresh=function(){farmBaseBuild();farmInit(true);ensureGameExtras();game.monthStart=monthlySnapshot(game.calendar.days[0].date);save();};
+  const farmBaseDay=processCalendarDay;
+  processCalendarDay=function(){const e=farmBaseDay();if(e)farmDaily(e);return e;};
+  const farmBaseNext=nextSeason;
+  nextSeason=function(){
+    if(game.day!==143||storageFailure||!ensureSeasonFinanceClosed())return farmBaseNext();
+    const year=game.year;farmCapture();farmBaseNext();
+    if(game.year!==year){farmInit(false);for(const t of game.teams){farmBalance(t);repairTeam(t);}save();}
+  };
+  const farmBaseExp=expForStat;
+  expForStat=function(p,k){return Math.max(1,Math.round(farmBaseExp(p,k)/farmGrowthFactor(p)));};
+  spendExperience=function(p){
+    const skills=seasonSkillKeys(p);
+    for(let i=0;i<3;i++){
+      const available=skills.filter(k=>p[k]<(p.ssEligible?.includes(k)?100:99));
+      if(!available.length){p.expPoints=Math.min(p.expPoints,999);break;}
+      const k=available.includes(p.trainFocus)?p.trainFocus:available[(p.id+game.day+i)%available.length],need=expForStat(p,k);
+      if(p.expPoints<need)break;
+      p.expPoints-=need;p[k]++;
+    }
+  };
+  const farmBaseDetail=playerDetails;
+  playerDetails=function(){
+    const base=farmBaseDetail(),p=getPlayer(ui.playerDetail);if(!p)return base;
+    return base+(ui.playerDetailTab==='stats'?farmCareerPanel(p):ui.playerDetailTab==='growth'?farmGrowthPanel(p):'');
+  };
+  function farmUIAllowed(){return ui.page==='game'&&!ui.busy&&!storageFailure&&!game.pendingMonth&&!game.pendingReview&&!game.pendingEvent&&!game.ceremonyStage&&!game.financeCrisis&&!pendingRareNews().length;}
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('[data-action]'),act=b?.dataset.action;if(!act?.startsWith('farm-'))return;
+    e.stopImmediatePropagation();if(!farmUIAllowed()||ui.tab!=='roster'||ui.rosterMode!=='farm')return;
+    const t=myTeam(),value=b.dataset.value;
+    if(act==='farm-sub'&&['manage','stats','schedule','facilities','reports'].includes(value))ui.farmSub=value;
+    else if(act==='farm-filter'&&['farm','first'].includes(value))ui.farmFilter=value;
+    else if(act==='farm-stats-mode'&&['bat','pitch'].includes(value))ui.farmMode=value;
+    else if(act==='farm-mode'&&['auto','manual'].includes(value)){farmClub(t).mode=value;if(value==='auto')farmBalance(t);repairTeam(t);save();}
+    else if(act==='farm-move'){if(!farmManualMove(t,getPlayer(b.dataset.id))){showToast('登録枠または必要人数を確認してください',true);return;}save();}
+    else if(act==='farm-upgrade'){if(!farmUpgrade(t,value))return;save();}
+    else return;
+    render();
+  },true);
+  document.addEventListener('change',e=>{
+    const el=e.target,act=el.dataset.change;if(!['farm-focus','farm-year'].includes(act))return;
+    e.stopImmediatePropagation();if(!farmUIAllowed())return;
+    if(act==='farm-year'){ui.farmArchiveYear=Number(el.value);render();return;}
+    const p=getPlayer(el.dataset.id);if(!p||p.teamId!==game.selectedId||!['balanced',...seasonSkillKeys(p)].includes(el.value))return;
+    p.trainFocus=el.value;save();showToast('育成方針を保存しました');
+  },true);
+
   const appRoot=document.querySelector('#app');
   if(appRoot)appRoot.innerHTML='<div class="title-screen"><h2>セーブデータを読み込んでいます…</h2></div>';
   (async()=>{
