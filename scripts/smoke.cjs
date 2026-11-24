@@ -107,7 +107,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert.match(app.innerHTML,/VERSION 0\.9\.49 · GLOBAL DECISION/);
+  assert.match(app.innerHTML,/VERSION 0\.9\.50 · FINAL OFFER/);
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
@@ -293,6 +293,17 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   if(app.innerHTML.includes('data-action="finish-month"'))finishMeeting();
   if(app.innerHTML.includes('data-action="finish-review"'))dispatch('click',{action:'finish-review'});
   await window.PennantLab.advance('season');
+  // An actionable counter-offer deliberately interrupts a season skip.
+  for(let n=0;n<3&&window.PennantLab.getSnapshot().day<143;n++){
+    await flush();const pending=store.get(1)?.data?.foreignMarket?.negotiations?.[2];
+    if(pending?.status!=='counter')break;
+    if(app.innerHTML.includes('data-action="finish-review"'))dispatch('click',{action:'finish-review'});
+    dispatch('click',{action:'tab',tab:'business',sub:'foreign'});
+    dispatch('click',{action:'foreign-counter-decline'});
+    dispatch('click',{action:'foreign-reply-open'});
+    if(app.innerHTML.includes('data-action="foreign-close"'))dispatch('click',{action:'foreign-close'});
+    dispatch('click',{action:'tab',tab:'hq'});await window.PennantLab.advance('season');
+  }
   const full=window.PennantLab.getSnapshot();
   assert.equal(full.day,143,'Season skip must finish without routine report interruption');
   assert.equal(full.games,858,'12 teams × 143 games should result in 858 games');
