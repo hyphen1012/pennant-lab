@@ -1360,3 +1360,36 @@ assert.match(html,/camp-compact-picker/);assert.match(html,/data-camp-selected/)
  assert(fs.readFileSync('mobile/src/index.js','utf8').includes("new Event('pl-native-suspend')"));
  console.log('PASS: lifecycle pause latch and native connection integration');
 }
+
+// v184: 500/1000-year synthetic archive endurance, not full match simulation.
+{
+ const s=inline[1],segment=(a,b)=>{const x=s.indexOf(a),y=s.indexOf(b,x+a.length);assert(x>=0&&y>x,a);return s.slice(x,y);};
+ const calendar=vm.runInNewContext('(function(){const SEASON_GAMES=143,INTERLEAGUE_GAMES=18;'+segment('  function calendarForSeason(','  function calendarNextDay(')+'return calendarForSeason;})()');
+ const records=vm.runInNewContext('(function(){'+segment('  function careerRows(','  function recordBookScreen(')+'return {recordRankRows,recordPageRows,recordFilterYears};})()',{newStats:p=>p?{g:0,outs:0,er:0,w:0,k:0,sv:0}:{g:0,pa:0,ab:0,h:0,bb:0,hr:0,doubles:0,triples:0},isPitch:p=>p.pos==='SP',getTeam:id=>({league:id<6?'E':'W'})});
+ const z=require('node:zlib'),crypto=require('node:crypto');
+ const snapshot={year:2027,players:[],seasonArchive:[],milestoneNews:[]};
+ for(let n=1;n<=1000;n++){
+  const year=2026+n,cal=calendar(year),days=cal.days.filter(d=>d.type==='game');
+  assert.equal(days.length,143);assert.equal(new Set(cal.days.map(d=>d.date)).size,cal.days.length);
+  assert(days.every((d,i)=>d.gameNo===i+1));assert(cal.days.every((d,i)=>i===0||d.date>cal.days[i-1].date));
+  snapshot.year=year+1;snapshot.seasonArchive.push({year,calendarStart:cal.startDate,calendarEnd:cal.endDate,awards:[]});
+  for(let j=0;j<50;j++){
+   const id=(n-1)*50+j,teamId=j%12,p={id,pos:j%2?'SP':'OF',teamId:-1,name:'歴代選手'+id,seasonHistory:[{year,teamId,stats:{g:143,pa:500,ab:450,h:100+j,hr:j,w:10+j%5,outs:450,er:35}}]};
+   if(j===0&&n>1)p.reincarnation={parentId:id-50,rootId:0,generation:n-1};
+   snapshot.players.push(p);
+  }
+  snapshot.milestoneNews.push({year,playerId:(n-1)*50,title:'記録 '+year});
+  if(n===500||n===1000){
+   const raw=Buffer.from(JSON.stringify(snapshot)),packed=z.gzipSync(raw),restoredRaw=z.gunzipSync(packed);
+   assert(raw.equals(restoredRaw));const restored=JSON.parse(restoredRaw);
+   assert.equal(restored.players.length,n*50);assert.equal(restored.seasonArchive.length,n);assert.equal(restored.milestoneNews.length,n);
+   assert.equal(new Set(restored.players.map(p=>p.id)).size,n*50);
+   for(const p of restored.players)if(p.reincarnation){const q=restored.players[p.reincarnation.parentId];assert.equal(q.id,p.reincarnation.parentId);assert.equal((q.reincarnation?.generation||0)+1,p.reincarnation.generation);assert.equal(p.reincarnation.rootId,0);}
+   const rows=records.recordRankRows(restored.players.filter(p=>p.pos==='OF'),restored.year,'career','h');
+   assert.equal(rows.length,n*25);assert.equal(records.recordPageRows(rows,0,30).length,30);
+   const last=Math.floor((rows.length-1)/30);assert.equal(records.recordPageRows(rows,last,30).length,rows.length-last*30);
+   assert.equal(records.recordFilterYears(restored.year,restored.seasonArchive,restored.players).length,n+1);
+   console.log('PASS synthetic archive endurance',JSON.stringify({years:n,players:restored.players.length,rawBytes:raw.length,gzipBytes:packed.length,sha256:crypto.createHash('sha256').update(raw).digest('hex')}));
+  }
+ }
+}
