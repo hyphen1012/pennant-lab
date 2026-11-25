@@ -643,7 +643,7 @@ assert.equal(goalFor('month',civilDays,0),2);
 assert.equal(goalFor('season',civilDays,0),6);
 assert.equal(goalFor('date',civilDays,0),1);
 const financeStart=inline[1].indexOf('  function closeFinancePeriod('),financeEnd=inline[1].indexOf('  function finalizeMonth(',financeStart);
-const financeApi=vm.runInNewContext('(function(){let game={year:2028,day:40,calendarIndex:25,calendar:{days:Array(100),endDate:"2028-09-30"},teams:[{id:1,league:"E",wins:10,cash:1,manager:{salary:1}}]};const myTeam=()=>game.teams[0],rankings=()=>game.teams;'+inline[1].slice(financeStart,financeEnd)+';return {game,closeFinancePeriod,checkFinanceCrisis};})()',{r2:n=>Math.round(n*100)/100,payroll:()=>20,stadiumPeriod:()=>({legacyOffset:.5,gross:2,operatingCost:.4}),sponsorSettle:()=>1.5,commerceSettle:()=>({income:.6,cost:.2}),wageDailyPeriod:()=>({amount:5,raw:5,estimatedDays:0}),clubOverhead:()=>({total:4}),sponsorIncident:()=>{}});
+const financeApi=vm.runInNewContext('(function(){let game={year:2028,day:40,calendarIndex:25,calendar:{days:Array(100),endDate:"2028-09-30"},teams:[{id:1,league:"E",wins:10,cash:1,manager:{salary:1}}]};const myTeam=()=>game.teams[0],rankings=()=>game.teams;'+inline[1].slice(financeStart,financeEnd)+';return {game,closeFinancePeriod,checkFinanceCrisis};})()',{r2:n=>Math.round(n*100)/100,payroll:()=>20,stadiumPeriod:()=>({legacyOffset:.5,gross:2,operatingCost:.4}),sponsorSettle:()=>1.5,commerceSettle:()=>({income:.6,cost:.2}),wageDailyPeriod:()=>({amount:5,raw:5,estimatedDays:0}),clubOverhead:()=>({total:4}),sponsorIncident:()=>{},vipRevenueBonus:()=>0});
 const fp=financeApi.closeFinancePeriod('2028-04-30');
 assert.equal(fp.clubs[1].revenue,7.9);
 assert.equal(fp.clubs[1].payroll,5.25);
