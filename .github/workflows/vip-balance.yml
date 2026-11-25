@@ -25,7 +25,7 @@ jobs:
       - run: |
           mkdir -p test-results
           set -o pipefail
-          node scripts/year-cycle-check.cjs 20 ${{ matrix.seed }} | tee test-results/vip-cycle.log
+          node scripts/year-cycle-check.cjs 50 ${{ matrix.seed }} | tee test-results/vip-cycle.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:

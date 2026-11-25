@@ -2,3 +2,20 @@ const fs=require('node:fs');const inline=fs.readFileSync('index.html','utf8').ma
 const harness="const ck=(v,m)=>{if(!v)throw Error(m)};save=()=>true;render=()=>{};showToast=()=>{};buildFresh();game.started=true;ensureGameExtras();ui.page='game';const t=myTeam(),p=own(t)[0],date=game.year+'-04-01';p.injury={date,daysLeft:21,totalDays:21,level:'serious'};const e=game.pendingEvent={year:game.year,teamId:t.id,playerId:p.id,date,days:21};game.injuryArchive=[{...e}];ck(specialTreatmentEligible(e,p),'eligible');ck(applySpecialTreatment(e,p)&&p.injury.daysLeft===11&&e.days===11&&game.injuryArchive[0].days===21,'actual recovery and immutable diagnosis');ck(!applySpecialTreatment(e,p),'duplicate');p.injury={date:game.year+'-05-01',daysLeft:12};ck(!applySpecialTreatment(e,p),'old episode');const snapshot=memorialPlayerSnapshot(p),age=snapshot.portrait.age,old=snapshot.overall;p.age++;p.contact=1;ck(snapshot.portrait.age===age&&snapshot.overall===old,'snapshot immutable');p.scoutingHidden=true;ck(memorialPlayerSnapshot(p)===null,'hidden');p.scoutingHidden=false;const rival=game.teams.find(x=>x.id!==t.id);const g={year:game.year,day:1,date,home:t.id,away:rival.id,homeScore:5,awayScore:2};memorialRemember(memorialWin(g));memorialRemember(memorialWin(g));ck(Object.keys(game.memorialHistory).length===1,'win dedup');ck(memorialEntries().some(e=>e.stat==='5 − 2'&&e.tier==='quiet'),'win share');ck(memorialWin({...g,homeScore:1})===null,'not victory');return {pass:true};";
 const doc={querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){},body:{appendChild(){},insertAdjacentHTML(){}}},win={addEventListener(){},scrollTo(){}},ls={getItem:()=>null,setItem(){},removeItem(){}};
 console.log('PASS medical and memorial',new Function('document','window','localStorage','setTimeout','clearTimeout',inline.slice(0,end).replace('(() => {','return (() => {')+harness+'})();')(doc,win,ls,()=>0,()=>{}));
+
+const asyncHarness=`return (async()=>{const ck=(v,m)=>{if(!v)throw Error(m)};
+save=()=>true;render=()=>{};showToast=()=>{};buildFresh();game.started=true;ensureGameExtras();ui.page='game';
+let t=myTeam(),p=own(t)[0],date=game.year+'-04-01';
+function reset(){p.injury={date,daysLeft:21,totalDays:21,level:'serious'};game.pendingEvent={year:game.year,teamId:t.id,playerId:p.id,date,days:21};}
+reset();TEST_REWARD.mode='cancel';ck(!await requestSpecialTreatment()&&p.injury.daysLeft===21,'cancel untouched');
+TEST_REWARD.mode='error';ck(!await requestSpecialTreatment()&&p.injury.daysLeft===21&&!ui.rewardBusy,'error untouched');
+TEST_REWARD.mode='deferred';const first=requestSpecialTreatment();ck(!await requestSpecialTreatment(),'concurrent blocked');TEST_REWARD.resolve(true);ck(await first&&p.injury.daysLeft===11,'one application');
+ck(!await requestSpecialTreatment(),'duplicate blocked');reset();const stale=requestSpecialTreatment();p.injury={date,daysLeft:19};TEST_REWARD.resolve(true);ck(!await stale&&p.injury.daysLeft===19,'old injury rejected');
+reset();const other=requestSpecialTreatment();const owner=game;game={...game};TEST_REWARD.resolve(true);ck(!await other&&p.injury.daysLeft===21,'other save rejected');game=owner;
+ck(memorialNewsEligible({teamId:t.id,type:'streak',tone:'loss'})===false,'no dead share link for losses');
+game.seasonArchive=[{year:2027,standings:{east:[{id:t.id,wins:60,rs:400,ra:500}]}},{year:2028,standings:{east:[{id:t.id,wins:61,rs:410,ra:499}]}}];
+const records=memorialClubRecords(t);ck(records.length===3&&records.every(x=>x.year===2028&&memorialTier(x)==='special'),'club record baseline');
+return true;})()`;
+const ad=()=>ad.mode==='cancel'?Promise.resolve(false):ad.mode==='error'?Promise.reject(Error('test failure')):new Promise(resolve=>ad.resolve=resolve);
+const asyncBody=inline.slice(0,end).replace('  const rewardAdProvider=null;','  const rewardAdProvider=TEST_REWARD;').replace('(() => {','return (() => {')+asyncHarness+'})();';
+new Function('document','window','localStorage','setTimeout','clearTimeout','TEST_REWARD',asyncBody)(doc,win,ls,()=>0,()=>{},ad).then(()=>console.log('PASS asynchronous treatment and club records'),err=>{console.error(err);process.exitCode=1;});

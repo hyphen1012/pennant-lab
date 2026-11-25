@@ -56,3 +56,5 @@ jobs:
 # v0.9.144 initial-rights revalidation
 
 # Revalidate the v0.9.146 budget-aware renewal policy; long runs are manually dispatchable.
+
+# v0.9.148: revalidate regular-season engine and additional memorial save data.

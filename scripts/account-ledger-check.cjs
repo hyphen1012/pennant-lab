@@ -7,7 +7,7 @@ const adapters={
  verifyEvent:async(account,proof)=>proof?.startsWith('event-')?{verified:true,account,eligible:true,id:proof}:null,
  verifyEntitlements:async account=>({verified:true,account,vip,adSkip:permanent}),
  verifyAction:async(account,proof)=>proof?.startsWith('action-')?{verified:true,account,eligible:true,id:proof}:null,
- verifyCompletion:async(account,proof)=>proof?.id?.startsWith('action-')?{verified:true,account,id:proof.id,attempt:proof.attempt,applied:proof.applied}:null,
+ verifyCompletion:async(account,proof)=>proof?.id?.startsWith('action-')?{verified:true,account,id:proof.id,attempt:proof.attempt,mode:proof.mode,applied:proof.applied}:null,
  now:()=>now
 }; // These fake adapters are test-only; no production endpoint or credentials.
 (async()=>{
@@ -23,19 +23,20 @@ const adapters={
  a.equal((await service.snapshot('a')).claimCount,3);a.equal((await service.claim('a','event-1')).result.reason,'duplicate');
  now+=3600000;vip=true;a.equal((await service.claim('a','event-4')).result.amount,2);
  a.equal((await service.reserve('a','action-vip','ticket')).mode,'entitlement');
- await service.finish('a',{id:'action-vip',attempt:1,applied:true});a.equal((await service.snapshot('a')).tickets,2);
+ await service.finish('a',{id:'action-vip',attempt:1,mode:'entitlement',applied:true});a.equal((await service.snapshot('a')).tickets,2);
  vip=false;permanent=false;
  a.equal((await service.reserve('a','action-1','ticket')).mode,'ticket');a.equal((await service.reserve('a','action-2','ticket')).mode,'ticket');a.equal((await service.reserve('a','action-3','ticket')).mode,'none');
- await service.finish('a',{id:'action-1',attempt:1,applied:false});a.equal((await service.snapshot('a')).tickets,2);
- await service.finish('a',{id:'action-2',attempt:1,applied:true});await service.finish('a',{id:'action-2',attempt:1,applied:true});a.equal((await service.snapshot('a')).tickets,1);
+ a.equal((await service.finish('a',{id:'action-1',attempt:1,mode:'ad',applied:true})).ok,false);
+ await service.finish('a',{id:'action-1',attempt:1,mode:'ticket',applied:false});a.equal((await service.snapshot('a')).tickets,2);
+ await service.finish('a',{id:'action-2',attempt:1,mode:'ticket',applied:true});await service.finish('a',{id:'action-2',attempt:1,mode:'ticket',applied:true});a.equal((await service.snapshot('a')).tickets,1);
  a.equal((await service.exchange('a','frame')).ok,true);a.equal((await service.snapshot('a')).points,0);
  a.equal((await service.snapshot('b')).tickets,1);
  a.equal((await service.reserve('a','action-1','ticket')).attempt,2);
- await service.finish('a',{id:'action-1',attempt:1,applied:true});
+ await service.finish('a',{id:'action-1',attempt:1,mode:'ticket',applied:true});
  a.equal((await service.snapshot('a')).tickets,1);
  ledger.close();ledger=openLedger(filename);service=createAccountService({ledger,...adapters});
  a.equal((await service.reserve('a','action-1','ticket')).attempt,2);
- a.equal((await service.finish('a',{id:'action-1',attempt:2,applied:true})).ok,true);
+ a.equal((await service.finish('a',{id:'action-1',attempt:2,mode:'ticket',applied:true})).ok,true);
  a.equal((await service.snapshot('a')).tickets,0);
  a.equal((await service.reserve('a','action-1','ticket')).status,'committed');
  await a.rejects(service.finish('a',{id:'action-1',applied:true}));

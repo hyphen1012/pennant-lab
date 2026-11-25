@@ -56,8 +56,8 @@ function createAccountService({ledger,authenticate,verifyEvent,verifyEntitlement
     const account=await identity(token),receipt=await verifyCompletion(account,completionProof);
     // Completion must be independently verified as applied or cancelled. A
     // lost connection is not cancellation; recover/resolve on server later.
-    if(receipt?.verified!==true||receipt.account!==account||typeof receipt.applied!=='boolean'||!Number.isSafeInteger(receipt.attempt)||receipt.attempt<1)throw Error('completion not verified');
-    return ledger.transact(account,s=>({ok:rules.finish(s,receipt.id,receipt.attempt,receipt.applied),wallet:publicState(s)}));
+    if(receipt?.verified!==true||receipt.account!==account||typeof receipt.applied!=='boolean'||!['ad','ticket','entitlement'].includes(receipt.mode)||!Number.isSafeInteger(receipt.attempt)||receipt.attempt<1)throw Error('completion not verified');
+    return ledger.transact(account,s=>({ok:Object.hasOwn(s.orders,receipt.id)&&s.orders[receipt.id].mode===receipt.mode&&rules.finish(s,receipt.id,receipt.attempt,receipt.applied),wallet:publicState(s)}));
   }
   return {snapshot,claim,exchange,reserve,finish};
 }

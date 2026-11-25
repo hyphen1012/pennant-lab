@@ -13415,14 +13415,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   infraUpgrade=function(t,k){const ok=memorialInfraBase(t,k);if(ok)memorialFacility(t);return ok;};
   const memorialStadiumBase=stadiumResize;
   stadiumResize=function(t,k,direction){const ok=memorialStadiumBase(t,k,direction);if(ok&&direction===1)memorialFacility(t);return ok;};
+  function memorialNewsEligible(e,t=myTeam()){return e?.teamId===t.id&&!!(e.featKey||e.recordKey||e.type==='champion'||e.careerKey||e.type==='player'||e.type==='streak'&&e.tone!=='loss');}
+  function memorialRareEligible(e,t=myTeam()){return !!e&&(e.teamId===t.id||e.kind==='foreign-discovery'||String(e.id).includes(':tournament:')||String(e.id).includes(':university:')||!!e.memorialPlayer);}
   function memorialEntries(){
     const t=myTeam(),out=[],add=e=>{if(!e?.id||!e.title)return;out.push({...e,tier:memorialTier(e)});};
-    for(const e of game.milestoneNews||[])if(e.teamId===t.id&&(e.featKey||e.recordKey||e.type==='champion'||e.careerKey||e.type==='player'||e.type==='streak'&&e.tone!=='loss'))add({...e,id:'news:'+e.id,category:null});
+    for(const e of game.milestoneNews||[])if(memorialNewsEligible(e,t))add({...e,id:'news:'+e.id,category:null});
     for(const e of Object.values(game.memorialHistory||{}))if(e.teamId===t.id)add(e);
     for(const g of game.games||[]){const e=memorialWin(g);if(e)add(e);}
     for(const p of game.players||[]){const r=p.retirement;if(r?.recorded&&r.teamId===t.id&&Number.isInteger(r.year))add({id:'retirement:'+r.year+':'+p.id,year:r.year,teamId:t.id,kind:'retirement',title:p.name+' 現役引退',body:r.age+'歳 · '+(r.teamName||t.name)});}
     // Public news headlines only, not hidden prospect names or abilities.
-    for(const e of game.rareNews||[])if(e.teamId===t.id||e.kind==='foreign-discovery'||String(e.id).includes(':tournament:')||String(e.id).includes(':university:')||e.memorialPlayer)add({id:'rare:'+e.id,year:e.year,date:e.date,title:e.title,body:e.body,category:e.category,teamId:e.teamId,memorialPlayer:e.memorialPlayer});
+    for(const e of game.rareNews||[])if(memorialRareEligible(e,t))add({id:'rare:'+e.id,year:e.year,date:e.date,title:e.title,body:e.body,category:e.category,teamId:e.teamId,memorialPlayer:e.memorialPlayer});
     for(const e of Object.values(game.memorialFacilities||{}))add(e);
     for(const s of game.seasonArchive||[]){
       if(s.postseason?.championId===t.id)add({id:'championship:'+s.year,year:s.year,title:t.name+' 日本一',kind:'championship',teamId:t.id});
@@ -13607,11 +13609,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const memorialHeroBase=resultHeroCard;
   resultHeroCard=function(g){const raw=memorialHeroBase(g),e=memorialWin(g);return e?raw+memorialResultLink(e.id):raw;};
   const memorialCardBase=milestoneCard;
-  milestoneCard=function(e){const raw=memorialCardBase(e);return e.teamId===game.selectedId?raw.replace('</article>',memorialResultLink('news:'+e.id)+'</article>'):raw;};
+  milestoneCard=function(e){const raw=memorialCardBase(e);return memorialNewsEligible(e)?raw.replace('</article>',memorialResultLink('news:'+e.id)+'</article>'):raw;};
   const memorialCompactBase=compactMilestone;
-  compactMilestone=function(e){const raw=memorialCompactBase(e);return e.teamId===game.selectedId?raw.replace('</details>',memorialResultLink('news:'+e.id)+'</details>'):raw;};
+  compactMilestone=function(e){const raw=memorialCompactBase(e);return memorialNewsEligible(e)?raw.replace('</details>',memorialResultLink('news:'+e.id)+'</details>'):raw;};
   const memorialRareScreenBase=rareNewsScreen;
-  rareNewsScreen=function(preview=null){const raw=memorialRareScreenBase(preview),e=pendingRareNews()[0];return !preview&&e&&raw.includes('data-action="rare-news-ack"')?raw+memorialResultLink('rare:'+e.id):raw;};
+  rareNewsScreen=function(preview=null){const raw=memorialRareScreenBase(preview),e=pendingRareNews()[0];return !preview&&memorialRareEligible(e)&&raw.includes('data-action="rare-news-ack"')?raw+memorialResultLink('rare:'+e.id):raw;};
   const memorialFarewellScreenBase=careerDecisionScreen;
   careerDecisionScreen=function(){const raw=memorialFarewellScreenBase(),e=careerCurrentEvent();return e?.type==='farewell'?raw+memorialResultLink('farewell:'+e.year+':'+e.id):raw;};
   window.addEventListener?.('click',e=>{

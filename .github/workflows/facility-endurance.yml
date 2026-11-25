@@ -29,3 +29,5 @@ jobs:
         with:
           name: natural-facility-endurance
           path: test-results/
+
+# v0.9.148: revalidate natural first arrival and five full subsequent seasons.
