@@ -29,4 +29,5 @@ if(process.env.TEST_VIP==='1'){
  patch("let reserveTopUps=0,totalGames=0,totalFarmGames=0,foreignSigned=0,minCash=Infinity;\\n","let reserveTopUps=0,totalGames=0,totalFarmGames=0,foreignSigned=0,minCash=Infinity;\\nvipStatusProvider=()=>({verified:true,vip:true});\\n");
 }
 patch("const row={year,games:858,facilityMin,performance,","const row={year,games:858,vipIncome:game.seasonArchive.at(-1)?.vipIncome||0,facilityMin,performance,");
+patch("const row={year,games:858,facilityMin,performance,vipIncome:","const row={year,games:858,facilityMin,performance,parkDiagnostics:game.teams.map(t=>({id:t.id,fans:clubFanCount(t),cash:t.cash,forecast:cpuForecast(t),prices:stadiumState(t).prices,plan:parkExpansionPlan(t)})),vipIncome:");
 new Function('require','process','console',s)(require,process,console);
