@@ -5,6 +5,7 @@ on:
     paths:
       - 'index.html'
       - 'scripts/year-cycle-check.cjs'
+      - 'scripts/ai-comparison-summary.cjs'
       - '.github/workflows/annual-cycle.yml'
 jobs:
   comparison:
@@ -34,3 +35,21 @@ jobs:
           path: test-results/
 
 # v0.9.144 initial-rights revalidation
+
+  aggregate:
+    needs: comparison
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: year-cycle-*
+          path: comparison-results
+      - run: node scripts/ai-comparison-summary.cjs comparison-results
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-comparison-summary
+          path: test-results/ai-comparison.json

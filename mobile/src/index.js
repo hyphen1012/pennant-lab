@@ -54,11 +54,12 @@ if(native){
     },
     async privacy(){await AdMob.showPrivacyOptionsForm();await refreshConsent();}
   };
-  document.addEventListener('visibilitychange',()=>{gate.setActive(!document.hidden);if(!document.hidden)void gate.check(true);});
+  document.addEventListener('visibilitychange',()=>{gate.setVisible(!document.hidden);if(!document.hidden)void gate.check(true);});
   window.addEventListener('offline',()=>gate.invalidate());
   window.addEventListener('online',()=>void gate.check(true));
-  App.addListener('appStateChange',({isActive})=>{gate.setActive(isActive);if(isActive)void gate.check(true);});
+  App.addListener('appStateChange',({isActive})=>{gate.setAppActive(isActive);if(isActive)void gate.check(true);});
   document.addEventListener('click',e=>{if(e.target.closest?.('[data-mobile-privacy]')){e.preventDefault();e.stopImmediatePropagation();void window.PennantNative.privacy().catch(()=>alert('広告のプライバシー設定を開けませんでした。'));}},true);
+  gate.setVisible(!document.hidden);
   update(false);
   void gate.check(true).then(ok=>{if(ok)void refreshConsent().catch(()=>{});});
   setInterval(()=>{if(!document.hidden)void gate.check(true);},10000);

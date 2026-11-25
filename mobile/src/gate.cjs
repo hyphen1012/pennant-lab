@@ -1,22 +1,26 @@
 // Native connectivity and rewarded-ad state machines; no synthetic rewards.
 function createGate({probe,now=Date.now,onChange=()=>{},ttl=15000}){
-  let validAt=-Infinity,pending=null,generation=0,active=true;
-  const ready=()=>active&&now()-validAt<ttl;
+  let validAt=-Infinity,pending=null,generation=0,visible=true,appActive=true;
+  const active=()=>visible&&appActive;
+  const ready=()=>active()&&now()-validAt<ttl;
   function invalidate(){generation++;validAt=-Infinity;pending=null;onChange(false);}
-  function setActive(value){active=value;if(!active)invalidate();}
+  function setVisible(value){visible=value===true;if(!active())invalidate();}
+  function setAppActive(value){appActive=value===true;if(!active())invalidate();}
+  // Visibility and native lifecycle are independent; neither can override the other's suspension.
+  function setActive(value){setAppActive(value);}
   async function check(force=false){
-    if(!active)return false;
+    if(!active())return false;
     if(!force&&ready())return true;
     if(pending)return pending;
     const token=generation;
     const task=Promise.resolve().then(probe).then(ok=>{
-      if(token!==generation||!active)return false;
+      if(token!==generation||!active())return false;
       validAt=ok===true?now():-Infinity;onChange(ready());return ready();
     },()=>{if(token===generation){validAt=-Infinity;onChange(false);}return false;});
     pending=task;
     try{return await task;}finally{if(pending===task)pending=null;}
   }
-  return {ready,check,invalidate,setActive};
+  return {ready,check,invalidate,setActive,setVisible,setAppActive};
 }
 function createReward({online,consent,initialize,prepare,show}){
   let busy=false,initialized=false;
