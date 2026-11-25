@@ -30,6 +30,7 @@ jobs:
     timeout-minutes: 360
     env:
       NODE_OPTIONS: --max-old-space-size=6144
+      SAVE_PROFILE: '1'
       YEARS: ${{ inputs.years || '100' }}
       SEED: ${{ inputs.seed || '1937' }}
       NO_RESERVE: ${{ matrix.mode == 'no-reserve' && '1' || '0' }}

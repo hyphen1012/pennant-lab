@@ -3,7 +3,9 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - 'index.html'
       - 'scripts/year-cycle-check.cjs'
+      - 'scripts/vip-balance-summary.cjs'
       - '.github/workflows/vip-balance.yml'
 jobs:
   compare:
@@ -31,3 +33,21 @@ jobs:
         with:
           name: vip-${{ matrix.vip }}-${{ matrix.seed }}
           path: test-results/
+
+  aggregate:
+    needs: compare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: vip-*
+          path: vip-results
+      - run: node scripts/vip-balance-summary.cjs vip-results
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vip-comparison
+          path: test-results/vip-comparison.json
