@@ -52,3 +52,5 @@ jobs:
         with:
           name: endurance-${{ matrix.mode }}
           path: test-results/
+
+# v0.9.144 initial-rights revalidation
