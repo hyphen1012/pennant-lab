@@ -68,3 +68,5 @@ jobs:
 
       - run: node mobile/gate-check.cjs
         if: always()
+      - run: node mobile/entitlement-check.cjs
+        if: always()
