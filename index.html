@@ -10702,7 +10702,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     return html;
   }
   function flowBlocking(f){
-    return Object.values(f.jobs).some(j=>j.status==='ready'&&j.id!=='movement-market')||flowForeignResponse();
+    return Object.values(f.jobs).some(j=>j.status==='ready'&&(j.id!=='movement-market'||(j.state?.news&&j.state.news!=='opening-wait')||!j.state||movementData()?.cpuDone))||flowForeignResponse();
   }
   function flowSection(html,advance=''){
     return '<section class="panel desk-panel flow-events"><div class="desk-heading"><div><div class="eyebrow">EVENTS · SCHEDULE</div><h3>イベント</h3></div>'+advance+'</div>'+(html||'<p class="small">発生中のイベントはありません。</p>')+'</section>';
@@ -10710,6 +10710,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const flowHQBase=frontOfficeScreen;
   frontOfficeScreen=function(){
     const f=flowGet();
+    if(f?.active)return flowHQBase();
     if(!f){const html=flowHQBase();return html.replace('<section class="panel desk-panel">',flowSection(flowScoutCards())+'<section class="panel desk-panel">');}
     const raw=oldHQ03(),duty=raw.match(/<section class="panel desk-panel">[\s\S]*?<\/section>/)?.[0]||'';
     const duties=duty.replace(/<button class="btn primary" data-action="advance-day"[^>]*>[\s\S]*?<\/button>/,'');
@@ -10810,7 +10811,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const flowAdvanceBase=advance;
   advance=async function(days){
     if(ui.page!=='game')return;
-    if(flowInbox()){ui.tab='hq';ui.autoDay=null;render();return;}
+    if(flowInbox()||flowForeignResponse()){ui.tab='hq';ui.autoDay=null;render();return;}
     const f=flowGet()||flowInit();
     if(f){if(ui.tab!=='hq'){ui.tab='hq';ui.playerDetail=null;render();return;}flowDay(f);return;}
     return flowAdvanceBase(days);
@@ -10848,10 +10849,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       app.innerHTML=shell('<section class="panel desk-panel"><div class="eyebrow">GM DESK · FRONT OFFICE</div><h2>'+h(myTeam().name)+' 本部</h2></section>'+flowSection(flowCard(inbox.title,inbox.desc,'data-action="flow-inbox" data-key="'+h(inbox.key)+'"'))+'<p class="small">重要なイベントを確認すると日程進行を再開できます。</p>');return;
     }
     ui.flowInboxOpen=null;
-    if(game.financeCrisis)return flowRenderBase();
+    if(game.financeCrisis||ui.autoDay)return flowRenderBase();
     const prior=flowGet(),f=prior||flowInit();
     if(!f)return flowRenderBase();
-    let changed=!prior||flowSync(f);
+    const synced=flowSync(f);let changed=!prior||synced;
     const before=JSON.stringify(f.jobs);flowRefresh(f);if(before!==JSON.stringify(f.jobs))changed=true;
     if(changed)save();
     if(f.active){
