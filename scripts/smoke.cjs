@@ -424,8 +424,13 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
         'Bullpen can relieve an overworked starter early; fielding and batting changes stay late-game');
       assert(typeof move.managerName==='string'&&move.managerName.length>0);
       assert(['pinch','pitch','runner','defense',undefined].includes(move.type));
+      // A later trade can change the player's current club. Validate the
+      // immutable match-time affiliation, not the end-of-season roster.
       const p=store.get(1).data.players.find(p=>p.id===move.inId);
-      assert(p&&p.teamId===move.teamId,'Substitute must belong to his team');
+      assert(p,'Substitute must have a registered player identity');
+      assert([g.home,g.away].includes(move.teamId),'Substitution club must be participating');
+      const appearances=move.type==='pitch'?g.box?.pitch:g.box?.bat;
+      assert(appearances?.some(row=>row.id===move.inId&&row.teamId===move.teamId),'Substitute must belong to his club at the time of the match');
       const key=move.teamId+':'+move.inId;
       assert(!byTeam.has(key),'Bench player cannot enter twice in one game');
       byTeam.set(key,true);
