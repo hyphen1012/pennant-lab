@@ -2,7 +2,7 @@
 const {chromium}=require('playwright'),fs=require('node:fs'),path=require('node:path');
 const base=process.env.PL_AUDIT_URL||'http://127.0.0.1:8765/';
 const categories=['PARALLEL','STAR','LEGEND','IMMORTAL','再来','転生','輪廻転生','異界転生','星煌転生','伝説転生'];
-const cases=['fa','reply','camp','facilities','sponsor','commerce','opening-promo'];
+const cases=['report-intro','report-self','report-draft','report-renewal','report-retirement','report-season','fa','reply','camp','facilities','sponsor','commerce','opening-promo'];
 // Instrument only the test response. The shipping HTML and its save format stay untouched.
 const source=fs.readFileSync('index.html','utf8');
 const screenNames=[...new Set([...source.matchAll(/function\s+(\w+(?:Screen|View))\s*\(/g)].map(m=>m[1]))].sort();
@@ -35,7 +35,7 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
     const slotState=()=>page.evaluate(()=>window.__plSlotAudit.state());
     const flush=()=>page.evaluate(()=>window.__plSlotAudit.flush());
     const open=async (slot,kind)=>{await click('[data-action="'+kind+'"][data-slot="'+slot+'"]');await page.waitForFunction(()=>window.__plSlotAudit.state().page!=='title');};
-    const choose=async id=>{await click('[data-action="pick-setup-team"][data-id="'+id+'"]');await click(action('finish-setup'));await page.waitForFunction(()=>window.__plSlotAudit.state().started);await flush();};
+    const choose=async id=>{await click('[data-action="pick-setup-team"][data-id="'+id+'"]');await click(action('finish-setup'));await click(action('report-intro-skip'));await page.waitForFunction(()=>window.__plSlotAudit.state().started);await flush();};
     await open(1,'new-slot');await choose(2);
     const first=await page.evaluate(()=>window.__plSlotAudit.playDay());
     if(first.day!==1||first.id!==2)throw Error('normal slot first day');
@@ -57,6 +57,48 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
    }
    for(const k of cases){
     current='scenario-'+k;await title();await click('[data-action="scenario-start"][data-value="'+k+'"]');await shot('scenario-'+k);
+    if(k==='report-intro'){
+     await click(action('report-intro-next'));await shot('report-intro-office');await click(action('report-intro-next'));await shot('report-intro-final');await click(action('report-intro-next'));
+    }
+    if(['report-self','report-draft','report-renewal'].includes(k)){
+     const id={'report-self':'self','report-draft':'draft','report-renewal':'renewal1'}[k];
+     await click('[data-action="flow-open"][data-job="'+id+'"]');
+     if(await page.locator(action('event-intro-continue')).first().isVisible())await click(action('event-intro-continue'));
+     if(k==='report-self'){
+      if(await page.locator('.report-support').count())throw Error('support appeared before training choice');
+      await click(action('annual-run'));await shot('report-self-support');
+      if(!(await page.locator('.report-support').isVisible()))throw Error('support missing after training choice');
+      await click(action('report-self-back'));await click(action('annual-run'));await click(action('annual-run'));
+     }else if(k==='report-draft'){
+      await page.locator(action('draft-start')).first().waitFor({state:'visible',timeout:8000});await shot('report-draft-ready');await click(action('draft-start'));await shot('report-draft-started');
+     }else{
+      const text=await page.locator('main').innerText();if(!/STAR|LEGEND/.test(text))throw Error('special renewal players missing');
+      await shot('report-renewal-ready');await click(action('renewal-submit-all'));await shot('report-renewal-bonus');await click(action('renewal-report-cancel'));
+     }
+    }
+    if(k==='report-season'){
+     const before=await page.evaluate(()=>window.__plSlotAudit.state());
+     await click(action('advance-day'));
+     const outcome=page.locator('.report-static-result');
+     const skip=page.locator(action('watch-skip')).first();
+     // Either a rest day or the actual game replay; no fabricated game state.
+     await page.waitForFunction(()=>document.querySelector('[data-action="watch-skip"],.report-static-result')||!window.__plAudit.state().busy,{},{timeout:15000});
+     if(await skip.isVisible())await skip.click();
+     await page.waitForFunction(()=>!window.__plAudit.state().busy,{},{timeout:30000});
+     const after=await page.evaluate(()=>window.__plSlotAudit.state());
+     if(after.day<before.day||after.day>before.day+1)throw Error('one-day game processed more than once');
+     if(await outcome.isVisible()){
+      await shot('report-season-result');const score=await page.locator('.result-score-row').first().innerText();
+      await page.waitForTimeout(900);if(score!==await page.locator('.result-score-row').first().innerText())throw Error('result unstable');
+      await click(action('finish-review'));
+     }
+     await shot('report-season-hq');
+    }
+    if(k==='report-retirement'){
+     await click(action('flow-inbox'));await click(action('career-event-accept'));await click(action('career-event-confirm'));
+     const next=page.locator(action('career-event-dismiss'));if(!(await next.innerText()).includes('次の去就相談'))throw Error('next retirement consultation missing');
+     await click(action('career-event-dismiss'));await page.locator(action('career-event-accept')).waitFor({state:'visible'});await shot('report-retirement-next');
+    }
     if(k==='fa'||k==='reply'){
      if(k==='fa'){
       await click('[data-action="flow-open"][data-value="news"]');await shot('fa-eve-news');
@@ -91,20 +133,20 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
      const candidates=page.locator('.dest-player '+action('ref-winter','taiwan'));
      await candidates.first().waitFor({state:'visible',timeout:5000});await candidates.first().click();await page.waitForTimeout(180);
      await check(s=>s.winter.length===1,'winter assignment');
-     await shot('winter-assigned');await click(action('annual-run'));
+     await shot('winter-assigned');await click(action('annual-run'));await click(action('ceremony-next'));
      await check(s=>s.jobs.winter==='done'&&s.jobs.autumn==='waiting','winter complete while autumn waits');
      await click('[data-action="tab"][data-tab="business"]');await click('[data-action="business-sub"][data-sub="facilities"]');await shot('parallel-facilities');
      await click('[data-action="tab"][data-tab="hq"]');await until('autumn');await enter('autumn');await shot('autumn-report');await click(action('ceremony-next'));
      await check(s=>s.jobs.autumn==='done','autumn complete');await until('booking');await enter('booking');await shot('camp-booking');
      await click(action('ref-group','farm'));await shot('camp-farm-choice');await click(action('ref-camp-next'));await check(s=>s.jobs.booking==='done','booking complete');
      await page.evaluate(()=>window.__plAudit.seedSpring());await until('self');await enter('self');await shot('self-training');
-     const intensity=page.locator('select[data-change="annual-intensity"]:not([disabled])').first();await intensity.selectOption('rest');await click(action('annual-run'));await check(s=>s.jobs.self==='waiting','self scheduled');
+     const intensity=page.locator('select[data-change="annual-intensity"]:not([disabled])').first();await intensity.selectOption('rest');await click(action('annual-run'));await shot('self-support');await click(action('annual-run'));await check(s=>s.jobs.self==='waiting','self scheduled');
      await until('self');await enter('self');await shot('self-report');await click(action('ceremony-next'));await until('camp');await enter('camp');await shot('spring-sites');
      await click(action('ref-camp-next'));await shot('spring-kickoff');await click(action('ref-camp-next'));await check(s=>s.jobs.camp==='waiting'&&s.camp===2,'camp waits for first visit');
-     await until('camp');await enter('camp');await shot('spring-visit-first');await click(action('ref-visit','rest'));await check(s=>s.jobs.camp==='waiting'&&s.camp===3,'camp waits for second visit');
+     await until('camp');await enter('camp');await shot('spring-visit-first');await click(action('ref-visit','rest'));await click(action('ref-visit-finish'));await check(s=>s.jobs.camp==='waiting'&&s.camp===3,'camp waits for second visit');
      await until('camp');await enter('camp');await shot('spring-visit-second');await click(action('annual-run'));await until('camp');await enter('camp');await shot('spring-report');
      for(const tab of ['INJURY','NEW','UP','STAY','DOWN']){await click(action('ref-report',tab));await shot('spring-report-'+tab);}
-     await click(action('ceremony-next'));await until('exhibition');await enter('exhibition');await shot('exhibition-policy');await click(action('annual-exhibition-choice','youth'));await click(action('annual-run'));await until('exhibition');await enter('exhibition');await shot('exhibition-report');await check(s=>s.exhibition===36,'exhibition game count');await click(action('ceremony-next'));
+     await click(action('ceremony-next'));await until('exhibition');await enter('exhibition');await shot('exhibition-policy');await click(action('annual-exhibition-choice','youth'));await click(action('annual-run'));await click(action('annual-run'));await until('exhibition');await enter('exhibition');await shot('exhibition-digest');for(let i=0;i<12&&await page.locator(action('report-digest-next')).first().isVisible();i++)await click(action('report-digest-next'));await shot('exhibition-report');await check(s=>s.exhibition===36,'exhibition game count');await click(action('ceremony-next'));
     }
     if(k==='commerce'){
      await dayTo('commerce-open','fan-fest');await click(action('commerce-open','fan-fest'));await shot('fest-brief');
@@ -126,7 +168,7 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
     if(k==='opening-promo'){
      await dayTo('commerce-open','opening-promo');await click(action('commerce-open','opening-promo'));await click(action('commerce-start'));
      for(let i=0;i<3;i++){await click(action('commerce-plan',i));await shot('opening-promo-plan-'+i);}
-     await click(action('commerce-confirm'));await shot('opening-promo-result');await click(action('commerce-finish'));
+     await click(action('commerce-confirm'));await click(action('commerce-schedule-finish'));await dayTo('commerce-open','opening-promo');await click(action('commerce-open','opening-promo'));await click(action('commerce-opening-live-finish'));await shot('opening-promo-result');await click(action('commerce-finish'));
     }
     if(k==='facilities'){
      for(const t of tabs){current='tab-'+t;await click('[data-action="tab"][data-tab="'+t+'"]');await shot('tab-'+t);}
@@ -149,7 +191,19 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
       await click('[data-memorial-close]');
      }
      await click('[data-action="tab"][data-tab="business"]');
-     for(const t of business){current='business-'+t;await click('[data-action="business-sub"][data-sub="'+t+'"]');await shot('business-'+t);}
+     for(const t of business){current='business-'+t;
+      if(t==='scout'||t==='foreign'){
+       await click('[data-action="tab"][data-tab="hq"]');
+       await click('[data-action="tab"][data-tab="business"][data-sub="'+t+'"]');
+       await shot('business-'+t);
+       await click(action('back-to-hq'));
+       await click('[data-action="tab"][data-tab="business"]:not([data-sub])');
+       // The general business tab may remember the previous scout subpage.
+       if(await page.locator(action('back-to-hq')).first().isVisible()){
+        await click(action('back-to-hq'));await click('[data-action="tab"][data-tab="business"][data-sub="finance"]');
+       }
+      }else{await click('[data-action="business-sub"][data-sub="'+t+'"]');await shot('business-'+t);}
+     }
     }
    }
   }catch(e){const detail=await page.evaluate(()=>({state:window.__plAudit?.state(),clicks:window.__plAuditClicks,heading:document.querySelector('main h2')?.innerText,actions:[...document.querySelectorAll('main [data-action]')].slice(0,12).map(e=>({action:e.dataset.action,id:e.dataset.id}))})).catch(()=>null);errors.push({width,screen:current,error:e.message,detail});await page.screenshot({path:path.join('test-results/browser',width+'-failure.png')}).catch(()=>{});}
