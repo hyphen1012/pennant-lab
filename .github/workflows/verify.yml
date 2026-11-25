@@ -74,3 +74,5 @@ jobs:
         if: always()
       - run: node scripts/memorial-vip-check.cjs
         if: always()
+      - run: node scripts/account-ledger-check.cjs
+        if: always()

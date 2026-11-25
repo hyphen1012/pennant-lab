@@ -1,0 +1,64 @@
+// Local/reference account service. NOT a public API or a deployed authority.
+const {DatabaseSync}=require('node:sqlite');
+const rules=require('../shared/monetization.cjs');
+function openLedger(filename){
+  const db=new DatabaseSync(filename);
+  db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS account_ledger (id TEXT PRIMARY KEY, payload TEXT NOT NULL)');
+  const read=db.prepare('SELECT payload FROM account_ledger WHERE id=?');
+  const write=db.prepare('INSERT INTO account_ledger(id,payload) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload');
+  function transact(account,fn){
+    if(typeof account!=='string'||!account||account.length>200)throw Error('invalid account');
+    db.exec('BEGIN IMMEDIATE');
+    try{
+      const row=read.get(account),state=row?JSON.parse(row.payload):rules.newAccount();
+      const result=fn(state);
+      if(result&&typeof result.then==='function')throw Error('transaction must be synchronous');
+      write.run(account,JSON.stringify(state));db.exec('COMMIT');return result;
+    }catch(err){db.exec('ROLLBACK');throw err;}
+  }
+  return {transact,close:()=>db.close()};
+}
+function createAccountService({ledger,authenticate,verifyEvent,verifyEntitlements,verifyAction,verifyCompletion,now=Date.now}){
+  if(!ledger?.transact||[authenticate,verifyEvent,verifyEntitlements,verifyAction,verifyCompletion].some(f=>typeof f!=='function'))throw Error('trusted adapters required');
+  async function identity(token){
+    const auth=await authenticate(token);
+    if(auth?.authenticated!==true||typeof auth.account!=='string'||!auth.account)throw Error('unauthorized');
+    return auth.account;
+  }
+  async function rights(account){
+    const result=await verifyEntitlements(account);
+    if(result?.verified!==true||result.account!==account)throw Error('entitlements unavailable');
+    return {verified:true,vip:result.vip===true,adSkip:result.adSkip===true};
+  }
+  const publicState=s=>({tickets:s.tickets,points:s.points,owned:Object.keys(s.owned).filter(k=>s.owned[k]===true),claimCount:s.claimCount,nextAt:s.claimCount>=3?s.lastClaim+rules.HOUR:null});
+  async function snapshot(token){const account=await identity(token);return ledger.transact(account,publicState);}
+  async function claim(token,eventProof,choice='ticket'){
+    const account=await identity(token),event=await verifyEvent(account,eventProof);
+    // Canonical event ID comes ONLY from trusted verifier. Never use save slot,
+    // client clock, user-supplied achievement ID or proof of social posting.
+    if(event?.verified!==true||event.account!==account||event.eligible!==true)throw Error('achievement not verified');
+    if(!['ticket','point'].includes(choice))throw Error('invalid reward choice');
+    const entitlements=await rights(account);
+    return ledger.transact(account,s=>({result:rules.claim(s,{eventId:event.id,now:now(),entitlements,choice}),wallet:publicState(s)}));
+  }
+  async function exchange(token,key){
+    const account=await identity(token);
+    return ledger.transact(account,s=>({ok:rules.exchange(s,key),wallet:publicState(s)}));
+  }
+  async function reserve(token,actionProof,choice){
+    const account=await identity(token),action=await verifyAction(account,actionProof);
+    if(action?.verified!==true||action.account!==account||action.eligible!==true)throw Error('action not verified');
+    if(!['ad','ticket'].includes(choice))throw Error('invalid mode');
+    const entitlements=await rights(account);
+    return ledger.transact(account,s=>({operationId:action.id,...rules.reserve(s,action.id,entitlements,choice),wallet:publicState(s)}));
+  }
+  async function finish(token,completionProof){
+    const account=await identity(token),receipt=await verifyCompletion(account,completionProof);
+    // Completion must be independently verified as applied or cancelled. A
+    // lost connection is not cancellation; recover/resolve on server later.
+    if(receipt?.verified!==true||receipt.account!==account||typeof receipt.applied!=='boolean')throw Error('completion not verified');
+    return ledger.transact(account,s=>({ok:rules.finish(s,receipt.id,receipt.applied),wallet:publicState(s)}));
+  }
+  return {snapshot,claim,exchange,reserve,finish};
+}
+module.exports={openLedger,createAccountService};
