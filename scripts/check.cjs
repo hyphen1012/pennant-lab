@@ -225,7 +225,7 @@ assert.equal(hrNames[2],'満塁ホームラン');
 // fictional SVG artwork, no nested ring, and special-title precedence.
 const paletteStart=inline[1].indexOf('  // v0.8.5: one authoritative ability grade');
 const paletteEnd=inline[1].indexOf('  // Physical condition is separate',paletteStart);
-const faceStart=inline[1].indexOf('  function renderFaceArtwork(p,options={})');
+const faceStart=inline[1].indexOf('  function faceDetailAttr(p,options={})');
 const faceEnd=inline[1].indexOf('  // Existing player portraits receive',faceStart);
 assert(paletteStart>=0&&paletteEnd>paletteStart&&faceStart>0&&faceEnd>faceStart);
 const portraitSource=inline[1].slice(paletteStart,paletteEnd)+
@@ -234,7 +234,7 @@ const identity=vm.runInNewContext('(function(){'+portraitSource+
   '\nreturn {grade,gradeBrief,gradeBriefColor,rankColor,playerDisplayedAbilityAverage,'+
   'playerVisualTheme,playerTitleTheme,portrait,faceMini,faceLabel,renderFaceArtwork,'+
   'themedPlayerName};})()',{
-  isPitch:p=>['SP','RP','CP'].includes(p.pos),rating:p=>p.overall||73,
+  ui:{page:'title'},isPitch:p=>['SP','RP','CP'].includes(p.pos),rating:p=>p.overall||73,
   h:s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
 });
 const hexMap={
