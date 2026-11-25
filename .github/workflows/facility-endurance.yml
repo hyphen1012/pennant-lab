@@ -22,7 +22,7 @@ jobs:
       - run: |
           mkdir -p test-results
           set -o pipefail
-          node scripts/year-cycle-check.cjs 150 1937 | tee test-results/facility-cycle.log
+          node scripts/year-cycle-check.cjs 55 1937 | tee test-results/facility-cycle.log
           node scripts/facility-endurance.cjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -31,3 +31,7 @@ jobs:
           path: test-results/
 
 # v0.9.148: revalidate natural first arrival and five full subsequent seasons.
+
+# v0.9.168: target first natural max within 50 seasons, then five further seasons (55 total maximum).
+
+# v0.9.169: preserve the 50-season target; audit actual cash and balanced capital allocation.
