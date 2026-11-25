@@ -1283,3 +1283,37 @@ assert.match(html,/function infraManageAction\(t,key,action\)/);
 assert.match(html,/\.farm-person>\.face-mini,\.farm-stat-person>\.face-mini\{width:44px;height:44px/);
 assert.doesNotMatch(html,/\.farm-person>span:not\(\.avatar\)/);
 console.log('PASS: central facilities navigation and compact farm portrait rules');
+
+
+// v0.9.163: report fixes must be tested against the actual presentation functions.
+{
+  const s=inline[1];
+  function segment(from,to){const a=s.indexOf(from),b=s.indexOf(to,a+from.length);assert(a>=0&&b>a,from);return s.slice(a,b);}
+  const venue=vm.runInNewContext('(function(){'+segment('  let reportVenueSequence=0;','  destinationPhoto=function')+'\nreturn reportLandscape;})()',{h:String});
+  const keys=['usa','miyazaki','ginowan','naha','korea','taiwan','ishigaki','miyako','kagoshima','ehime','amami','club','aus','south','dubai','gm'];
+  const ids=new Set();
+  for(const k of [...keys,...keys]){
+    const svg=venue(k),own=[...svg.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
+    assert.equal(own.length,5);
+    for(const id of own){assert(!ids.has(id),'Duplicate venue ID '+id);ids.add(id);}
+    for(const m of svg.matchAll(/url\(#([^)]+)\)/g))assert(own.includes(m[1]),'Missing venue definition '+m[1]);
+    assert(svg.includes('M480 503L80 177M480 503L880 177')&&svg.includes('M472 497h16v8l-8 6 -8 -6Z'));
+  }
+  assert.equal(ids.size,160);
+  assert(!venue('none').includes('<svg'));
+  const score=vm.runInNewContext('(function(){'+segment('  function matchOutcome(g){','  function highlightPlayer(g){')+segment('  function gameSetScreen(g){','  function watchInningFrames(g){')+'\nreturn {matchOutcome,gameSetScreen};})()',{h:String,game:{selectedId:1},ui:{watchGame:{auto:true}},myTeam:()=>({id:1,short:'東京'}),getTeam:id=>({id,short:'仙台'})});
+  for(const home of [1,2])for(const [homeScore,awayScore] of [[4,2],[2,4],[0,0],[11,10]]){
+    const g={home,away:home===1?2:1,homeScore,awayScore,day:1},r=score.matchOutcome(g),view=score.gameSetScreen(g);
+    assert.deepEqual([...view.matchAll(/<b>(\d+)<\/b>/g)].map(m=>Number(m[1])),[r.mine,r.theirs]);
+    assert(view.includes(r.label));
+  }
+  const players=Array.from({length:20},(_,i)=>({id:i+1,pitch:i<10,rating:90-i%10,stats:{},special:[9,19].includes(i)}));
+  const d={rows:players.map(p=>({id:p.id,bonuses:[],status:p.id===2?'signed':'unoffered'}))};
+  const bonus=vm.runInNewContext('(function(){'+segment('  function reportRenewalBonuses(d){','  const reportDraftViewBase=')+'\nreturn reportRenewalBonuses;})()',{
+    renewalEditable:(_,r)=>r.status==='unoffered',getPlayer:id=>players.find(p=>p.id===id),isPitch:p=>p.pitch,rating:p=>p.rating,awardPerformance:()=>0,playerTitleTheme:p=>p.special,renewalBonusOptions:()=>[['wins',1],['other',1]],renewalBonusMet:()=>false
+  });
+  bonus(d);
+  assert.deepEqual(d.rows.filter(r=>r.bonuses.length).map(r=>r.id),[1,3,10,11,12,20]);
+  assert(d.rows.every(r=>r.bonuses.length<=1));
+  console.log('PASS: 32 venue instances and 160 unique references; 8 GAME SET scores; incentive eligibility');
+}
