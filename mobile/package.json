@@ -1,0 +1,27 @@
+{
+  "name": "pennant-lab-mobile",
+  "version": "0.9.142",
+  "private": true,
+  "scripts": {
+    "prepareWeb": "node prepare.cjs",
+    "test": "node gate-check.cjs",
+    "android": "npm run prepareWeb && npx cap sync android",
+    "ios": "npm run prepareWeb && npx cap sync ios"
+  },
+  "engines": {
+    "node": ">=22.21.1"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/filesystem": "^8.0.0",
+    "@capacitor/share": "^8.0.0",
+    "@capacitor-community/admob": "8.3.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
+    "esbuild": "^0.25.0"
+  }
+}

@@ -1,0 +1,8 @@
+# PENNANT LAB native pilot
+Capacitor 8 + community AdMob 8.3.0 (Google Mobile Ads SDK) integration. Web development build remains unchanged/offline-capable. App ID jp.pennantlab.game is provisional; confirm before registration. Generated android/ios/www directories are build products.
+- npm install; npm test; npm run prepareWeb; npx cap add android / ios; node configure-native.cjs; npx cap sync android / ios.
+- CI builds Android debug APK and unsigned iOS Simulator app; these are not store submissions.
+- Default build strictly uses official demo application/ad unit IDs; no real revenue. Release requires PL_PRODUCTION=1 and real Android/iOS PL_ADMOB_*_APP and PL_ADMOB_*_UNIT, plus published consent messages, signing, store registration, privacy disclosures, and platform validation.
+- Health endpoint uses HTTPS response content and cache-busting. Native UI blocks when unreachable, daily engine checks at safe boundaries, off-season checks and app resume invalidation. Save storage stays local. No background auto-resume. Demo health endpoint depends on GitHub Pages; availability and ownership need release review.
+- Reward only from successful native SDK return, never dismissal; optional ads and consent errors never prevent ordinary online game progress. Native backup shares a local temporary JSON file. Native restore, lifecycle, accessibility, connectivity and ad flows require emulator/device checks.
+- Docs: https://capacitorjs.com/docs/getting-started ; https://github.com/capacitor-community/admob/blob/main/docs/rewarded.md ; https://github.com/capacitor-community/admob/blob/main/docs/consent.md

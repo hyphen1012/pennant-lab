@@ -1,0 +1,29 @@
+const fs=require('node:fs'),path=require('node:path'),esbuild=require('esbuild');
+const root=path.resolve(__dirname,'..'),out=path.join(__dirname,'www');
+const production=process.env.PL_PRODUCTION==='1';
+const sample='ca-app-pub-3940256099942544';
+const units={android:process.env.PL_ADMOB_ANDROID_UNIT||sample+'/5224354917',ios:process.env.PL_ADMOB_IOS_UNIT||sample+'/1712485313'};
+const apps={android:process.env.PL_ADMOB_ANDROID_APP||sample+'~3347511713',ios:process.env.PL_ADMOB_IOS_APP||sample+'~1458002511'};
+if(production&&[...Object.values(units),...Object.values(apps)].some(x=>x.startsWith(sample)))throw Error('Production requires real AdMob application and reward IDs for both platforms');
+if(!production&&[...Object.values(units),...Object.values(apps)].some(x=>!x.startsWith(sample)))throw Error('Development must use Google demo IDs only');
+if(Object.values(units).some(x=>!/^ca-app-pub-\d+\/\d+$/.test(x))||Object.values(apps).some(x=>!/^ca-app-pub-\d+~\d+$/.test(x)))throw Error('Invalid AdMob IDs');
+const health=process.env.PL_HEALTH_URL||'https://hyphen1012.github.io/pennant-lab/health.txt';
+if(!health.startsWith('https://'))throw Error('HTTPS health endpoint required');
+fs.rmSync(out,{recursive:true,force:true});fs.mkdirSync(out,{recursive:true});fs.cpSync(path.join(root,'assets'),path.join(out,'assets'),{recursive:true});
+let html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+function replace(a,b){if(html.split(a).length!==2)throw Error('native integration anchor missing: '+a);html=html.replace(a,b);}
+replace('  const rewardAdProvider=null;', '  const rewardAdProvider=window.PennantNative?.reward||null;');
+replace('      const entry=processCalendarDay();','      if(!window.PennantNative||!await window.PennantNative.check())break;\n      const entry=processCalendarDay();');
+replace('    if(!offDayCanStart(f))return false;\n    const token=', '    if(!offDayCanStart(f)||!window.PennantNative?.ready())return false;\n    const token=');
+replace('const valid=game===token.owner&&flowGet()===token.flow&&token.flow.date===token.from&&!document.hidden;', 'const valid=game===token.owner&&flowGet()===token.flow&&token.flow.date===token.from&&!document.hidden&&window.PennantNative?.ready();');
+replace('      f.date=calendarOffsetDate(f.date,1);flowTick(f);\n      if(flowGet()!==f', '      if(!window.PennantNative?.ready())break;\n      f.date=calendarOffsetDate(f.date,1);flowTick(f);\n      if(flowGet()!==f');
+replace("    if(act==='export-save'){", "    if(act==='export-save'){\n      if(window.PennantNative){void window.PennantNative.exportSave(JSON.stringify(game), 'PENNANT_LAB_'+game.year+'_save.json').catch(()=>showToast('バックアップ共有に失敗しました',true));return;}");
+replace("  const appRoot=document.querySelector('#app');","  const appRoot=document.querySelector('#app');\n  window.PennantNative?.setBackup(()=>{if(!game||ui.busy||scenarioLab)throw Error('busy');save();return window.PennantNative.exportSave(JSON.stringify(game),'PENNANT_LAB_'+game.year+'_save.json');});");
+replace('<script>','<script src="native-runtime.js"></script>\n<script>');
+// Native-only privacy entry is inserted beside the title slot list.
+html=html.replace('<div class="title-slot-title">','<button type="button" class="btn outline full" data-mobile-privacy>広告プライバシー設定</button><div class="title-slot-title">');
+const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];if(!script)throw Error('game script missing');new Function(script);
+fs.writeFileSync(path.join(out,'index.html'),html);
+esbuild.buildSync({entryPoints:[path.join(__dirname,'src/index.js')],bundle:true,format:'iife',platform:'browser',outfile:path.join(out,'native-runtime.js'),define:{__PL_CONFIG__:JSON.stringify({health,units,production})}});
+fs.writeFileSync(path.join(__dirname,'native-build-config.json'),JSON.stringify({apps,production},null,2));
+console.log('Prepared native web assets',production?'production configuration':'Google test ads');

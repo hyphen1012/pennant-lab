@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict');
+const {createGate,createReward}=require('./src/gate.cjs');
+(async()=>{
+ let now=0,connected=false,probeCount=0,changes=[];
+ const g=createGate({now:()=>now,ttl:10,probe:async()=>{probeCount++;return connected;},onChange:x=>changes.push(x)});
+ assert.equal(g.ready(),false);assert.equal(await g.check(),false);
+ connected=true;assert.equal(await g.check(),true);assert.equal(await g.check(),true);assert.equal(probeCount,2);
+ now=11;assert.equal(g.ready(),false);connected=false;assert.equal(await g.check(),false);
+ let release;const delayed=createGate({probe:()=>new Promise(r=>release=r)});
+ const pending=delayed.check();await Promise.resolve();delayed.invalidate();release(true);assert.equal(await pending,false);assert.equal(delayed.ready(),false);
+ let ads=0,consent=false,init=0,reward={type:'item',amount:1};
+ const r=createReward({online:async()=>true,consent:async()=>consent,initialize:async()=>{init++},prepare:async()=>{},show:async()=>{ads++;return reward}});
+ await assert.rejects(r());assert.equal(ads,0);consent=true;assert.equal(await r(),true);reward={type:'item',amount:0};assert.equal(await r(),false);assert.equal(init,1);
+ const fail=createReward({online:async()=>true,consent:async()=>true,initialize:async()=>{},prepare:async()=>{},show:async()=>{throw Error('cancelled')}});
+ await assert.rejects(fail());let finish;const slow=createReward({online:async()=>true,consent:async()=>true,initialize:async()=>{},prepare:async()=>{},show:()=>new Promise(r=>finish=r)});const first=slow();assert.equal(await slow(),false);while(!finish)await Promise.resolve();finish({type:'x',amount:1});assert.equal(await first,true);
+ console.log('PASS native connectivity freshness, stale response, consent, no reward on cancel, concurrency');
+})().catch(e=>{console.error(e);process.exitCode=1;});

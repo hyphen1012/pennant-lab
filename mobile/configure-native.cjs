@@ -1,0 +1,5 @@
+const fs=require('node:fs'),path=require('node:path');
+const {apps}=JSON.parse(fs.readFileSync(path.join(__dirname,'native-build-config.json'),'utf8'));
+const manifest=path.join(__dirname,'android/app/src/main/AndroidManifest.xml'),plist=path.join(__dirname,'ios/App/App/Info.plist');
+if(fs.existsSync(manifest)){let xml=fs.readFileSync(manifest,'utf8');xml=xml.replace(/\s*<meta-data\s+android:name="com.google.android.gms.ads.APPLICATION_ID"[^>]*\/>/g,'');if(!xml.includes('</application>'))throw Error('application missing');xml=xml.replace('</application>','<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="'+apps.android+'"/>\n    </application>');fs.writeFileSync(manifest,xml);}
+if(fs.existsSync(plist)){let xml=fs.readFileSync(plist,'utf8');xml=xml.replace(/\s*<key>GADApplicationIdentifier<\/key>\s*<string>[^<]*<\/string>/g,'');if(!xml.includes('</dict>'))throw Error('plist dictionary missing');const at=xml.lastIndexOf('</dict>');xml=xml.slice(0,at)+'<key>GADApplicationIdentifier</key>\n<string>'+apps.ios+'</string>\n'+xml.slice(at);fs.writeFileSync(plist,xml);}
