@@ -84,3 +84,8 @@ jobs:
         if: always()
       - run: node mobile/release-surface-check.cjs
         if: always()
+
+      - run: node mobile/account-client-check.cjs
+        if: always()
+      - run: node scripts/rate-limit-check.cjs
+        if: always()

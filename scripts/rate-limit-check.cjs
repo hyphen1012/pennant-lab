@@ -1,0 +1,12 @@
+const a=require('node:assert/strict');
+const {createRateLimiter}=require('../server/rate-limit.cjs');
+let t=0;
+const allow=createRateLimiter({now:()=>t,windowMs:100,ipLimit:3,tokenLimit:2,maxEntries:8});
+const req=(token,remoteAddress='127.0.0.1')=>allow({token,remoteAddress});
+a.equal(req('a'),true);a.equal(req('a','127.0.0.2'),true);a.equal(req('a','127.0.0.3'),false);
+a.equal(req('b'),true);a.equal(req('c'),true);a.equal(req('d'),false);
+a.equal(req('d','127.0.0.2'),true);
+t=100;a.equal(req('a'),true);t=99;a.equal(req('b'),false);
+const bounded=createRateLimiter({now:()=>100,maxEntries:2});a.equal(bounded({token:'a',remoteAddress:'x'}),true);a.equal(bounded({token:'b',remoteAddress:'x'}),false);a.equal(bounded({token:'a',remoteAddress:'x'}),true);
+a.equal(bounded({token:'a',remoteAddress:''}),false);
+console.log('PASS bounded single-process rate limiter: token/IP, expiry, capacity, clock rollback');
