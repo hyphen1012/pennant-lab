@@ -2121,6 +2121,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .fa-room{border-color:var(--room-color)}.fa-room h2{font-size:1.3em}.fa-desk-scene{height:clamp(205px,60vw,340px);position:relative;overflow:hidden;border:1px solid var(--room-accent);border-radius:10px;background:linear-gradient(#23334a 0 66%,#33465a 66%);isolation:isolate}.fa-room-wall{position:absolute;inset:8% 7% 34%;display:flex;justify-content:space-between;gap:8px;align-items:stretch}.fa-room-wall i{width:22%;border:3px solid #8b806b;background:#17273b}.fa-room-wall b{flex:1;border:4px solid #73849a;background:linear-gradient(140deg,#738ca4,#263b54);box-shadow:inset 0 0 0 2px #1b2838}.fa-seat{position:absolute;left:32%;right:32%;top:33%;bottom:14%;border-radius:30% 30% 8% 8%;background:#0b111c;border:3px solid #52617a}.fa-person-body{position:absolute;left:29%;right:29%;top:43%;bottom:9%;border-radius:42% 42% 8% 8%;background:linear-gradient(100deg,#162131,#667388 48%,#172536);border:2px solid #8590a0}.fa-person-head{position:absolute;left:36%;right:36%;top:9%;height:52%;display:grid;place-items:center}.fa-person-head svg{width:100%;height:100%;filter:drop-shadow(0 4px 3px #0008)}.fa-desk-table{position:absolute;left:-6%;right:-6%;bottom:0;height:30%;background:linear-gradient(#a58a65,#67513d 72%,#342b25);clip-path:polygon(14% 0,86% 0,100% 100%,0 100%);border-top:3px solid #d2b78f}.fa-paper{position:absolute;left:43%;top:20%;width:22%;height:54%;transform:skewX(-18deg);background:repeating-linear-gradient(#e2e5e3 0 5px,#a8adb0 6px 7px);box-shadow:2px 3px 4px #0007}.fa-cup{position:absolute;left:24%;top:12%;width:8%;height:31%;border-radius:50%;background:#d5dadf;border:4px solid #f4f5f1;box-shadow:2px 5px 4px #0007}.fa-desk-caption{position:absolute;bottom:4px;right:7px;color:#e3d7bf;font-size:10px}.fa-desk-scene[data-room-theme]:not([data-room-theme="normal"]){background:radial-gradient(ellipse at 50% 20%,var(--room-accent),#0b1320 80%)}.fa-desk-scene[data-room-theme="IMMORTAL"] .fa-room-wall{opacity:.18}.fa-desk-scene[data-room-theme="輪廻転生"] .fa-room-wall b{background:radial-gradient(circle,#d6cee3,#3d315c 65%)}.fa-room-dialogue{border-left:3px solid var(--room-color);background:#0a1423;padding:14px;margin:10px 0;min-height:90px}.fa-room-dialogue small{color:var(--room-color)}.fa-room-dialogue p{margin:6px 0 0;line-height:1.7}.fa-turn-head{display:flex;justify-content:space-between;gap:5px;align-items:center;margin:14px 0 8px;color:#f2d27b;font-size:13px}.fa-gauges{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:12px}.fa-gauge{height:6px;border-radius:6px;background:#2a3a50;overflow:hidden}.fa-gauge i{display:block;height:100%;background:#95b8dc}.fa-gauges>div:nth-child(2) i{background:#90d4ab}.fa-gauges>div:nth-child(3) i{background:#e79aa4}.fa-turn-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:8px 0}.fa-turn-choices .btn{font-size:12px;white-space:normal;min-height:44px}.fa-room>.btn{margin-top:10px}.fa-log{margin:10px 0}.fa-log p{font-size:12px;border-bottom:1px solid #8195aa30;padding-bottom:8px}.scenario-banner{height:48px}.scenario-banner+.app-shell .top{top:48px}
 @media(prefers-reduced-motion:reduce){.fa-hall-walk,.fa-door-leaf,.fa-transit .fa-door-frame{animation:none!important}.fa-door-leaf.left{transform:rotateY(-70deg)}.fa-door-leaf.right{transform:rotateY(70deg)}}
 
+
+.fa-room-aura{position:absolute;inset:0;color:var(--room-color);opacity:.43;display:grid;place-items:center;pointer-events:none}.fa-room-aura svg{width:100%;height:100%;animation:fa-orbit 13s linear infinite}.fa-desk-scene[data-room-theme="PARALLEL"] .fa-room-aura svg{animation:fa-split 2.5s ease-in-out infinite}.fa-desk-scene[data-room-theme="STAR"] .fa-room-aura svg,.fa-desk-scene[data-room-theme="星煌転生"] .fa-room-aura svg{animation:fa-glow 3.5s ease-in-out infinite}.fa-desk-scene[data-room-theme="LEGEND"] .fa-room-wall i,.fa-desk-scene[data-room-theme="伝説転生"] .fa-room-wall i{background:linear-gradient(135deg,#694035,#d5a981);border-color:#d3ad79}.fa-desk-scene[data-room-theme="IMMORTAL"] .fa-room-aura svg{animation:fa-omen 7s ease-in-out infinite}.fa-desk-scene[data-room-theme="IMMORTAL"] .fa-person-head{filter:saturate(.28) brightness(.72)}.fa-desk-scene[data-room-theme="輪廻転生"] .fa-room-aura svg{animation:fa-fracture 3s ease-out both}.fa-witness{background:#1a1425;color:#d9c8ec}.fa-transit[data-room-theme="PARALLEL"] .fa-door-void{background:repeating-linear-gradient(120deg,#15162a,#5c3f92 20px,#1b1830 30px)}.fa-transit[data-room-theme="STAR"] .fa-door-void,.fa-transit[data-room-theme="星煌転生"] .fa-door-void{background:radial-gradient(circle,#f9e3aa,#815421 50%,#0c101a 80%)}.fa-transit[data-room-theme="LEGEND"] .fa-door-leaf,.fa-transit[data-room-theme="伝説転生"] .fa-door-leaf{background:repeating-linear-gradient(90deg,#39211b,#684236 14px,#492b24 25px)}.fa-transit[data-room-theme="輪廻転生"] .fa-door-void{background:repeating-radial-gradient(ellipse,#302246,#b4a6ce 12px,#17131f 16px,#302246 22px)}.fa-room[data-room-theme="IMMORTAL"] .fa-room-dialogue{background:#080b12;letter-spacing:.12em}.fa-room[data-room-theme="輪廻転生"] .fa-room-dialogue{border-image:linear-gradient(#9f8ac6,#eff0fa,#7c65ad) 1}@media(prefers-reduced-motion:reduce){.fa-room-aura svg{animation:none!important}}
+
 </style>
 </head>
 <body><div id="app"></div><script>
@@ -11150,12 +11153,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         if(f.date<=o.replyUntil)continue;
         o.status='refused';o.resolved=f.date;o.expired=true;o.seen=false;
       }
-      if(f.date<c.due)continue;
+      if(f.date<c.due){if(!c.reported&&f.date>=calendarOffsetDate(c.due,-1)){const top=offdeskRivals(d,r)[0];if(top){c.reported=true;pushNews('【移籍市場・途中経過】'+p.name+'に'+getTeam(top.id)?.name+'が関心。去就はまだ決まっていません。',f.date);}}continue;}
       const rival=movementRival(d,r);
       if(rival&&movementSign(d,r,rival.t,rival.salary)){
         pushNews('【移籍市場】'+p.name+'が'+rival.t.name+'との契約に合意。',f.date);
       }else{
-        c.state='closed';c.result=r.kind==='return'?'国内復帰を見送り':'移籍見送り・残留予定';
+        c.state='closed';c.result=r.kind==='return'?'国内復帰先未定・自由契約予定':'契約未成立・自由契約予定';
         pushNews('【移籍市場】'+p.name+'：'+c.result,f.date);
       }
       c.decided=f.date;
@@ -11285,13 +11288,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     setTimeout(()=>{if(ui.faTransit!==token||game!==token.owner||offdeskState()!==x)return;ui.faTransit=null;render();draftJump(0);},reduced?0:kind==='hall'?1700:2300);
   }
   function faDeskScene(p){
-    return '<div class="fa-desk-scene" '+faRoomStyle(p)+'><div class="fa-room-wall"><i></i><b></b><i></i></div><div class="fa-seat"></div><div class="fa-person-body"></div><div class="fa-person-head">'+renderFaceArtwork(p)+'</div><div class="fa-desk-table"><i class="fa-paper"></i><i class="fa-cup"></i></div><span class="fa-desk-caption">GM席からの視点</span></div>';
+    const t=playerTitleTheme(p),cat=t?.name,art=cat==='IMMORTAL'?immortalSigil():cat==='輪廻転生'?'<svg viewBox="0 0 320 180" aria-hidden="true"><circle cx="160" cy="90" r="58" fill="none" stroke="currentColor" stroke-dasharray="4 8"/><path d="M160 0L143 49L187 85L118 115L160 180M187 85L320 20M118 115L0 150M160 90V51M160 90L126 102" stroke="currentColor" fill="none" stroke-width="2"/></svg>':cat?'<svg viewBox="0 0 320 180" aria-hidden="true"><g fill="none" stroke="currentColor"><ellipse cx="160" cy="90" rx="145" ry="40"/><ellipse cx="160" cy="90" rx="110" ry="62" transform="rotate(32 160 90)"/><circle cx="160" cy="90" r="75"/></g></svg>':'';
+    return '<div class="fa-desk-scene" '+faRoomStyle(p)+'>'+(art?'<div class="fa-room-aura">'+art+'</div>':'')+'<div class="fa-room-wall"><i></i><b></b><i></i></div><div class="fa-seat"></div><div class="fa-person-body"></div><div class="fa-person-head">'+renderFaceArtwork(p)+'</div><div class="fa-desk-table"><i class="fa-paper"></i><i class="fa-cup"></i></div><span class="fa-desk-caption">GM席からの視点</span></div>';
   }
   function faTalkLog(v){return v?.log?.length?'<details class="fa-log"><summary>交渉履歴 · '+v.log.length+'ターン</summary>'+v.log.map(l=>'<p><b>GM：</b>'+h(l.label)+'<br><b>選手：</b>'+h(l.speech)+'</p>').join('')+'</details>':'';}
   function faRoomScreen(x,d,r){
     const p=getPlayer(r.id),theme=playerTitleTheme(p),state=faOutcome(d,r),o=d.offers[r.id],can=faCanApproach(d,r),v=can?faTalk(d,r,true):d.faTalks?.[r.id];
     const action=(key,label,disabled=false)=>'<button class="btn outline" data-action="fa-floor-command" data-value="'+key+'" '+(disabled?'disabled':'')+'>'+h(label)+'</button>';
-    const speech=can?v.speech:state.key==='waiting'?'条件を預かりました。後日、代理人から連絡します。':theme?.name==='IMMORTAL'?'…………。':state.key==='signed'?'これからよろしくお願いします。':state.key==='rival'?'他球団でプレーすることを決めました。':'今回はご縁がありませんでした。';
+    const speech=can?v.speech:theme?.name==='IMMORTAL'?'…………。':theme?.name==='輪廻転生'&&p.reincarnation?pastLifeSpeech(p,'reply',state.key==='signed'?2:1):state.key==='waiting'?'条件を預かりました。後日、代理人から連絡します。':state.key==='signed'?'これからよろしくお願いします。':state.key==='rival'?'他球団でプレーすることを決めました。':'今回はご縁がありませんでした。';
     let commands='';
     if(can){
       const spent=v.turn>=v.max;
@@ -11300,11 +11304,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }else{
       commands='<p class="fa-room-state" data-state="'+state.key+'">'+h(state.text)+'</p>'+(o?.due?'<p>回答予定 '+h(formatCalendarDate(o.due))+'</p>':'')+(o&&['signed','refused'].includes(o.status)&&!o.seen?'<button class="btn primary full" data-action="fa-floor-ack">回答を確認して退出 ›</button>':'');
     }
-    return '<section class="panel fa-room" '+faRoomStyle(p)+'><div class="eyebrow">ROOM '+faRoomNumber(d,r)+' · '+h(OFFDESK_MARKET_LABEL[x.view])+'</div><h2>'+themedPlayerName(p)+'</h2>'+faDeskScene(p)+'<div class="fa-room-dialogue"><small>選手本人</small><p>「'+h(speech)+'」</p></div>'+(theme&&p.reincarnation&&can?'<details><summary>過去の記憶</summary>'+lineageFlashback(p,false)+'</details>':'')+'<p class="small">希望年俸 '+fmtSalary(r.demand)+' · 競合 '+(faDeal(d,r)?0:offdeskRivals(d,r).length)+'球団</p><details><summary>能力・今季成績・競合球団</summary>'+movementIdentity(p)+statDisplayGrid(p,p.stats,true)+'<p>'+h(offdeskRivals(d,r).map(a=>getTeam(a.id)?.name).filter(Boolean).join('、')||'競合球団なし')+'</p></details>'+commands+faTalkLog(v)+'<button class="btn outline full" data-action="fa-floor-list">交渉フロアに戻る ›</button><button class="btn outline full" data-action="fa-floor-home">本部に戻る ›</button></section>';
+    return '<section class="panel fa-room" '+faRoomStyle(p)+'><div class="eyebrow">ROOM '+faRoomNumber(d,r)+' · '+h(OFFDESK_MARKET_LABEL[x.view])+'</div><h2>'+themedPlayerName(p)+'</h2>'+faDeskScene(p)+'<div class="fa-room-dialogue"><small>選手本人</small><p>「'+h(speech)+'」</p></div>'+((theme?.name==='輪廻転生'&&can)?'<div class="fa-room-dialogue fa-witness"><small>謎の人物</small><p>「球史が、また変わりますよ……。」</p></div>':'')+(theme&&p.reincarnation&&can?'<details><summary>過去の記憶</summary>'+lineageFlashback(p,false)+'</details>':'')+'<p class="small">希望年俸 '+fmtSalary(r.demand)+' · 競合 '+(faDeal(d,r)?0:offdeskRivals(d,r).length)+'球団</p><details><summary>能力・今季成績・競合球団</summary>'+movementIdentity(p)+statDisplayGrid(p,p.stats,true)+'<p>'+h(offdeskRivals(d,r).map(a=>getTeam(a.id)?.name).filter(Boolean).join('、')||'競合球団なし')+'</p></details>'+commands+faTalkLog(v)+'<button class="btn outline full" data-action="fa-floor-list">交渉フロアに戻る ›</button><button class="btn outline full" data-action="fa-floor-home">本部に戻る ›</button></section>';
   }
   const floorNegotiationBase=offdeskNegotiationScreen;
   offdeskNegotiationScreen=function(x,d){
-    if(x.intro)return floorNegotiationBase(x,d).replace('交渉室へ ›','交渉フロアへ ›');
+    if(x.intro)return floorNegotiationBase(x,d).replace('交渉室へ ›','交渉フロアへ ›').replace('</section>','<button class="btn outline full" data-action="fa-floor-home">本部に戻る ›</button></section>');
     const trans=ui.faTransit;if(trans&&trans.x===x)return faTransitScreen(x,d,trans);
     const r=offdeskMarketRows(d,x.view).find(v=>v.id===x.floorRoom);
     return r?faRoomScreen(x,d,r):faFloorMap(x,d);
@@ -11313,8 +11317,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const f=flowGet(),d=movementData(),x=offdeskState();
     if(action==='fa-floor-finish'){
       if(!f||f.active||flowInbox()||ui.busy||storageFailure||!d)return;
-      const n=(d.eventRows||[]).filter(r=>faCanApproach(d,r)).length;
-      if(!window.confirm?.('未交渉・再交渉可能な選手 '+n+'名。市場を終了すると以降は交渉できません。終了しますか？'))return;
+      const n=(d.eventRows||[]).filter(r=>faCanApproach(d,r)).length,unseen=Object.values(d.offers).filter(o=>['signed','refused'].includes(o.status)&&!o.seen).length;
+      if(!window.confirm?.('未交渉・再交渉可能な選手 '+n+'名、未確認回答 '+unseen+'件。市場を終了すると以降は交渉できません。終了しますか？'))return;
       flowAction('flow-market-finish',el);return;
     }
     if(!offdeskSafe()||!x?.open||x.news||!['fa','return'].includes(x.view))return;
@@ -11348,6 +11352,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const floorNewsBase=offdeskMarketNews;
   offdeskMarketNews=function(x,d){
     let html=floorNewsBase(x,d);
+    if(x.news==='results'&&!x.faFocus){for(const r of d.eventRows||[]){const c=d.faClock?.rows[r.id];if(c?.state!=='closed'||faDeal(d,r))continue;const p=getPlayer(r.id);if(!p)continue;html=html.replace(movementIdentity(p)+'<p>契約未成立</p>',movementIdentity(p)+'<p>'+h(c.result)+'</p>');}}
     if(x.news==='opening'){
       const ids=game.faOpeningDraws?.[game.year]?.ids||[],cs=(game.foreignMarket?.candidates||[]).filter(c=>ids.includes(c.id));
       for(const c of cs){
@@ -11361,8 +11366,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   };
   // Keep the map's controls separate from the player-face detail capture listener.
   window.addEventListener?.('click',e=>{
-    const el=e.target.closest('[data-action]');if(!el||!el.dataset.action.startsWith('fa-floor-'))return;
-    e.preventDefault();e.stopImmediatePropagation();faFloorAction(el.dataset.action,el);
+    const el=e.target.closest('[data-action]');if(!el)return;const a=el.dataset.action;
+    if(a==='movement-market-finish'&&offdeskMarketActive()&&!movementData()?.cpuDone){if(!window.confirm?.('移籍市場を終了すると未交渉の選手にも交渉できなくなります。終了しますか？')){e.preventDefault();e.stopImmediatePropagation();}return;}
+    if(!a.startsWith('fa-floor-'))return;
+    e.preventDefault();e.stopImmediatePropagation();faFloorAction(a,el);
   },true);
 
   const appRoot=document.querySelector('#app');

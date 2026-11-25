@@ -16,3 +16,8 @@ jobs:
         if: always()
       - run: node scripts/transfer-check.cjs
         if: always()
+
+      - run: node scripts/stadium-check.cjs
+        if: always()
+      - run: node scripts/farm-check.cjs
+        if: always()
