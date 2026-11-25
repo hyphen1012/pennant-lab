@@ -615,7 +615,8 @@ assert.match(html,/calendar-date-confirm/);
 console.log('PASS: full-row civil date reel and fixed center marker');
 
 const evStart=inline[1].indexOf('  function eventIntroInfo(){'),evEnd=inline[1].indexOf('  function ceremonyView(){',evStart);
-const eventApi=vm.runInNewContext('(function(){let game={year:2028,day:143,ceremonyStage:"awards-all",pendingCeremonyIntro:"awards-all"};let ui={};'+inline[1].slice(evStart,evEnd)+'\nreturn {game,ui,eventIntroInfo,eventIntroScreen};})()',{h:String});
+const evDeps=['const ANNUAL_PHASES=','const ANNUAL_PRE=','function annualPhaseYear(','function annualStage('].map((anchor,i)=>{const start=inline[1].indexOf(anchor);const end=i===0?inline[1].indexOf('\n  };',start)+5:i===1?inline[1].indexOf(';',start)+1:inline[1].indexOf('\n',start);assert(start>=0&&end>start,anchor);return inline[1].slice(start,end);}).join('\n');
+const eventApi=vm.runInNewContext('(function(){let game={year:2028,day:143,ceremonyStage:"awards-all",pendingCeremonyIntro:"awards-all"};let ui={};'+evDeps+'\n'+inline[1].slice(evStart,evEnd)+'\nreturn {game,ui,eventIntroInfo,eventIntroScreen};})()',{h:String});
 assert.equal(eventApi.eventIntroInfo().title,'年間表彰式');
 assert.match(eventApi.eventIntroScreen(eventApi.eventIntroInfo()),/data-event="awards-all"/);
 eventApi.game.pendingMonth={};assert.equal(eventApi.eventIntroInfo(),null);delete eventApi.game.pendingMonth;
@@ -642,15 +643,15 @@ assert.equal(goalFor('month',civilDays,0),2);
 assert.equal(goalFor('season',civilDays,0),6);
 assert.equal(goalFor('date',civilDays,0),1);
 const financeStart=inline[1].indexOf('  function closeFinancePeriod('),financeEnd=inline[1].indexOf('  function finalizeMonth(',financeStart);
-const financeApi=vm.runInNewContext('(function(){let game={year:2028,day:40,calendarIndex:25,calendar:{days:Array(100),endDate:"2028-09-30"},teams:[{id:1,league:"E",wins:10,cash:1,manager:{salary:1}}]};const myTeam=()=>game.teams[0],rankings=()=>game.teams;'+inline[1].slice(financeStart,financeEnd)+';return {game,closeFinancePeriod,checkFinanceCrisis};})()',{r2:n=>Math.round(n*100)/100,payroll:()=>20});
+const financeApi=vm.runInNewContext('(function(){let game={year:2028,day:40,calendarIndex:25,calendar:{days:Array(100),endDate:"2028-09-30"},teams:[{id:1,league:"E",wins:10,cash:1,manager:{salary:1}}]};const myTeam=()=>game.teams[0],rankings=()=>game.teams;'+inline[1].slice(financeStart,financeEnd)+';return {game,closeFinancePeriod,checkFinanceCrisis};})()',{r2:n=>Math.round(n*100)/100,payroll:()=>20,stadiumPeriod:()=>({legacyOffset:.5,gross:2,operatingCost:.4}),sponsorSettle:()=>1.5,commerceSettle:()=>({income:.6,cost:.2}),wageDailyPeriod:()=>({amount:5,raw:5,estimatedDays:0}),clubOverhead:()=>({total:4}),sponsorIncident:()=>{}});
 const fp=financeApi.closeFinancePeriod('2028-04-30');
-assert.equal(fp.clubs[1].revenue,2.55);
+assert.equal(fp.clubs[1].revenue,7.9);
 assert.equal(fp.clubs[1].payroll,5.25);
-assert.equal(financeApi.game.teams[0].cash,-1.7);
-assert.equal(financeApi.game.financeCrisis.shortfall,1.7);
+assert.equal(financeApi.game.teams[0].cash,-.95);
+assert.equal(financeApi.game.financeCrisis.shortfall,.95);
 financeApi.closeFinancePeriod('2028-04-30');
-assert.equal(financeApi.game.teams[0].cash,-1.7,'Monthly settlement is idempotent');
-assert.match(html,/const uninterruptedSeason=skip&&kind==='season'/);
+assert.equal(financeApi.game.teams[0].cash,-.95,'Monthly settlement is idempotent');
+assert.match(html,/skip=mode==='skip'&&!oneDay/);
 assert.match(html,/if\(game\.financeCrisis\)break;/);
 console.log('PASS: calendar targets, monthly cash settlement, no duplicate charge and cash crisis');
 
@@ -679,10 +680,12 @@ const losses=Array.from({length:4},()=>({home:1,away:2,homeScore:0,awayScore:3})
 assert.equal(streakFn(losses,1).count,4);assert.equal(streakFn(losses,1).result,'loss');
 assert.equal(streakFn([...losses,{home:1,away:2,homeScore:1,awayScore:1}],1).count,0);
 assert.equal(streakFn([...losses,{home:2,away:1,homeScore:0,awayScore:3}],1).result,'win');
-assert.match(html,/if\(oneDay\|\|game\.pendingMonth\|\|\(!skip&&freshNews\.length\)\)break;/);
+assert.match(html,/game\.pendingMonth=null;\s*game\.pendingMilestoneIds=\[\];/);
+assert.match(html,/if\(pendingRareNews\(\).length\)\{game\.rareResume=false;break;\}/);
+assert.match(html,/if\(oneDay\)break;/);
 console.log('PASS: streak counting, ties, home/away and skip-compatible news');
 
-assert.match(html,/function deskTask\(priority,icon,title,description,attrs\)/);
+assert.match(html,/function deskTask\(priority,icon,title,description,attrs,newCount=0\)/);
 assert.match(html,/assets\/scenes\/home-ballpark\.svg/);
 assert.match(html,/assets\/scenes\/front-office\.svg/);
 assert.match(html,/padding-box,linear-gradient\(135deg,var\(--duty-edge\)/);
