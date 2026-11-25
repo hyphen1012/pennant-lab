@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - 'index.html'
       - 'scripts/year-cycle-check.cjs'
       - '.github/workflows/annual-cycle.yml'
 jobs:
@@ -10,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        seed: [1937,4391,8821]
+        seed: [1937,4391,8821,5107,12011]
         fixed: [-1,0]
     runs-on: ubuntu-latest
     timeout-minutes: 180

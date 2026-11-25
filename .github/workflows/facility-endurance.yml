@@ -1,0 +1,29 @@
+name: Natural facility level 20 endurance
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/facility-endurance.cjs'
+      - '.github/workflows/facility-endurance.yml'
+jobs:
+  natural-investment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      FIXED_TEAM: -1
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          mkdir -p test-results
+          set -o pipefail
+          node scripts/year-cycle-check.cjs 150 1937 | tee test-results/facility-cycle.log
+          node scripts/facility-endurance.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: natural-facility-endurance
+          path: test-results/
