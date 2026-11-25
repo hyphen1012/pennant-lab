@@ -3908,7 +3908,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(last){
       const myRuns=last.home===mine.id?last.homeScore:last.awayScore;
       const oppRuns=last.home===mine.id?last.awayScore:last.homeScore;
-      const delta=myRuns>oppRuns?220:myRuns<oppRuns?-65:20;
+      const delta=clubFanDelta(mine,myRuns,oppRuns);
       game.fans=Math.max(10000,Math.round((game.fans||60000)+delta));
       game.ownerRating=clamp(Math.round((game.ownerRating||60)+(myRuns>oppRuns?0.65:myRuns<oppRuns?-0.40:0)),1,100);
     }
@@ -10149,11 +10149,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const weekday=date?new Date(date+'T00:00:00Z').getUTCDay():3;
     const weekend=weekday===0||weekday===6?1.17:1;
     const variance=.93+.14*((Math.sin((game.year*17+t.id*91+day*47)*78.233)*43758.5453%1+1)%1);
-    const base=16500*Math.pow(Math.max(10000,Math.min(1200000,fans))/60000,.62)*(.72+.56*form)*(1+Math.min(.35,stars*.035+rare*.045))*(.9+.2*other)*weekend*variance*(1+.042*(x.park-1)+.008*(x.food+x.goods-2));
+    const base=16500*Math.pow(Math.max(10000,Math.min(1200000,fans))/60000,.62)*(.72+.56*form)*(1+Math.min(.35,stars*.035+rare*.045))*(.9+.2*other)*weekend*variance*(1+.012*(x.park-1)+.006*(x.food+x.goods-2));
     const seats=STADIUM_SHARE.map((share,i)=>{const limit=Math.floor(cap*share),demand=base*share*Math.pow(x.prices[i]/STADIUM_DEFAULT[i],-1.65);return Math.min(limit,Math.max(0,Math.round(demand)));});
     const attendance=seats.reduce((a,b)=>a+b,0),ticket=seats.reduce((a,b,i)=>a+b*x.prices[i],0);
     const food=Math.round(attendance*(850+40*(x.food-1))),goods=Math.round(attendance*(600+45*(x.goods-1))*(1+Math.min(.5,rare*.07+stars*.025)));
-    const operating=Math.round(14000000+attendance*900+food*.58+goods*.62+cap*80);
+    const operating=Math.round(14000000+attendance*(900+18*(x.park-1))+food*.58+goods*.62+cap*80);
     const priceRatio=x.prices.reduce((a,b,i)=>a+STADIUM_SHARE[i]*b/STADIUM_DEFAULT[i],0);
     const satisfaction=clamp(Math.round(72+1.2*(x.park-1)+.65*(x.food+x.goods-2)-32*(priceRatio-1)),0,100);
     return {attendance,capacity:cap,seats,prices:x.prices.slice(),ticket,food,goods,operating,satisfaction,year:game.year};
@@ -11973,6 +11973,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   // v0.9.122 — CPU clubs use the same economy primitives, but decide independently.
   const CPU_ECON_STYLE=['堅実経営','戦力・育成重視','集客・営業重視'];
   function clubFanCount(t){return Math.max(10000,Math.round(Number(t.id===game.selectedId?game.fans:t.fans)||60000));}
+  function clubFanDelta(t,rs,ra){const fans=clubFanCount(t),damping=1+fans/250000;return Math.round(rs>ra?220/damping:rs<ra?-(65+fans/3500):20/damping);}
   function cpuEconomy(t){return t.economyAI??={style:Math.floor(draftHash(2027,t.id,'economy-style')*3),decisions:[],year:null,spent:0,investments:0};}
   function cpuLog(t,date,kind,label,cost=0){const a=cpuEconomy(t);a.decisions.push({date,kind,label,cost});if(a.decisions.length>160)a.decisions.splice(0,a.decisions.length-160);}
   function cpuReserve(t){return r2(Math.max(10,(payroll(t)+Number(t.manager?.salary||0)+infraAnnual(t)+stadiumUpkeep(t)+clubOverhead(t,1,0).total)*.4));}
@@ -11991,14 +11992,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const q=items.filter(p=>p.lv>1).sort((p,q)=>(facilityUpkeep(q.k,q.lv)-facilityUpkeep(q.k,q.lv-1))-(facilityUpkeep(p.k,p.lv)-facilityUpkeep(p.k,p.lv-1)))[0];
       if(q&&(q.stadium?stadiumResize(t,q.k,-1):infraDowngrade(t,q.k))){cpuLog(t,date,'reduce',q.label+' Lv.'+(q.lv-1));return true;}return false;
     }
-    if(a.investments>=3||forecast<.8||t.cash<reserve)return false;
-    const budget=Math.max(0,Math.min(t.cash-reserve,(a.spent===0?Math.max(1,forecast*.38+(t.cash-reserve)*.08):Math.max(1,forecast*.38+(t.cash-reserve+a.spent)*.08))-a.spent));
+    const annualLimit=clamp(1+Math.floor(Math.max(0,forecast)/15)+(a.style===0?0:1),1,a.style===0?4:5);if(a.investments>=annualLimit||forecast<.8||t.cash<reserve)return false;
+    const share=[.30,.46,.42][a.style],budget=Math.max(0,Math.min(t.cash-reserve,Math.max(1,forecast*share+(t.cash-reserve+a.spent)*.12)-a.spent));
     const base=stadiumDemand(t,null,null,Math.max(1,game.day)),fill=base.attendance/base.capacity;
     for(const q of items){
       q.cost=facilityCost(q.k,q.lv);q.extra=facilityUpkeep(q.k,q.lv+1)-facilityUpkeep(q.k,q.lv);
-      q.score=(q.stadium?(q.k==='park'?fill*2.7:1.4+fill):2.2)*(a.style===1&&!q.stadium?1.35:a.style===2&&q.stadium?1.35:1)/(Math.max(.3,q.cost)+q.extra*3)/(1+q.lv*.05);
+      q.score=(q.stadium?(q.k==='park'?fill*3.5:1.4+fill):2.2)*(a.style===1&&!q.stadium?1.55:a.style===2&&q.stadium?1.65:1)/(Math.max(.3,q.cost)+q.extra*3)/(1+q.lv*.05);
     }
-    const q=items.filter(q=>q.lv<20&&q.cost<=budget&&t.cash-q.cost>=reserve&&forecast-q.extra>(q.lv>=15?4:1)&& (q.k!=='park'||fill>=.78)&&(q.lv<15||t.cash-q.cost>=Math.max(30,reserve*2))).sort((p,q)=>q.score-p.score)[0];
+    const q=items.filter(q=>q.lv<20&&q.cost<=budget&&t.cash-q.cost>=reserve&&forecast-q.extra>(q.lv>=15?5:1)&& (q.k!=='park'||fill>=.78)&&(q.lv<15||t.cash-q.cost>=Math.max(30,reserve*2))).sort((p,q)=>q.score-p.score)[0];
     if(!q)return false;
     if(!(q.stadium?stadiumResize(t,q.k,1):infraUpgrade(t,q.k)))return false;
     a.spent=r2(a.spent+q.cost);a.investments++;cpuLog(t,date,'invest',q.label+' Lv.'+(q.lv+1),q.cost);return true;
@@ -12046,7 +12047,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const cpuProcessBase=processCalendarDay;
   processCalendarDay=function(){
     if(game.calendarIndex===0)for(const t of game.teams)cpuPricePlan(t,game.calendar.startDate);
-    const e=cpuProcessBase();if(e?.type==='game')for(const t of game.teams){if(t.id===game.selectedId)continue;const g=gameByTeam(t.id);if(!g||g.day!==game.day)continue;const rs=g.home===t.id?g.homeScore:g.awayScore,ra=g.home===t.id?g.awayScore:g.homeScore;t.fans=Math.max(10000,clubFanCount(t)+(rs>ra?220:rs<ra?-65:20));}
+    const e=cpuProcessBase();if(e?.type==='game')for(const t of game.teams){if(t.id===game.selectedId)continue;const g=gameByTeam(t.id);if(!g||g.day!==game.day)continue;const rs=g.home===t.id?g.homeScore:g.awayScore,ra=g.home===t.id?g.awayScore:g.homeScore;t.fans=Math.max(10000,clubFanCount(t)+clubFanDelta(t,rs,ra));}
     return e;
   };
   const cpuArchiveBase=archiveSeason;
@@ -12063,7 +12064,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function facilityCost(key,lv){return r2(draftScoutCost(lv)*(FACILITY_COST_FACTOR[key]??1));}
   function facilityUpkeep(key,lv){return r2(infraUpkeep(lv)*(FACILITY_UPKEEP_FACTOR[key]??1));}
   function clubOverhead(t,fraction,revenue){
-    const staff=r2(8*fraction),travel=r2(5*fraction),camp=r2(3*fraction),venue=r2(6*fraction),admin=r2(5*fraction+Math.max(0,revenue)*.035);
+    const x=stadiumState(t),development=Object.keys(INFRA_LABELS).reduce((n,k)=>n+infraLevel(t,k)-1,0)/95;const staff=r2((8+8*development)*fraction),travel=r2(5*fraction),camp=r2(3*fraction),venue=r2((6+12*(STADIUM_CAPACITY[x.park]-18000)/42000)*fraction),admin=r2(5*fraction+Math.max(0,revenue)*.055);
     return {staff,travel,camp,venue,admin,total:r2(staff+travel+camp+venue+admin)};
   }
   function marketRenewalSalary(p){
