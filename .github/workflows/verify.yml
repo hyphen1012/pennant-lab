@@ -21,3 +21,8 @@ jobs:
         if: always()
       - run: node scripts/farm-check.cjs
         if: always()
+
+      - run: node scripts/sponsor-check.cjs
+        if: always()
+      - run: node scripts/commerce-check.cjs
+        if: always()
