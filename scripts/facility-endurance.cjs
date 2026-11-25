@@ -8,7 +8,7 @@ const milestones=[];
 for(let i=0;i<r.rows.length;i++)for(const c of r.rows[i].clubs){
   if(!full(c))continue;
   const following=r.rows.slice(i+1,i+6);
-  if(following.length===5&&following.every(row=>full(row.clubs.find(x=>x.id===c.id))))milestones.push({club:c.id,reached:r.rows[i].year,maintainedThrough:following[4].year,allClubsAtReach:r.rows[i].clubs,allClubsAfterFiveYears:following[4].clubs});
+  if(following.length===5&&following.every(row=>full(row.clubs.find(x=>x.id===c.id))&&row.facilityMin?.[c.id]?.length===8&&row.facilityMin[c.id].every(l=>l===20)))milestones.push({club:c.id,reached:r.rows[i].year,maintainedThrough:following[4].year,allClubsAtReach:r.rows[i].clubs,allClubsAfterFiveYears:following[4].clubs});
 }
 const best=r.rows.reduce((a,row)=>{for(const c of row.clubs){const score=c.levels.reduce((x,y)=>x+y,0);if(score>a.score)a={year:row.year,score,...c};}return a;},{score:0});
 const report={years:r.years,minCash:r.minCash,reserveTopUps:r.reserveTopUps,best,milestone:milestones[0]||null,last:r.last.clubs};

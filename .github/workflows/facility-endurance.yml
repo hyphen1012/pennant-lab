@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - 'scripts/year-cycle-check.cjs'
       - 'scripts/facility-endurance.cjs'
       - '.github/workflows/facility-endurance.yml'
 jobs:

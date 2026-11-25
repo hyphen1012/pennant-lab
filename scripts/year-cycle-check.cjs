@@ -14,4 +14,8 @@ patch("mode:TEST_RESERVE?'reserve-isolated':'no-reserve'","mode:TEST_FIXED<0?'ad
 patch('"TEST_RESERVE","TEST_LOG",code)', '"TEST_RESERVE","TEST_LOG","TEST_FIXED",code)');
 patch("process.env.NO_RESERVE!=='1',true);","false,true,fixedTeam);");
 patch("'test-results/long-run.json'","'test-results/year-cycle-'+fixedTeam+'.json'");
+// Record the lowest facility level at every existing cash-audit checkpoint.
+patch("function financeAudit(){for(const t of game.teams){","let facilityMin={};function financeAudit(){for(const t of game.teams){const levels=CLUB_CONDITION_KEYS.map(k=>Object.hasOwn(INFRA_LABELS,k)?infraLevel(t,k):stadiumState(t)[k]);facilityMin[t.id]=levels.map((v,i)=>Math.min(v,facilityMin[t.id]?.[i]??20));");
+patch("const year=game.year,begin=Date.now();","facilityMin={};financeAudit();const year=game.year,begin=Date.now();");
+patch("const row={year,games:858,performance,","const row={year,games:858,facilityMin,performance,");
 new Function('require','process','console',s)(require,process,console);
