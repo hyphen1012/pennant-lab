@@ -1,0 +1,35 @@
+name: Facility 50-season independent calibration
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/facility-calibration.yml'
+      - 'scripts/facility-finance-diagnostics.cjs'
+jobs:
+  independent:
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [4391, 8821]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      FIXED_TEAM: -1
+      STOP_AFTER_FACILITY: '1'
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          mkdir -p test-results
+          set -o pipefail
+          node scripts/year-cycle-check.cjs 55 ${{ matrix.seed }} | tee test-results/facility-cycle.log
+          node scripts/facility-finance-diagnostics.cjs
+          node scripts/facility-endurance.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: facility-calibration-${{ matrix.seed }}
+          path: test-results/
