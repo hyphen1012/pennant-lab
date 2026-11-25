@@ -22,12 +22,17 @@ permissions:
 
 jobs:
   endurance:
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [no-reserve, reserve-isolated]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     env:
       NODE_OPTIONS: --max-old-space-size=6144
       YEARS: ${{ inputs.years || '100' }}
       SEED: ${{ inputs.seed || '1937' }}
+      NO_RESERVE: ${{ matrix.mode == 'no-reserve' && '1' || '0' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,7 +40,7 @@ jobs:
           node-version: '22'
       - name: Farm regression
         run: node scripts/farm-check.cjs
-      - name: Full engine endurance
+      - name: Full regular-season engine endurance
         shell: bash
         run: |
           mkdir -p test-results
@@ -45,5 +50,5 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: endurance-results
+          name: endurance-${{ matrix.mode }}
           path: test-results/
