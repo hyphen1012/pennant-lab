@@ -15,7 +15,13 @@ patch('"TEST_RESERVE","TEST_LOG",code)', '"TEST_RESERVE","TEST_LOG","TEST_FIXED"
 patch("process.env.NO_RESERVE!=='1',true);","false,true,fixedTeam);");
 patch("'test-results/long-run.json'","'test-results/year-cycle-'+fixedTeam+'.json'");
 // Record the lowest facility level at every existing cash-audit checkpoint.
-patch("function financeAudit(){for(const t of game.teams){","let facilityMin={};function financeAudit(){for(const t of game.teams){const levels=CLUB_CONDITION_KEYS.map(k=>Object.hasOwn(INFRA_LABELS,k)?infraLevel(t,k):stadiumState(t)[k]);facilityMin[t.id]=levels.map((v,i)=>Math.min(v,facilityMin[t.id]?.[i]??20));");
-patch("const year=game.year,begin=Date.now();","facilityMin={};financeAudit();const year=game.year,begin=Date.now();");
+patch("function financeAudit(){for(const t of game.teams){","let facilityMin={},firstMax=null,cycleYear=game.year;function facilitySnapshot(){return game.teams.map(t=>({id:t.id,cash:t.cash,levels:CLUB_CONDITION_KEYS.map(k=>Object.hasOwn(INFRA_LABELS,k)?infraLevel(t,k):stadiumState(t)[k])}));}function financeAudit(){const snapshot=facilitySnapshot();for(const t of game.teams){const levels=snapshot.find(c=>c.id===t.id).levels;facilityMin[t.id]=levels.map((v,i)=>Math.min(v,facilityMin[t.id]?.[i]??20));");
+patch("forecast '+cpuForecast(t));}}","forecast '+cpuForecast(t));}const maxed=snapshot.filter(c=>c.levels.length===8&&c.levels.every(l=>l===20));if(!firstMax&&maxed.length)firstMax={cycleYear,engineYear:game.year,calendarIndex:game.calendarIndex,day:game.day,clubs:maxed.map(c=>c.id),allClubs:snapshot,minAfterReach:{}};if(firstMax)for(const id of firstMax.clubs){const levels=snapshot.find(c=>c.id===id).levels;firstMax.minAfterReach[id]=levels.map((v,i)=>Math.min(v,firstMax.minAfterReach[id]?.[i]??20));}}");
+patch("const year=game.year,begin=Date.now();","cycleYear=game.year;facilityMin={};financeAudit();const year=game.year,begin=Date.now();");
+patch("if((run+1)%10===0||run===TEST_YEARS-1){","if((run+1)%10===0||run===TEST_YEARS-1||(TEST_STOP&&firstMax&&year>=firstMax.cycleYear+5)){");
+patch("rows.push(row);if(TEST_LOG)console.log(JSON.stringify(row));","rows.push(row);if(TEST_LOG)console.log(JSON.stringify(row));if(TEST_STOP&&firstMax&&year>=firstMax.cycleYear+5)break;");
+patch("return {years:rows.length,totalGames","return {firstMax,years:rows.length,totalGames");
+patch('"TEST_LOG","TEST_FIXED",code)', '"TEST_LOG","TEST_FIXED","TEST_STOP",code)');
+patch("false,true,fixedTeam);","false,true,fixedTeam,process.env.STOP_AFTER_FACILITY==='1');");
 patch("const row={year,games:858,performance,","const row={year,games:858,facilityMin,performance,");
 new Function('require','process','console',s)(require,process,console);

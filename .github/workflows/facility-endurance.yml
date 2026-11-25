@@ -12,6 +12,7 @@ jobs:
     timeout-minutes: 350
     env:
       FIXED_TEAM: -1
+      STOP_AFTER_FACILITY: '1'
       NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - uses: actions/checkout@v4
