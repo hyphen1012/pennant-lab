@@ -977,10 +977,10 @@ const c1={id:1,player:{pos:'SP'},type:'高校生',preferredTeam:1,preference:'�
 const row={teamId:1,candidateId:1,status:'rights'},draft={year:2027,candidates:[c1]};
 assert(!api.draftOfferResponse(draft,row,1,'develop'));
 for(const key of profile.preferred)assert(api.draftReply(draft,row,key));
-assert(!api.draftReply(draft,row,'growth'));assert(api.draftOfferResponse(draft,row,1,'develop'));assert.equal(row.status,'signed');assert.equal(api.t.cash,9.84);
-assert(!api.draftOfferResponse(draft,row,1,'develop'));assert.equal(api.t.cash,9.84);
+assert(!api.draftReply(draft,row,'growth'));assert(api.draftOfferResponse(draft,row,1,'develop'));assert.equal(row.status,'signed');assert.equal(api.t.cash,9.55);
+assert(!api.draftOfferResponse(draft,row,1,'develop'));assert.equal(api.t.cash,9.55);
 const c2={...c1,id:2,threshold:69,overseas:true,status:'rights'},bad={teamId:1,candidateId:2,status:'rights',conversation:{context:{},interest:15,answers:[{}, {}, {}]}};draft.candidates.push(c2);
-assert(api.draftOfferResponse(draft,bad,2,'develop'));assert.equal(bad.status,'refused');assert.equal(api.t.cash,9.84);
+assert(api.draftOfferResponse(draft,bad,2,'develop'));assert.equal(bad.status,'refused');assert.equal(api.t.cash,9.55);
 assert(api.recruitmentInitial({priorities:['winning']},{winning:20},1,false)>api.recruitmentInitial({priorities:['winning']},{winning:-20},1,false));
 assert(api.recruitmentReaction(profile,{},0,profile.preferred[0])>api.recruitmentReaction(profile,{},0,'winning'));
 assert(api.draftScoutCost(4)>api.draftScoutCost(2));
@@ -1019,7 +1019,7 @@ assert.match(html,/data-action="draft-report-view"/);
 {
 const a=inline[1].indexOf('  const DRAFT_MIN='),b=inline[1].indexOf('  const DRAFT_REGIONS=',a);
 const c=inline[1].indexOf('  function draftRights('),d=inline[1].indexOf('  function draftCutScreen(',c);
-const api=vm.runInNewContext('(function(){const game={selectedId:1,teams:[]},players=[],own=t=>players.filter(p=>p.teamId===t.id),rating=()=>60;'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {game,players,DRAFT_MIN,draftCanNominate,draftRosterProjection,draftCutOptions,draftToggleCut,draftPlanCPU,draftCutIds};})()');
+const api=vm.runInNewContext('(function(){const game={year:2027,selectedId:1,teams:[]},players=[],own=t=>players.filter(p=>p.teamId===t.id),rating=()=>60,retirementScheduled=p=>p.age>=40,movementLeaving=()=>false,faContractActive=(p,y)=>!!p.faContract&&p.faContract.startYear<=y&&y<=p.faContract.endYear;'+inline[1].slice(a,b)+inline[1].slice(c,d)+';return {game,players,DRAFT_MIN,draftCanNominate,draftRosterProjection,draftCutOptions,draftToggleCut,draftPlanCPU,draftCutIds};})()');
 const t={id:1},cpu={id:2},draft={phase:'done',picks:[]},candidate={status:'available',player:{pos:'OF'}};api.game.teams.push(t,cpu);
 let id=0;for(const team of [t,cpu]){for(const [pos,n] of Object.entries(api.DRAFT_MIN))for(let i=0;i<n;i++)api.players.push({id:++id,teamId:team.id,pos,age:25});while(api.players.filter(p=>p.teamId===team.id).length<49)api.players.push({id:++id,teamId:team.id,pos:'OF',age:25});for(let i=0;i<5;i++)draft.picks.push({teamId:team.id,status:'signed',pos:'OF'});}
 assert.equal(api.draftCutIds(null,t).length,0);assert(api.draftCanNominate(draft,t,candidate));assert(api.draftCanNominate(draft,cpu,candidate));
@@ -1153,7 +1153,7 @@ const a=inline[1].indexOf('function broadcastCutArt('),b=inline[1].indexOf('  fu
 const api=vm.runInNewContext('(function(){const h=String,renderFaceArtwork=()=>"<i>portrait</i>";'+inline[1].slice(a,b)+';return {rinneStadiumArt,rinneStudioArt,rinneTearScreen,broadcastFeature};})()');
 assert(api.rinneStadiumArt().includes('崩壊した架空の野球場'));assert(api.rinneStudioArt().includes('壊滅したスタジオ'));const tear=api.rinneTearScreen();assert(tear.includes('rinne-piece left')&&tear.includes('rinne-piece right')&&tear.includes('rinne-fragments'));
 for(const category of ['PARALLEL','STAR','LEGEND','IMMORTAL','再来','転生','輪廻転生'])assert.equal(api.broadcastFeature({}, {category,tournament:true,hidden:true,name:'????',role:'投手'}).includes('ruined-feature'),category==='輪廻転生');
-assert.match(html,/if\(node&&e.category!=='輪廻転生'\)/);console.log('PASS: RINNE exclusive torn cut-in, ruined stadium and ruined studio');
+assert.match(html,/if\(node&&\(e.category!=='輪廻転生'\|\|e.kind==='foreign-discovery'\)\)/);console.log('PASS: RINNE exclusive torn cut-in, ruined stadium and ruined studio');
 }
 
 {
@@ -1220,7 +1220,7 @@ assert.equal(domestic.candidates.filter(api.scoutVisible).length,18);assert.equa
 assert.equal(api.scoutVisible(domestic.candidates.at(-1)),false);assert.equal(api.scoutVisible(foreign.candidates.at(-1)),false);
 const snapshot=JSON.stringify(foreign);assert.equal(api.ensureScoutSchedule(foreign,'foreign'),foreign);assert.equal(JSON.stringify(foreign),snapshot);
 assert.equal(new Set(['PARALLEL','STAR','LEGEND','IMMORTAL'].map(api.foreignDiscoverySpeech)).size,4);
-assert.match(html,/scoutDiscoveryDaily\(entry\)/);assert.match(html,/foreignRate:\.03/);assert.match(html,/infraControls\(t,'foreign','foreign-upgrade'\)/);
+assert.match(html,/scoutDiscoveryDaily\(entry\)/);assert.match(html,/foreignRate:\.03/);assert.match(html,/campus-from-scout/);assert.match(html,/infraUpgrade\(t,'foreign'\)/);
 console.log('PASS: progressive fixed candidate discovery schedule and independent scout levels');
 }
 
