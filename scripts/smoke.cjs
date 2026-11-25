@@ -57,7 +57,7 @@ const document={
   addEventListener:(type,callback,capture)=>listeners.push({type,callback,capture:!!capture})
 };
 const window={
-  indexedDB,scrollTo(){},location:{href:'https://localhost/'}
+  indexedDB,addEventListener:(type,callback,capture)=>listeners.push({type,callback,capture:!!capture}),scrollTo(){},location:{href:'https://localhost/'}
 };
 const localStorage={
   getItem:key=>local.has(key)?local.get(key):null,
