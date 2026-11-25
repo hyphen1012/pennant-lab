@@ -6769,7 +6769,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function financeScreen(){
     const t=myTeam(),pay=payroll(t),rank=rankings(t.league).findIndex(x=>x.id===t.id)+1;
-    const projRevenue=r2(5+(game.day?t.wins/game.day:.5)*6+(rank===1?2.5:rank===2?1.2:0)+stadiumProjection(t)-stadiumUpkeep(t));
+    const co=commerceData(t),fc=co.clubs[game.year];const projRevenue=r2(5+(game.day?t.wins/game.day:.5)*6+(rank===1?2.5:rank===2?1.2:0)+stadiumProjection(t)-stadiumUpkeep(t)+sponsorAnnual(sponsorActive(sponsorContract(t,game.year)))+(co.broadcasts[game.year]?.annual||0)+(commerceNaming(t,game.year)?.annual||0)+(fc?fc.income-fc.cost:0));
     return `<div class="pc-scene"><div class="pc-monitor"><div class="device-bar">PENNANT OFFICE · 財務管理</div><div class="device-content"><h2 class="page-title">球団経営</h2><p class="page-sub">FA獲得契約金と、月末の年俸・監督報酬の支払いを管理します。</p><div class="grid2" style="margin-bottom:12px"><div class="metric"><div class="lab">保有資金</div><div class="val finance-money-value">${fmtMoney(t.cash)}</div></div><div class="metric"><div class="lab">選手年俸総額</div><div class="val finance-money-value">${fmtSalary(pay)}</div></div></div><section class="panel"><h3 class="panel-title">GMの仕事</h3><p class="small">選手年俸・監督報酬と球団収入は月末に精算します。シーズン成績が良いほど収入も増えます。</p><div class="metric" style="margin-top:12px"><div class="lab">参考：現在の勝率で計算したシーズン収入見込み</div><div class="val" style="font-size:19.8px">${fmtMoney(projRevenue)}</div><div class="sub">シーズン終了時に確定。今後の勝敗・順位によって変動します。</div></div><div class="divider"></div><div class="row between"><strong style="font-size:13.5px">所属人数</strong><span class="small">野手${hitters(t).length}人・投手${pitchers(t).length}人（最大${ROSTER_MAX}人）</span></div><div class="actions" style="margin-top:14px"><button class="btn primary" data-action="tab" data-tab="market">FA市場へ</button><button class="btn outline" data-action="tab" data-tab="roster" data-roster="players">選手を整理</button></div></section>${infraFinancePanel(t,projRevenue)}<section class="panel"><h3 class="panel-title">月次報告の履歴</h3>
     <p class="small">月末の精算結果を確認できます。旧版の報告は見込み額の記録です。</p>
     ${[...new Set((game.monthlyArchive||[]).map(m=>m.year))].sort((a,b)=>b-a).map(year=>`<details class="month-history-year" ${year===game.year?'open':''}>
@@ -11084,14 +11084,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const labSaveBase=save;
   save=function(){return scenarioLab?true:labSaveBase();};
   const labTitleBase=titleScreen;
-  titleScreen=function(){return labTitleBase().replace(/VERSION 0\.9\.\d+ · [^<]+/,'VERSION 0.9.115 · COMMERCIAL SEASON').replace('<div class="title-info">','<section class="panel"><div class="eyebrow">DEVELOPMENT · SCENARIO LAB</div><h3>テストプレイ</h3><p class="small">通常のセーブとは完全に分離した確認用データです。</p>'+[['fa','FA解禁前夜・特殊選手全種'],['reply','FA交渉回答・再交渉'],['camp','秋季キャンプ・冬季派遣の並行進行'],['facilities','球団設備・球場経営'],['sponsor','スポンサー契約・営業部'],['commerce','放映権・ファンクラブ・営業イベント']].map(([k,v])=>'<button class="btn outline full" data-action="scenario-start" data-value="'+k+'">'+v+' ›</button>').join('')+'</section><div class="title-info">');};
+  titleScreen=function(){return labTitleBase().replace(/VERSION 0\.9\.\d+ · [^<]+/,'VERSION 0.9.115 · COMMERCIAL SEASON').replace('<div class="title-info">','<section class="panel"><div class="eyebrow">DEVELOPMENT · SCENARIO LAB</div><h3>テストプレイ</h3><p class="small">通常のセーブとは完全に分離した確認用データです。</p>'+[['fa','FA解禁前夜・特殊選手全種'],['reply','FA交渉回答・再交渉'],['camp','秋季キャンプ・冬季派遣の並行進行'],['facilities','球団設備・球場経営'],['sponsor','スポンサー契約・営業部'],['commerce','放映権・ファンクラブ・営業イベント'],['opening-promo','開幕戦イベント']].map(([k,v])=>'<button class="btn outline full" data-action="scenario-start" data-value="'+k+'">'+v+' ›</button>').join('')+'</section><div class="title-info">');};
   function scenarioStart(kind){
-    if(scenarioLab||ui.page!=='title'||!['fa','reply','camp','facilities','sponsor','commerce'].includes(kind))return false;
+    if(scenarioLab||ui.page!=='title'||!['fa','reply','camp','facilities','sponsor','commerce','opening-promo'].includes(kind))return false;
     scenarioLab={game,ui,kind};ui={...ui,page:'game',tab:'hq',busy:false,rarePreview:null,confirm:null,playerDetail:null,detail:null,autoDay:null,flowInboxOpen:null};
     try{
       buildFresh();ensureGameExtras();game.started=true;game.gmName='TEST GM';myTeam().cash=100;
       game.pendingCeremonyIntro=null;game.ceremonyStage=null;game.pendingRareIds=[];game.pendingMilestoneIds=[];
       if(kind==='facilities'){ui.tab='business';ui.businessSub='facilities';return true;}
+      if(kind==='opening-promo'){game.day=0;game.calendarIndex=0;const f=game.calendarFlow={version:1,year:game.year,date:calendarOffsetDate(game.calendar.startDate,-2),mode:'pre',jobs:flowJobs(FLOW_PRE,game.year),active:null};for(const j of Object.values(f.jobs))j.status='done';f.jobs['opening-promo'].status='scheduled';f.jobs['offdesk-opening'].status='scheduled';return true;}
       game.day=143;game.calendarIndex=game.calendar.days.length;
       const f=game.calendarFlow={version:1,year:game.year,date:game.year+(kind==='commerce'?'-11-22':kind==='sponsor'?'-12-20':kind==='camp'?'-11-23':kind==='reply'?'-12-29':'-12-26'),mode:'off',jobs:flowJobs(FLOW_OFF,game.year),active:null};
       for(const j of Object.values(f.jobs))j.status='done';
