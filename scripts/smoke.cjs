@@ -171,9 +171,9 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   const playerButton=app.innerHTML.match(/data-action="player-detail" data-id="(\d+)"/);
   assert(playerButton,'Player detail button exists');
   dispatch('click',{action:'player-detail',id:playerButton[1]});
-  assert.match(app.innerHTML,/class="profile-row"/);
-  assert.match(app.innerHTML,/class="avatar player-portrait/);
-  assert.match(app.innerHTML,/class="face-artwork"/);
+  assert.match(app.innerHTML,/class="profile-row profile-upper-row"/);
+  assert.match(app.innerHTML,/player-upper-art/);
+  assert.match(app.innerHTML,/data-action="detail-tab"/);
   dispatch('click',{action:'detail-tab',sub:'stats'});
   assert(app.innerHTML.includes('通算成績'));
   assert(app.innerHTML.includes('年度別成績'));
