@@ -85,6 +85,7 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
     }
     if(k==='facilities'){
      for(const t of tabs){current='tab-'+t;await click('[data-action="tab"][data-tab="'+t+'"]');await shot('tab-'+t);}
+     await click('[data-action="record-sub"][data-sub="memorial"]');await shot('memorial-empty');
      await click('[data-action="tab"][data-tab="business"]');
      for(const t of business){current='business-'+t;await click('[data-action="business-sub"][data-sub="'+t+'"]');await shot('business-'+t);}
     }

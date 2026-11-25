@@ -24,4 +24,9 @@ patch("return {years:rows.length,totalGames","return {firstMax,years:rows.length
 patch('"TEST_LOG","TEST_FIXED",code)', '"TEST_LOG","TEST_FIXED","TEST_STOP",code)');
 patch("false,true,fixedTeam);","false,true,fixedTeam,process.env.STOP_AFTER_FACILITY==='1');");
 patch("const row={year,games:858,performance,","const row={year,games:858,facilityMin,performance,");
+// Only this headless test can inject a synthetic verified VIP state.
+if(process.env.TEST_VIP==='1'){
+ patch("let reserveTopUps=0,totalGames=0,totalFarmGames=0,foreignSigned=0,minCash=Infinity;\\n","let reserveTopUps=0,totalGames=0,totalFarmGames=0,foreignSigned=0,minCash=Infinity;\\nvipStatusProvider=()=>({verified:true,vip:true});\\n");
+}
+patch("const row={year,games:858,facilityMin,performance,","const row={year,games:858,vipIncome:game.seasonArchive.at(-1)?.vipIncome||0,facilityMin,performance,");
 new Function('require','process','console',s)(require,process,console);

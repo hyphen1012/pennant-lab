@@ -1,0 +1,33 @@
+name: VIP annual economy comparison (test only)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/year-cycle-check.cjs'
+      - '.github/workflows/vip-balance.yml'
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        vip: ['0','1']
+        seed: [1937,8821]
+    env:
+      FIXED_TEAM: '-1'
+      TEST_VIP: ${{ matrix.vip }}
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          mkdir -p test-results
+          set -o pipefail
+          node scripts/year-cycle-check.cjs 20 ${{ matrix.seed }} | tee test-results/vip-cycle.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vip-${{ matrix.vip }}-${{ matrix.seed }}
+          path: test-results/

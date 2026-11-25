@@ -72,3 +72,5 @@ jobs:
         if: always()
       - run: node scripts/monetization-check.cjs
         if: always()
+      - run: node scripts/memorial-vip-check.cjs
+        if: always()

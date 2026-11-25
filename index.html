@@ -2602,7 +2602,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const rank=last?rankings(t.league).findIndex(x=>x.id===t.id):-1;
       const gate=stadiumPeriod(t,prior,through);
       const sponsorship=sponsorSettle(t,iso,'season'),commerce=commerceSettle(t,iso,'season');
-      const revenue=r2(sponsorship+commerce.income+r2(15.5*through/total)-r2(15.5*prior/total)+r2(t.wins*6/143)-r2(prev.wins*6/143)+(rank===0?2.5:rank===1?1.2:0)-gate.legacyOffset+gate.gross);
+      const baseRevenue=r2(sponsorship+commerce.income+r2(15.5*through/total)-r2(15.5*prior/total)+r2(t.wins*6/143)-r2(prev.wins*6/143)+(rank===0?2.5:rank===1?1.2:0)-gate.legacyOffset+gate.gross);
+      const vipIncome=vipRevenueBonus(t,r2(sponsorship+commerce.income+gate.gross+(rank===0?2.5:rank===1?1.2:0))),revenue=r2(baseRevenue+vipIncome);
       const performanceBonus=last?renewalEarnedBonuses(t):{total:0,rows:[]};
       const wageDays=wageDailyPeriod(t,prior,through,total);
       const wages=r2(wageDays.amount+Number(t.manager?.salary||0)*fraction+performanceBonus.total);
@@ -2610,10 +2611,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const maintenance=infra?Math.max(0,r2(infra.accrued-(infra.paid||0))):0;
       const investment=infra?Math.max(0,r2(infra.investment-(infra.reportedInvestment||0))):0;
       if(infra){infra.paid=r2((infra.paid||0)+maintenance);infra.reportedInvestment=r2((infra.reportedInvestment||0)+investment);}
-      const overhead=clubOverhead(t,fraction,revenue),opening=t.cash;
+      const overhead=clubOverhead(t,fraction,baseRevenue),opening=t.cash;
       t.cash=r2(opening+revenue-wages-maintenance-gate.operatingCost-commerce.cost-overhead.total);
-      period.clubs[t.id]={opening,revenue,sponsorship,commerce,payroll:wages,playerWage:wageDays.amount,wageEstimatedDays:wageDays.estimatedDays,performanceBonus:performanceBonus.total,bonusDetails:performanceBonus.rows,maintenance,investment,stadium:gate,stadiumOperating:gate.operatingCost,overhead,cash:t.cash,net:r2(revenue-wages-maintenance-investment-gate.operatingCost-commerce.cost-overhead.total)};
-      ledger.clubs[t.id]={wins:t.wins,commerceIncome:r2((prev.commerceIncome||0)+commerce.income),commerceCost:r2((prev.commerceCost||0)+commerce.cost),sponsorship:r2((prev.sponsorship||0)+sponsorship),revenue:r2(prev.revenue+revenue),payroll:r2(prev.payroll+wages),wageDailyRaw:wageDays.raw,wageEstimatedDays:(prev.wageEstimatedDays||0)+wageDays.estimatedDays,performanceBonus:r2((prev.performanceBonus||0)+performanceBonus.total),maintenance:r2((prev.maintenance||0)+maintenance),investment:r2((prev.investment||0)+investment),stadiumOperating:r2((prev.stadiumOperating||0)+gate.operatingCost),overhead:r2((prev.overhead||0)+overhead.total)};
+      period.clubs[t.id]={opening,revenue,vipIncome,sponsorship,commerce,payroll:wages,playerWage:wageDays.amount,wageEstimatedDays:wageDays.estimatedDays,performanceBonus:performanceBonus.total,bonusDetails:performanceBonus.rows,maintenance,investment,stadium:gate,stadiumOperating:gate.operatingCost,overhead,cash:t.cash,net:r2(revenue-wages-maintenance-investment-gate.operatingCost-commerce.cost-overhead.total)};
+      ledger.clubs[t.id]={wins:t.wins,vipIncome:r2((prev.vipIncome||0)+vipIncome),commerceIncome:r2((prev.commerceIncome||0)+commerce.income),commerceCost:r2((prev.commerceCost||0)+commerce.cost),sponsorship:r2((prev.sponsorship||0)+sponsorship),revenue:r2(prev.revenue+revenue),payroll:r2(prev.payroll+wages),wageDailyRaw:wageDays.raw,wageEstimatedDays:(prev.wageEstimatedDays||0)+wageDays.estimatedDays,performanceBonus:r2((prev.performanceBonus||0)+performanceBonus.total),maintenance:r2((prev.maintenance||0)+maintenance),investment:r2((prev.investment||0)+investment),stadiumOperating:r2((prev.stadiumOperating||0)+gate.operatingCost),overhead:r2((prev.overhead||0)+overhead.total)};
     }
     ledger.through=through;ledger.periods.push(period);
     for(const t of game.teams)sponsorIncident(t,iso);
@@ -4108,8 +4109,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   async function requestSeasonReward(key){
     // v0.9.147: new special-candidate guarantees are retired; legacy earned data remains intact.
-    return false;
-    if(!rewardAdProvider||ui.rewardBusy||!rewardAllowed(game,key))return;
+    if(!openingSpecialRewardsEnabled()||!rewardAdProvider||ui.rewardBusy||!rewardAllowed(game,key))return;
     const state=game,year=game.year;ui.rewardBusy=true;render();
     try{
       const completed=await rewardAdProvider({key,year});
@@ -4120,8 +4120,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }catch(e){showToast('広告を利用できませんでした。報酬は消費されていません。');}
     finally{ui.rewardBusy=false;render();}
   }
+  function openingSpecialRewardsEnabled(){return false;}
   function seasonRewardPanel(){
-    return '';
+    if(!openingSpecialRewardsEnabled())return '';
     if(game.day!==0||(game.calendarIndex||0)!==0)return '';
     return '<section class="panel season-reward"><div class="eyebrow">OPENING · REWARD</div><h3>開幕特別スカウト</h3><p class="small">候補の出現保証。指名・入団の保証ではありません。</p>'+Object.entries(OPENING_REWARDS).map(([key,categories])=>'<button class="btn outline full" data-action="season-reward" data-value="'+key+'" '+(!rewardAdProvider||!rewardAllowed(game,key)||ui.rewardBusy?'disabled':'')+'>広告 '+key+' · '+categories.join(' ＋ ')+' '+(game.seasonRewards?.[game.year]?.[key]?'受取済み':!rewardAdProvider?'（配信準備中）':!rewardAllowed(game,key)?'（条件未達）':'候補保証')+'</button>').join('')+'<p class="tiny">広告Cは適格な国内の元選手が各階層に存在する場合のみ。IMMORTAL・輪廻転生の出現率は変わりません。</p></section>';
   }
@@ -10546,15 +10547,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const q={ticket:0,food:0,goods:0,operating:0,games:0,attendance:0,capacity:0};
     for(const period of periods){const v=period.clubs?.[t.id]?.stadium;if(v)for(const k of Object.keys(q))q[k]+=Number(v[k])||0;}
     const sponsorOff=sponsorReceived(t,game.year,'off'),sponsorTotal=r2((tot.sponsorship||0)+sponsorOff),co=commerceTotals(t,game.year,'off'),ci=r2((tot.commerceIncome||0)+co.income),cc=r2((tot.commerceCost||0)+co.cost);
-    const revenue=r2((tot.revenue||0)+sponsorOff+co.income),pay=tot.payroll||0,bonus=tot.performanceBonus||0,maint=tot.maintenance||0,op=tot.stadiumOperating||0,invest=tot.investment||0,overhead=tot.overhead||0,rewards=tot.rewards||0,extras=clubLifeSpend(t,game.year);
+    const vipTotal=r2((tot.vipIncome||0)+vipOffTotal(t,game.year)),revenue=r2((tot.revenue||0)+sponsorOff+co.income+vipOffTotal(t,game.year)),pay=tot.payroll||0,bonus=tot.performanceBonus||0,maint=tot.maintenance||0,op=tot.stadiumOperating||0,invest=tot.investment||0,overhead=tot.overhead||0,rewards=tot.rewards||0,extras=clubLifeSpend(t,game.year);
     const transfers=clubTransferYear(t,game.year),gross=(q.ticket+q.food+q.goods)/1e8,net=r2(revenue+transfers.income-pay-maint-op-invest-cc-overhead-rewards-extras-transfers.cost),operating=r2(net+invest);
     const owner=renderFaceArtwork({id:82001+t.id*17,age:61,pos:'OF',teamId:t.id},{role:'manager'});
     const statement=net>=0?'今季の収支は黒字です。来季への投資と資金余力を確認しましょう。':'今季の収支は赤字です。来季は固定費と補強計画を慎重に見直してください。';
     const metrics='<div class="offdesk-kpis"><div><small>年間収入</small><strong>'+fmtMoney(revenue)+'</strong></div><div><small>営業収支（投資前）</small><strong class="'+(operating<0?'offdesk-loss':'')+'">'+fmtMoney(operating)+'</strong></div><div><small>投資後の差額</small><strong class="'+(net<0?'offdesk-loss':'')+'">'+fmtMoney(net)+'</strong></div><div><small>現在の保有資金</small><strong>'+fmtMoney(t.cash)+'</strong></div></div>';
     const section=(title,rows)=>'<section class="offdesk-fin-section"><h3>'+title+'</h3>'+rows+'</section>';
     const max=Math.max(1,...periods.map(p=>Math.abs(p.clubs?.[t.id]?.revenue||0)),...periods.map(p=>{const v=p.clubs?.[t.id]||{};return Math.abs((v.payroll||0)+(v.maintenance||0)+(v.stadiumOperating||0)+(v.investment||0));}));
-    const months=periods.map(p=>{const v=p.clubs?.[t.id]||{},cost=(v.payroll||0)+(v.maintenance||0)+(v.stadiumOperating||0)+(v.investment||0);return '<details class="offdesk-month"><summary>'+h(formatCalendarDate(p.date))+' <b>'+fmtMoney(v.net||0)+'</b></summary><div class="offdesk-bar"><i style="width:'+Math.min(100,(v.revenue||0)/max*100)+'%"></i></div><div class="offdesk-bar cost"><i style="width:'+Math.min(100,cost/max*100)+'%"></i></div>'+offdeskMoneyRow('収入',v.revenue||0)+offdeskMoneyRow('うちスポンサー収入',v.sponsorship||0)+offdeskMoneyRow('うち営業収入',v.commerce?.income||0)+offdeskMoneyRow('営業経費',-(v.commerce?.cost||0))+offdeskMoneyRow('球団運営諸費用（定期更新含む）',-(v.overhead?.total||0))+offdeskMoneyRow('うち設備定期更新費',-(v.overhead?.renewal||0))+offdeskMoneyRow('自動報奨金・還元',-(v.rewards||0))+offdeskMoneyRow('同月の任意支援・修繕（支払済）',-clubLifeMonth(t,p.date))+offdeskMoneyRow('同月の補強費（支払済）',-clubTransferYear(t,game.year,p.date.slice(0,7)).cost)+offdeskMoneyRow('同月の移籍金受取',clubTransferYear(t,game.year,p.date.slice(0,7)).income)+offdeskMoneyRow('選手・監督報酬',-(v.payroll||0))+offdeskMoneyRow('施設維持費',-(v.maintenance||0))+offdeskMoneyRow('球場試合運営費',-(v.stadiumOperating||0))+offdeskMoneyRow('強化投資',-(v.investment||0))+offdeskMoneyRow('精算後資金',v.cash||0)+'</details>';}).join('');
-    return offdeskRoom(game.year+'年 年間収支報告会','ANNUAL GENERAL MEETING','<div class="offdesk-owner">'+owner+'<div><small>球団オーナー</small><p>「'+statement+'」</p></div></div>'+metrics+section('収入の内訳',offdeskMoneyRow('入場料収入',q.ticket/1e8)+offdeskMoneyRow('飲食売上',q.food/1e8)+offdeskMoneyRow('グッズ売上',q.goods/1e8)+offdeskMoneyRow('スポンサー収入（期間外入金を含む）',sponsorTotal)+offdeskMoneyRow('放映権・命名権・ファンクラブ等',ci)+offdeskMoneyRow('その他の収入（従来の概算分を含む）',revenue-gross-sponsorTotal-ci)+offdeskMoneyRow('シーズン中移籍金受取',transfers.income)+offdeskMoneyRow('収入合計',revenue+transfers.income))+section('支出の内訳',offdeskMoneyRow('選手・監督基本報酬',-(pay-bonus))+offdeskMoneyRow('出来高報酬',-bonus)+offdeskMoneyRow('施設・スカウト・球場維持費',-maint)+offdeskMoneyRow('球場試合運営費（飲食等原価含む）',-op)+offdeskMoneyRow('強化投資（支払済み）',-invest)+offdeskMoneyRow('営業・ファンクラブ経費',-cc)+offdeskMoneyRow('球団職員・遠征・管理・定期更新等',-overhead)+offdeskMoneyRow('自動報奨金・還元',-rewards)+offdeskMoneyRow('任意支援・待遇改善・大規模修繕',-extras)+offdeskMoneyRow('シーズン中補強費',-transfers.cost)+offdeskMoneyRow('支出合計',-(pay+maint+op+invest+cc+overhead+rewards+extras+transfers.cost)))+section('ホーム球場実績','<p>集計対象 '+q.games+'試合　延べ '+Math.round(q.attendance).toLocaleString()+'人</p><p class="small">平均 '+(q.games?Math.round(q.attendance/q.games).toLocaleString()+'人':'—')+' ／ 稼働率 '+(q.capacity?Math.round(q.attendance/q.capacity*100)+'%':'—')+'</p>')+section('月別収支・資金推移',months||'<p>月別の記録なし</p>')+'<p class="small">月次帳簿と報告日までの期間外スポンサー入金を集計した会議資料です。以降の入金は経営画面の契約履歴で確認できます。移籍・個別イベント等の帳簿外支出がある場合、保有資金の増減と差額は一致しません。旧セーブに未記録の売上は推定しません。</p><button class="btn primary full" data-action="ceremony-next">オーナー会議を終了 · FA・海外挑戦の相談へ ›</button>');
+    const months=periods.map(p=>{const v=p.clubs?.[t.id]||{},cost=(v.payroll||0)+(v.maintenance||0)+(v.stadiumOperating||0)+(v.investment||0);return '<details class="offdesk-month"><summary>'+h(formatCalendarDate(p.date))+' <b>'+fmtMoney(v.net||0)+'</b></summary><div class="offdesk-bar"><i style="width:'+Math.min(100,(v.revenue||0)/max*100)+'%"></i></div><div class="offdesk-bar cost"><i style="width:'+Math.min(100,cost/max*100)+'%"></i></div>'+offdeskMoneyRow('収入',v.revenue||0)+offdeskMoneyRow('うちVIP増収',v.vipIncome||0)+offdeskMoneyRow('うちスポンサー収入',v.sponsorship||0)+offdeskMoneyRow('うち営業収入',v.commerce?.income||0)+offdeskMoneyRow('営業経費',-(v.commerce?.cost||0))+offdeskMoneyRow('球団運営諸費用（定期更新含む）',-(v.overhead?.total||0))+offdeskMoneyRow('うち設備定期更新費',-(v.overhead?.renewal||0))+offdeskMoneyRow('自動報奨金・還元',-(v.rewards||0))+offdeskMoneyRow('同月の任意支援・修繕（支払済）',-clubLifeMonth(t,p.date))+offdeskMoneyRow('同月の補強費（支払済）',-clubTransferYear(t,game.year,p.date.slice(0,7)).cost)+offdeskMoneyRow('同月の移籍金受取',clubTransferYear(t,game.year,p.date.slice(0,7)).income)+offdeskMoneyRow('選手・監督報酬',-(v.payroll||0))+offdeskMoneyRow('施設維持費',-(v.maintenance||0))+offdeskMoneyRow('球場試合運営費',-(v.stadiumOperating||0))+offdeskMoneyRow('強化投資',-(v.investment||0))+offdeskMoneyRow('精算後資金',v.cash||0)+'</details>';}).join('');
+    return offdeskRoom(game.year+'年 年間収支報告会','ANNUAL GENERAL MEETING','<div class="offdesk-owner">'+owner+'<div><small>球団オーナー</small><p>「'+statement+'」</p></div></div>'+metrics+section('収入の内訳',offdeskMoneyRow('入場料収入',q.ticket/1e8)+offdeskMoneyRow('飲食売上',q.food/1e8)+offdeskMoneyRow('グッズ売上',q.goods/1e8)+offdeskMoneyRow('スポンサー収入（期間外入金を含む）',sponsorTotal)+offdeskMoneyRow('放映権・命名権・ファンクラブ等',ci)+offdeskMoneyRow('VIP増収',vipTotal)+offdeskMoneyRow('その他の収入（従来の概算分を含む）',revenue-gross-sponsorTotal-ci-vipTotal)+offdeskMoneyRow('シーズン中移籍金受取',transfers.income)+offdeskMoneyRow('収入合計',revenue+transfers.income))+section('支出の内訳',offdeskMoneyRow('選手・監督基本報酬',-(pay-bonus))+offdeskMoneyRow('出来高報酬',-bonus)+offdeskMoneyRow('施設・スカウト・球場維持費',-maint)+offdeskMoneyRow('球場試合運営費（飲食等原価含む）',-op)+offdeskMoneyRow('強化投資（支払済み）',-invest)+offdeskMoneyRow('営業・ファンクラブ経費',-cc)+offdeskMoneyRow('球団職員・遠征・管理・定期更新等',-overhead)+offdeskMoneyRow('自動報奨金・還元',-rewards)+offdeskMoneyRow('任意支援・待遇改善・大規模修繕',-extras)+offdeskMoneyRow('シーズン中補強費',-transfers.cost)+offdeskMoneyRow('支出合計',-(pay+maint+op+invest+cc+overhead+rewards+extras+transfers.cost)))+section('ホーム球場実績','<p>集計対象 '+q.games+'試合　延べ '+Math.round(q.attendance).toLocaleString()+'人</p><p class="small">平均 '+(q.games?Math.round(q.attendance/q.games).toLocaleString()+'人':'—')+' ／ 稼働率 '+(q.capacity?Math.round(q.attendance/q.capacity*100)+'%':'—')+'</p>')+section('月別収支・資金推移',months||'<p>月別の記録なし</p>')+'<p class="small">月次帳簿と報告日までの期間外スポンサー入金を集計した会議資料です。以降の入金は経営画面の契約履歴で確認できます。移籍・個別イベント等の帳簿外支出がある場合、保有資金の増減と差額は一致しません。旧セーブに未記録の売上は推定しません。</p><button class="btn primary full" data-action="ceremony-next">オーナー会議を終了 · FA・海外挑戦の相談へ ›</button>');
   }
   const offdeskCeremonyBase=ceremonyView;
   ceremonyView=function(){return game.ceremonyStage==='settlement'?offdeskAnnualFinance():offdeskCeremonyBase();};
@@ -11760,7 +11761,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     return true;
   }
   function sponsorOffPay(date){
-    for(const t of game.teams){const amount=sponsorSettle(t,date,'off');if(amount){t.cash=r2(t.cash+amount);if(t.id===game.selectedId)pushNews('【営業部】スポンサー料 '+fmtMoney(amount)+' の入金を確認しました。',date);}}
+    for(const t of game.teams){const amount=sponsorSettle(t,date,'off');if(amount){const bonus=vipOffBonus(t,date,'sponsor',amount);t.cash=r2(t.cash+amount+bonus);if(t.id===game.selectedId)pushNews('【営業部】スポンサー料 '+fmtMoney(amount)+' の入金を確認しました。',date);}}
   }
   function sponsorState(f,j){
     const t=myTeam(),year=f.year+1;
@@ -11850,7 +11851,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const annual=(br?.annual||0)+(nc?.annual||0),amt=r2(annual*k/12)-r2(annual*(k-1)/12),i=r2(amt+(k===1?fc?.income||0:0)),co=k===1?fc?.cost||0:0;d.payments.push({year:y,month:k,kind:'monthly',source,date,income:i,cost:co});income+=i;cost+=co;}
     return {income:r2(income),cost:r2(cost)};
   }
-  function commerceOffPay(date){for(const t of game.teams){const a=commerceSettle(t,date,'off');t.cash=r2(t.cash+a.income-a.cost);}}
+  function commerceOffPay(date){for(const t of game.teams){const a=commerceSettle(t,date,'off'),bonus=vipOffBonus(t,date,'commerce',a.income);t.cash=r2(t.cash+a.income-a.cost+bonus);}}
   function commerceEvent(t,y,id,s,date){const d=commerceData(t);if(d.events.some(a=>a.year===y&&a.id===id))return false;const declined=!!s.decline,plan=s.plan||0,players=(s.players||[]).map(getPlayer).filter(p=>p&&p.teamId===t.id),cost=declined?0:id==='tv'?0:[.04,.10,.22][plan],income=declined?0:id==='tv'?.03:0;
     if((cost>0&&t.cash<cost)||id==='tv'&&!declined&&(players.length!==5||new Set(players.map(p=>p.id)).size!==5))return false;
     const gain=declined?0:id==='tv'?Math.round(150+players.reduce((n,p)=>n+rating(p)+(p.specialCategory?35:0),0)*1.6):[250,650,1300][plan];
@@ -13350,7 +13351,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(scenarioLab||t.id!==game.selectedId)return;
     const levels=Object.fromEntries(CLUB_CONDITION_KEYS.map(k=>[k,Object.hasOwn(INFRA_LABELS,k)?infraLevel(t,k):stadiumState(t)[k]]));
     const entries=game.memorialFacilities??={};
-    const add=(key,level,label)=>{if(!entries[key])entries[key]={id:'facility:'+key,year:game.year,date:flowGet()?.date||calendarNextDay()?.date||game.calendar.endDate,teamId:t.id,level,title:label,kind:'facility',body:Object.entries(levels).map(([k,v])=>(INFRA_LABELS[k]||STADIUM_KEYS[k]?.[0]||k)+' Lv.'+v).join(' / ')};};
+    const add=(key,level,label)=>{if(!entries[key])entries[key]={id:'facility:'+key,year:game.year,date:flowGet()?.date||calendarNextDay()?.date||game.calendar.endDate,teamId:t.id,level,title:label,kind:'facility',body:Object.entries(levels).map(([k,v])=>(INFRA_LABELS[k]||STADIUM_KEYS[k]||k)+' Lv.'+v).join(' / ')};};
     for(const lv of [10,15,20])if(Object.values(levels).every(n=>n>=lv))add('all:'+lv,lv,'全8施設 Lv.'+lv+' 達成');
     for(const [k,lv] of Object.entries(levels))if(lv===20)add(k+':20',20,(INFRA_LABELS[k]||({park:'球場',food:'飲食設備',goods:'グッズ設備'})[k]||k)+' Lv.20 達成');
   }
@@ -13408,6 +13409,68 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     dlg.showModal();
   }
   window.addEventListener?.('click',e=>{const b=e.target.closest?.('[data-memorial-id],[data-memorial-page]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();if(ui.page!=='game'||ui.busy||ui.rewardBusy||ui.tab!=='records'||ui.recordSub!=='memorial')return;if(b.dataset.memorialId)memorialOpen(memorialEntries().find(x=>x.id===b.dataset.memorialId));else{ui.memorialPage=Math.max(0,(ui.memorialPage||0)+Number(b.dataset.memorialPage));render();draftJump(0);}},true);
+
+
+  // Verified entitlement adapter is intentionally disconnected in shipping builds.
+  // Only tests inject it. Store/backend must independently verify it before activation.
+  let vipStatusProvider=null;
+  function vipRevenueBonus(t,eligible){
+    if(scenarioLab||t.id!==game.selectedId||!vipStatusProvider||!Number.isFinite(eligible)||eligible<=0)return 0;
+    const status=vipStatusProvider();return status?.verified===true&&status.vip===true?r2(eligible*.2):0;
+  }
+  function vipOffBonus(t,date,source,eligible){
+    const bonus=vipRevenueBonus(t,eligible);if(!bonus)return 0;
+    const y=Number(date.slice(0,4)),rows=(game.vipOffIncome??={})[y]??=[];
+    // Base monthly settlement already owns idempotency. Record only new base payments.
+    rows.push({teamId:t.id,date,source,eligible,bonus});return bonus;
+  }
+  function vipOffTotal(t,y){return r2((game.vipOffIncome?.[y]||[]).filter(x=>x.teamId===t.id).reduce((n,x)=>n+x.bonus,0));}
+  const vipFinanceBase=financeScreen;
+  financeScreen=function(){const t=myTeam(),v=game.financeLedger?.year===game.year?game.financeLedger.clubs?.[t.id]:null,bonus=r2((v?.vipIncome||0)+vipOffTotal(t,game.year));return vipFinanceBase().replace('<div class="device-content">','<div class="device-content"><section class="panel"><h3>VIP収入明細</h3>'+offdeskMoneyRow('今季のVIP増収（入金済）',bonus)+'<p class="small">現行配信ではVIP販売は準備中です。通常収入・移籍収入は変更していません。</p></section>');};
+  const vipArchiveBase=archiveSeason;
+  archiveSeason=function(){vipArchiveBase();const a=game.seasonArchive?.find(x=>x.year===game.year);if(a&&!Object.hasOwn(a,'vipIncome'))a.vipIncome=r2((game.financeLedger?.clubs?.[game.selectedId]?.vipIncome||0)+vipOffTotal(myTeam(),game.year));};
+
+  // Prompt flags are local presentation state only; rewards are never granted here.
+  function memorialNoticeEnabled(){try{return localStorage.getItem('pl-memorial-notices')!=='off';}catch{return true;}}
+  function memorialNotice(e){
+    if(scenarioLab||!e?.id||!e.title)return;
+    const tier=memorialTier(e);if(tier==='quiet')return;
+    const s=game.memorialNotice??={seen:{},special:0,pending:[]};
+    if(Object.hasOwn(s.seen,e.id))return;
+    s.seen[e.id]=true;if(tier==='special')s.special++;
+    if(!memorialNoticeEnabled()||tier==='special'&&s.special%3!==0)return;
+    s.pending.push({id:e.id,year:e.year,title:e.title,tier});
+  }
+  const memorialNewsBase=collectMilestoneNews;
+  collectMilestoneNews=function(entry){
+    const before=(game.milestoneNews||[]).length,ids=memorialNewsBase(entry);
+    for(const e of (game.milestoneNews||[]).slice(before))if(e.teamId===game.selectedId&&(e.recordKey||e.featKey||e.careerKey))memorialNotice({...e,id:'news:'+e.id});
+    return ids;
+  };
+  const memorialRareBase=rareQueue;
+  rareQueue=function(...args){
+    const ok=memorialRareBase(...args);
+    if(ok){const e=game.rareNews.at(-1);if(e&&(e.teamId===game.selectedId||e.kind==='foreign-discovery'||String(e.id).includes(':tournament:')||String(e.id).includes(':university:')))memorialNotice({...e,id:'rare:'+e.id});}
+    return ok;
+  };
+  const memorialFacilityNoticeBase=memorialFacility;
+  memorialFacility=function(t){const before=new Set(Object.keys(game.memorialFacilities||{}));memorialFacilityNoticeBase(t);for(const [k,e] of Object.entries(game.memorialFacilities||{}))if(!before.has(k))memorialNotice(e);};
+  const memorialArchiveBase=archiveSeason;
+  archiveSeason=function(){const before=(game.seasonArchive||[]).length;memorialArchiveBase();if((game.seasonArchive||[]).length>before){for(const e of memorialEntries())if(e.year===game.year&&(e.kind==='championship'||e.anniversary))memorialNotice(e);}};
+  const memorialHQBase=frontOfficeScreen;
+  frontOfficeScreen=function(){
+    const raw=memorialHQBase(),pending=game.memorialNotice?.pending||[];
+    if(!memorialNoticeEnabled()||!pending.length||flowGet()?.active||flowInbox()||ui.busy)return raw;
+    const recent=pending.slice(-3).reverse();
+    return raw+'<section class="panel memorial-gallery"><div class="eyebrow">MEMORIAL · NEW</div><h3>球団の記念実績</h3>'+recent.map(e=>'<p>'+h(e.title)+'</p>').join('')+'<p class="small">未確認 '+pending.length+'件。閲覧せず日程を進められます。</p><button class="btn outline full" data-memorial-hq>記念アルバムを見る</button><button class="btn outline full" data-memorial-dismiss>案内を閉じる</button></section>';
+  };
+  const memorialGalleryBase=memorialScreen;
+  memorialScreen=function(){return memorialGalleryBase().replace('<h2>記念アルバム</h2>','<h2>記念アルバム</h2><button class="btn outline full" data-memorial-setting aria-pressed="'+memorialNoticeEnabled()+'">共有案内：'+(memorialNoticeEnabled()?'ON':'OFF')+'</button>');};
+  window.addEventListener?.('click',e=>{const b=e.target.closest?.('[data-memorial-hq],[data-memorial-dismiss],[data-memorial-setting]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();if(ui.page!=='game'||ui.busy||ui.rewardBusy||scenarioLab&&b.matches('[data-memorial-setting]'))return;
+    if(b.matches('[data-memorial-setting]')){try{const enabled=!memorialNoticeEnabled();localStorage.setItem('pl-memorial-notices',enabled?'on':'off');if(!enabled&&game.memorialNotice)game.memorialNotice.pending=[];}catch{showToast('設定を保存できませんでした。',true);return;}}
+    else{if(game.memorialNotice)game.memorialNotice.pending=[];if(b.matches('[data-memorial-hq]')){ui.tab='records';ui.recordSub='memorial';ui.memorialPage=0;}}
+    save();render();draftJump(0);
+  },true);
 
   const appRoot=document.querySelector('#app');
   if(appRoot)appRoot.innerHTML='<div class="title-screen"><h2>セーブデータを読み込んでいます…</h2></div>';
