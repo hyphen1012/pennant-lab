@@ -2,7 +2,7 @@
 const {chromium}=require('playwright'),fs=require('node:fs'),path=require('node:path');
 const base=process.env.PL_AUDIT_URL||'http://127.0.0.1:8765/';
 const categories=['PARALLEL','STAR','LEGEND','IMMORTAL','再来','転生','輪廻転生','異界転生','星煌転生','伝説転生'];
-const cases=['fa','reply','camp','facilities','sponsor','commerce','opening-promo'];
+const cases=['report-intro','report-self','report-draft','report-renewal','report-retirement','fa','reply','camp','facilities','sponsor','commerce','opening-promo'];
 // Instrument only the test response. The shipping HTML and its save format stay untouched.
 const source=fs.readFileSync('index.html','utf8');
 const screenNames=[...new Set([...source.matchAll(/function\s+(\w+(?:Screen|View))\s*\(/g)].map(m=>m[1]))].sort();
@@ -57,6 +57,30 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
    }
    for(const k of cases){
     current='scenario-'+k;await title();await click('[data-action="scenario-start"][data-value="'+k+'"]');await shot('scenario-'+k);
+    if(k==='report-intro'){
+     await click(action('report-intro-next'));await shot('report-intro-office');await click(action('report-intro-next'));await shot('report-intro-final');await click(action('report-intro-next'));
+    }
+    if(['report-self','report-draft','report-renewal'].includes(k)){
+     const id={'report-self':'self','report-draft':'draft','report-renewal':'renewal1'}[k];
+     await click('[data-action="flow-open"][data-job="'+id+'"]');
+     if(await page.locator(action('event-intro-continue')).first().isVisible())await click(action('event-intro-continue'));
+     if(k==='report-self'){
+      if(await page.locator('.report-support').count())throw Error('support appeared before training choice');
+      await click(action('annual-run'));await shot('report-self-support');
+      if(!(await page.locator('.report-support').isVisible()))throw Error('support missing after training choice');
+      await click(action('report-self-back'));await click(action('annual-run'));await click(action('annual-run'));
+     }else if(k==='report-draft'){
+      await page.locator(action('draft-start')).first().waitFor({state:'visible',timeout:8000});await shot('report-draft-ready');await click(action('draft-start'));await shot('report-draft-started');
+     }else{
+      const text=await page.locator('main').innerText();if(!/STAR|LEGEND/.test(text))throw Error('special renewal players missing');
+      await shot('report-renewal-ready');await click(action('renewal-submit-all'));await shot('report-renewal-bonus');await click(action('renewal-report-cancel'));
+     }
+    }
+    if(k==='report-retirement'){
+     await click(action('flow-inbox'));await click(action('career-event-accept'));await click(action('career-event-confirm'));
+     const next=page.locator(action('career-event-dismiss'));if(!(await next.innerText()).includes('次の去就相談'))throw Error('next retirement consultation missing');
+     await click(action('career-event-dismiss'));await page.locator(action('career-event-accept')).waitFor({state:'visible'});await shot('report-retirement-next');
+    }
     if(k==='fa'||k==='reply'){
      if(k==='fa'){
       await click('[data-action="flow-open"][data-value="news"]');await shot('fa-eve-news');
