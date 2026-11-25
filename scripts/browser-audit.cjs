@@ -2,7 +2,7 @@
 const {chromium}=require('playwright'),fs=require('node:fs'),path=require('node:path');
 const base=process.env.PL_AUDIT_URL||'http://127.0.0.1:8765/';
 const categories=['PARALLEL','STAR','LEGEND','IMMORTAL','再来','転生','輪廻転生','異界転生','星煌転生','伝説転生'];
-const cases=['report-intro','report-self','report-draft','report-renewal','report-retirement','fa','reply','camp','facilities','sponsor','commerce','opening-promo'];
+const cases=['report-intro','report-self','report-draft','report-renewal','report-retirement','report-season','fa','reply','camp','facilities','sponsor','commerce','opening-promo'];
 // Instrument only the test response. The shipping HTML and its save format stay untouched.
 const source=fs.readFileSync('index.html','utf8');
 const screenNames=[...new Set([...source.matchAll(/function\s+(\w+(?:Screen|View))\s*\(/g)].map(m=>m[1]))].sort();
@@ -75,6 +75,24 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
       const text=await page.locator('main').innerText();if(!/STAR|LEGEND/.test(text))throw Error('special renewal players missing');
       await shot('report-renewal-ready');await click(action('renewal-submit-all'));await shot('report-renewal-bonus');await click(action('renewal-report-cancel'));
      }
+    }
+    if(k==='report-season'){
+     const before=await page.evaluate(()=>window.__plSlotAudit.state());
+     await click(action('advance-day'));
+     const outcome=page.locator('.report-static-result');
+     const skip=page.locator(action('watch-skip')).first();
+     // Either a rest day or the actual game replay; no fabricated game state.
+     await page.waitForFunction(()=>document.querySelector('[data-action="watch-skip"],.report-static-result')||!window.__plAudit.state().busy,{},{timeout:15000});
+     if(await skip.isVisible())await skip.click();
+     await page.waitForFunction(()=>!window.__plAudit.state().busy,{},{timeout:30000});
+     const after=await page.evaluate(()=>window.__plSlotAudit.state());
+     if(after.day<before.day||after.day>before.day+1)throw Error('one-day game processed more than once');
+     if(await outcome.isVisible()){
+      await shot('report-season-result');const score=await page.locator('.result-score-row').first().innerText();
+      await page.waitForTimeout(900);if(score!==await page.locator('.result-score-row').first().innerText())throw Error('result unstable');
+      await click(action('finish-review'));
+     }
+     await shot('report-season-hq');
     }
     if(k==='report-retirement'){
      await click(action('flow-inbox'));await click(action('career-event-accept'));await click(action('career-event-confirm'));
