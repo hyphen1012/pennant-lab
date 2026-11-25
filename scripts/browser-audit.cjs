@@ -41,7 +41,7 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
     if(first.day!==1||first.id!==2)throw Error('normal slot first day');
     await title();await open(1,'continue-slot');
     const restored=await slotState();if(restored.day!==first.day||restored.id!==first.id||restored.cash!==first.cash)throw Error('normal slot restore');
-    await title();await open(2,'new-slot');await choose(3);
+    await title();await open(2,'new-slot');await flush();await choose(3);
     const second=await slotState();if(second.slot!==2||second.day!==0||second.id!==3)throw Error('second slot isolation');
     await title();const winner=await page.evaluate(()=>window.__plSlotAudit.race());if(winner!==1||(await slotState()).day!==1)throw Error('overlapping slot opens');
     await title();await page.evaluate(()=>window.__plSlotAudit.clearPreview(1));await title();
