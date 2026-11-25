@@ -69,7 +69,7 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
      if(await page.locator(action('event-intro-continue')).first().isVisible())await click(action('event-intro-continue'));
      if(k==='report-self'){
       if(await page.locator('.report-support').count())throw Error('support appeared before training choice');
-      await click(action('annual-run'));await shot('report-self-support');
+      await click(action('annual-run'));await detail('care');await shot('report-self-support');
       if(!(await page.locator('.report-support').isVisible()))throw Error('support missing after training choice');
       await click(action('report-self-back'));await click(action('annual-run'));await click(action('annual-run'));
      }else if(k==='report-draft'){
@@ -147,7 +147,7 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
      await until('self');await enter('self');await shot('self-report');await click(action('ceremony-next'));await until('camp');await enter('camp');await checkCampPicker();await shot('spring-sites');
      await click(action('ref-camp-next'));await shot('spring-kickoff');await click(action('ref-camp-next'));await check(s=>s.jobs.camp==='waiting'&&s.camp===2,'camp waits for first visit');
      await until('camp');await enter('camp');await shot('spring-visit-first');await click(action('ref-visit','rest'));await click(action('ref-visit-finish'));await check(s=>s.jobs.camp==='waiting'&&s.camp===3,'camp waits for second visit');
-     await until('camp');await enter('camp');await shot('spring-visit-second');await click(action('annual-run'));await until('camp');await enter('camp');await shot('spring-report');
+     await until('camp');await enter('camp');await shot('spring-visit-second');await click(action('annual-run'));await until('camp');await enter('camp');await page.locator('[data-training-result="camp"]').waitFor({state:'visible'});await shot('spring-report');
      for(const tab of ['INJURY','NEW','UP','STAY','DOWN']){await click(action('ref-report',tab));await shot('spring-report-'+tab);}
      await click(action('ceremony-next'));await until('exhibition');await enter('exhibition');await shot('exhibition-policy');for(const k of ['first','balanced','youth'])await selectPolicy(k);await click(action('annual-run'));if(!(await page.locator('main').innerText()).includes('若手育成'))throw Error('meeting policy mismatch');await click(action('annual-run'));await until('exhibition');await enter('exhibition');for(const key of ['pitch','bat','field']){await page.locator('[data-digest-cut="'+key+'"]').waitFor({state:'visible',timeout:6000});await shot('exhibition-digest-'+key);}await page.locator('.preseason-results').waitFor({state:'visible',timeout:8000});if(await page.locator('[data-preseason-result]').count()!==6)throw Error('preseason full results missing');await shot('exhibition-report');await check(s=>s.exhibition===36,'exhibition game count');await click(action('ceremony-next'));
     }
@@ -171,7 +171,7 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
     if(k==='opening-promo'){
      await dayTo('commerce-open','opening-promo');await click(action('commerce-open','opening-promo'));await click(action('commerce-start'));
      for(let i=0;i<3;i++){await click(action('commerce-plan',i));await shot('opening-promo-plan-'+i);}
-     await click(action('commerce-confirm'));await click(action('commerce-schedule-finish'));await dayTo('commerce-open','opening-promo');await click(action('commerce-open','opening-promo'));await click(action('commerce-opening-live-finish'));await shot('opening-promo-result');await click(action('commerce-finish'));
+     await click(action('commerce-confirm'));await click(action('commerce-schedule-finish'));await dayTo('commerce-open','opening-promo');await click(action('commerce-open','opening-promo'));await click(action('commerce-opening-live-finish'));await detail('stadium');await shot('opening-promo-result');await click(action('commerce-finish'));
     }
     if(k==='facilities'){
      for(const t of tabs){current='tab-'+t;await click('[data-action="tab"][data-tab="'+t+'"]');await shot('tab-'+t);}
