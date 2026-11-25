@@ -22,6 +22,7 @@ replace("  const appRoot=document.querySelector('#app');","  const appRoot=docum
 replace('<script>','<script src="native-runtime.js"></script>\n<script>');
 // Native-only privacy entry is inserted beside the title slot list.
 html=html.replace('<div class="title-slot-title">','<button type="button" class="btn outline full" data-mobile-privacy>広告プライバシー設定</button><div class="title-slot-title">');
+if(production)html=require('./release-surface.cjs').releaseSurface(html);
 const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];if(!script)throw Error('game script missing');new Function(script);
 fs.writeFileSync(path.join(out,'index.html'),html);
 esbuild.buildSync({entryPoints:[path.join(__dirname,'src/index.js')],bundle:true,format:'iife',platform:'browser',outfile:path.join(out,'native-runtime.js'),define:{__PL_CONFIG__:JSON.stringify({health,units,production})}});

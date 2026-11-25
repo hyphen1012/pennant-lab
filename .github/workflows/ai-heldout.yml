@@ -1,0 +1,57 @@
+name: Adaptive AI held-out validation
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/ai-heldout-summary.cjs'
+      - '.github/workflows/ai-heldout.yml'
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {seed: 2467, fixed: -1}
+          - {seed: 2467, fixed: 3}
+          - {seed: 3719, fixed: -1}
+          - {seed: 3719, fixed: 3}
+          - {seed: 6949, fixed: -1}
+          - {seed: 6949, fixed: 8}
+          - {seed: 10037, fixed: -1}
+          - {seed: 10037, fixed: 8}
+    env:
+      FIXED_TEAM: ${{ matrix.fixed }}
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          mkdir -p test-results
+          set -o pipefail
+          node scripts/year-cycle-check.cjs 10 ${{ matrix.seed }} | tee test-results/heldout.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: heldout-${{ matrix.seed }}-${{ matrix.fixed }}
+          path: test-results/
+  aggregate:
+    needs: compare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: heldout-*
+          path: heldout-results
+      - run: node scripts/ai-heldout-summary.cjs heldout-results
+      - uses: actions/upload-artifact@v4
+        with:
+          name: heldout-report
+          path: test-results/heldout-comparison.json

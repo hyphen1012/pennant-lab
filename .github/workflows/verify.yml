@@ -82,3 +82,5 @@ jobs:
         if: always()
       - run: node scripts/account-http-check.cjs
         if: always()
+      - run: node mobile/release-surface-check.cjs
+        if: always()
