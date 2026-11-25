@@ -10,7 +10,12 @@ jobs:
   natural-investment:
     runs-on: ubuntu-latest
     timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [1937, 4391, 8821]
     env:
+      FACILITY_SEED: ${{ matrix.seed }}
       FIXED_TEAM: -1
       STOP_AFTER_FACILITY: '1'
       NODE_OPTIONS: --max-old-space-size=6144
@@ -22,12 +27,12 @@ jobs:
       - run: |
           mkdir -p test-results
           set -o pipefail
-          node scripts/year-cycle-check.cjs 55 1937 | tee test-results/facility-cycle.log
+          node scripts/year-cycle-check.cjs 55 "$FACILITY_SEED" | tee test-results/facility-cycle.log
           node scripts/facility-endurance.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: natural-facility-endurance
+          name: natural-facility-endurance-${{ matrix.seed }}
           path: test-results/
 
 # v0.9.148: revalidate natural first arrival and five full subsequent seasons.
