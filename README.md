@@ -5,7 +5,7 @@
 ## プレイする
 
 - [PENNANT LAB 公開版](https://hyphen1012.github.io/pennant-lab/)
-- GitHub `main` の実装バージョン：**v0.9.123（REAL CLUB ECONOMY）**。GitHub Pagesの公開反映には時間差が生じる場合があります。
+- GitHub `main` の実装バージョン：**v0.9.146（RELEASE VALIDATION）**。GitHub Pagesの公開反映には時間差が生じる場合があります。
 
 ## 主な実装済み機能
 

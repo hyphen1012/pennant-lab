@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - 'index.html'
       - 'scripts/browser-audit.cjs'
       - '.github/workflows/browser-audit.yml'
 jobs:

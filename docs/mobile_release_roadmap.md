@@ -22,3 +22,9 @@
 
 ## v0.9.142 native pilot
 Android debug APK / iOS Simulator app のCIビルド成功。mobile/README.md を参照。本番広告ID、署名、ストア登録、実機、接続先運用は未完了。v144で再ビルドを実施する。
+
+## v0.9.145–146 validation (2026-11-25)
+- v144: regular regression 18/20; after fixture correction v145 19/20 (legacy smoke still failing). Browser audit and debug native builds v144 succeeded; new index changes now trigger both workflows.
+- v144 annual 10-year policy comparison: 6/6 complete, no reserve injection. v145 8/10 complete: seed 12011 in both modes failed in 2034 with club 2 cash -1.92 / -2.31; annual forecast -6.55 / -7.99. Do not mark economics or adaptive performance as proven. Evidence-gated tactics are implemented; controlled synthetic policy checks passed, not a guarantee of a winning record.
+- v146: CPU renewal forecasts next-year revenues, payroll and reserves; releases eligible excess-depth players before signing when forecast is insufficient; no cash subsidy and no override of manual GM contracts. Headless annual tests use the same delegated plan for the test GM. Pending CI results. Natural facility acceptance requires eight facilities at Lv.20 and five further annual snapshots, with all twelve clubs' balances/levels recorded. 150-year limit, no bailouts. It is a test, not an achieved milestone.
+- Production release is NOT approved: legacy smoke, long endurance, latest browser and builds, native/device verification, production ads, signing and account setup are open. Do not label v146 as RC or 1.0.

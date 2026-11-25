@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - 'index.html'
       - 'mobile/**'
       - '.github/workflows/mobile-build.yml'
 jobs:
