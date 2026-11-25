@@ -8,7 +8,7 @@ const source=fs.readFileSync('index.html','utf8');
 const screenNames=[...new Set([...source.matchAll(/function\s+(\w+(?:Screen|View))\s*\(/g)].map(m=>m[1]))].sort();
 const marker="  const appRoot=document.querySelector('#app');";
 if(source.split(marker).length!==2||screenNames.length<60)throw Error('screen instrumentation anchors missing');
-const instrumentation='const __plScreens=new Set();window.__plAudit={take:()=>{const a=[...__plScreens];__plScreens.clear();return a;}};\n'+screenNames.map(n=>n+'=(fn=>function(...args){__plScreens.add('+JSON.stringify(n)+');return fn.apply(this,args);})('+n+');').join('\n')+'\n';
+const instrumentation='const __plScreens=new Set();window.__plAudit={take:()=>{const a=[...__plScreens];__plScreens.clear();return a;},state:()=>({page:ui.page,tab:ui.tab,phase:game.ceremonyStage,active:flowGet()?.active,room:offdeskState()?.floorRoom,transit:ui.faTransit?.kind,open:offdeskState()?.open,intro:offdeskState()?.intro,safe:offdeskSafe(),busy:ui.busy,storageFailure:!!storageFailure})};\n'+screenNames.map(n=>n+'=(fn=>function(...args){__plScreens.add('+JSON.stringify(n)+');return fn.apply(this,args);})('+n+');').join('\n')+'\n';
 const tabs=['team','roster','hq','business','records'];
 const business=['finance','stadium','facilities','market','scout','foreign','manager','care','staff','club'];
 (async()=>{
@@ -16,6 +16,7 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
  fs.mkdirSync('test-results/browser',{recursive:true});
  try{for(const width of [320,360,430]){
   const page=await browser.newPage({viewport:{width,height:850},isMobile:true,hasTouch:true,deviceScaleFactor:1,reducedMotion:width===320?'reduce':'no-preference'});
+  await page.addInitScript(()=>{window.__plAuditClicks=[];window.addEventListener('click',e=>{const el=e.target.closest?.('[data-action]');window.__plAuditClicks.push({action:el?.dataset.action,id:el?.dataset.id,tag:e.target.tagName});if(window.__plAuditClicks.length>12)window.__plAuditClicks.shift();},true);});
   await page.route(base,async route=>{
    const res=await route.fetch(),html=await res.text();
    if(html.split(marker).length!==2)throw Error('served game audit anchor missing');
@@ -49,8 +50,12 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
      await page.locator(action('fa-floor-room')).first().waitFor({timeout:8000});await shot(k+'-floor');
      const ids=await page.locator(action('fa-floor-room')).evaluateAll(els=>els.map(e=>e.dataset.id));
      for(const [i,id] of ids.slice(0,10).entries()){
-      await click('[data-action="fa-floor-room"][data-id="'+id+'"]');
-      if(await page.locator(action('fa-floor-transit-skip')).first().isVisible()){await shot(k+'-door-'+i);await click(action('fa-floor-transit-skip'));}
+      current=k+'-room-entry-'+i;
+      const tile=page.locator('[data-action="fa-floor-room"][data-id="'+id+'"]').first();
+      await tile.scrollIntoViewIfNeeded();await tile.click({timeout:8000});
+      await page.locator('.fa-transit,.fa-room').first().waitFor({timeout:8000});
+      const skip=page.locator(action('fa-floor-transit-skip')).first();
+      if(await skip.isVisible()){await shot(k+'-door-'+i);if(await skip.isVisible())await skip.click({timeout:8000}).catch(async err=>{if(!(await page.locator('.fa-room').isVisible()))throw err;});}
       await page.locator('.fa-room').waitFor({timeout:8000});await shot(k+'-room-'+i);
       await click(action('fa-floor-list'));
      }
@@ -84,7 +89,7 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
      for(const t of business){current='business-'+t;await click('[data-action="business-sub"][data-sub="'+t+'"]');await shot('business-'+t);}
     }
    }
-  }catch(e){errors.push({width,screen:current,error:e.message});}
+  }catch(e){const detail=await page.evaluate(()=>({state:window.__plAudit?.state(),clicks:window.__plAuditClicks,heading:document.querySelector('main h2')?.innerText,actions:[...document.querySelectorAll('main [data-action]')].slice(0,12).map(e=>({action:e.dataset.action,id:e.dataset.id}))})).catch(()=>null);errors.push({width,screen:current,error:e.message,detail});await page.screenshot({path:path.join('test-results/browser',width+'-failure.png')}).catch(()=>{});}
   await page.close();
  }}finally{await browser.close();const coverage=screenNames.map(name=>({name,capturedAt:rows.filter(r=>r.screens?.includes(name)).map(r=>({width:r.width,shot:r.name})),quality:'not visually adjudicated'}));
  fs.writeFileSync('test-results/browser/coverage.json',JSON.stringify({scope:'Functions called since prior screenshot; not proof that every branch or artistic quality was inspected',total:coverage.length,observed:coverage.filter(x=>x.capturedAt.length).length,coverage},null,2));
