@@ -2,7 +2,10 @@
 function createGate({probe,now=Date.now,onChange=()=>{},ttl=15000}){
   let validAt=-Infinity,pending=null,generation=0,visible=true,appActive=true;
   const active=()=>visible&&appActive;
-  const ready=()=>active()&&now()-validAt<ttl;
+  const ready=()=>{const age=now()-validAt;return active()&&Number.isFinite(age)&&age>=0&&age<ttl;};
+  // Expire the previously accepted lease even when a new probe is still pending.
+  // Keep that probe in flight: it may establish a new valid lease on success.
+  function expire(){if(!ready()){validAt=-Infinity;onChange(false);return true;}return false;}
   function invalidate(){generation++;validAt=-Infinity;pending=null;onChange(false);}
   function setVisible(value){visible=value===true;if(!active())invalidate();}
   function setAppActive(value){appActive=value===true;if(!active())invalidate();}
@@ -11,6 +14,7 @@ function createGate({probe,now=Date.now,onChange=()=>{},ttl=15000}){
   async function check(force=false){
     if(!active())return false;
     if(!force&&ready())return true;
+    expire();
     if(pending)return pending;
     const token=generation;
     const task=Promise.resolve().then(probe).then(ok=>{
@@ -20,7 +24,7 @@ function createGate({probe,now=Date.now,onChange=()=>{},ttl=15000}){
     pending=task;
     try{return await task;}finally{if(pending===task)pending=null;}
   }
-  return {ready,check,invalidate,setActive,setVisible,setAppActive};
+  return {ready,check,expire,invalidate,setActive,setVisible,setAppActive};
 }
 function createReward({online,consent,initialize,prepare,show}){
   let busy=false,initialized=false;

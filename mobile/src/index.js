@@ -22,7 +22,8 @@ if(native){
     }
     overlay.hidden=online;overlay.style.display=online?'none':'grid';overlay.querySelector('#pl-backup').hidden=!backup;
   }
-  const gate=createGate({probe:async()=>{
+  // Monotonic time is independent of manual device clock changes.
+  const gate=createGate({now:()=>performance.now(),probe:async()=>{
     const response=await CapacitorHttp.get({url:config.health+'?n='+Date.now(),headers:{'Cache-Control':'no-cache'},connectTimeout:5000,readTimeout:5000,responseType:'text'});
     return response.status===200&&String(response.data).trim()==='PENNANT-LAB-ONLINE-v1';
   },onChange:update});
@@ -65,9 +66,12 @@ if(native){
   window.addEventListener('offline',()=>gate.invalidate());
   window.addEventListener('online',()=>void gate.check(true));
   App.addListener('appStateChange',({isActive})=>{gate.setAppActive(isActive);if(isActive)void gate.check(true);});
+  // If the main thread was paused, enforce expiry before an app control acts.
+  window.addEventListener('click',e=>{const root=document.querySelector('#app');if(root?.contains(e.target)&&!gate.ready()){gate.expire();e.preventDefault();e.stopImmediatePropagation();void gate.check(true);}},true);
   document.addEventListener('click',e=>{if(e.target.closest?.('[data-mobile-privacy]')){e.preventDefault();e.stopImmediatePropagation();void window.PennantNative.privacy().catch(()=>alert('広告のプライバシー設定を開けませんでした。'));}},true);
   gate.setVisible(!document.hidden);
   update(false);
   void gate.check(true).then(ok=>{if(ok)void refreshConsent().catch(()=>{});});
+  setInterval(()=>{if(!document.hidden)gate.expire();},1000);
   setInterval(()=>{if(!document.hidden)void gate.check(true);},10000);
 }
