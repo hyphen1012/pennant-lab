@@ -1320,3 +1320,7 @@ console.log('PASS: central facilities navigation and compact farm portrait rules
 
 for(const key of ['meeting','pitch','bat','field']){const art=fs.readFileSync('assets/scenes/preseason-'+key+'.svg','utf8');assert(art.startsWith('<svg')&&art.includes('viewBox="0 0 960 540"'));assert(art.length>4000);}
 assert.match(html,/REPORT_DIGEST_CUTS=\[\['pitch'/);assert.match(html,/report-digest-skip/);assert.doesNotMatch(html,/data-action="report-digest-next"/);assert.match(html,/data-preseason-result/);
+
+// v165 R58/R59: policy must reach the click dispatcher.
+assert.match(html,/'annual-pick','annual-auto','annual-clear','annual-run','annual-exhibition-choice'\]\.includes\(action\)\)return;/);
+assert.match(html,/camp-compact-picker/);assert.match(html,/data-camp-selected/);
