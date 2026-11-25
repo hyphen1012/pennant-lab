@@ -17,6 +17,6 @@ const harness="\nconst assert=(condition,message)=>{if(!condition)throw Error(ga
 const code=input.slice(0,end).replace("(() => {","return (() => {").replace("((Date.now()^0x53e719f1)>>>0)||1937",String(seed)) + harness+"})();";
 const document={querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){},body:{appendChild(){},insertAdjacentHTML(){}}};
 const localStorage={getItem:()=>null,setItem(){},removeItem(){}};
-const result=new Function("document","window","localStorage","setTimeout","clearTimeout","TEST_YEARS","TEST_SEED","TEST_RESERVE","TEST_LOG",code)(document,{},localStorage,()=>0,()=>{},years,seed,process.env.NO_RESERVE!=='1',true);
+const result=new Function("document","window","localStorage","setTimeout","clearTimeout","TEST_YEARS","TEST_SEED","TEST_RESERVE","TEST_LOG",code)(document,{addEventListener(){},scrollTo(){}},localStorage,()=>0,()=>{},years,seed,process.env.NO_RESERVE!=='1',true);
 fs.mkdirSync('test-results',{recursive:true});fs.writeFileSync('test-results/long-run.json',JSON.stringify(result,null,2));
 console.log(JSON.stringify({...result,rows:undefined},null,2));
