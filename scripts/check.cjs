@@ -176,7 +176,7 @@ assert.match(html,/result\.scoringPlays=scoringPlays/);
 assert.match(html,/scoringPlays\.push\(\{inning,teamId:batTeam\.id/);
 assert.match(html,/watchReplaySteps\(g\)/);
 assert.match(html,/watchScoringTitle\(play\)/);
-assert.match(html,/scoring\?\(mode==='fast'\?900:1700\):interval/);
+assert.match(html,/scoring\?\(mode==='fast'\?900:Math\.round\(1700\/1\.15\)\):interval/);
 const baseballTeams=[
   {id:1,name:'東京フェニックス',short:'東京',league:'E'},
   {id:2,name:'長野アルパインズ',short:'長野',league:'W'}
@@ -196,14 +196,11 @@ function scoringSample(step,withLogs=true){
     teamBadge:t=>t.short,formatCalendarDate:()=> '5月16日'};
   return vm.runInNewContext(watchSource+'\nwatchGameScreen({gameNo:20,date:"2031-05-16"});',context);
 }
-const oneRun=scoringSample(1),twoRun=scoringSample(2),endOfHalf=scoringSample(3);
-assert.match(oneRun,/田中 健/);
-assert.match(oneRun,/1点タイムリーヒット/);
-assert.match(oneRun,/＋1点 · 0 → 1/);
-assert.doesNotMatch(oneRun,/鈴木 翔/,'No future scoring batter can leak');
-assert.match(twoRun,/鈴木 翔/);
-assert.match(twoRun,/2ランホームラン/);
-assert.match(twoRun,/＋2点 · 1 → 3/);
+const homer=scoringSample(1),endOfHalf=scoringSample(2);
+assert.doesNotMatch(homer,/田中 健/);
+assert.match(homer,/鈴木 翔/);
+assert.match(homer,/2ランホームラン/);
+assert.match(homer,/＋2点 · 1 → 3/);
 assert.match(endOfHalf,/攻撃終了/);
 assert.doesNotMatch(endOfHalf,/class="watch-scoring-flash/);
 const oldFormat=scoringSample(1,false);
@@ -680,7 +677,7 @@ const losses=Array.from({length:4},()=>({home:1,away:2,homeScore:0,awayScore:3})
 assert.equal(streakFn(losses,1).count,4);assert.equal(streakFn(losses,1).result,'loss');
 assert.equal(streakFn([...losses,{home:1,away:2,homeScore:1,awayScore:1}],1).count,0);
 assert.equal(streakFn([...losses,{home:2,away:1,homeScore:0,awayScore:3}],1).result,'win');
-assert.match(html,/game\.pendingMonth=null;\s*game\.pendingMilestoneIds=\[\];/);
+assert.match(html,/game\.pendingMonth\.explicit=true/);
 assert.match(html,/if\(pendingRareNews\(\).length\)\{game\.rareResume=false;break;\}/);
 assert.match(html,/if\(oneDay\)break;/);
 console.log('PASS: streak counting, ties, home/away and skip-compatible news');

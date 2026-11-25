@@ -137,7 +137,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
-  dispatch('click',{action:'finish-setup'});assert(app.innerHTML.includes('EVENTS · SCHEDULE'));assert(app.innerHTML.includes('data-action="flow-day"'));
+  dispatch('click',{action:'finish-setup'});dispatch('click',{action:'report-intro-skip'});assert(app.innerHTML.includes('EVENTS · SCHEDULE'));assert(app.innerHTML.includes('data-action="flow-day"'));
   const pre=window.TestFixture.clock();assert.equal(pre.mode,'pre');assert.equal(pre.date,pre.year+'-01-01');
   assert(window.TestFixture.tick());assert.equal(window.TestFixture.clock().jobs.self.status,'ready');
   assert.equal(window.PennantLab.getSnapshot().games,0);assert(app.innerHTML.includes('data-job="self"'));
