@@ -26,3 +26,21 @@
 6. Android/iOS署名/実機試験、修正、正式配信。実機監査だけが残った状態にはまだ達していない。
 
 公開URL: https://hyphen1012.github.io/pennant-lab/?v=150
+
+
+## 追記: v0.9.151–152 / 2026-11-25
+### ユーザーによる優先順位の変更
+500年・1000年はフルシミュレーション/性能保証の正式配信合格条件から除外し、参考試験レベルでよい。100年耐久を主とし、1000年の日付生成・創設記念の軽量試験で最低限確認。旧データは開発用テストセーブのため旧版との完全互換を必須としない。ただし正式配信以降のデータを意図的に消去しない。既存の可逆圧縮・履歴保持・旧形式読込は維持。
+
+### 新規実装
+- [4eb2546](https://github.com/hyphen1012/pennant-lab/commit/4eb2546c3afa1a78e698d88c6874a081ea6f4739) v151: 春季キャンプの事前資金検証（資金不足による他球団の部分実行を防止）。記念アルバムの年度・7分類フィルター。1000年暦と50/100/500/1000創設記念軽量試験。秋季・冬季の並行処理、キャンプ地、自主トレ、春季視察、オープン戦の実クリック監査追加。
+- [d3fb882](https://github.com/hyphen1012/pennant-lab/commit/d3fb882f11f34141b86434320f7d5d6ae5511a34) 正式ネイティブ生成時のテストシナリオ/特殊演出見本/開発用グローバル操作の無効化。開発Web・debug buildは現状維持。追加4シード・2球団のAI対照比較CI（初期/後期5年を記録）。
+- [4b9f58d](https://github.com/hyphen1012/pennant-lab/commit/4b9f58dc6a1981442fbbdae7046bcc6820b23387) v152: 球団経営→球団事業・待遇→医務室で現在の全負傷選手を管理。負傷報告を閉じても任意広告による回復期間半減（切上げ/最低1日）。同一負傷1回、他球団対象外、別負傷は上限なし。通常治療無料。年度をまたぐ元の負傷診断を保存。非同期広告のキャンセル/連打/対象変更/画面変更回帰。Webでは広告未接続のため治療ボタン無効。実広告・券・永久・VIP接続は未完。
+
+### 試験更新
+- [v150ブラウザ](https://github.com/hyphen1012/pennant-lab/actions/runs/45615094675) 331画面状態、検出エラー0。美術・全分岐・実機は別。
+- [v149 VIP50年集約](https://github.com/hyphen1012/pennant-lab/actions/runs/45614814799) 全4試行、全施設Lv10は通常2074/VIP2072（両シード）、全施設Lv15/20未到達、VIP終値増分1001.21/1202.82億、破綻なし。自動経営の結果であり手動プレイ到達年数は未確定。
+- [v151総合回帰](https://github.com/hyphen1012/pennant-lab/actions/runs/45617019813)、[年間モデル比較](https://github.com/hyphen1012/pennant-lab/actions/runs/45617019782)、[ネイティブdebug](https://github.com/hyphen1012/pennant-lab/actions/runs/45617020011)、[正式版表面除外回帰](https://github.com/hyphen1012/pennant-lab/actions/runs/45617264421) 成功。
+- 新規試験（結果は実ログで判定）：[v151拡張ブラウザ](https://github.com/hyphen1012/pennant-lab/actions/runs/45617019778)、[AI独立検証](https://github.com/hyphen1012/pennant-lab/actions/runs/45617264632)、[v152総合回帰](https://github.com/hyphen1012/pennant-lab/actions/runs/45617483675)、[v152ブラウザ](https://github.com/hyphen1012/pennant-lab/actions/runs/45617483549)、[v152ネイティブ](https://github.com/hyphen1012/pennant-lab/actions/runs/45617483494)、[v152 Pages](https://github.com/hyphen1012/pennant-lab/actions/runs/45617482277)。最初の全施設Lv20自然到達＋維持の試験は前回のものを継続中。未確定の試験は合格扱いにしない。
+
+最新版URL: https://hyphen1012.github.io/pennant-lab/?v=152
