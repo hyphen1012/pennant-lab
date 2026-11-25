@@ -576,7 +576,7 @@ console.log('PASS: pitch-count bullpen, left/right matchup, workload and no pitc
 
 // Calendar presentation must not change the persisted save schema or simulate twice.
 assert.match(html,/function calendarDateIntroScreen\(entry\)/);
-assert.match(html,/const dateIntroDelay=mode==='fast'\?640:1500/);
+assert.match(html,/const dateIntroDelay=mode==='fast'\?640:Math\.round\(1500\/1\.15\)/);
 assert.match(html,/await waitForDailyDisplay\(dateIntroDelay\);\s*ui\.dateIntro=false;ui\.autoDay=null;\s*if\(ui\.pauseRequested\|\|document\.hidden\|\|storageFailure\)break;\s*}\s*const entry=processCalendarDay\(\);/);
 assert.match(html,/prefers-reduced-motion:reduce\)\{\.calendar-date-track/);
 const dateStart=inline[1].indexOf('  function calendarOffsetDate(');
