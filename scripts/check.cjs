@@ -1301,11 +1301,11 @@ console.log('PASS: central facilities navigation and compact farm portrait rules
   }
   assert.equal(ids.size,160);
   assert(!venue('none').includes('<svg'));
-  const score=vm.runInNewContext('(function(){'+segment('  function matchOutcome(g){','  function highlightPlayer(g){')+segment('  function gameSetScreen(g){','  function watchInningFrames(g){')+'\nreturn {matchOutcome,gameSetScreen};})()',{h:String,game:{selectedId:1},ui:{watchGame:{auto:true}},myTeam:()=>({id:1,short:'東京'}),getTeam:id=>({id,short:'仙台'})});
+  const score=vm.runInNewContext('(function(){'+segment('  function matchOutcome(g){','  function highlightPlayer(g){')+segment('  function gameSetScreen(g){','  function watchInningFrames(g){')+'\nreturn {matchOutcome,gameSetScreen};})()',{h:String,game:{selectedId:1},ui:{watchGame:{auto:true}},myTeam:()=>({id:1,short:'東京'}),getTeam:id=>({id,short:'仙台'}),clubIdentity:()=>({color:'#b08050'}),clubAccessible:c=>c,teamBadge:t=>'<span class="mini-logo" data-test-team="'+t.id+'"></span>'});
   for(const home of [1,2])for(const [homeScore,awayScore] of [[4,2],[2,4],[0,0],[11,10]]){
     const g={home,away:home===1?2:1,homeScore,awayScore,day:1},r=score.matchOutcome(g),view=score.gameSetScreen(g);
     assert.deepEqual([...view.matchAll(/<b>(\d+)<\/b>/g)].map(m=>Number(m[1])),[r.mine,r.theirs]);
-    assert(view.includes(r.label));
+    assert(view.includes(r.label));assert.equal((view.match(/class="mini-logo"/g)||[]).length,2);assert.equal((view.match(/--score-club:/g)||[]).length,2);
   }
   const players=Array.from({length:20},(_,i)=>({id:i+1,pitch:i<10,rating:90-i%10,stats:{},special:[9,19].includes(i)}));
   const d={rows:players.map(p=>({id:p.id,bonuses:[],status:p.id===2?'signed':'unoffered'}))};
@@ -1317,3 +1317,6 @@ console.log('PASS: central facilities navigation and compact farm portrait rules
   assert(d.rows.every(r=>r.bonuses.length<=1));
   console.log('PASS: 32 venue instances and 160 unique references; 8 GAME SET scores; incentive eligibility');
 }
+
+for(const key of ['meeting','pitch','bat','field']){const art=fs.readFileSync('assets/scenes/preseason-'+key+'.svg','utf8');assert(art.startsWith('<svg')&&art.includes('viewBox="0 0 960 540"'));assert(art.length>4000);}
+assert.match(html,/REPORT_DIGEST_CUTS=\[\['pitch'/);assert.match(html,/report-digest-skip/);assert.doesNotMatch(html,/data-action="report-digest-next"/);assert.match(html,/data-preseason-result/);
