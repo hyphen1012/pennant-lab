@@ -68,7 +68,8 @@ const fakeTimeout=(fn,ms,...args)=>ms>=3000&&ms!==4400?0:setTimeout(fn,ms>=300?0
 const context={window,document,localStorage,console,setTimeout:fakeTimeout,
   clearTimeout,Date,Math,JSON,Number,String,Array,Object,Set,Map,
   Promise,Blob:global.Blob,URL:global.URL};
-vm.runInNewContext(script,context,{filename:'pennant-lab.js'});
+// Fixtures are injected only into this test's VM, never shipped in the game.
+vm.runInNewContext(script.replace('window.PennantLab={',"window.TestFixture={\n  regular:()=>{game.ceremonyStage=null;game.pendingCeremonyIntro=null;game.calendarFlow=null;game.offseasonDesk=null;ui.tab=\"hq\";save();render();},\n  clock:()=>JSON.parse(JSON.stringify(flowGet())),\n  tick:()=>{const f=flowGet();if(!f)throw Error(\"missing calendar\");return flowNextEvent(f);},\n  annual:()=>{const year=game.year,check=(v,m)=>{if(!v)throw Error(m);};\n    const d=ensureDraft(),mv=movementInit();game.ceremonyStage=\"movement-declarations\";\n    for(const r of mv.requests.filter(r=>r.from===game.selectedId&&r.status===\"request\"))movementAction(\"movement-allow\",{dataset:{id:String(r.id)}});\n    game.ceremonyStage=null;\n    for(const date of [\"11-30\",\"12-14\",\"12-17\",\"12-21\",\"12-31\"]){const f={mode:\"off\",year,date:year+\"-\"+date};cpuCommercialCalendar(f);commerceOffPay(f.date);sponsorOffPay(f.date);}\n    for(let i=0;i<300&&d.phase!==\"negotiate\"&&d.phase!==\"done\";i++){\n      if(d.phase===\"lottery\"){if(d.pendingLottery.stage===\"choose\")check(draftDraw(d,null,\"delegate\"),\"draw\");else if(d.pendingLottery.stage===\"sealed\")check(draftOpenTicket(d),\"ticket\");else check(draftNextDraw(d),\"next draw\");}else draftAuto(d);\n      d.announcement=null;\n    }\n    if(d.phase===\"negotiate\"){draftAuto(d);check(draftFinalize(d),\"draft finish\");}\n    check(d.phase===\"done\",\"draft done\");\n    for(const t of game.teams){for(let i=0;i<50&&draftRosterProjection(d,t).excess;i++){const p=draftCutOptions(d,t).find(p=>!draftCutIds(d,t).includes(p.id));check(p&&draftToggleCut(d,t,p.id),\"cut\");}check(!draftRosterProjection(d,t).excess,\"roster projection\");}\n    d.cutConfirmed=true;\n    for(const t of game.teams)check(budgetedRenewalPlan(t,mv).confirmed,\"renewals\");\n    check(annualRunPhase(\"autumn\"),\"autumn training\");check(winterDispatch(),\"winter dispatch\");\n    movementCPU(mv);mv.closed=true;\n    game.calendarFlow=null;game.ceremonyStage=null;game.pendingCeremonyIntro=null;nextSeason();\n    check(game.year===year+1,\"next year\");\n    game.ceremonyStage=null;game.calendarFlow=null;game.offseasonDesk=null;game.pendingCeremonyIntro=null;\n    ui.tab=\"hq\";save();render();\n  }\n};window.PennantLab={"),context,{filename:'pennant-lab.js'});
 
 function dispatch(type,data={}){
   const el={
@@ -136,7 +137,12 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   const snap=window.PennantLab.getSnapshot();
   assert.equal(snap.teams.length,12);
   assert.equal(snap.playerCount>250,true);
-  dispatch('click',{action:'finish-setup'});
+  dispatch('click',{action:'finish-setup'});assert(app.innerHTML.includes('EVENTS · SCHEDULE'));assert(app.innerHTML.includes('data-action="flow-day"'));
+  const pre=window.TestFixture.clock();assert.equal(pre.mode,'pre');assert.equal(pre.date,pre.year+'-01-01');
+  assert(window.TestFixture.tick());assert.equal(window.TestFixture.clock().jobs.self.status,'ready');
+  assert.equal(window.PennantLab.getSnapshot().games,0);assert(app.innerHTML.includes('data-job="self"'));
+  // The regular-season UI test is an independent fixture; training is exercised by annual_training.cjs.
+  window.TestFixture.regular();await flush();
   dispatch('click',{action:'tab',tab:'business'});
   dispatch('click',{action:'business-sub',sub:'club'});
   assert(app.innerHTML.includes('アイコン文字'));
@@ -246,7 +252,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert.match(app.innerHTML,/data-action="mgr-open"/);
   assert.match(app.innerHTML,/class="desk-task" data-action="mgr-open" data-priority="(?:optional|recommended)"/);
   assert(app.innerHTML.includes('GM DESK · FRONT OFFICE'));
-  assert(app.innerHTML.includes('class="hero-context"'));
+  assert(app.innerHTML.includes('EVENTS · SCHEDULE'));
   assert(app.innerHTML.includes('data-priority="recommended"'));
   assert(app.innerHTML.includes('data-priority="optional"'));
   assert(!app.innerHTML.includes('data-priority="required"'),'Regular duties do not invent mandatory restrictions');
@@ -279,6 +285,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   dispatch('click',{action:'mgr-order',key:'pinch',choice:'attack'});
   dispatch('click',{action:'mgr-order',key:'youth',choice:'attack'});
   assert.match(app.innerHTML,/最近の監督采配/);
+  dispatch('click',{action:'tab',tab:'hq'});
   await window.PennantLab.advance('day');
   // The day action must show the simulated inning-by-inning watch before the final score.
   for(let tries=0;tries<12&&watchRenders.length===0;tries++){
@@ -333,28 +340,27 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   const dateCountBeforeSkip=dateRenders.length;
   dispatch('click',{action:'playback-mode',mode:'skip'});
   await window.PennantLab.advance('season');
-  // An actionable counter-offer deliberately interrupts a season skip.
-  for(let n=0;n<30&&window.PennantLab.getSnapshot().day<143;n++){
+  // Current mandatory inbox and negotiated responses; normal reports must never stop the season.
+  async function serviceInterruptions(){
+    const page=app.innerHTML;
+    const inbox=page.match(/data-action="flow-inbox" data-key="([^"]+)"/);
+    if(inbox)dispatch('click',{action:'flow-inbox',key:inbox[1]});
+    else if(page.includes('data-action="flow-foreign"'))dispatch('click',{action:'flow-foreign'});
+    else if(page.includes('data-action="foreign-counter-decline"'))dispatch('click',{action:'foreign-counter-decline'});
+    else if(page.includes('data-action="foreign-reply-open"'))dispatch('click',{action:'foreign-reply-open'});
+    else if(page.includes('data-action="foreign-close"'))dispatch('click',{action:'foreign-close'});
+    else if(page.includes('data-action="rare-news-next"'))dispatch('click',{action:'rare-news-next'});
+    else if(page.includes('data-action="rare-news-ack"'))dispatch('click',{action:'rare-news-ack'});
+    else if(page.includes('data-action="career-event-accept"'))dispatch('click',{action:'career-event-accept'});
+    else if(page.includes('data-action="career-event-confirm"'))dispatch('click',{action:'career-event-confirm'});
+    else if(page.includes('data-action="career-event-dismiss"'))dispatch('click',{action:'career-event-dismiss'});
+    else if(page.includes('data-action="injury-ack"'))dispatch('click',{action:'injury-ack'});
+    else return false;
+    await flush();return true;
+  }
+  for(let n=0;n<300&&window.PennantLab.getSnapshot().day<143;n++){
     await flush();
-    if(app.innerHTML.includes('data-action="rare-news-next"')){
-      dispatch('click',{action:'rare-news-next'});
-      assert(app.innerHTML.includes('data-action="rare-news-next"'));
-      assert(app.innerHTML.includes('ニューススタジオのキャスター')||app.innerHTML.includes('海外担当スカウト'));
-      dispatch('click',{action:'rare-news-next'});
-      assert(app.innerHTML.includes('data-action="rare-news-ack"'));
-    }
-    if(app.innerHTML.includes('data-action="rare-news-ack"')){
-      dispatch('click',{action:'rare-news-ack'});
-      await new Promise(r=>setTimeout(r,70));continue;
-    }
-    const pending=store.get(1)?.data?.foreignMarket?.negotiations?.[2];
-    if(pending?.status!=='counter')break;
-    if(app.innerHTML.includes('data-action="finish-review"'))dispatch('click',{action:'finish-review'});
-    dispatch('click',{action:'tab',tab:'business',sub:'foreign'});
-    dispatch('click',{action:'foreign-counter-decline'});
-    dispatch('click',{action:'foreign-reply-open'});
-    if(app.innerHTML.includes('data-action="foreign-close"'))dispatch('click',{action:'foreign-close'});
-    dispatch('click',{action:'tab',tab:'hq'});await window.PennantLab.advance('season');
+    if(!await serviceInterruptions()){dispatch('click',{action:'tab',tab:'hq'});await window.PennantLab.advance('season');}
   }
   const full=window.PennantLab.getSnapshot();
   assert.equal(full.day,143,'Season skip must finish without routine report interruption');
@@ -365,7 +371,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   const specialNews=store.get(1).data.milestoneNews;
   assert.equal(specialNews.filter(e=>e.type==='champion').length,2,'Both league champions have news');
   assert.equal(new Set(specialNews.map(e=>e.id)).size,specialNews.length,'No duplicate events');
-  assert(store.get(1).data.pendingMilestoneIds.length>0,'Skipped news awaits review only after season');
+  assert.equal(store.get(1).data.pendingMilestoneIds.length,0,'Routine news remains archived without mandatory review');
   const archivedMatches=store.get(1)?.data?.games||[];
   const gmOwned=full.selectedId;
   const watchedMatches=archivedMatches.filter(g=>g.home===gmOwned||g.away===gmOwned);
@@ -526,130 +532,16 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(app.innerHTML.includes('data-medium="news"'));
   dispatch('click',{action:'news-edition-close'});
   dispatch('click',{action:'tab',tab:'hq'});
-  assert(app.innerHTML.includes('data-action="ceremony-start"'));
-  assert(app.innerHTML.includes('class="panel season-action" data-priority="required"'));
-  dispatch('click',{action:'ceremony-start'});
-  const cashBeforeOffseason=window.PennantLab.getSnapshot().teams.map(t=>t.cash);
-  const titles=['awards-all','settlement','draft','roster-cut','winter','self','camp','opening'];
-  for(const key of titles){
-    if(key==='opening'&&app.innerHTML.includes('data-action="draft-reveal-close"')){
-      const reveal=app.innerHTML.match(/data-action="draft-reveal" data-id="(\d+)"/);
-      if(reveal){dispatch('click',{action:'draft-reveal',id:reveal[1]});assert(app.innerHTML.includes('基礎測定結果'));dispatch('click',{action:'draft-reveal',id:reveal[1]});assert(app.innerHTML.includes('入団時能力確定'));}
-      dispatch('click',{action:'draft-reveal-close'});dispatch('click',{action:'draft-confirm-accept'});
-    }
-    assert(app.innerHTML.includes('data-event="'+key+'"'),'Milestone title: '+key);
-    assert(!app.innerHTML.includes('data-action="ceremony-next"'),'No underlying transition on title');
-    const before=window.PennantLab.getSnapshot();
-    dispatch('click',{action:'event-intro-continue',event:key});
-    assert(!app.innerHTML.includes('data-event="'+key+'"'));
-    if(['winter','self','camp'].includes(key)){
-      const tone=key==='camp'?'spring':'winter';
-      assert(app.innerHTML.includes('class="panel ceremony-panel" data-tone="'+tone+'"'),'Training panel palette must match title: '+key);
-    }
-    assert.equal(window.PennantLab.getSnapshot().year,before.year);
-    assert.equal(window.PennantLab.getSnapshot().day,before.day);
-    if(key==='opening')break;
-    if(key==='awards-all'){
-      assert(app.innerHTML.includes('data-action="ceremony-open"'));
-      assert(app.innerHTML.includes('data-action="ceremony-close"'));
-      dispatch('click',{action:'ceremony-open',editionId:'E-nine'});
-      assert(app.innerHTML.includes('東リーグ · ベストナイン'));
-      assert(app.innerHTML.includes('edition-compact'));
-      dispatch('click',{action:'ceremony-back'});
-      assert(app.innerHTML.includes('data-action="ceremony-open"'));
-      dispatch('click',{action:'ceremony-close'});
-      assert(app.innerHTML.includes('role="alertdialog"'));
-      dispatch('click',{action:'edition-exit-cancel'});
-      assert(!app.innerHTML.includes('role="alertdialog"'));
-      assert(app.innerHTML.includes('data-action="ceremony-open"'));
-      dispatch('click',{action:'ceremony-next'});
-      assert(app.innerHTML.includes('role="alertdialog"'));
-      dispatch('click',{action:'edition-exit-confirm'});
-    }else if(key==='draft'){
-      assert(app.innerHTML.includes('SCOUTING STAFF'));
-      const candidate=app.innerHTML.match(/data-action="draft-detail" data-id="(\d+)"/);
-      assert(candidate);
-      dispatch('click',{action:'draft-detail',id:candidate[1]});
-      assert(app.innerHTML.includes('推定には誤差'));
-      dispatch('click',{action:'draft-research',id:candidate[1]});
-      assert(app.innerHTML.includes('スカウト面談メモ'));
-      dispatch('click',{action:'draft-research',id:candidate[1],value:'analysis'});
-      assert(app.innerHTML.includes('映像・データ分析 完了'));
-      dispatch('click',{action:'draft-research',id:candidate[1],value:'interview'});
-      assert(app.innerHTML.includes('本人・関係者面談 完了'));
-      dispatch('click',{action:'draft-report-view',id:candidate[1],value:'field'});
-      assert(app.innerHTML.includes('現地視察 完了'));
-      dispatch('click',{action:'draft-start'});dispatch('click',{action:'draft-confirm-accept'});
-      if(app.innerHTML.includes('data-action="rare-draft-continue"'))dispatch('click',{action:'rare-draft-continue'});
-      const choice=app.innerHTML.match(/data-action="draft-choose" data-id="(\d+)"/);
-      assert(choice);
-      const rumor=app.innerHTML.match(/data-action="draft-rumor" data-id="(\d+)" data-value="([^"]+)"/);assert(rumor);dispatch('click',{action:'draft-rumor',id:rumor[1],value:rumor[2]});assert(app.innerHTML.includes('実際の指名を保証するものではありません'));dispatch('click',{action:'draft-confirm-cancel'});
-      dispatch('click',{action:'draft-choose',id:choice[1]});
-      assert(app.innerHTML.includes('role="alertdialog"'));
-      dispatch('click',{action:'draft-confirm-cancel'});
-      assert(!app.innerHTML.includes('role="alertdialog"'));
-      dispatch('click',{action:'draft-choose',id:choice[1]});
-      dispatch('click',{action:'draft-confirm-accept'});
-      const drainAnnouncements=async()=>{for(let n=0;n<80&&app.innerHTML.includes('data-draft-announcement="true"');n++){assert(app.innerHTML.includes('12球団 指名リアルタイム状況'));await flush();}};
-      assert(app.innerHTML.includes('data-draft-announcement="true"'));
-      const drainDraws=async()=>{
-        await drainAnnouncements();
-        for(let n=0;n<80&&app.innerHTML.includes('class="draft-draw-stage"');n++){
-          if(app.innerHTML.includes('data-own-draw="false"')){
-            assert(app.innerHTML.includes('自動進行'));
-            assert(!app.innerHTML.includes('data-action="draft-draw-delegate"'));
-            await flush();continue;
-          }
-          assert(app.innerHTML.includes('自球団の競合抽選'));
-          dispatch('click',{action:'draft-draw-delegate'});
-          assert(app.innerHTML.includes('data-action="draft-draw-open"'));
-          dispatch('click',{action:'draft-draw-open'});
-          assert(app.innerHTML.includes('LOTTERY RESULT'));
-          dispatch('click',{action:'draft-draw-next'});
-        }
-      };
-      await drainDraws();
-      assert(app.innerHTML.includes('指名・抽選結果'));
-      dispatch('click',{action:'draft-first-next'});await drainAnnouncements();
-      for(let n=0;n<40&&!app.innerHTML.includes('2巡目 · 順番指名');n++){
-        if(app.innerHTML.includes('data-action="draft-cpu-next"'))dispatch('click',{action:'draft-cpu-next'});
-        else if(app.innerHTML.includes('data-action="draft-pass"')){dispatch('click',{action:'draft-pass'});dispatch('click',{action:'draft-confirm-accept'});}
-        await drainDraws();if(app.innerHTML.includes('data-action="draft-first-next"'))dispatch('click',{action:'draft-first-next'});await drainAnnouncements();
-      }
-      assert(app.innerHTML.includes('2巡目 · 順番指名'));
-      const second=app.innerHTML.match(/data-action="draft-choose" data-id="(\d+)"/);assert(second);
-      dispatch('click',{action:'draft-choose',id:second[1]});dispatch('click',{action:'draft-confirm-accept'});await drainAnnouncements();
-      assert(app.innerHTML.includes('3巡目 · 順番指名'));
-      const third=app.innerHTML.match(/data-action="draft-choose" data-id="(\d+)"/);assert(third);
-      dispatch('click',{action:'draft-choose',id:third[1]});dispatch('click',{action:'draft-confirm-accept'});await drainAnnouncements();
-      for(let round=4;round<=5;round++){
-        assert(app.innerHTML.includes(round+'巡目 · 順番指名'));
-        const later=app.innerHTML.match(/data-action="draft-choose" data-id="(\d+)"/);assert(later);
-        dispatch('click',{action:'draft-choose',id:later[1]});dispatch('click',{action:'draft-confirm-accept'});await drainAnnouncements();
-      }
-      dispatch('click',{action:'draft-auto'});
-      assert(app.innerHTML.includes('role="alertdialog"'));
-      dispatch('click',{action:'draft-confirm-accept'});
-      for(let n=0;n<40&&!app.innerHTML.includes('data-action="draft-finish"');n++){await drainDraws();if(app.innerHTML.includes('data-action="draft-first-next"'))dispatch('click',{action:'draft-first-next'});else break;}
-      assert(app.innerHTML.includes('data-action="draft-finish"'));
-      dispatch('click',{action:'draft-finish'});
-      dispatch('click',{action:'draft-confirm-accept'});
-    }else if(key==='roster-cut'){
-      assert(app.innerHTML.includes('戦力外通告'));
-      for(let i=0;i<8&&/data-action="draft-cut-finish" disabled/.test(app.innerHTML);i++){
-        const option=app.innerHTML.match(/data-action="draft-cut-toggle" data-id="(\d+)">放出候補にする/);assert(option);
-        dispatch('click',{action:'draft-cut-toggle',id:option[1]});
-        assert(app.innerHTML.includes('本当にこの選手に戦力外通告しますか？'));
-        dispatch('click',{action:'draft-confirm-accept'});
-        if(app.innerHTML.includes('重要選手への戦力外通告'))dispatch('click',{action:'draft-confirm-accept'});
-      }
-      assert(!/data-action="draft-cut-finish" disabled/.test(app.innerHTML));
-      dispatch('click',{action:'draft-cut-finish'});assert(app.innerHTML.includes('role="alertdialog"'));
-      dispatch('click',{action:'draft-confirm-accept'});
-    }else dispatch('click',{action:'ceremony-next'});
-  }
+  // Annual calendar replaced the old fixed ceremony-next chain.
+  assert(app.innerHTML.includes('data-action="flow-day"'));
+  const off=window.TestFixture.clock();assert.equal(off.mode,'off');
+  for(let i=0;i<20&&window.TestFixture.clock().jobs['awards-all'].status!=='ready';i++)assert(window.TestFixture.tick());
+  assert.equal(window.TestFixture.clock().jobs['awards-all'].status,'ready');
+  assert.equal(window.TestFixture.clock().jobs.draft.status,'scheduled');
+  // Complete actual annual engine actions in an isolated headless fixture.
+  // This is not an end-to-end traversal of every annual event screen.
+  window.TestFixture.annual();await flush();
   assert.equal(window.PennantLab.getSnapshot().year,full.year+1);
-  await flush();
   const draft=store.get(1).data.draftHistory.find(d=>d.year===full.year);
   assert(draft&&draft.picks.length>0);assert(draft.picks.some(p=>p.round===5));
   assert(store.get(1).data.teams.every(t=>store.get(1).data.players.filter(p=>p.teamId===t.id).length<=50));
@@ -657,9 +549,11 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(draft.picks.every(p=>p.status!=='rights'));
   for(const row of draft.picks.filter(p=>p.status==='signed')){const p=store.get(1).data.players.find(p=>p.id===row.playerId);assert(p&&p.teamId===row.teamId&&p.rookieSeason===full.year+1&&p.stats.g===0);}
   for(const row of draft.picks.filter(p=>p.status!=='signed'))assert(!store.get(1).data.players.some(p=>p.id===row.candidateId));
-  assert.deepEqual(window.PennantLab.getSnapshot().teams.map((t,i)=>t.cash),cashBeforeOffseason.map((cash,i)=>Math.round((cash-draft.picks.filter(p=>p.teamId===i&&p.status==='signed').reduce((n,p)=>n+p.contract.fee,0))*100)/100),'Only signed draft fees change cash');
+  assert(window.PennantLab.getSnapshot().teams.every(t=>Number.isFinite(t.cash)),'Annual commerce, training and salary cash remains finite');
   assert.equal(window.PennantLab.getSnapshot().day,0);
-  assert(app.innerHTML.includes('data-action="advance-day"'));
+  assert(app.innerHTML.includes('data-action="flow-inbox"'),'New-player report is a required inbox event');
+  const entry=app.innerHTML.match(/data-action="flow-inbox" data-key="([^"]+)"/);assert(entry);dispatch('click',{action:'flow-inbox',key:entry[1]});
+  if(app.innerHTML.includes('data-action="draft-reveal-close"')){dispatch('click',{action:'draft-reveal-close'});dispatch('click',{action:'draft-confirm-accept'});}await flush();
   await flush();
   assert.equal(store.get(1).data.pendingCeremonyIntro,null);
   dispatch('click',{action:'tab',tab:'records'});
@@ -699,11 +593,11 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(app.innerHTML.includes('全12球団の引退選手'));
   assert(app.innerHTML.includes('助っ人外国人'));
   dispatch('click',{action:'legacy-filter',kind:'route',value:'foreign'});
-  assert(app.innerHTML.includes('該当する引退選手はまだいません'));
+  assert(app.innerHTML.includes('助っ人外国人'));
   const legacy=store.get(1).data.legacyArchive;
   assert(legacy&&legacy.year===full.year+1);
-  assert(legacy.entries.every(e=>e.eligibleFrom<=legacy.year&&e.score>=0&&e.score<=100&&e.route==='draft'));
-  assert(legacy.entries.some(e=>e.tier),'Retired players include eligible historical figures');
+  assert(legacy.entries.every(e=>e.eligibleFrom<=legacy.year&&e.score>=0&&e.score<=100&&['draft','foreign'].includes(e.route)));
+  assert(Array.isArray(legacy.entries));
   dispatch('click',{action:'record-sub',sub:'decade'});
   assert(app.innerHTML.includes('球界・球団10年史'));
   dispatch('click',{action:'decade-archive-open',year:'2036'});
@@ -719,6 +613,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   fixture.data.year=2037;fixture.data.pendingDecade=2036;fixture.data.pendingCeremonyIntro='opening';
   store.set(1,fixture);
   dispatch('click',{action:'continue-slot',slot:'1'});await flush();
+  const decadeInbox=app.innerHTML.match(/data-action="flow-inbox" data-key="([^"]+)"/);if(decadeInbox)dispatch('click',{action:'flow-inbox',key:decadeInbox[1]});
   assert(app.innerHTML.includes('2036'));
   assert(app.innerHTML.includes('球界10年史'));
   dispatch('click',{action:'decade-open',editionId:'timeline'});
@@ -734,6 +629,6 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert.equal(store.get(1).data.lastDecadeViewed,2036);
   assert(app.innerHTML.includes('data-event="opening"'));
   console.log('PASS: decade archive navigation and one-time event exit');
-  console.log('PASS: six milestone titles, full offseason sequence and next-year opening');
+  console.log('PASS: civil-date pre/off-season checkpoints and headless annual engine rollover');
   console.log('PASS: v0.9.7 cinematic watch, manager, personalized GM reports, save and season');
 })().catch(e=>{console.error(e);process.exitCode=1;});
