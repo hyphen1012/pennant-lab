@@ -46,3 +46,7 @@ Android debug APK / iOS Simulator app のCIビルド成功。mobile/README.md �
 
 ## v0.9.147 製品化追加仕様
 [収益化・記念共有設計](monetization_and_memorial.md)参照。新規特殊出現保証の停止、記念アルバムとPNG共有、サーバー用報酬/券/ポイント/VIP分類ルールを実装。サーバー未接続なので報酬・有料権限を付与しない。100年無補填試験成功、全施設試験は別途継続。FA画面の再試験と実機監査は未完了。
+
+
+## 2026-11-25 — v0.9.149–150 development checkpoint
+See [development handoff](development_handoff_2026-11-25.md) for exact commits, CI runs and remaining gates. v149 adds a backwards-reading gzip IndexedDB codec for large saves and coalesces pending writes without deleting history; the prior version cannot read the new compressed record. Keep a backup before migrating. v149 adaptive tactics use opponent-form-adjusted outcomes, reduced exploration and stronger evidence thresholds after warmup. The five paired seeds improved from -21 aggregate wins to +154 (4/5 positive), not a general guarantee. v150 adds VIP preview/verified theme and memorial rendering; no live commerce or trusted provider enabled. v150 regression, native debug build and Pages succeeded. Physical device, full artistic and yearly-UI audit, natural facility max plus five seasons, 500/1000-year actual saves and production credentials remain open.
