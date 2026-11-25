@@ -31,3 +31,5 @@ jobs:
           path: test-results/
 
 # v0.9.148: revalidate natural first arrival and five full subsequent seasons.
+
+# v0.9.167: re-run the unchanged 150-year natural attainment + five-year criterion after capital planning changes.
