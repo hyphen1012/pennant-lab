@@ -1335,7 +1335,7 @@ assert.match(html,/camp-compact-picker/);assert.match(html,/data-camp-selected/)
   let rank=0;const expected=rows.map((r,i)=>{if(i===0||r.value!==rows[i-1].value)rank=i+1;return {...r,rank};});
   for(const page of [0,1,2,10,999,1666,1667]){
    const actual=api.recordPageRows(rows,page,30);
-   assert.deepEqual(JSON.parse(JSON.stringify(actual)),expected.slice(page*30,(page+1)*30));
+   assert.deepEqual(Array.from(actual,r=>({...r})),expected.slice(page*30,(page+1)*30));
    assert(actual.length<=30);
   }
   assert(rows.every(r=>!('rank'in r)));
@@ -1346,4 +1346,17 @@ assert.match(html,/camp-compact-picker/);assert.match(html,/data-camp-selected/)
  const players=[{seasonHistory:[{year:2028},{year:2026}]},{seasonHistory:[{year:2028},{year:2030}]},{}];
  assert.deepEqual(Array.from(api.recordFilterYears(2031,[{year:2027},{year:2028}],players)),[2031,2030,2028,2027,2026]);
  console.log('PASS: 50k historical rows; bounded page allocation, ties in both sort directions, year union and no mutation');
+}
+
+// v184: cancellation remains latched even if the app becomes visible before the timer fires.
+{
+ const s=inline[1],a=s.indexOf('  function pauseForLifecycle(){'),b=s.indexOf("  window.addEventListener?.('pagehide'",a);
+ assert(a>=0&&b>a);let skips=0;const ui={busy:true,pauseRequested:false,autoWait:{skip:()=>skips++}};
+ const pause=vm.runInNewContext(s.slice(a,b)+';pauseForLifecycle',{ui});
+ assert.equal(pause(),true);assert.equal(ui.pauseRequested,true);assert.equal(skips,1);
+ ui.busy=false;ui.pauseRequested=false;assert.equal(pause(),false);assert.equal(ui.pauseRequested,false);
+ assert.match(html,/if\(valid&&!cancelled&&!storageFailure&&/);
+ const native=fs.readFileSync('mobile/prepare.cjs','utf8');assert(native.includes('ui.pauseRequested||document.hidden||storageFailure||!window.PennantNative.ready()'));
+ assert(fs.readFileSync('mobile/src/index.js','utf8').includes("new Event('pl-native-suspend')"));
+ console.log('PASS: lifecycle pause latch and native connection integration');
 }
