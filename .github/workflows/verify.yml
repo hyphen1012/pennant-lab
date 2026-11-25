@@ -26,3 +26,39 @@ jobs:
         if: always()
       - run: node scripts/commerce-check.cjs
         if: always()
+
+      - run: node scripts/annual_training.cjs
+        if: always()
+
+      - run: node scripts/daily-wage-stint-check.cjs
+        if: always()
+
+      - run: node scripts/gm-season-trade-check.cjs
+        if: always()
+
+      - run: node scripts/staff-legacy-check.cjs
+        if: always()
+
+      - run: node scripts/rival-learning-check.cjs
+        if: always()
+
+      - run: node scripts/fa-recruit-learning-check.cjs
+        if: always()
+
+      - run: node scripts/club-services-check.cjs
+        if: always()
+
+      - run: node scripts/care-finance-cinema-check.cjs
+        if: always()
+
+      - run: node scripts/season-skip-check.cjs
+        if: always()
+
+      - run: node scripts/club-honors-check.cjs
+        if: always()
+
+      - run: node scripts/club-rewards-check.cjs
+        if: always()
+
+      - run: node scripts/cpu-economy-check.cjs
+        if: always()
