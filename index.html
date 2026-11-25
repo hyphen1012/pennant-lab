@@ -11758,10 +11758,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function commerceOffPay(date){for(const t of game.teams){const a=commerceSettle(t,date,'off');t.cash=r2(t.cash+a.income-a.cost);}}
   function commerceEvent(t,y,id,s,date){const d=commerceData(t);if(d.events.some(a=>a.year===y&&a.id===id))return false;const declined=!!s.decline,plan=s.plan||0,players=(s.players||[]).map(getPlayer).filter(p=>p&&p.teamId===t.id),cost=declined?0:id==='tv'?0:[.04,.10,.22][plan],income=declined?0:id==='tv'?.03:0;
-    if(t.cash<cost||id==='tv'&&!declined&&(players.length!==5||new Set(players.map(p=>p.id)).size!==5))return false;
+    if((cost>0&&t.cash<cost)||id==='tv'&&!declined&&(players.length!==5||new Set(players.map(p=>p.id)).size!==5))return false;
     const gain=declined?0:id==='tv'?Math.round(150+players.reduce((n,p)=>n+rating(p)+(p.specialCategory?35:0),0)*1.6):[250,650,1300][plan];
     if(t.id===game.selectedId){game.fans=Math.max(10000,(game.fans||60000)+gain);game.fieldRating=clamp((game.fieldRating??60)+(declined&&id==='tv'?2:0),0,100);}else t.fans=clubFanCount(t)+gain;
-    t.cash=r2(t.cash+income-cost);const row={year:y,id,date,plan,declined,players:players.map(p=>p.id),gain,income,cost};d.events.push(row);d.payments.push({year:Number(date.slice(0,4)),kind:'event',source:'off',date,income,cost});pushNews('【営業部】'+COMMERCE_LABEL[id]+(declined?'を辞退しました。':'を実施。ファン '+gain+'人増加。'),date);return row;
+    t.cash=r2(t.cash+income-cost);const row={year:y,id,date,plan,declined,players:players.map(p=>p.id),gain,income,cost};d.events.push(row);d.payments.push({year:Number(date.slice(0,4)),kind:'event',source:'off',date,income,cost});pushNews('【営業部】'+(t.id===game.selectedId?'':t.short+'：')+COMMERCE_LABEL[id]+(declined?'を辞退しました。':'を実施。ファン '+gain+'人増加。'),date);return row;
   }
   function commerceState(f,j){const t=myTeam(),y=j.id==='opening-promo'?f.year:f.year+1,old=commerceData(t).clubs[f.year];return j.state??={year:y,phase:j.id,open:false,stage:'brief',delta:0,plan:0,players:[],name:old?.name||t.name+'ファンクラブ',fee:old?.fee??4000,perk:old?.perk||'pin',color:old?.color||0,font:old?.font||0,since:old?.since||y,choice:-1};}
   function fanCard(s){
