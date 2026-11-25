@@ -173,7 +173,19 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
       await click('[data-memorial-close]');
      }
      await click('[data-action="tab"][data-tab="business"]');
-     for(const t of business){current='business-'+t;await click('[data-action="business-sub"][data-sub="'+t+'"]');await shot('business-'+t);}
+     for(const t of business){current='business-'+t;
+      if(t==='scout'||t==='foreign'){
+       await click('[data-action="tab"][data-tab="hq"]');
+       await click('[data-action="tab"][data-tab="business"][data-sub="'+t+'"]');
+       await shot('business-'+t);
+       await click(action('back-to-hq'));
+       await click('[data-action="tab"][data-tab="business"]:not([data-sub])');
+       // The general business tab may remember the previous scout subpage.
+       if(await page.locator(action('back-to-hq')).first().isVisible()){
+        await click(action('back-to-hq'));await click('[data-action="tab"][data-tab="business"][data-sub="finance"]');
+       }
+      }else{await click('[data-action="business-sub"][data-sub="'+t+'"]');await shot('business-'+t);}
+     }
     }
    }
   }catch(e){const detail=await page.evaluate(()=>({state:window.__plAudit?.state(),clicks:window.__plAuditClicks,heading:document.querySelector('main h2')?.innerText,actions:[...document.querySelectorAll('main [data-action]')].slice(0,12).map(e=>({action:e.dataset.action,id:e.dataset.id}))})).catch(()=>null);errors.push({width,screen:current,error:e.message,detail});await page.screenshot({path:path.join('test-results/browser',width+'-failure.png')}).catch(()=>{});}
