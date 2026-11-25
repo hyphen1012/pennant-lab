@@ -362,6 +362,9 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
     await flush();
     if(!await serviceInterruptions()){dispatch('click',{action:'tab',tab:'hq'});await window.PennantLab.advance('season');}
   }
+  // The final match can itself produce a mandatory injury or rare report.
+  // Acknowledge via actual UI before checking that the inbox is clear.
+  for(let n=0;n<100;n++){await flush();if(!await serviceInterruptions())break;}
   const full=window.PennantLab.getSnapshot();
   assert.equal(full.day,143,'Season skip must finish without routine report interruption');
   assert.equal(full.games,858,'12 teams × 143 games should result in 858 games');
@@ -456,7 +459,7 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(monthlyArchive.length>=6,'Skipped months remain archived');
   assert(monthlyArchive.every(m=>m.actualFinance),'Skipped months have actual finance records');
   assert.equal(store.get(1).data.pendingMonth,null,'Season skip clears routine month prompts');
-  assert.equal(store.get(1).data.pendingEvent,null,'Season skip clears routine injury prompts');
+  assert.equal(store.get(1).data.pendingEvent,null,'Mandatory injury reports, including the final game, are acknowledged through UI');
   const weeklies=store.get(1).data.dailyBulletins.filter(p=>p.weekly);
   assert(weeklies.length>10,'Season skip preserves weekly newspapers');
   for(const p of weeklies){
