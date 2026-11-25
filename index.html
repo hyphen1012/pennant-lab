@@ -6922,7 +6922,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       save();render();window.scrollTo(0,0);showToast('GM就任、おめでとうございます');return;
     }
     if(act==='select-team'){
-      game.selectedId=Number(b.dataset.id);game.started=true;ensureCPUClubEmblems(game);ui.confirm=null;ui.tab='hq';ui.page='game';save();render();window.scrollTo({top:0});return;
+      {const former=myTeam(),target=getTeam(Number(b.dataset.id));if(former&&target&&former.id!==target.id){const nextFans=clubFanCount(target);former.fans=clubFanCount(former);game.fans=nextFans;}}game.selectedId=Number(b.dataset.id);game.started=true;ensureCPUClubEmblems(game);ui.confirm=null;ui.tab='hq';ui.page='game';save();render();window.scrollTo({top:0});return;
     }
     if(act==='team-sub'){ui.teamSub=b.dataset.sub;render();return}
     if(act==='record-sub'){ui.recordSub=b.dataset.sub;ui.newsEdition=null;ui.decadeYear=null;ui.decadeSection=null;render();return}
@@ -10136,7 +10136,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function stadiumResize(t,k,direction){
     if(!Object.hasOwn(STADIUM_KEYS,k)||![-1,1].includes(direction))return false;
     const x=stadiumState(t),lv=x[k],next=lv+direction,cost=direction===1?stadiumCost(k,lv):0;
-    if(next<1||next>20||t.cash<cost)return false;
+    if(next<1||next>20||(cost>0&&t.cash<cost))return false;
     t.cash=r2(t.cash-cost);x[k]=next;
     if(cost)infraFinance(t).investment=r2(infraFinance(t).investment+cost);
     return true;
@@ -11843,7 +11843,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   render=function(){const f=flowGet(),j=f?.jobs?.[f.active];if(ui.page==='game'&&!ui.busy&&j&&COMMERCE_LABEL[j.id]&&offdeskSafe()&&!flowInbox()){const app=$('#app');if(!app)return;app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(myTeam())+'">'+header()+'<main class="main">'+commerceScreen(f,j)+'</main></div>';if(scenarioLab)app.insertAdjacentHTML?.('afterbegin','<div class="scenario-banner"><strong>TEST PLAY · 保存されません</strong><button class="btn outline sm" data-action="scenario-exit">テスト終了</button></div>');syncFanPreview();return;}return commerceRenderBase();};
   const commerceFinanceBase=financeScreen;
   financeScreen=function(){const t=myTeam(),d=commerceData(t);const cards=[game.year,game.year+1].map(y=>{const br=d.broadcasts[y],nc=commerceNaming(t,y),fc=d.clubs[y],tot=commerceTotals(t,y);if(!br&&!nc&&!fc)return '';return '<section class="panel"><div class="eyebrow">COMMERCIAL RIGHTS</div><h3>'+y+'年 営業契約</h3>'+offdeskMoneyRow('放映権 年額',br?.annual||0)+offdeskMoneyRow('命名権 年額',nc?.annual||0)+(nc?'<p>'+h(nc.name)+' · '+nc.end+'年まで</p>':'')+(fc?fanCard(fc)+'<p>会員 '+fc.members.toLocaleString()+'名</p>'+offdeskMoneyRow('会費収入',fc.income)+offdeskMoneyRow('特典原価',-fc.cost):'')+offdeskMoneyRow('営業入金済',tot.income)+offdeskMoneyRow('営業支出済',-tot.cost)+'</section>';}).join('');return commerceFinanceBase().replace('<div class="device-content">','<div class="device-content">'+cards);};
-  const commerceForecastBase=infraForecast;infraForecast=function(t){const d=commerceData(t),fc=d.clubs[game.year];return r2(commerceForecastBase(t)+(d.broadcasts[game.year]?.annual||0)+(commerceNaming(t,game.year)?.annual||0)+(fc?fc.income-fc.cost:0));};
+  const commerceForecastBase=infraForecast;infraForecast=function(t){const d=commerceData(t),fc=d.clubs[game.year];return r2(commerceForecastBase(t)+sponsorAnnual(sponsorActive(sponsorContract(t,game.year)))+(d.broadcasts[game.year]?.annual||0)+(commerceNaming(t,game.year)?.annual||0)+(fc?fc.income-fc.cost:0));};
   const commerceStadiumBase=stadiumScreen;stadiumScreen=function(t){const nc=commerceNaming(t,game.year);return commerceStadiumBase(t).replace(h(t.name)+' 本拠地',nc?h(nc.name):h(t.name)+' 本拠地');};
   window.addEventListener?.('click',e=>{const el=e.target.closest('[data-action]');if(!el||!el.dataset.action.startsWith('commerce-'))return;e.preventDefault();e.stopImmediatePropagation();if(el.dataset.action==='commerce-player'&&tvSuppressClick(el))return;commerceAction(el.dataset.action,el);},true);
   document.addEventListener?.('change',e=>{if(e.target?.id==='commerce-fan-name'){const f=flowGet(),j=f?.jobs?.fanclub;if(f?.active==='fanclub'&&j?.state){j.state.name=String(e.target.value||myTeam().name+'ファンクラブ').slice(0,30);save();}}});
@@ -12007,7 +12007,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(t.id===game.selectedId)return false;const a=cpuEconomy(t),x=stadiumState(t);
     if(a.priceYear===game.year||!stadiumCanPrice(t))return false;a.priceYear=game.year;
     const old=x.prices.slice(),baseline=stadiumDemand(t,null,date,Math.max(1,game.day)),net=v=>v.ticket+v.food+v.goods-v.operating;
-    let best=old,bestScore=net(baseline);
+    let best=old,bestScore=net(baseline)+(a.style===2?baseline.attendance*180:0);
     // A bounded uniform adjustment, using actual demand rather than invented income.
     for(const ratio of [.9,.95,1,1.05,1.1]){
       const vals=old.map((v,i)=>clamp(Math.round(v*ratio/100)*100,Math.round(STADIUM_DEFAULT[i]*.7/100)*100,Math.round(STADIUM_DEFAULT[i]*1.3/100)*100));
