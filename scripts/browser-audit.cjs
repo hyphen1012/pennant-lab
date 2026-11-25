@@ -8,7 +8,7 @@ const source=fs.readFileSync('index.html','utf8');
 const screenNames=[...new Set([...source.matchAll(/function\s+(\w+(?:Screen|View))\s*\(/g)].map(m=>m[1]))].sort();
 const marker="  const appRoot=document.querySelector('#app');";
 if(source.split(marker).length!==2||screenNames.length<60)throw Error('screen instrumentation anchors missing');
-const instrumentation='const __plScreens=new Set();window.__plAudit={take:()=>{const a=[...__plScreens];__plScreens.clear();return a;},state:()=>({page:ui.page,tab:ui.tab,phase:game.ceremonyStage,active:flowGet()?.active,room:offdeskState()?.floorRoom,transit:ui.faTransit?.kind,open:offdeskState()?.open,intro:offdeskState()?.intro,safe:offdeskSafe(),busy:ui.busy,storageFailure:!!storageFailure})};\n'+screenNames.map(n=>n+'=(fn=>function(...args){__plScreens.add('+JSON.stringify(n)+');return fn.apply(this,args);})('+n+');').join('\n')+'\n';
+const instrumentation='const __plScreens=new Set();window.__plAudit={take:()=>{const a=[...__plScreens];__plScreens.clear();return a;},state:()=>({page:ui.page,tab:ui.tab,phase:game.ceremonyStage,active:flowGet()?.active,room:offdeskState()?.floorRoom,transit:ui.faTransit?.kind,open:offdeskState()?.open,intro:offdeskState()?.intro,safe:offdeskSafe(),busy:ui.busy,storageFailure:!!storageFailure}),seedMemorial:()=>{const t=myTeam(),p=own(t)[0],cats=["LEGEND","IMMORTAL","輪廻転生"];game.memorialHistory={};for(const cat of cats){const fake={...p,specialCategory:cat,originCategory:cat};game.memorialHistory["audit-"+cat]={id:"audit-"+cat,year:game.year,teamId:t.id,category:cat,title:cat+" 達成記念",body:"ブラウザ試験専用データ",memorialPlayer:memorialPlayerSnapshot(fake)};}game.memorialHistory["audit-facility"]={id:"audit-facility",year:game.year,teamId:t.id,kind:"facility",level:20,title:"全8施設 Lv.20 達成",body:"試験用記念画像"};render();}};\n'+screenNames.map(n=>n+'=(fn=>function(...args){__plScreens.add('+JSON.stringify(n)+');return fn.apply(this,args);})('+n+');').join('\n')+'\n';
 const tabs=['team','roster','hq','business','records'];
 const business=['finance','stadium','facilities','market','scout','foreign','manager','care','staff','club'];
 (async()=>{
@@ -86,6 +86,23 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
     if(k==='facilities'){
      for(const t of tabs){current='tab-'+t;await click('[data-action="tab"][data-tab="'+t+'"]');await shot('tab-'+t);}
      await click('[data-action="record-sub"][data-sub="memorial"]');await shot('memorial-empty');
+     await page.evaluate(()=>window.__plAudit.seedMemorial());
+     await shot('memorial-populated');
+     for(const [idx,key] of ['LEGEND','IMMORTAL','輪廻転生','facility'].entries()){
+      current='memorial-png-'+idx;
+      await click('[data-memorial-id="audit-'+key+'"]');
+      const saveButton=page.locator('[data-memorial-save]');
+      await saveButton.waitFor({state:'visible',timeout:8000});
+      await page.waitForFunction(()=>!document.querySelector('[data-memorial-save]')?.disabled,{},{timeout:15000});
+      const dimensions=await page.locator('.memorial-dialog canvas').evaluate(c=>[c.width,c.height,c.toDataURL('image/png').length]);
+      if(dimensions[0]!==1080||dimensions[1]!==1350||dimensions[2]<10000)throw Error('invalid memorial PNG '+dimensions);
+      await shot('memorial-image-'+idx);
+      const downloaded=page.waitForEvent('download',{timeout:10000});await saveButton.click();
+      const file=await downloaded,bytes=fs.readFileSync(await file.path());
+      if(bytes.subarray(0,8).toString('hex')!=='89504e470d0a1a0a'||bytes.readUInt32BE(16)!==1080||bytes.readUInt32BE(20)!==1350)throw Error('invalid downloaded PNG');
+      await file.saveAs(path.join('test-results/browser',width+'-memorial-'+idx+'.png'));
+      await click('[data-memorial-close]');
+     }
      await click('[data-action="tab"][data-tab="business"]');
      for(const t of business){current='business-'+t;await click('[data-action="business-sub"][data-sub="'+t+'"]');await shot('business-'+t);}
     }

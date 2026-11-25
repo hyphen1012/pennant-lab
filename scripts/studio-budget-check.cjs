@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),{planBudget}=require('../studio/budget-policy.cjs');
+const x={settledRevenue:100000,paidOperatingCosts:20000,taxReserve:10000,refundReserve:5000,workingCapitalReserve:15000,bankCash:80000,monthlyLimit:30000,monthSpent:10000,pendingCommitments:5000,reinvestBps:10000,reconciled:true,killSwitch:false,anomaly:false};
+assert.equal(planBudget(x).proposedYen,15000);
+assert.equal(planBudget({...x,bankCash:36000}).proposedYen,1000);
+assert.equal(planBudget({...x,settledRevenue:20000,unsettledRevenue:1000000}).proposedYen,0);
+assert.equal(planBudget({...x,reconciled:false}).proposedYen,0);
+assert.equal(planBudget({...x,killSwitch:true}).proposedYen,0);
+assert.equal(planBudget({...x,anomaly:true}).proposedYen,0);
+assert.equal(planBudget({...x,reinvestBps:1000}).proposedYen,0);
+assert.throws(()=>planBudget({...x,reinvestBps:10001}));
+assert.throws(()=>planBudget({...x,bankCash:NaN}));
+console.log('PASS studio budget dry-run: settled revenue, reserves, committed spend, cap and emergency stop');
