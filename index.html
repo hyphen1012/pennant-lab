@@ -6082,6 +6082,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
           <p class="gm-briefing-lead">回復まで試合に出場できません。健康な選手をスタメン候補に自動補充しました。必要に応じて打順・ローテーションを確認してください。</p>
         </div>
       </div>
+      ${specialTreatmentPanel(e,p)}
       <button class="btn primary full gm-briefing-confirm" data-action="injury-ack">報告を確認して本部へ ›</button>
     </div>`)+`</div>`;
   }
@@ -7956,7 +7957,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(action==='career-event-accept'&&e.type==='consult'){e.type='plan';}
     else if(action==='career-event-toggle'&&e.type==='plan'&&farewellChoices(p).some(x=>x[0]===el.dataset.value)){const k=el.dataset.value;q.options=q.options.includes(k)?q.options.filter(x=>x!==k):[...q.options,k];}
     else if(action==='career-event-confirm'&&e.type==='plan'){const cost=r2(farewellChoices(p).filter(x=>q.options.includes(x[0])).reduce((n,x)=>n+x[2],0));if(!refCharge(myTeam(),cost))return;q.status='accepted';q.cost=cost;pushNews(p.name+'が今季限りの引退を表明。'+(q.options.length?'球団は'+q.options.map(k=>FAREWELL_OPTIONS.find(x=>x[0]===k)[1]).join('・')+'を準備します。':''),e.date);e.type='thanks';}
-    else if(action==='career-event-ad'&&e.type==='consult'&&rewardAdProvider){const owner=game,slot=activeSlot;ui.rewardBusy=true;try{if(await rewardAdProvider({key:'RETIREMENT_CONTINUE',year:game.year,candidateId:p.id})===true&&game===owner&&activeSlot===slot&&careerCurrentEvent()===e){q.status='continued';careerEventDone(e);}}finally{ui.rewardBusy=false;render();}return;}
+    else if(action==='career-event-ad'&&e.type==='consult'&&rewardAdProvider){const owner=game,slot=activeSlot;ui.rewardBusy=true;try{if(await rewardAdProvider({key:'RETIREMENT_CONTINUE',year:game.year,candidateId:p.id})===true&&game===owner&&activeSlot===slot&&careerCurrentEvent()===e){q.status='continued';careerEventDone(e);}}catch(err){showToast('広告を利用できませんでした。去就は変更されていません。',true);}finally{ui.rewardBusy=false;render();}return;}
     else if(action==='career-event-dismiss'&&['farewell','thanks'].includes(e.type)){careerEventDone(e);return;}
     else return;save();render();draftJump(0);
   }
@@ -13341,9 +13342,64 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 
   // Memorial sharing is independent of ads, payments and the game clock.
+  // Only the current injury episode can be treated; failed/cancelled ads never
+  // change the diagnosis or historical medical record.
+  function specialTreatmentEligible(e,p){
+    return !!(e&&p&&e===game.pendingEvent&&e.teamId===game.selectedId&&p.teamId===game.selectedId&&p.injury?.date===e.date&&Number.isInteger(p.injury.daysLeft)&&p.injury.daysLeft>=2&&!p.injury.specialTreatment&&!e.specialTreatment);
+  }
+  function specialTreatmentPanel(e,p){
+    if(e?.specialTreatment)return '<p class="small">特別治療済み · 治療後の復帰目安 '+e.days+'日</p>';
+    if(!specialTreatmentEligible(e,p))return '';
+    return '<section class="panel"><h3>特別治療</h3><p>回復期間を約半分（最低1日）に短縮します。通常の治療は無料で続けられます。</p><button class="btn outline full" data-special-treatment '+(!rewardAdProvider||ui.rewardBusy?'disabled':'')+'>リワード広告で特別治療'+(!rewardAdProvider?'（配信準備中）':'')+'</button></section>';
+  }
+  function applySpecialTreatment(e,p){
+    if(!specialTreatmentEligible(e,p))return false;
+    const before=p.injury.daysLeft,after=Math.max(1,Math.ceil(before/2)),detail={before,after,date:e.date};
+    p.injury.daysLeft=after;p.injury.specialTreatment=detail;e.specialTreatment={...detail};e.days=after;
+    const original=(game.injuryArchive||[]).find(x=>x.playerId===p.id&&x.date===e.date&&x.year===game.year);
+    if(original)original.specialTreatment={...detail};
+    return true;
+  }
+  async function requestSpecialTreatment(){
+    const e=game.pendingEvent,p=e&&getPlayer(e.playerId);
+    if(!rewardAdProvider||ui.rewardBusy||storageFailure||!specialTreatmentEligible(e,p))return false;
+    const owner=game,slot=activeSlot,injury=p.injury;
+    ui.rewardBusy=true;render();
+    try{
+      if(await rewardAdProvider({key:'SPECIAL_TREATMENT',year:game.year,candidateId:p.id,date:e.date})!==true)return false;
+      if(game!==owner||activeSlot!==slot||p.injury!==injury||!applySpecialTreatment(e,p))return false;
+      save();return true;
+    }catch(err){showToast('広告を利用できませんでした。治療内容は変更されていません。',true);return false;}
+    finally{ui.rewardBusy=false;render();}
+  }
+  window.addEventListener?.('click',e=>{
+    if(!e.target.closest?.('[data-special-treatment]'))return;
+    e.preventDefault();e.stopImmediatePropagation();if(ui.page==='game'&&!ui.busy)void requestSpecialTreatment();
+  },true);
+
+  // A compact public snapshot, not a reference to mutable current abilities.
+  function memorialPlayerSnapshot(p){
+    if(!p||!Number.isInteger(p.teamId)||p.teamId<0||p.scoutingHidden===true||p.abilitiesHidden===true)return null;
+    const a=snapshotAbilities(p,game.year,null,'memorial');
+    const portrait={id:p.id,age:p.age,pos:p.pos,appearanceSeed:p.appearanceSeed,originCategory:p.originCategory,specialCategory:p.specialCategory,pastLifeAppearance:p.pastLifeAppearance?{...p.pastLifeAppearance}:null};
+    const past=p.reincarnation?pastLifeFacts(p):null;
+    return {name:p.name,portrait,abilities:a.abilities,overall:a.overall,past:past?{club:past.club,age:past.age,year:past.year,metric:past.metric}:null};
+  }
+  function memorialWin(g){
+    const t=myTeam();if(!g||g.year!==game.year||![g.home,g.away].includes(t.id))return null;
+    const home=g.home===t.id,rs=home?g.homeScore:g.awayScore,ra=home?g.awayScore:g.homeScore;
+    if(!(rs>ra))return null;
+    const opp=getTeam(home?g.away:g.home);
+    return {id:'win:'+g.year+':'+t.id+':'+g.day,year:g.year,date:g.date,teamId:t.id,kind:'win',title:t.name+' 勝利',stat:rs+' − '+ra,body:'第'+g.day+'戦 · 対 '+(opp?.name||'対戦球団')};
+  }
+  function memorialRemember(e){
+    if(!e||scenarioLab)return;
+    const items=game.memorialHistory??={};
+    if(!Object.hasOwn(items,e.id))items[e.id]=e;
+  }
   function memorialTier(e){
     if(['IMMORTAL','輪廻転生','RINNE'].includes(e.category))return 'unmeasurable';
-    if(e.category==='LEGEND'||e.featKey==='perfect'||e.recordKey||e.level>=15||e.anniversary>=100)return 'top';
+    if(['LEGEND','伝説転生','MYTH'].includes(e.category)||e.featKey==='perfect'||e.recordKey||e.level>=15||e.anniversary>=100)return 'top';
     if(e.category||e.featKey||e.level===10||e.anniversary===50||e.kind==='championship')return 'special';
     return 'quiet';
   }
@@ -13361,9 +13417,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   stadiumResize=function(t,k,direction){const ok=memorialStadiumBase(t,k,direction);if(ok&&direction===1)memorialFacility(t);return ok;};
   function memorialEntries(){
     const t=myTeam(),out=[],add=e=>{if(!e?.id||!e.title)return;out.push({...e,tier:memorialTier(e)});};
-    for(const e of game.milestoneNews||[])if(e.teamId===t.id&&(e.featKey||e.recordKey||e.type==='champion'||e.careerKey))add({...e,id:'news:'+e.id,category:null});
+    for(const e of game.milestoneNews||[])if(e.teamId===t.id&&(e.featKey||e.recordKey||e.type==='champion'||e.careerKey||e.type==='player'||e.type==='streak'&&e.tone!=='loss'))add({...e,id:'news:'+e.id,category:null});
+    for(const e of Object.values(game.memorialHistory||{}))if(e.teamId===t.id)add(e);
+    for(const g of game.games||[]){const e=memorialWin(g);if(e)add(e);}
+    for(const p of game.players||[]){const r=p.retirement;if(r?.recorded&&r.teamId===t.id&&Number.isInteger(r.year))add({id:'retirement:'+r.year+':'+p.id,year:r.year,teamId:t.id,kind:'retirement',title:p.name+' 現役引退',body:r.age+'歳 · '+(r.teamName||t.name)});}
     // Public news headlines only, not hidden prospect names or abilities.
-    for(const e of game.rareNews||[])if(e.teamId===t.id||e.kind==='foreign-discovery'||String(e.id).includes(':tournament:')||String(e.id).includes(':university:'))add({id:'rare:'+e.id,year:e.year,date:e.date,title:e.title,body:e.body,category:e.category,teamId:e.teamId});
+    for(const e of game.rareNews||[])if(e.teamId===t.id||e.kind==='foreign-discovery'||String(e.id).includes(':tournament:')||String(e.id).includes(':university:')||e.memorialPlayer)add({id:'rare:'+e.id,year:e.year,date:e.date,title:e.title,body:e.body,category:e.category,teamId:e.teamId,memorialPlayer:e.memorialPlayer});
     for(const e of Object.values(game.memorialFacilities||{}))add(e);
     for(const s of game.seasonArchive||[]){
       if(s.postseason?.championId===t.id)add({id:'championship:'+s.year,year:s.year,title:t.name+' 日本一',kind:'championship',teamId:t.id});
@@ -13380,33 +13439,65 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   const memorialRecordBase=recordScreen;
   recordScreen=function(){const raw=memorialRecordBase(),nav='<button class="subtab '+(ui.recordSub==='memorial'?'active':'')+'" data-action="record-sub" data-sub="memorial">記念アルバム</button>';if(ui.recordSub==='memorial'){const end=raw.indexOf('</div>',raw.indexOf('<div class="subtabs">'));return raw.slice(0,end)+nav+'</div>'+memorialScreen();}return raw.replace('</button></div>','</button>'+nav+'</div>');};
-  function memorialDraw(canvas,e){
+  async function memorialDraw(canvas,e){
     const W=1080,H=1350;canvas.width=W;canvas.height=H;const c=canvas.getContext('2d');
     const colors={quiet:['#101c30','#305d85','#b3d8ef'],special:['#16172c','#67432c','#ffe1a0'],top:['#100d22','#402c67','#e8cafd'],unmeasurable:['#03040d','#292342','#f1f0ff']};
-    const [bg,mid,accent]=colors[e.tier]||colors.quiet;const g=c.createLinearGradient(0,0,W,H);g.addColorStop(0,bg);g.addColorStop(.6,mid);g.addColorStop(1,bg);c.fillStyle=g;c.fillRect(0,0,W,H);
+    const theme=achievementTheme(achievementKey(e))||playerTitleTheme({specialCategory:e.category});
+    const [bg,mid,accent]=theme?[theme.base||'#11172b',theme.accent||'#302c55',theme.ring||'#f5dfac']:colors[e.tier]||colors.quiet;
+    const g=c.createLinearGradient(0,0,W,H);g.addColorStop(0,bg);g.addColorStop(.6,mid);g.addColorStop(1,bg);c.fillStyle=g;c.fillRect(0,0,W,H);
     c.save();c.translate(W/2,520);for(let i=0;i<16;i++){c.rotate(Math.PI/8);c.strokeStyle=accent;c.globalAlpha=.10;c.lineWidth=2;c.beginPath();c.ellipse(0,0,470,160+i*7,0,0,Math.PI*2);c.stroke();}c.restore();
     c.strokeStyle=accent;c.lineWidth=3;c.strokeRect(42,42,W-84,H-84);c.globalAlpha=1;
     function line(value,y,size,weight='600',color='#fff'){c.font=weight+' '+size+'px sans-serif';c.textAlign='center';c.fillStyle=color;c.fillText(String(value),W/2,y,W-140);}
     function wrap(value,y,size,max){c.font='600 '+size+'px sans-serif';const rows=[];let s='';for(const ch of String(value||'')){if(c.measureText(s+ch).width>W-160&&s){rows.push(s);s=ch;}else s+=ch;}if(s)rows.push(s);if(rows.length>max){rows.length=max;rows[max-1]=rows[max-1].slice(0,-1)+'…';}rows.forEach((v,i)=>line(v,y+i*(size+20),size));}
     line('P E N N A N T   L A B',132,42,'700',accent);line('MEMORIAL COLLECTION',190,25,'500',accent);
-    line(e.year+' SEASON',330,52,'700',accent);line(e.category||({quiet:'CLUB HISTORY',special:'SPECIAL ACHIEVEMENT',top:'HISTORIC ACHIEVEMENT',unmeasurable:'UNMEASURABLE'})[e.tier],420,42,'700',accent);
-    wrap(e.title,565,72,4);wrap(e.stat||e.body||'',950,32,5);
+    line(e.year+' SEASON · '+(getTeam(e.teamId)?.name||'球界'),260,38,'700',accent);
+    line(e.category||theme?.en||({quiet:'CLUB HISTORY',special:'SPECIAL ACHIEVEMENT',top:'HISTORIC ACHIEVEMENT',unmeasurable:'UNMEASURABLE'})[e.tier],320,36,'700',accent);
+    const mp=e.memorialPlayer;
+    if(mp?.portrait){
+      // Reuse the game's original player art and event-time age/appearance.
+      // No hidden candidate or reconstructed current abilities are used.
+      const svg=renderFaceArtwork(mp.portrait,{upperBody:true}).replace('<svg ','<svg xmlns="http://www.w3.org/2000/svg" width="504" height="522" ');
+      const url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));
+      try{const img=new Image();await new Promise((ok,fail)=>{img.onload=ok;img.onerror=fail;img.src=url;});c.drawImage(img,288,340,504,522);}
+      finally{URL.revokeObjectURL(url);}
+      wrap(e.title,910,48,2);wrap(e.stat||e.body||'',1040,27,2);
+      if(mp.past?.club)line('前世：'+mp.past.club+' · '+(mp.past.year??'')+'年',1140,27,'600',accent);
+      else if(Number.isFinite(mp.overall))line('記録時 総合能力 '+mp.overall,1140,28,'600',accent);
+    }else{
+      // Type-specific emblems. These are original procedural art, not AI assets.
+      c.save();c.translate(W/2,610);c.strokeStyle=accent;c.fillStyle=accent;c.lineWidth=9;
+      if(e.kind==='facility'){for(let i=0;i<5;i++){let x=-200+i*85,h=80+i*29;c.strokeRect(x,-h,65,h+85);for(let j=0;j<3;j++)c.fillRect(x+12,-h+20+j*31,14,14);}}
+      else if(e.kind==='championship'||e.anniversary){c.beginPath();c.moveTo(-125,-100);c.lineTo(125,-100);c.quadraticCurveTo(115,75,0,90);c.quadraticCurveTo(-115,75,-125,-100);c.stroke();c.fillRect(-10,85,20,65);c.fillRect(-85,150,170,14);}
+      else{c.beginPath();c.arc(0,0,150,0,Math.PI*2);c.stroke();for(const sign of [-1,1]){c.beginPath();c.ellipse(sign*125,0,82,143,0,0,Math.PI*2);c.stroke();}}
+      c.restore();wrap(e.title,850,62,3);wrap(e.stat||e.body||'',1080,29,3);
+    }
     line('ゲーム内実績の記念アート · 実際のゲーム画面ではありません',1210,25,'500',accent);line('PENNANT LAB',1285,32,'700',accent);
     return canvas;
   }
-  function memorialOpen(e){
+  async function memorialOpen(e){
     if(!e||document.querySelector('.memorial-dialog'))return;
-    const dlg=document.createElement('dialog');dlg.className='memorial-dialog';dlg.innerHTML='<h2>記念画像</h2><p>投稿は任意です。画像保存・共有による報酬はありません。</p><canvas aria-label="記念画像"></canvas><p class="small" aria-live="polite"></p><button class="btn primary full" data-memorial-share>共有する</button><button class="btn outline full" data-memorial-close>閉じる</button>';
-    document.body.appendChild(dlg);const canvas=memorialDraw(dlg.querySelector('canvas'),e),status=dlg.querySelector('[aria-live]');
-    dlg.querySelector('[data-memorial-close]').onclick=()=>dlg.close();dlg.addEventListener('close',()=>dlg.remove());
-    dlg.querySelector('[data-memorial-share]').onclick=async function(){this.disabled=true;try{
+    const dlg=document.createElement('dialog');dlg.className='memorial-dialog';
+    dlg.innerHTML='<h2>記念画像</h2><p>投稿は任意です。画像保存・共有による報酬はありません。</p><canvas aria-label="記念画像"></canvas><p class="small" aria-live="polite">画像を作成しています…</p><button class="btn primary full" data-memorial-share disabled>共有する</button><button class="btn outline full" data-memorial-save disabled>画像を保存</button><button class="btn outline full" data-memorial-close>閉じる</button>';
+    document.body.appendChild(dlg);
+    const canvas=dlg.querySelector('canvas'),status=dlg.querySelector('[aria-live]'),share=dlg.querySelector('[data-memorial-share]'),download=dlg.querySelector('[data-memorial-save]');
+    dlg.querySelector('[data-memorial-close]').onclick=()=>dlg.close();dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();
+    try{
+      await memorialDraw(canvas,e);if(!dlg.isConnected)return;
       const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('image');
       const name='PENNANT_LAB_'+e.year+'_memorial.png',file=new File([blob],name,{type:'image/png'});
-      if(window.PennantNative?.shareImage){await window.PennantNative.shareImage(canvas.toDataURL('image/png').split(',')[1],name);}
-      else if(navigator.share&&navigator.canShare?.({files:[file]})){await navigator.share({files:[file],title:'PENNANT LAB',text:e.title+' #PENNANTLAB'});}
-      else{const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);status.textContent='記念画像の保存を開始しました。';}
-    }catch(err){status.textContent=err?.name==='AbortError'?'共有をキャンセルしました。':'共有できませんでした。もう一度お試しください。';}finally{this.disabled=false;}};
-    dlg.showModal();
+      const saveImage=()=>{const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);status.textContent='記念画像の保存を開始しました。';};
+      const native=window.PennantNative?.shareImage;
+      const nativeData=native?canvas.toDataURL('image/png').split(',')[1]:null;
+      // Precompute the PNG before a click so Web Share retains user activation.
+      share.onclick=async()=>{share.disabled=true;try{
+        if(native)await native(nativeData,name);
+        else if(navigator.share&&navigator.canShare?.({files:[file]}))await navigator.share({files:[file],title:'PENNANT LAB',text:e.title+' #PENNANTLAB https://hyphen1012.github.io/pennant-lab/'});
+        else saveImage();
+      }catch(err){status.textContent=err?.name==='AbortError'?'共有をキャンセルしました。':'共有できませんでした。もう一度お試しください。';}finally{share.disabled=false;}};
+      download.onclick=()=>{if(native)void share.onclick();else saveImage();};
+      download.textContent=native?'共有メニューから保存':'画像を保存';
+      share.disabled=false;download.disabled=false;status.textContent='画像作成完了 · 1080 × 1350 PNG';
+    }catch(err){status.textContent='記念画像を作成できませんでした。閉じてもう一度お試しください。';}
   }
   window.addEventListener?.('click',e=>{const b=e.target.closest?.('[data-memorial-id],[data-memorial-page]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();if(ui.page!=='game'||ui.busy||ui.rewardBusy||ui.tab!=='records'||ui.recordSub!=='memorial')return;if(b.dataset.memorialId)memorialOpen(memorialEntries().find(x=>x.id===b.dataset.memorialId));else{ui.memorialPage=Math.max(0,(ui.memorialPage||0)+Number(b.dataset.memorialPage));render();draftJump(0);}},true);
 
@@ -13444,14 +13535,32 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const memorialNewsBase=collectMilestoneNews;
   collectMilestoneNews=function(entry){
     const before=(game.milestoneNews||[]).length,ids=memorialNewsBase(entry);
-    for(const e of (game.milestoneNews||[]).slice(before))if(e.teamId===game.selectedId&&(e.recordKey||e.featKey||e.careerKey))memorialNotice({...e,id:'news:'+e.id});
+    if(entry.type==='game'){const g=gameByTeam(game.selectedId);if(g?.day===game.day)memorialRemember(memorialWin(g));}
+    for(const e of (game.milestoneNews||[]).slice(before))if(e.teamId===game.selectedId){
+      if(e.playerId!=null&&!e.memorialPlayer)e.memorialPlayer=memorialPlayerSnapshot(getPlayer(e.playerId));
+      if(e.recordKey||e.featKey||e.careerKey)memorialNotice({...e,id:'news:'+e.id});
+    }
     return ids;
   };
   const memorialRareBase=rareQueue;
   rareQueue=function(...args){
     const ok=memorialRareBase(...args);
-    if(ok){const e=game.rareNews.at(-1);if(e&&(e.teamId===game.selectedId||e.kind==='foreign-discovery'||String(e.id).includes(':tournament:')||String(e.id).includes(':university:')))memorialNotice({...e,id:'rare:'+e.id});}
+    if(ok){const e=game.rareNews.at(-1);
+      if(e){
+        const registered=getPlayer(e.playerId);
+        if(registered&&registered===args[2]&&e.kind!=='foreign-discovery')e.memorialPlayer=memorialPlayerSnapshot(registered);
+        if(e.teamId===game.selectedId||e.kind==='foreign-discovery'||String(e.id).includes(':tournament:')||String(e.id).includes(':university:')||e.memorialPlayer)memorialNotice({...e,id:'rare:'+e.id});
+      }
+    }
     return ok;
+  };
+  const memorialCareerTickBase=careerDecisionTick;
+  careerDecisionTick=function(entry){
+    memorialCareerTickBase(entry);
+    for(const e of careerEvents())if(e.year===game.year&&e.teamId===game.selectedId&&e.type==='farewell'){
+      const p=getPlayer(e.id),q=p?.retirePlan;
+      if(q?.held)memorialRemember({id:'farewell:'+e.year+':'+p.id,year:e.year,date:e.date,teamId:e.teamId,kind:'farewell',title:p.name+' 引退セレモニー',body:q.options.map(k=>FAREWELL_OPTIONS.find(x=>x[0]===k)?.[1]).filter(Boolean).join('・'),memorialPlayer:memorialPlayerSnapshot(p)});
+    }
   };
   const memorialFacilityNoticeBase=memorialFacility;
   memorialFacility=function(t){const before=new Set(Object.keys(game.memorialFacilities||{}));memorialFacilityNoticeBase(t);for(const [k,e] of Object.entries(game.memorialFacilities||{}))if(!before.has(k))memorialNotice(e);};

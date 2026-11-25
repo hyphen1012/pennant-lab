@@ -76,3 +76,5 @@ jobs:
         if: always()
       - run: node scripts/account-ledger-check.cjs
         if: always()
+      - run: node scripts/medical-memorial-check.cjs
+        if: always()
