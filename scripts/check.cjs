@@ -1324,3 +1324,26 @@ assert.match(html,/REPORT_DIGEST_CUTS=\[\['pitch'/);assert.match(html,/report-di
 // v165 R58/R59: policy must reach the click dispatcher.
 assert.match(html,/'annual-pick','annual-auto','annual-clear','annual-run','annual-exhibition-choice'\]\.includes\(action\)\)return;/);
 assert.match(html,/camp-compact-picker/);assert.match(html,/data-camp-selected/);
+
+// v183: rank pagination must equal full-list competition ranks, including ties across pages.
+{
+ const s=inline[1],a=s.indexOf('  function recordPageRows('),b=s.indexOf('  function recordBookScreen(',a);
+ assert(a>=0&&b>a);
+ const api=vm.runInNewContext('(function(){'+s.slice(a,b)+';return {recordPageRows,recordFilterYears};})()');
+ for(const direction of [1,-1]){
+  const rows=Array.from({length:50000},(_,i)=>({value:direction*Math.floor(i/43),id:i}));
+  let rank=0;const expected=rows.map((r,i)=>{if(i===0||r.value!==rows[i-1].value)rank=i+1;return {...r,rank};});
+  for(const page of [0,1,2,10,999,1666,1667]){
+   const actual=api.recordPageRows(rows,page,30);
+   assert.deepEqual(JSON.parse(JSON.stringify(actual)),expected.slice(page*30,(page+1)*30));
+   assert(actual.length<=30);
+  }
+  assert(rows.every(r=>!('rank'in r)));
+ }
+ const same=Array.from({length:91},(_,id)=>({value:7,id}));
+ assert(api.recordPageRows(same,3,30).every(r=>r.rank===1));
+ assert.equal(api.recordPageRows([],0,30).length,0);
+ const players=[{seasonHistory:[{year:2028},{year:2026}]},{seasonHistory:[{year:2028},{year:2030}]},{}];
+ assert.deepEqual(Array.from(api.recordFilterYears(2031,[{year:2027},{year:2028}],players)),[2031,2030,2028,2027,2026]);
+ console.log('PASS: 50k historical rows; bounded page allocation, ties in both sort directions, year union and no mutation');
+}
