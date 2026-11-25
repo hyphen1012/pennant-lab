@@ -70,3 +70,5 @@ jobs:
         if: always()
       - run: node mobile/entitlement-check.cjs
         if: always()
+      - run: node scripts/monetization-check.cjs
+        if: always()

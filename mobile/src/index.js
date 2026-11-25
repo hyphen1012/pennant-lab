@@ -52,6 +52,13 @@ if(native){
       try{await Share.share({title:'PENNANT LAB セーブデータ',files:[result.uri]});}
       finally{await Filesystem.deleteFile({path,directory:Directory.Cache}).catch(()=>{});}
     },
+    async shareImage(data,name){
+      if(typeof data!=='string'||data.length>20*1024*1024||!/^PENNANT_LAB_\d+_memorial\.png$/.test(name))throw Error('invalid memorial image');
+      const path='pennant-'+Date.now()+'-'+name;
+      const result=await Filesystem.writeFile({path,data,directory:Directory.Cache});
+      try{await Share.share({title:'PENNANT LAB 記念アート',files:[result.uri]});}
+      finally{await Filesystem.deleteFile({path,directory:Directory.Cache}).catch(()=>{});}
+    },
     async privacy(){await AdMob.showPrivacyOptionsForm();await refreshConsent();}
   };
   document.addEventListener('visibilitychange',()=>{gate.setVisible(!document.hidden);if(!document.hidden)void gate.check(true);});

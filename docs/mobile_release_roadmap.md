@@ -42,3 +42,7 @@ Android debug APK / iOS Simulator app のCIビルド成功。mobile/README.md �
 - Facility acceptance refinement: capture the first all-Lv20 checkpoint (including all twelve clubs) during each financial audit, retain minimum levels after that moment, require the first club(s) to maintain five further complete seasons, and stop after that verified interval or the 150-year cap. No selection of a later successful club. Previous run continues under the earlier year-end-only criteria. New CI evidence required.
 
 - Prepared and tested a store-neutral entitlement boundary for proposed lifetime ad skip and VIP expiry; no store transactions or paid effects are enabled. The trusted verifier, product IDs/prices, refunds, restore purchases, account binding, social rewards and store submission still require implementation/approval. User-facing game version remains v0.9.146; no product release claim.
+
+
+## v0.9.147 製品化追加仕様
+[収益化・記念共有設計](monetization_and_memorial.md)参照。新規特殊出現保証の停止、記念アルバムとPNG共有、サーバー用報酬/券/ポイント/VIP分類ルールを実装。サーバー未接続なので報酬・有料権限を付与しない。100年無補填試験成功、全施設試験は別途継続。FA画面の再試験と実機監査は未完了。

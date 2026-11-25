@@ -52,7 +52,7 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
      for(const [i,id] of ids.slice(0,10).entries()){
       current=k+'-room-entry-'+i;
       const tile=page.locator('[data-action="fa-floor-room"][data-id="'+id+'"]').first();
-      await tile.scrollIntoViewIfNeeded();await tile.click({timeout:8000});
+      await tile.scrollIntoViewIfNeeded();await tile.tap({timeout:8000});
       await page.locator('.fa-transit,.fa-room').first().waitFor({timeout:8000});
       const skip=page.locator(action('fa-floor-transit-skip')).first();
       if(await skip.isVisible()){await shot(k+'-door-'+i);if(await skip.isVisible())await skip.click({timeout:8000}).catch(async err=>{if(!(await page.locator('.fa-room').isVisible()))throw err;});}
