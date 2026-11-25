@@ -234,7 +234,7 @@ const identity=vm.runInNewContext('(function(){'+portraitSource+
   '\nreturn {grade,gradeBrief,gradeBriefColor,rankColor,playerDisplayedAbilityAverage,'+
   'playerVisualTheme,playerTitleTheme,portrait,faceMini,faceLabel,renderFaceArtwork,'+
   'themedPlayerName};})()',{
-  ui:{page:'title'},isPitch:p=>['SP','RP','CP'].includes(p.pos),rating:p=>p.overall||73,
+  window:{addEventListener(){}},document:{addEventListener(){}},ui:{page:'title'},isPitch:p=>['SP','RP','CP'].includes(p.pos),rating:p=>p.overall||73,
   h:s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
 });
 const hexMap={
