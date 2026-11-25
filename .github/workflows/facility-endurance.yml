@@ -40,3 +40,5 @@ jobs:
 # v0.9.168: target first natural max within 50 seasons, then five further seasons (55 total maximum).
 
 # v0.9.169: preserve the 50-season target; audit actual cash and balanced capital allocation.
+
+# Trial B: reserve sensitivity only; identical 3 seeds and 50+5 season pass criteria.

@@ -12173,7 +12173,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   // Elite park expansion is a long-horizon investment, not just next month's
   // occupancy. Include actual extra gate income, operating expenses, upkeep,
   // venue staffing/renewal and the post-upgrade operating reserve.
-  function eliteOperatingReserve(reserve){return r2(Math.max(30,reserve*1.6));}
+  // Trial B: retain base operating reserve plus a 35% risk margin (previously 60%).
+  function eliteOperatingReserve(reserve){return r2(Math.max(30,reserve*1.35));}
   function parkExpansionPlan(t,forecast=cpuForecast(t)){
     const x=stadiumState(t),level=x.park;if(level>=20)return null;
     const homes=game.schedule.flat().filter(m=>m.home===t.id).length||71;
