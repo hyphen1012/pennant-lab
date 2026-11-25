@@ -330,7 +330,7 @@ const safeClamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 const pinchApi=vm.runInNewContext('(function(){'+pinchCode+
   '\nreturn {pinchHitterChoice,managerPinchBatter,liveDefenseScore};})()',{
   managerDecision:(t,key)=>t.gmOrders[key]==='attack'?86:t.gmOrders[key]==='safe'?14:52,
-  managerRatings:()=>({field:76}),
+  managerRatings:()=>({field:76}),managerSpecialBonus:()=>0,
   effectiveSkill:(p,key)=>p[key]*((p.energy||100)/100),
   availableForGame:p=>!p.injury,
   fieldingTier:(p,role)=>p.pos===role?'main':'off',
@@ -408,7 +408,7 @@ const benchV088=vm.runInNewContext('(function(){'+inline[1].slice(pitStart,pitEn
   inline[1].slice(benchStart,benchEnd)+
   '\nreturn {managerPitcherChoice,managerPinchRunner,managerDefenseUpgrade};})()',{
   managerDecision:freshManagerDecision,
-  managerRatings:()=>({field:84,pitch:80}),
+  managerRatings:()=>({field:84,pitch:80}),managerSpecialBonus:()=>0,
   clamp:(n,lo,hi)=>Math.max(lo,Math.min(hi,n)),
   pitchers:team=>team.pitchers,
   firstPitchers:team=>team.pitchers,
@@ -538,7 +538,7 @@ assert(midStart>=0&&midEnd>midStart);
 const noHitStart=inline[1].indexOf('  function preserveNoHitStart('),noHitEnd=inline[1].indexOf('  function managerPitcherChoice(',noHitStart);
 const midAPI=vm.runInNewContext('(function(){'+inline[1].slice(noHitStart,noHitEnd)+inline[1].slice(midStart,midEnd)+
   '\nreturn managerMidInningPitcherChoice;})()',{
-  managerDecision:()=>76,managerRatings:()=>({pitch:72}),
+  managerDecision:()=>76,managerRatings:()=>({pitch:72}),managerSpecialBonus:()=>0,
   clamp:(x,a,b)=>Math.max(a,Math.min(b,x)),
   pitchers:team=>team.pitchers,
   firstPitchers:team=>team.pitchers,
