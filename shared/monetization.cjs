@@ -29,19 +29,24 @@ function exchange(s,key){
 // Stable per-account operation id must be generated/bound to eligible game action
 // by server, not by the client. Pending reservations do not count as consumed.
 function reserve(s,id,entitlements,choice){
-  if(!validId(id))throw Error('invalid operation');
-  if(own(s.orders,id))return {...s.orders[id]};
-  if(entitlements?.verified===true&&(entitlements.vip===true||entitlements.adSkip===true))return {...(s.orders[id]={mode:'entitlement',status:'pending'})};
-  if(choice!=='ticket')return {mode:'ad',status:'external'};
+  if(!validId(id)||!['ad','ticket'].includes(choice))throw Error('invalid operation');
+  const previous=own(s.orders,id)?s.orders[id]:null;
+  if(previous&&previous.status!=='cancelled')return {...previous,attempt:previous.attempt??1,replay:true};
+  const attempt=(previous?.attempt??(previous?1:0))+1;
+  const paid=entitlements?.verified===true&&(entitlements.vip===true||entitlements.adSkip===true);
   const held=Object.values(s.orders).filter(o=>o.mode==='ticket'&&o.status==='pending').length;
-  if(s.tickets<=held)return {mode:'none',status:'unavailable'};
-  return {...(s.orders[id]={mode:'ticket',status:'pending'})};
+  if(!paid&&choice==='ticket'&&s.tickets<=held)return {mode:'none',status:'unavailable'};
+  const mode=paid?'entitlement':choice;
+  return {...(s.orders[id]={mode,status:'pending',attempt}),replay:false};
 }
-function finish(s,id,applied){
-  if(!validId(id)||!own(s.orders,id))return false;const o=s.orders[id];
+function finish(s,id,attempt,applied){
+  if(!validId(id)||!Number.isSafeInteger(attempt)||attempt<1||typeof applied!=='boolean'||!own(s.orders,id))return false;
+  const o=s.orders[id];
+  if((o.attempt??1)!==attempt)return false;
   if(o.status!=='pending')return o.status==='committed'&&applied===true;
-  if(applied===true){if(o.mode==='ticket'){if(s.tickets<1)throw Error('reservation invariant');s.tickets--;}o.status='committed';}
-  else o.status='cancelled';return applied===true;
+  if(applied){if(o.mode==='ticket'){if(s.tickets<1)throw Error('reservation invariant');s.tickets--;}o.status='committed';}
+  else o.status='cancelled';
+  return applied;
 }
 function vipBonus(kind,baseYen,entitlements){
   if(!Number.isSafeInteger(baseYen)||baseYen<0)throw Error('invalid revenue');

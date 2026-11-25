@@ -4,10 +4,23 @@ const claim=(eventId,now,entitlements=free,choice='ticket')=>p.claim(s,{eventId,
 a.equal(claim('a',100).kind,'ticket');a.equal(claim('b',100).kind,'ticket');a.equal(claim('c',100,owner).kind,'point');a.equal(claim('d',101).reason,'cooldown');a.equal(claim('a',102).reason,'duplicate');
 a.equal(claim('d',100+p.HOUR,vip).amount,2);a.equal(s.points,3);a.equal(s.tickets,2);a.equal(p.exchange(s,'frame'),true);a.equal(p.exchange(s,'frame'),false);
 a.throws(()=>claim('e',0));a.equal(claim('e',100+10*p.HOUR).ok,true);a.equal(claim('f',100+10*p.HOUR).reason,'cooldown');
-a.equal(p.reserve(s,'op1',free,'ticket').mode,'ticket');a.equal(p.reserve(s,'op1',free,'ticket').mode,'ticket');a.equal(p.finish(s,'op1',true),true);a.equal(p.finish(s,'op1',true),true);a.equal(s.tickets,2);p.reserve(s,'op2',free,'ticket');p.finish(s,'op2',false);a.equal(s.tickets,2);a.equal(p.reserve(s,'op3',vip,'ticket').mode,'entitlement');p.finish(s,'op3',true);a.equal(s.tickets,2);a.equal(p.reserve(s,'ad',free,'ad').mode,'ad');
+a.equal(p.reserve(s,'op1',free,'ticket').mode,'ticket');a.equal(p.reserve(s,'op1',free,'ticket').mode,'ticket');a.equal(p.finish(s,'op1',1,true),true);a.equal(p.finish(s,'op1',1,true),true);a.equal(s.tickets,2);p.reserve(s,'op2',free,'ticket');p.finish(s,'op2',1,false);a.equal(s.tickets,2);a.equal(p.reserve(s,'op3',vip,'ticket').mode,'entitlement');p.finish(s,'op3',1,true);a.equal(s.tickets,2);a.equal(p.reserve(s,'ad',free,'ad').mode,'ad');
 const cap=p.newAccount();cap.tickets=30;a.equal(p.claim(cap,{eventId:'cap',now:10,entitlements:free}).reason,'capacity');a.equal(cap.claimCount,0);a.equal(p.claim(cap,{eventId:'cap',now:10,entitlements:free,choice:'point'}).ok,true);
 for(const k of ['ticket','goods','fanclub','sponsor','broadcast','food','prize']){a.equal(p.vipBonus(k,100000000,vip),20000000);a.equal(p.vipBonus(k,100000000,free),0);}
 for(const k of ['transfer','posting','playerSale','insurance','investment','unknown'])a.equal(p.vipBonus(k,100000000,vip),0);
 a.equal(p.vipBonus('ticket',100000000,{vip:true}),0);
 const q={};a.equal(p.promptDecision(q,'1','special'),false);a.equal(p.promptDecision(q,'2','special'),false);a.equal(p.promptDecision(q,'3','special'),true);a.equal(p.promptDecision(q,'3','special'),false);a.equal(p.promptDecision(q,'4','top'),true);a.equal(p.promptDecision(q,'5','unmeasurable',false),false);
 console.log('PASS memorial reward timing, idempotency, reservation, cap, point exchange, entitlement priority, VIP scope, prompt cadence');
+const retry=p.newAccount();retry.tickets=2;
+a.equal(p.reserve(retry,'retry',free,'ticket').attempt,1);
+p.finish(retry,'retry',1,false);
+a.equal(p.reserve(retry,'retry',free,'ticket').attempt,2);
+a.equal(p.finish(retry,'retry',1,true),false);a.equal(retry.tickets,2);
+a.equal(p.finish(retry,'retry',2,true),true);a.equal(retry.tickets,1);
+a.equal(p.reserve(retry,'retry',free,'ticket').status,'committed');
+a.equal(p.reserve(retry,'retry',free,'ticket').replay,true);
+a.equal(p.finish(retry,'retry',2,true),true);a.equal(retry.tickets,1);
+a.equal(p.reserve(retry,'ad-retry',free,'ad').status,'pending');
+p.finish(retry,'ad-retry',1,false);a.equal(p.reserve(retry,'ad-retry',free,'ad').attempt,2);
+a.equal(p.finish(retry,'ad-retry',1,true),false);a.equal(p.finish(retry,'ad-retry',2,true),true);
+console.log('PASS stale attempt rejection, verified cancellation retry and ad reservation');
