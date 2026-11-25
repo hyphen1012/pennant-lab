@@ -3289,7 +3289,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     return entry;
   }
   function buildFresh(){
-    game={v:VERSION,seed:((Date.now()^0x53e719f1)>>>0)||1937,nextId:1,year:2027,day:0,
+    game={v:VERSION,seed:scenarioLab?1937:((Date.now()^0x53e719f1)>>>0)||1937,nextId:1,year:2027,day:0,
       selectedId:2,started:false,gmName:'GM',fans:60000,ownerRating:60,fieldRating:60,teams:[],players:[],schedule:[],games:[],news:[],newsArchive:[],history:[],seasonArchive:[],calendar:null};
     TEAMS.forEach((d,id)=>game.teams.push({id,name:d[0],city:d[1],short:d[2],league:d[3],color:d[4],letter:d[5],cash:r2(8+rand()*4),wins:0,losses:0,ties:0,rs:0,ra:0,lineup:[],rotation:[],starterIndex:0}));
     const rosterPositions=['C','C','1B','1B','2B','2B','3B','3B','SS','SS','OF','OF','OF','OF','SP','SP','SP','SP','SP','RP','RP','RP','RP','CP'];
@@ -5853,7 +5853,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function appLogo(){return `<div class="app-brand"><span class="brand-mark">⚾</span><span><b>PENNANT<span class="brand-gold"> LAB</span></b><small>BASEBALL GENERAL MANAGER</small></span></div>`}
   function slotData(i){try{const raw=localStorage.getItem(SLOT_PREFIX+i);if(!raw)return null;const d=JSON.parse(raw);return d&&Array.isArray(d.teams)&&d.teams.length===12?d:null}catch(e){return null}}
   function titleScreen(){
-    return `<div class="title-screen"><div class="title-hero"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.9.84 · CAMP & WINTER</span></div><div class="title-slot-title">セーブデータを選択</div><div class="title-slots">${[1,2,3].map(i=>{
+    return `<div class="title-screen"><div class="title-hero"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.9.106 · SPECIAL TRANSFER</span></div><div class="title-slot-title">セーブデータを選択</div><div class="title-slots">${[1,2,3].map(i=>{
       const d=slotData(i),t=d?.teams?.find(t=>t.id===d.selectedId);
       return `<button class="save-slot ${d?.started?'has-game':'empty-slot'} ${t?leagueClass(t.league):''}" data-action="${d?.started?'continue-slot':'new-slot'}" data-slot="${i}">${d?.started?teamBadge(t,'slot-emblem'):'<span class="slot-emblem">＋</span>'}<span class="slot-label">${d?.started?`<strong>${h(t.name)}</strong><small>${leagueTag(t.league)}　${d.year}年 · ${d.day}/143試合 · ${h(d.gmName||'GM')}</small><small>${d.teams.find(t=>t.id===d.selectedId)?.wins||0}勝　${fmtMoney(t.cash)}</small>`:`<strong>新しい球団で始める</strong><small>空きデータ ${i}</small>`}</span><span class="slot-index">DATA ${i} ›</span></button>`;
     }).join('')}</div><button class="btn outline full" data-action="rare-preview-open">特殊選手の演出確認モード ›</button><div class="title-info">本体データは端末内データベースに保存されます。バックアップは「経営」からJSON形式で書き出せます。<br>v0.3以前のテストセーブは引き継がれません。</div></div>`;
@@ -10545,7 +10545,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       else if(v!=='phase')return;
       if(phase==='offdesk-opening'){game.ceremonyStage=null;game.pendingCeremonyIntro='opening';save();render();draftJump(0);return;}
       x.open=true;
-    }else if(action==='offdesk-home'){if(d&&['fa','return'].includes(x.view)&&!x.intro)for(const r of offdeskMarketRows(d,x.view)){const o=d.offers[r.id];if(o&&['signed','refused'].includes(o.status))o.seen=true;}x.open=false;x.intro=false;}
+    }else if(action==='offdesk-home'){if(d&&['fa','return'].includes(x.view)&&!x.intro)for(const r of offdeskMarketRows(d,x.view)){const o=d.offers[r.id];if(o&&['signed','refused'].includes(o.status)&&!playerTitleTheme(getPlayer(r.id)))o.seen=true;}x.faFocus=null;x.faStage=0;x.open=false;x.intro=false;}
     else if(action==='offdesk-enter'&&d&&x.open&&['fa','return'].includes(x.view))x.intro=false;
     else if(action==='offdesk-news-eve'&&d&&x.news==='eve'&&x.view==='news'){x.news='opening-wait';x.open=false;}
     else if(action==='offdesk-news-open'&&d&&x.news==='opening'&&x.view==='news'){x.news=null;x.open=false;}
@@ -10958,7 +10958,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }
     if(x.news==='results'){
       const rare=(d.eventRows||[]).filter(r=>playerTitleTheme(getPlayer(r.id)));
-      if(rare.length)append('<section class="panel"><div class="eyebrow">SPECIAL TRANSFER REPORT</div><h3>特殊選手の去就特集</h3>'+rare.map(r=>'<button class="btn outline full" data-action="fa-special-open" data-id="'+r.id+'">'+h(getPlayer(r.id).name)+' · '+h(playerTitleTheme(getPlayer(r.id)).name)+' ›</button>').join('')+'</section>');
+      if(rare.length)append('<section class="panel"><div class="eyebrow">SPECIAL TRANSFER REPORT</div><h3>特殊選手の去就特集</h3>'+rare.map(r=>'<button class="btn outline full" data-action="fa-special-open" data-id="'+r.id+'">'+h(getPlayer(r.id).name)+' · '+h(playerTitleTheme(getPlayer(r.id)).name)+(x.faNewsSeen?.includes(r.id)?' · 確認済':' · 未確認')+' ›</button>').join('')+'</section>');
     }
     return html;
   };
@@ -11015,7 +11015,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const r=rows.find(r=>r.id===x.faFocus);if(!r)return;
       if(action==='fa-special-next'&&(x.faStage||0)===0)x.faStage=1;
       else if(['fa-special-next','fa-special-skip'].includes(action)){
-        if(news){x.faFocus=null;x.faStage=0;}else x.faStage=2;
+        if(news){x.faNewsSeen??=[];if(!x.faNewsSeen.includes(r.id))x.faNewsSeen.push(r.id);x.faFocus=null;x.faStage=0;}else x.faStage=2;
       }else if(action==='fa-special-list'){
         if((x.faStage||0)<2)return;
         const o=d.offers[r.id];if(o&&['signed','refused'].includes(o.status))o.seen=true;
@@ -11024,17 +11024,22 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     }
     save();render();draftJump(0);
   }
-  // Do not acknowledge a rare reply just by leaving the list.
+
   const faActionBase=offdeskAction;
   offdeskAction=function(action,el){
     const x=offdeskState(),d=movementData();
-    if(action==='offdesk-home'&&x&&d&&['fa','return'].includes(x.view)){
-      const unseen=offdeskMarketRows(d,x.view).filter(r=>playerTitleTheme(getPlayer(r.id))&&d.offers[r.id]&&!d.offers[r.id].seen).map(r=>r.id);
-      faActionBase(action,el);
-      for(const id of unseen)if(d.offers[id]?.seen)d.offers[id].seen=false;
-      x.faFocus=null;x.faStage=0;save();return;
+    if(action==='offdesk-news-results'&&x?.news==='results'&&d){
+      const unseen=(d.eventRows||[]).filter(r=>playerTitleTheme(getPlayer(r.id))&&!x.faNewsSeen?.includes(r.id));
+      if(unseen.length){showToast('特殊選手の去就特集を確認してください。',true);return;}
     }
     faActionBase(action,el);
+  };
+  const faCloseBase=offdeskCloseMarket;
+  offdeskCloseMarket=function(d){
+    if((d.eventRows||[]).some(r=>playerTitleTheme(getPlayer(r.id))&&['signed','refused'].includes(d.offers[r.id]?.status)&&!d.offers[r.id].seen)){
+      showToast('特殊選手からの交渉回答を確認してください。',true);return false;
+    }
+    return faCloseBase(d);
   };
   // Scenario Lab: no persistence, no replacement of any of the three slots.
   let scenarioLab=null;
@@ -11059,11 +11064,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       const j=f.jobs['movement-market'];j.status='ready';j.state=flowDesk(f,j);j.state.open=false;j.state.news=kind==='reply'?null:'eve';
       f.jobs.booking.status='scheduled';
       const d=movementData(true);d.declared=true;d.eventRows=[];
-      const pool=game.players.filter(p=>p.teamId!=null&&p.teamId>=0&&p.teamId!==game.selectedId).slice(0,FA_RARE_CATEGORIES.length+1);
+      const pool=game.teams.filter(t=>t.id!==game.selectedId).map(t=>own(t).find(p=>!isPitch(p))||own(t)[0]);
       pool.forEach((p,i)=>{
         const cat=FA_RARE_CATEGORIES[i];if(cat){p.specialCategory=cat;if(i<4)applySpecialTalent(p,cat,game.year,'draft',1937);else p.reincarnation={parentId:-p.id,rootId:-p.id,generation:1,retirementYear:game.year-2,retirementAge:38,retirementTeamName:'テスト球団'};}
         p.age=29;const demand=movementSalary(p),row={id:p.id,from:p.teamId,kind:'fa',demand};d.eventRows.push(row);d.requests.push({...row,status:'declared',offer:demand,minimum:demand,year:game.year});
       });
+      const returning=game.players.find(p=>p.teamId===null&&!p.overseasCareer);if(returning){returning.age=30;applySpecialTalent(returning,'LEGEND',game.year,'foreign',1937);returning.overseasCareer={active:true,from:0,departureYear:game.year-3,returnYear:game.year+1,route:'posting'};d.eventRows.push({id:returning.id,from:null,kind:'return',demand:movementSalary(returning)});}
       if(kind==='reply'){
         const [a,b,c]=d.eventRows;
         d.offers[a.id]={status:'counter',salary:a.demand,role:'trust',rivals:[],round:1,counter:r2(clamp(a.demand*1.12,.05,5)),resolved:f.date};
@@ -11081,9 +11087,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const labRenderBase=render;
   render=function(){
     labRenderBase();
-    if(scenarioLab){const app=$('#app');if(app)app.insertAdjacentHTML('afterbegin','<div class="scenario-banner"><strong>TEST PLAY · 保存されません</strong><button class="btn outline sm" data-action="scenario-exit" '+(ui.busy?'disabled':'')+'>テスト終了</button></div>');}
+    if(scenarioLab){const app=$('#app');if(app)app.insertAdjacentHTML?.('afterbegin','<div class="scenario-banner"><strong>TEST PLAY · 保存されません</strong><button class="btn outline sm" data-action="scenario-exit" '+(ui.busy?'disabled':'')+'>テスト終了</button></div>');}
   };
-  window.addEventListener('click',e=>{
+  window.addEventListener?.('click',e=>{
     const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;
     if(a.startsWith('fa-special-')){e.preventDefault();e.stopImmediatePropagation();faSpecialAction(a,b);return;}
     if(a==='scenario-start'||a==='scenario-exit'||scenarioLab&&['title','new-slot','continue-slot','ask-reset','import-save','export-save'].includes(a)){

@@ -13,3 +13,6 @@ jobs:
           node-version: '22'
       - run: node scripts/check.cjs
       - run: node scripts/smoke.cjs
+        if: always()
+      - run: node scripts/transfer-check.cjs
+        if: always()
