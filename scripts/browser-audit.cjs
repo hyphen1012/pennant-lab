@@ -25,6 +25,7 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
   let current='startup';page.on('pageerror',e=>errors.push({width,screen:current,error:e.message}));
   const click=async selector=>{const b=page.locator(selector).first();await b.click({timeout:8000});await page.waitForTimeout(180);};
   const shot=async name=>{current=name;await page.waitForTimeout(100);const metrics=await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,text:document.querySelector('#app')?.innerText?.length||0,screens:window.__plAudit?.take()||[],smallControls:[...document.querySelectorAll('#app button:not([disabled])')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&(r.width<24||r.height<24)}).map(e=>({action:e.dataset.action||'',label:e.innerText.slice(0,50)}))}));rows.push({width,name,...metrics});await page.screenshot({path:path.join('test-results/browser',width+'-'+name+'.png')});if(!metrics.text||metrics.scroll>metrics.width+2)errors.push({width,screen:name,error:'blank or document horizontal overflow '+JSON.stringify(metrics)});};
+  const detail=async key=>{const el=page.locator('[data-normal-detail="'+key+'"],[data-normal-stage="'+key+'"]').first();await el.waitFor({state:'visible',timeout:5000});const safe=await el.evaluate(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.left>=-2&&r.right<=innerWidth+2;});if(!safe)throw Error('normal detail overflow '+key);};
   const action=(a,v)=>'[data-action="'+a+'"]'+(v===undefined?'':'[data-value="'+v+'"]');
   const selectPolicy=async k=>{const sel=action('annual-exhibition-choice',k);await click(sel);if(await page.locator(sel).getAttribute('aria-pressed')!=='true'||await page.locator('.preseason-policy-option[aria-pressed="true"]').count()!==1)throw Error('policy selection UI '+k);const state=await page.evaluate(()=>window.__plAudit.trainingState());if(state.policy!==k)throw Error('policy not persisted in plan '+k);};
   const checkCampPicker=async()=>{await page.locator('.camp-compact-picker').waitFor({state:'visible'});const initial=await page.locator('[data-camp-selected]').getAttribute('data-camp-selected');for(const key of ['ishigaki','usa','club']){const b=page.locator(action('ref-site',key));if(await b.isEnabled()){await click(action('ref-site',key));if(await page.locator('[data-camp-selected]').getAttribute('data-camp-selected')!==key||await b.getAttribute('aria-pressed')!=='true')throw Error('camp selection mismatch '+key);}}const sizes=await page.locator('.camp-compact-picker').evaluate(e=>({height:e.getBoundingClientRect().height,viewport:innerHeight,detail:e.querySelector('.camp-compact-detail').getBoundingClientRect().height,map:e.querySelector('.dest-regional').getBoundingClientRect().height}));if(sizes.height>sizes.viewport-220||sizes.map>300||sizes.detail<60)throw Error('camp picker not compact '+JSON.stringify(sizes));await click(action('ref-site',initial));};
@@ -72,10 +73,10 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
       if(!(await page.locator('.report-support').isVisible()))throw Error('support missing after training choice');
       await click(action('report-self-back'));await click(action('annual-run'));await click(action('annual-run'));
      }else if(k==='report-draft'){
-      await page.locator(action('draft-start')).first().waitFor({state:'visible',timeout:8000});await shot('report-draft-ready');await click(action('draft-start'));await shot('report-draft-started');
+      await page.locator(action('draft-start')).first().waitFor({state:'visible',timeout:8000});await detail('scout');await shot('report-draft-ready');await click(action('draft-start'));await shot('report-draft-started');
      }else{
       const text=await page.locator('main').innerText();if(!/STAR|LEGEND/.test(text))throw Error('special renewal players missing');
-      await shot('report-renewal-ready');await click(action('renewal-submit-all'));await shot('report-renewal-bonus');await click(action('renewal-report-cancel'));
+      await detail('contract');await shot('report-renewal-ready');await click(action('renewal-submit-all'));await shot('report-renewal-bonus');await click(action('renewal-report-cancel'));
      }
     }
     if(k==='report-season'){
@@ -137,7 +138,7 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
      await check(s=>s.winter.length===1,'winter assignment');
      await shot('winter-assigned');await click(action('annual-run'));await click(action('ceremony-next'));
      await check(s=>s.jobs.winter==='done'&&s.jobs.autumn==='waiting','winter complete while autumn waits');
-     await click('[data-action="tab"][data-tab="business"]');await click('[data-action="business-sub"][data-sub="facilities"]');await shot('parallel-facilities');
+     await click('[data-action="tab"][data-tab="business"]');await click('[data-action="business-sub"][data-sub="facilities"]');await detail('campus');await shot('parallel-facilities');
      await click('[data-action="tab"][data-tab="hq"]');await until('autumn');await enter('autumn');await shot('autumn-report');await click(action('ceremony-next'));
      await check(s=>s.jobs.autumn==='done','autumn complete');await until('booking');await enter('booking');await checkCampPicker();await shot('camp-booking');
      await click(action('ref-group','farm'));await shot('camp-farm-choice');await click(action('ref-camp-next'));await check(s=>s.jobs.booking==='done','booking complete');
@@ -151,21 +152,21 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
      await click(action('ceremony-next'));await until('exhibition');await enter('exhibition');await shot('exhibition-policy');for(const k of ['first','balanced','youth'])await selectPolicy(k);await click(action('annual-run'));if(!(await page.locator('main').innerText()).includes('若手育成'))throw Error('meeting policy mismatch');await click(action('annual-run'));await until('exhibition');await enter('exhibition');for(const key of ['pitch','bat','field']){await page.locator('[data-digest-cut="'+key+'"]').waitFor({state:'visible',timeout:6000});await shot('exhibition-digest-'+key);}await page.locator('.preseason-results').waitFor({state:'visible',timeout:8000});if(await page.locator('[data-preseason-result]').count()!==6)throw Error('preseason full results missing');await shot('exhibition-report');await check(s=>s.exhibition===36,'exhibition game count');await click(action('ceremony-next'));
     }
     if(k==='commerce'){
-     await dayTo('commerce-open','fan-fest');await click(action('commerce-open','fan-fest'));await shot('fest-brief');
-     await click(action('commerce-start'));await shot('fest-selection');await click(action('commerce-plan',2));await click(action('commerce-confirm'));await shot('fest-booking');
+     await dayTo('commerce-open','fan-fest');await click(action('commerce-open','fan-fest'));await detail('fest');await shot('fest-brief');
+     await click(action('commerce-start'));await detail('fest');await shot('fest-selection');await click(action('commerce-plan',2));await click(action('commerce-confirm'));await shot('fest-booking');
      await click(action('commerce-schedule-finish'));await dayTo('commerce-open','fan-fest');await click(action('commerce-open','fan-fest'));await shot('fest-live');
-     await click(action('commerce-live-finish'));await shot('fest-result');await click(action('commerce-finish'));
-     await dayTo('commerce-open','fanclub');await click(action('commerce-open','fanclub'));await click(action('commerce-start'));await shot('fanclub-selection');
+     await click(action('commerce-live-finish'));await detail('fest');await shot('fest-result');await click(action('commerce-finish'));
+     await dayTo('commerce-open','fanclub');await click(action('commerce-open','fanclub'));await click(action('commerce-start'));await detail('fanclub');await shot('fanclub-selection');
      await page.locator('#commerce-fan-name').fill('PENNANT AUDIT');await click(action('commerce-fee',500));await click(action('commerce-perk','uniform'));await shot('fanclub-preview');
-     await click(action('commerce-confirm'));await shot('fanclub-result');await click(action('commerce-finish'));
-     await click(action('commerce-open','tv'));await click(action('commerce-start'));await shot('tv-selection');
+     await click(action('commerce-confirm'));await detail('fanclub');await shot('fanclub-result');await click(action('commerce-finish'));
+     await click(action('commerce-open','tv'));await click(action('commerce-start'));await detail('tv');await shot('tv-selection');
      const guests=await page.locator(action('commerce-player')).evaluateAll(els=>els.slice(0,5).map(e=>e.dataset.value));
      if(guests.length!==5)throw Error('five TV guests required');for(const id of guests)await click(action('commerce-player',id));
      await click(action('commerce-confirm'));await shot('tv-booking');await click(action('commerce-schedule-finish'));
-     await dayTo('commerce-open','tv');await click(action('commerce-open','tv'));await shot('tv-live');await click(action('commerce-tv-finish'));await shot('tv-result');await click(action('commerce-finish'));
-     await dayTo('sponsor-open');await click(action('sponsor-open'));await click(action('sponsor-start'));await shot('sponsor-selection');await click(action('sponsor-confirm'));await shot('sponsor-result');await click(action('sponsor-finish'));
-     await click(action('commerce-open','broadcast'));await click(action('commerce-start'));await click(action('commerce-delta',3));await shot('broadcast-negotiation');await click(action('commerce-confirm'));await shot('broadcast-result');await click(action('commerce-finish'));
-     await click(action('commerce-open','naming'));await click(action('commerce-start'));await shot('naming-selection');await click(action('commerce-confirm'));await shot('naming-result');await click(action('commerce-finish'));
+     await dayTo('commerce-open','tv');await click(action('commerce-open','tv'));await detail('tv');await shot('tv-live');await click(action('commerce-tv-finish'));await detail('tv');await shot('tv-result');await click(action('commerce-finish'));
+     await dayTo('sponsor-open');await click(action('sponsor-open'));await click(action('sponsor-start'));await detail('sponsor');await shot('sponsor-selection');await click(action('sponsor-confirm'));await detail('sponsor');await shot('sponsor-result');await click(action('sponsor-finish'));
+     await click(action('commerce-open','broadcast'));await click(action('commerce-start'));await click(action('commerce-delta',3));await detail('broadcast');await shot('broadcast-negotiation');await click(action('commerce-confirm'));await detail('broadcast');await shot('broadcast-result');await click(action('commerce-finish'));
+     await click(action('commerce-open','naming'));await click(action('commerce-start'));await detail('naming');await shot('naming-selection');await click(action('commerce-confirm'));await detail('naming');await shot('naming-result');await click(action('commerce-finish'));
     }
     if(k==='opening-promo'){
      await dayTo('commerce-open','opening-promo');await click(action('commerce-open','opening-promo'));await click(action('commerce-start'));
