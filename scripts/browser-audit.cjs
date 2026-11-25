@@ -98,13 +98,13 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
      await check(s=>s.jobs.autumn==='done','autumn complete');await until('booking');await enter('booking');await shot('camp-booking');
      await click(action('ref-group','farm'));await shot('camp-farm-choice');await click(action('ref-camp-next'));await check(s=>s.jobs.booking==='done','booking complete');
      await page.evaluate(()=>window.__plAudit.seedSpring());await until('self');await enter('self');await shot('self-training');
-     const intensity=page.locator('select[data-change="annual-intensity"]:not([disabled])').first();await intensity.selectOption('rest');await click(action('annual-run'));await check(s=>s.jobs.self==='waiting','self scheduled');
+     const intensity=page.locator('select[data-change="annual-intensity"]:not([disabled])').first();await intensity.selectOption('rest');await click(action('annual-run'));await shot('self-support');await click(action('annual-run'));await check(s=>s.jobs.self==='waiting','self scheduled');
      await until('self');await enter('self');await shot('self-report');await click(action('ceremony-next'));await until('camp');await enter('camp');await shot('spring-sites');
      await click(action('ref-camp-next'));await shot('spring-kickoff');await click(action('ref-camp-next'));await check(s=>s.jobs.camp==='waiting'&&s.camp===2,'camp waits for first visit');
      await until('camp');await enter('camp');await shot('spring-visit-first');await click(action('ref-visit','rest'));await click(action('ref-visit-finish'));await check(s=>s.jobs.camp==='waiting'&&s.camp===3,'camp waits for second visit');
      await until('camp');await enter('camp');await shot('spring-visit-second');await click(action('annual-run'));await until('camp');await enter('camp');await shot('spring-report');
      for(const tab of ['INJURY','NEW','UP','STAY','DOWN']){await click(action('ref-report',tab));await shot('spring-report-'+tab);}
-     await click(action('ceremony-next'));await until('exhibition');await enter('exhibition');await shot('exhibition-policy');await click(action('annual-exhibition-choice','youth'));await click(action('annual-run'));await click(action('annual-run'));await until('exhibition');await enter('exhibition');await shot('exhibition-report');await check(s=>s.exhibition===36,'exhibition game count');await click(action('ceremony-next'));
+     await click(action('ceremony-next'));await until('exhibition');await enter('exhibition');await shot('exhibition-policy');await click(action('annual-exhibition-choice','youth'));await click(action('annual-run'));await click(action('annual-run'));await until('exhibition');await enter('exhibition');await shot('exhibition-digest');for(let i=0;i<12&&await page.locator(action('report-digest-next')).first().isVisible();i++)await click(action('report-digest-next'));await shot('exhibition-report');await check(s=>s.exhibition===36,'exhibition game count');await click(action('ceremony-next'));
     }
     if(k==='commerce'){
      await dayTo('commerce-open','fan-fest');await click(action('commerce-open','fan-fest'));await shot('fest-brief');

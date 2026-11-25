@@ -144,8 +144,8 @@ assert.match(html,/data-action="\$\{history\?'monthly-history-close':'finish-mon
 
 // v0.8.3: Avoid revealing a 17-half-inning game before the final out.
 // The progress width is computed against the public 9-inning/12-inning rules.
-assert.match(html,/waitForDailyDisplay\(mode==='fast'\?720:1900\)/);
-assert.match(html,/waitForDailyDisplay\(mode==='fast'\?840:2300\)/);
+assert.match(html,/waitForDailyDisplay\(mode==='fast'\?720:Math\.round\(1900\/1\.15\)\)/);
+assert.match(html,/waitForDailyDisplay\(mode==='fast'\?840:Math\.round\(2300\/1\.15\)\)/);
 assert.doesNotMatch(html,/\$\{step\}\/\$\{frames\.length\} 半イニング/);
 assert.match(html,/const finishedHalves=revealed\.length;/);
 function partialWatch(omitNinthBottom){
