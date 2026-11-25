@@ -616,6 +616,9 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   dispatch('click',{action:'decade-close'});
   assert(app.innerHTML.includes('球界・球団10年史'));
   // Synthetic decade boundary fixture: preserve the normal one-season smoke above.
+  // Slot selection is only legal from the title, after pending writes finish.
+  dispatch('click',{action:'title'});await flush();
+  assert(app.innerHTML.includes('セーブデータを選択'));
   const fixture=JSON.parse(JSON.stringify(store.get(1)));
   fixture.data.seasonArchive=Array.from({length:10},(_,i)=>({...fixture.data.seasonArchive[0],year:2027+i}));
   fixture.data.year=2037;fixture.data.pendingDecade=2036;fixture.data.pendingCeremonyIntro='opening';
