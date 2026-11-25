@@ -1,0 +1,30 @@
+const assert=require('node:assert/strict');
+const {openLedger,createAccountService}=require('../server/account-ledger.cjs');
+const {createAccountHttp}=require('../server/account-http.cjs');
+const ledger=openLedger(':memory:');
+const service=createAccountService({ledger,authenticate:async token=>['a','b'].includes(token)?{authenticated:true,account:token}:null,verifyEvent:async(account,p)=>p==='event'?{verified:true,account,eligible:true,id:p}:null,verifyEntitlements:async account=>({verified:true,account,vip:false,adSkip:false}),verifyAction:async(account,p)=>p==='action'?{verified:true,account,eligible:true,id:p}:null,verifyCompletion:async(account,p)=>p==='receipt'?{verified:true,account,id:'action',mode:'ticket',attempt:1,applied:true}:null,now:()=>1000});
+assert.throws(()=>createAccountHttp({service}));
+const server=createAccountHttp({service,maxBody:1024,allowRequest:async({token})=>token!=='limited'});
+(async()=>{
+ await new Promise(ok=>server.listen(0,'127.0.0.1',ok));
+ const url='http://127.0.0.1:'+server.address().port;
+ async function req(path,body={},token='a',extra={}){const r=await fetch(url+'/v1/'+path,{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+token},body:JSON.stringify(body),...extra});return [r.status,await r.json(),r.headers.get('cache-control')];}
+ assert.equal((await req('wallet',{},'bad'))[0],403);
+ assert.equal((await req('wallet',{},'limited'))[0],429);
+ assert.equal((await req('wallet',{},'a',{headers:{'content-type':'application/json'}}))[0],401);
+ assert.equal((await req('claim',{eventProof:'event',choice:'ticket',account:'b'}))[0],400);
+ assert.equal((await req('claim',{eventProof:'x'.repeat(2048),choice:'ticket'}))[0],413);
+ assert.equal((await req('claim',{eventProof:'forged',choice:'ticket'}))[0],403);
+ const [x,y]=await Promise.all([req('claim',{eventProof:'event',choice:'ticket'}),req('claim',{eventProof:'event',choice:'ticket'})]);
+ assert.equal([x,y].filter(r=>r[1].result.ok).length,1);
+ assert.equal((await req('wallet'))[2],'no-store');
+ assert.equal((await req('reserve',{actionProof:'action',choice:'ticket'}))[1].status,'pending');
+ assert.equal((await req('order',{id:'action'},'b'))[1].order,null);
+ assert.equal((await req('order',{id:'action'}))[1].order.attempt,1);
+ assert.equal((await req('finish',{completionProof:'forged'}))[0],403);
+ assert.equal((await req('finish',{completionProof:'receipt'}))[1].ok,true);
+ assert.equal((await req('finish',{completionProof:'receipt'}))[1].wallet.tickets,0);
+ assert.equal((await req('order',{id:'action'}))[1].order.status,'committed');
+ assert.equal((await req('wallet',{},'b'))[1].tickets,0);
+ console.log('PASS account HTTP boundary');
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{server.close();ledger.close();});

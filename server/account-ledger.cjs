@@ -59,6 +59,14 @@ function createAccountService({ledger,authenticate,verifyEvent,verifyEntitlement
     if(receipt?.verified!==true||receipt.account!==account||typeof receipt.applied!=='boolean'||!['ad','ticket','entitlement'].includes(receipt.mode)||!Number.isSafeInteger(receipt.attempt)||receipt.attempt<1)throw Error('completion not verified');
     return ledger.transact(account,s=>({ok:Object.hasOwn(s.orders,receipt.id)&&s.orders[receipt.id].mode===receipt.mode&&rules.finish(s,receipt.id,receipt.attempt,receipt.applied),wallet:publicState(s)}));
   }
-  return {snapshot,claim,exchange,reserve,finish};
+  async function orderStatus(token,id){
+    const account=await identity(token);
+    if(typeof id!=='string'||!id||id.length>200)throw Error('invalid operation');
+    return ledger.transact(account,s=>{
+      const o=Object.hasOwn(s.orders,id)?s.orders[id]:null;
+      return {order:o?{operationId:id,mode:o.mode,status:o.status,attempt:o.attempt??1}:null,wallet:publicState(s)};
+    });
+  }
+  return {snapshot,claim,exchange,reserve,finish,orderStatus};
 }
 module.exports={openLedger,createAccountService};

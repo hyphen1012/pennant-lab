@@ -80,3 +80,5 @@ jobs:
         if: always()
       - run: node scripts/studio-budget-check.cjs
         if: always()
+      - run: node scripts/account-http-check.cjs
+        if: always()
