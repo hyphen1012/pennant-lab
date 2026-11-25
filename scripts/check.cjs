@@ -192,7 +192,7 @@ function scoringSample(step,withLogs=true){
   const game={year:2031,selectedId:1,games:[g]};
   const ui={watchGame:{year:2031,day:20,step},autoPaused:false};
   const getTeam=id=>baseballTeams.find(t=>t.id===id);
-  const context={game,ui,getTeam,getPlayer:()=>null,leagueClass:()=>'',h:s=>String(s),
+  const context={game,ui,getTeam,getPlayer:()=>null,rareCinemaArt:()=>'',rareCinemaKnown:()=>false,leagueClass:()=>'',h:s=>String(s),
     teamBadge:t=>t.short,formatCalendarDate:()=> '5月16日'};
   return vm.runInNewContext(watchSource+'\nwatchGameScreen({gameNo:20,date:"2031-05-16"});',context);
 }
