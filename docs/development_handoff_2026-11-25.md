@@ -44,3 +44,10 @@
 - 新規試験（結果は実ログで判定）：[v151拡張ブラウザ](https://github.com/hyphen1012/pennant-lab/actions/runs/45617019778)、[AI独立検証](https://github.com/hyphen1012/pennant-lab/actions/runs/45617264632)、[v152総合回帰](https://github.com/hyphen1012/pennant-lab/actions/runs/45617483675)、[v152ブラウザ](https://github.com/hyphen1012/pennant-lab/actions/runs/45617483549)、[v152ネイティブ](https://github.com/hyphen1012/pennant-lab/actions/runs/45617483494)、[v152 Pages](https://github.com/hyphen1012/pennant-lab/actions/runs/45617482277)。最初の全施設Lv20自然到達＋維持の試験は前回のものを継続中。未確定の試験は合格扱いにしない。
 
 最新版URL: https://hyphen1012.github.io/pennant-lab/?v=152
+
+
+### v0.9.153 追加記録
+- 独立4条件の学習AI比較: 勝利差 -86 / -25 / +98 / -1、計-14。既存5条件と合わせ+140だが、優越性は未確定。
+- 150年自然施設試験(旧版)は資金破綻0、全施設Lv20到達0、最高157/160、最低資金8.16億。球場だけLv15〜17。維持費・建設費を下げず、拡張後営業収支・余剰資金・契約更改/FA留保・席種別料金判断を追加。自然到達と5年維持は再試験待ち。
+- v153初回年間系CIはログ用の文字列アンカー不一致で実行前に失敗。通常/VIP両方の変換・構文を検証して修正。ゲーム本体の経営破綻とは区別する。
+- v152拡張ブラウザ監査・回帰・ネイティブdebugビルド成功。正式配信の認証、ストア課金・広告、実機監査、画像品質監査は引き続き未完了。
