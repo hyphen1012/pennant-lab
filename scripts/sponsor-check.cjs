@@ -14,7 +14,9 @@ ck(sponsorAction('sponsor-back',{dataset:{}})&&j.status==='ready','park');
 ck(sponsorAction('sponsor-open',{dataset:{}})&&j.state.selected.length===1,'selection persisted');
 ck(sponsorAction('sponsor-confirm',{dataset:{}})&&s.stage==='result','contract');
 const contract=sponsorContract(t,y),expected=contract.companies[0].annual;ck(contract.companies.length===1&&!sponsorSign(t,y,[],f.date),'no duplicate');
-ck(game.teams.every(t=>sponsorContract(t,y)),'CPU contracts');
+ck(game.teams.filter(t=>t.id!==game.selectedId).every(t=>!sponsorContract(t,y)),'isolated scenario skips CPU contracts');
+// Exercise the production calendar path separately, on the isolated fixture only.
+const scenario=scenarioLab;try{scenarioLab=null;cpuCommercialCalendar(f);ck(game.teams.every(t=>sponsorContract(t,y)),'CPU contracts on production calendar');const snapshot=JSON.stringify(game.teams.map(t=>t.sponsorships));cpuCommercialCalendar(f);ck(snapshot===JSON.stringify(game.teams.map(t=>t.sponsorships)),'CPU contract idempotence');}finally{scenarioLab=scenario;}
 ck(sponsorAction('sponsor-finish',{dataset:{}})&&j.status==='done','complete');
 const cash=t.cash;sponsorOffPay(y+'-01-01');ck(t.cash===r2(cash+r2(expected/12))&&contract.payments.length===1,'offseason cash');
 sponsorOffPay(y+'-01-01');ck(contract.payments.length===1&&t.cash===r2(cash+r2(expected/12)),'offseason no duplicate');
