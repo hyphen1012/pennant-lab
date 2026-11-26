@@ -52,7 +52,8 @@ if(canonicalUiPilot){
  html=require('./canonical-title-pilot.cjs').canonicalTitlePilot(html);
  // Staging only. The approved startup video and its encoded audio are untouched.
  fs.copyFileSync(path.join(__dirname,'src/scene-audio.js'),path.join(out,'scene-audio.js'));
- html=html.replace('<script>','<script src="scene-audio.js"></script>\n<script>');
+ fs.copyFileSync(path.join(__dirname,'src/canonical-memorial-art.js'),path.join(out,'canonical-memorial-art.js'));
+ html=html.replace('<script>','<script src="scene-audio.js"></script><script src="canonical-memorial-art.js"></script>\n<script>');
 }
 const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];if(!script)throw Error('game script missing');new Function(script);
 fs.writeFileSync(path.join(out,'index.html'),html);

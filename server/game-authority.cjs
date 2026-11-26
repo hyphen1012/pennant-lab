@@ -191,6 +191,11 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
   return inspect(account,(s,db)=>{const r=world(db,account,slot);if(r.world!==worldId||r.revision!==revision)throw Error('canonical revision conflict');
   return {world:r.world,revision:r.revision,page:JSON.parse(json(sync(engine.reportPage(r.state,JSON.parse(json(command,4096)))),262144))};});
  }
+ function publicAchievement(r,s,e){
+  const eventId=digest([r.world,e.key]),out={eventId,label:e.label,claimed:Object.hasOwn(s.claims,eventId)};
+  if(Number.isSafeInteger(e.art?.year)&&e.art.year>=2027&&e.art.year<=999999&&['win','facility','championship','league-championship','award','retirement','farewell','club-record','anniversary','record'].includes(e.art.kind))out.art={year:e.art.year,kind:e.art.kind};
+  return out;
+ }
  async function achievementPage(token,slot,worldId,revision,command){
   const account=await identity(token);
   if(typeof worldId!=='string'||!n(revision)||revision<1||!command||Object.keys(command).length!==2||!n(command.offset)||!n(command.limit)||command.limit<1||command.limit>40)throw Error('invalid achievement page');
@@ -199,13 +204,13 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
    const events=sync(engine.achievements(r.state));if(!Array.isArray(events)||events.length>50000)throw Error('invalid canonical achievements');
    const list=events.filter(e=>e?.eligible===true&&id(e.key)&&typeof e.label==='string'&&e.label.length<=160);
    if(command.offset>list.length)throw Error('achievement offset out of range');
-   const items=list.slice(command.offset,command.offset+command.limit).map(e=>{const eventId=digest([r.world,e.key]);return {eventId,label:e.label,claimed:Object.hasOwn(s.claims,eventId)};});
+   const items=list.slice(command.offset,command.offset+command.limit).map(e=>publicAchievement(r,s,e));
    const end=command.offset+items.length;return {world:r.world,revision:r.revision,page:{offset:command.offset,total:list.length,nextOffset:end<list.length?end:null,items}};
   });
  }
  async function achievements(token,slot){const account=await identity(token);return inspect(account,(s,db)=>{
   const r=world(db,account,slot),events=sync(engine.achievements(r.state));if(!Array.isArray(events)||events.length>50000)throw Error('invalid canonical achievements');
-  return events.filter(e=>e?.eligible===true&&id(e.key)&&typeof e.label==='string'&&e.label.length<=160).map(e=>{const eventId=digest([r.world,e.key]);return {eventId,label:e.label,claimed:Object.hasOwn(s.claims,eventId)};});
+  return events.filter(e=>e?.eligible===true&&id(e.key)&&typeof e.label==='string'&&e.label.length<=160).map(e=>publicAchievement(r,s,e));
  });}
  return {create,deleteWorld,read,advance,reserve,settle,cancel,claim,achievements,orderStatus,slots,freePage,playerPage,achievementPage,reportPage,tradePage};
 }

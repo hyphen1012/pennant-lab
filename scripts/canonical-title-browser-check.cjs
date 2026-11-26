@@ -25,6 +25,7 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
    "localStorage.setItem('pennant_lab_v04_slot_1','guest-sentinel');",
    "localStorage.setItem('pennant_lab_account_v1_'+owner+'_slot_1','account-sentinel');",
    "window.PennantNative={accountRequired:true,ready:()=>online,check:async()=>online,canonicalGame:session,get accountContext(){return ctx;},accountReady:async()=>{ctx={account:owner,isCurrent:()=>true,openCloud:async()=>{throw Error('legacy cloud forbidden');}};session.setSession({account:owner,token:'a'});},logoutAccount:()=>{throw Error('not in fixture');}};",
+   "window.fixtureShares=[];window.PennantNative.shareImage=async(data,name)=>{window.fixtureShares.push({data,name});};",
    "window.fixtureOnline=on=>{online=on;if(!on){session.suspend();window.dispatchEvent(new Event('pl-native-suspend'));}};"
   ].join('\n'),resolveDir:process.cwd()},bundle:true,write:false,platform:'browser'}).outputFiles[0].text;
   browser=await chromium.launch({headless:true});
@@ -243,7 +244,17 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   const injured=beforeReward.game.club.roster.find(x=>x.injuryDays===8);a.ok(injured);
   await page.locator('[data-action="canonical-achievements-open"]').click();
   const claim=page.locator('article.panel').filter({has:page.getByRole('heading',{name:'試験用施設実績'})}).locator('[data-choice="point"]');
-  await claim.waitFor();page.once('dialog',d=>d.accept());await claim.click();
+  await claim.waitFor();
+  const artButton=page.locator('article.panel').filter({has:page.getByRole('heading',{name:'試験用施設実績'})}).locator('[data-action="canonical-achievements-art"]');
+  await artButton.click();const art=page.locator('[data-canonical-memorial] img');
+  await art.waitFor();await page.waitForFunction(()=>{const img=document.querySelector('[data-canonical-memorial] img');return img?.complete&&img.naturalWidth===1080&&img.naturalHeight===1350;});
+  a.equal(await page.evaluate(()=>window.fixtureShares.length),0);
+  await page.locator('[data-action="canonical-achievements-share"]').click();
+  await page.waitForFunction(()=>window.fixtureShares.length===1);
+  const shared=await page.evaluate(()=>window.fixtureShares[0]);a.match(shared.name,/^PENNANT_LAB_2027_memorial\.png$/);const png=Buffer.from(shared.data,'base64');a.equal(png.readUInt32BE(16),1080);a.equal(png.readUInt32BE(20),1350);
+  const afterArt=await post('read',{slot:3});a.equal(afterArt.revision,beforeReward.revision);a.deepEqual(afterArt.wallet,beforeReward.wallet);
+  await page.locator('[data-action="canonical-achievements-art-close"]').click();a.equal(await art.count(),0);
+  page.once('dialog',d=>d.accept());await claim.click();
   await page.getByText('受け取りを確認しました：ポイント 1').waitFor();
   a.equal((await post('read',{slot:3})).wallet.points,1);
   await page.locator('[data-action="canonical-achievements-back"]').click();await page.locator('[data-action="canonical-ticket-exchange"]:enabled').waitFor();

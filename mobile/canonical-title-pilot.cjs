@@ -79,7 +79,7 @@ const pilotCode = `
     }catch{return false;}
   }
   function canonicalReset(){
-    canonicalDeleteClear();canonicalDeleteSuppressed=null;canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalForeignOpen=false;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';canonicalReplay=null;canonicalReplaySkip=false;canonicalArchive=null;canonicalManagerEntry=true;canonicalTrade=null;canonicalTradeQuote=null;canonicalTradeClub=null;canonicalAchievementPage=null;canonicalAchievementNote='';canonicalRewardNote='';
+    canonicalDeleteClear();canonicalDeleteSuppressed=null;canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalForeignOpen=false;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';canonicalReplay=null;canonicalReplaySkip=false;canonicalArchive=null;canonicalManagerEntry=true;canonicalTrade=null;canonicalTradeQuote=null;canonicalTradeClub=null;canonicalAchievementPage=null;canonicalAchievementNote='';canonicalMemorial=null;canonicalMemorialBusy=false;canonicalRewardNote='';
     canonicalPilot.suspend();ui.clubDraft=null;ui.portalSlot=null;ui.portalOrigin=null;slotOpening=false;
     ui.page='title';ui.launchTitle=false;
   }
@@ -418,18 +418,19 @@ const pilotCode = `
   let canonicalPlayback='normal',canonicalTarget=null,canonicalRunning=false,canonicalStop=false;
   const canonicalCanRun=g=>!!g?.headquarters?.canCalendar&&!canonicalSnapshot?.pending?.length&&accountCurrent();
   let canonicalRewardReturn='canonical-hq',canonicalRewardNote='';
-  let canonicalAchievementPage=null,canonicalAchievementNote='';
+  let canonicalAchievementPage=null,canonicalAchievementNote='',canonicalMemorial=null,canonicalMemorialBusy=false;
   function canonicalAchievementRender(){
     const app=$('#app'),snap=canonicalSnapshot,g=snap?.game,p=canonicalAchievementPage;if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-achievements-back">‹ 報酬へ</button></div>';
     const dis=slotOpening||!snap||!!snap.pending?.length;
     const btn=(label,choice,id)=>'<button class="btn outline" data-action="canonical-achievements-claim" data-choice="'+choice+'" data-id="'+h(id)+'" '+(dis?'disabled':'')+'>'+label+'</button>';
-    const body='<h2 class="page-title">記念実績・報酬</h2>'+(snap?.wallet?'<p>広告券 '+snap.wallet.tickets+' / 30 · ポイント '+snap.wallet.points+'</p>':'')+'<p class="small">サーバーに記録された自球団の実績のみ対象です。権利や受け取り制限はサーバーが判定します。SNS共有・記念アートは未接続です。</p>'+(canonicalAchievementNote?'<p role="status">'+h(canonicalAchievementNote)+'</p>':'')+(p&&snap?'<p>'+(p.total?p.offset+1:0)+'〜'+(p.offset+p.items.length)+' / '+p.total+'件</p>'+p.items.map(e=>'<article class="panel"><h3>'+h(e.label)+'</h3>'+(e.claimed?'<p>受け取り済み</p>':'<div class="chips">'+btn('広告券を希望','ticket',e.eventId)+btn('ポイントを希望','point',e.eventId)+'</div>')+'</article>').join('')+'<div class="chips"><button class="btn outline" data-action="canonical-achievements-prev" '+(slotOpening||p.offset===0?'disabled':'')+'>前のページ</button><button class="btn outline" data-action="canonical-achievements-next" '+(slotOpening||p.nextOffset===null?'disabled':'')+'>次のページ</button></div>':'<p role="status">'+(slotOpening?'実績を確認しています。':'最新状態を取得してください。自動再送は行いません。')+'</p>')+'<button class="btn outline full" data-action="canonical-achievements-refresh" '+(slotOpening?'disabled':'')+'>最新状態を取得</button>';
+    const preview=canonicalMemorial&&snap&&canonicalMemorial.world===snap.world&&canonicalMemorial.revision===snap.revision?'<section class="panel" data-canonical-memorial><h3>記念アート（試作）</h3><img alt="記念アート" style="width:100%;height:auto;max-width:360px;display:block;margin:auto" src="'+h(canonicalMemorial.url)+'"><div class="chips"><button class="btn primary" data-action="canonical-achievements-share" '+(canonicalMemorialBusy?'disabled':'')+'>画像を共有・保存</button><button class="btn outline" data-action="canonical-achievements-art-close">閉じる</button></div><p class="small">SNS投稿は不要です。画像はゲーム内の記念作品です。</p></section>':'';
+    const body='<h2 class="page-title">記念実績・報酬</h2>'+preview+(snap?.wallet?'<p>広告券 '+snap.wallet.tickets+' / 30 · ポイント '+snap.wallet.points+'</p>':'')+'<p class="small">サーバーに記録された自球団の実績のみ対象です。権利や受け取り制限はサーバーが判定します。記念アートの保存・共有は任意で、報酬の受け取りとは無関係です。</p>'+(canonicalAchievementNote?'<p role="status">'+h(canonicalAchievementNote)+'</p>':'')+(p&&snap?'<p>'+(p.total?p.offset+1:0)+'〜'+(p.offset+p.items.length)+' / '+p.total+'件</p>'+p.items.map(e=>'<article class="panel"><h3>'+h(e.label)+'</h3><button class="btn outline full" data-action="canonical-achievements-art" data-id="'+h(e.eventId)+'" '+(slotOpening?'disabled':'')+'>記念アートを開く</button>'+(e.claimed?'<p>受け取り済み</p>':'<div class="chips">'+btn('広告券を希望','ticket',e.eventId)+btn('ポイントを希望','point',e.eventId)+'</div>')+'</article>').join('')+'<div class="chips"><button class="btn outline" data-action="canonical-achievements-prev" '+(slotOpening||p.offset===0?'disabled':'')+'>前のページ</button><button class="btn outline" data-action="canonical-achievements-next" '+(slotOpening||p.nextOffset===null?'disabled':'')+'>次のページ</button></div>':'<p role="status">'+(slotOpening?'実績を確認しています。':'最新状態を取得してください。自動再送は行いません。')+'</p>')+'<button class="btn outline full" data-action="canonical-achievements-refresh" '+(slotOpening?'disabled':'')+'>最新状態を取得</button>';
     app.innerHTML='<div class="app-shell" '+(g?'style="'+clubThemeStyle(g.team)+'"':'')+'>'+top+'<main class="main">'+body+'</main></div>';
   }
   async function canonicalAchievementRequest(offset,claim=null,refresh=false){
     if(slotOpening||!accountCurrent()||!canonicalSlot)return;
-    const epoch=canonicalEpoch,world=canonicalSnapshot?.world||canonicalHqWorld;slotOpening=true;canonicalAchievementNote='';canonicalAchievementPage=null;render();
+    const epoch=canonicalEpoch,world=canonicalSnapshot?.world||canonicalHqWorld;slotOpening=true;canonicalAchievementNote='';canonicalAchievementPage=null;canonicalMemorial=null;render();
     try{
       if(claim||refresh||!canonicalSnapshot){const r=await(claim?canonicalPilot.claimAchievement(claim.id,claim.choice,true):canonicalPilot.refresh());if(epoch!==canonicalEpoch)return;if(r.status!=='ready'||r.snapshot.world!==world)throw Error('achievement observation required');canonicalSnapshot=r.snapshot;if(claim){const v=r.claimResult;canonicalAchievementNote=v?.ok?'受け取りを確認しました：'+(v.kind==='ticket'?'広告券':'ポイント')+' '+v.amount:({duplicate:'受け取り済みです。',cooldown:'受け取り制限中です。',capacity:'広告券が上限に達しています。'})[v?.reason]||'受け取り状況を確認してください。';}}
       const r=await canonicalPilot.achievementPage({offset,limit:30});if(epoch!==canonicalEpoch)return;if(r.status!=='ready')throw Error('achievement page required');canonicalAchievementPage=r.page;
@@ -438,12 +439,23 @@ const pilotCode = `
   }
   function canonicalAchievementClick(b){
     const act=b.dataset.action,p=canonicalAchievementPage;
-    if(act==='canonical-achievements-back'){ui.page='canonical-rewards';void canonicalRewardRequest(null);return;}
+    if(act==='canonical-achievements-back'){canonicalMemorial=null;ui.page='canonical-rewards';void canonicalRewardRequest(null);return;}
     if(act==='canonical-achievements-refresh'){void canonicalAchievementRequest(0,null,true);return;}
     if(!p||!canonicalSnapshot)return;
+    if(act==='canonical-achievements-art'){const e=p.items.find(e=>e.eventId===b.dataset.id);if(!e||!window.PennantMemorialArt)return;try{const canvas=document.createElement('canvas'),m=window.PennantMemorialArt.draw(canvas,e),url=canvas.toDataURL('image/png');if(!url.startsWith('data:image/png;base64,'))throw Error('image encoding');canonicalMemorial={url,year:m.year??0,world:canonicalSnapshot.world,revision:canonicalSnapshot.revision};render();document.querySelector('[data-canonical-memorial]')?.scrollIntoView?.({block:'start'});}catch{showToast('記念アートを生成できませんでした。',true);}return;}
+    if(act==='canonical-achievements-art-close'){canonicalMemorial=null;render();return;}
+    if(act==='canonical-achievements-share'){void canonicalShareMemorial();return;}
     if(act==='canonical-achievements-prev'&&p.offset>0)void canonicalAchievementRequest(Math.max(0,p.offset-30));
     else if(act==='canonical-achievements-next'&&p.nextOffset!==null)void canonicalAchievementRequest(p.nextOffset);
     else if(act==='canonical-achievements-claim'&&!canonicalSnapshot.pending?.length&&p.items.some(e=>e.eventId===b.dataset.id&&!e.claimed)&&['ticket','point'].includes(b.dataset.choice)&&window.confirm('この実績の報酬を受け取りますか？'))void canonicalAchievementRequest(p.offset,{id:b.dataset.id,choice:b.dataset.choice});
+  }
+  async function canonicalShareMemorial(){
+    const m=canonicalMemorial,epoch=canonicalEpoch;
+    if(!m||canonicalMemorialBusy||!accountCurrent()||slotOpening||m.world!==canonicalSnapshot?.world||m.revision!==canonicalSnapshot?.revision)return;
+    canonicalMemorialBusy=true;const name='PENNANT_LAB_'+m.year+'_memorial.png';
+    try{if(typeof window.PennantNative?.shareImage==='function')await window.PennantNative.shareImage(m.url.slice('data:image/png;base64,'.length),name);else{const a=document.createElement('a');a.href=m.url;a.download=name;a.click();}}
+    catch{if(epoch===canonicalEpoch)showToast('画像を共有・保存できませんでした。',true);}
+    finally{if(epoch===canonicalEpoch){canonicalMemorialBusy=false;if(ui.page==='canonical-achievements')render();}}
   }
   function canonicalRewardLink(){return '<button class="btn outline full" data-action="canonical-rewards-open">広告券・報酬・慰留</button>';}
   function canonicalRewardRender(){
