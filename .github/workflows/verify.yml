@@ -155,3 +155,6 @@ jobs:
 
       - run: node scripts/canonical-client-check.cjs
         if: always()
+
+      - run: node scripts/headless-engine-check.cjs
+        if: always()
