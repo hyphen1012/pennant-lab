@@ -265,3 +265,6 @@ PR107 retains its stronger disclosure and cinema projection; PR106's packaged br
 
 ## Canonical staging rewards screen
 Use existing canonical reward orchestration through the selected session. Explicit ticket/verified entitlement only, no native ad request or fake proof. Pending orders can be reconciled or explicitly cancelled; unknown outcomes require a read, never retry. Screen obtains fresh authoritative wallet/actions before presenting choices. All eight engine reward routes are displayed only when the server lists them; actual ad SDK/SSV, achievements UI, per-route browser validation and production remain pending. Session fixture tests lost settlement response.
+
+## Archived match and latest newspaper (staging)
+Project a bounded actual last own-club match (innings, score, teams/emblems, events, box stats and two-entry default bench report) and the last recorded daily/weekly paper. Read-only screen; no client simulation and no synthetic match stats. No full historical pagination, live inning playback, weekly mail detail or original cinematic equivalence yet. Existing engine fixture checks exact scores and read-only state. No public or production activation.
