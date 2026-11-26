@@ -12,3 +12,7 @@ Capacitor 8 + community AdMob 8.3.0 (Google Mobile Ads SDK) integration. Web dev
 - This is not receipt verification. No store SDK, receipt verifier, purchase UI, prices, product IDs, reward ticket or VIP multiplier is enabled. Integrate the independently verified platform adapter after product design and store account configuration. Never use save data or a local boolean to grant purchases. Restoration and refund/revocation scenarios must be tested against the real stores before release.
 
 - v157: native gate uses monotonic time, expires the prior lease while a renewal is pending, checks expiry before app clicks and refreshes the offline overlay independently of network probes. Device lifecycle and actual physical-device behavior still require testing. Native npm test now includes the account-client reference regression; no live account endpoint is connected.
+
+
+## Production safety override (2026-11-26)
+The previous SDK-completion reward path is development-only. PL_PRODUCTION=1 is deliberately blocked by production-readiness.cjs until the outstanding integration gates are reviewed and completed. New lifecycle, store purchase and scoped save modules are isolated boundaries; do not infer native SDK or live cloud UI integration. See [runbook](../docs/production_connection_runbook.md).

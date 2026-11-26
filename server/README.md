@@ -34,3 +34,7 @@ Node 22 SQLite transactions persist claims, vouchers, points, cosmetic exchange 
 - HTTPS限定のバイナリ通信アダプタ、ストリーム上限、SHA256、revision・応答検査、セッション世代・中断、明示承認アップロード、曖昧な書込結果の自動再試行禁止を実装。履歴世代の取込ステージと取消、取込確認状態コントローラ追加。回帰・native npm test登録。実行結果未確認。
 - 現時点は参照クライアントとUI状態管理のみ。実ゲームIndexedDBの原子的CAS・旧データ回復コピー・形式検証、実画面、認証、HTTPS配備、CORS/ネイティブ通信、実端末試験未接続。既存ローカルセーブと有料権限を変更しない。通信断後は一覧/revision照会して判断し、再送しない。
 - 経営試験E run45738847901 全3seed未達。50/55年最高合計1937:156/156、4391:154/156、8821:153/156。最低現金7.00/2.65/7.34億。50+5条件変更なし、E採用保留。
+
+
+## Additional pre-production boundaries
+`auth-introspection.cjs`, `admob-ssv.cjs`, `ad-proof-registry.cjs`, `save-game-codec.cjs`: provider-neutral authenticated identity, conservative ASCII SSV signature verification, durable reservation evidence and bounded gzip structural validation. No public listener, provider keys, authoritative reward application or deletion workflow. See [runbook](../docs/production_connection_runbook.md). Real signed callback compatibility and independent backup/recovery remain mandatory.

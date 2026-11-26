@@ -110,3 +110,21 @@ jobs:
 
       - run: node scripts/save-client-check.cjs
         if: always()
+
+      - run: node scripts/commerce-lifecycle-check.cjs
+        if: always()
+
+      - run: node scripts/admob-ssv-check.cjs
+        if: always()
+
+      - run: node scripts/release-blocker-check.cjs
+        if: always()
+
+      - run: node scripts/save-codec-check.cjs
+        if: always()
+
+      - run: node scripts/auth-purchase-boundary-check.cjs
+        if: always()
+
+      - run: node scripts/ad-proof-registry-check.cjs
+        if: always()

@@ -46,7 +46,7 @@ if(native){
     show:()=>AdMob.showRewardVideoAd()
   });
   window.PennantNative={
-    ready:gate.ready,check:gate.check,reward,
+    ready:gate.ready,check:gate.check,reward:config.production?null:reward, // SDK callback is development-only; no production reward authority
     setBackup(fn){backup=fn;update(gate.ready());},
     async exportSave(json,name){
       const path='pennant-'+Date.now()+'-'+name;
