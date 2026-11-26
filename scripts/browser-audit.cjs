@@ -32,12 +32,12 @@ const business=['finance','stadium','facilities','market','scout','foreign','man
   const dayTo=async(a,v)=>{const target=page.locator(action(a,v)).first();for(let i=0;i<40&&!(await target.isVisible());i++){await click(action('flow-day'));await page.waitForTimeout(1250);}await target.waitFor({state:'visible',timeout:5000});};
   const title=async()=>{await page.goto(base);await page.locator('[data-action="launch-start"]').waitFor({timeout:20000});if(await page.locator('.save-slot').count())throw Error('save cards visible on launch title');await click('[data-action="launch-start"]');await page.locator('[data-action="rare-preview-open"]').waitFor({timeout:20000});};
   try{
-   await title();await shot('save-terminal');
+   await title();if(await page.locator('.multiverse-map .world-orb').count()!==3)throw Error('three parallel worlds missing');await shot('save-terminal');
    if(width===360){
     current='normal-slot-save';
     const slotState=()=>page.evaluate(()=>window.__plSlotAudit.state());
     const flush=()=>page.evaluate(()=>window.__plSlotAudit.flush());
-    const open=async (slot,kind)=>{await click('[data-action="'+kind+'"][data-slot="'+slot+'"]');await page.waitForFunction(()=>window.__plSlotAudit.state().page!=='title');};
+    const open=async (slot,kind)=>{await page.locator('[data-action="'+kind+'"][data-slot="'+slot+'"]').click();const portal=page.locator('.portal-transit');await portal.waitFor({state:'visible',timeout:3000});if(!(await portal.innerText()).includes('DATA 0'+slot))throw Error('wrong portal destination');await page.waitForFunction(()=>window.__plSlotAudit.state().page!=='title');};
     const choose=async id=>{await click('[data-action="pick-setup-team"][data-id="'+id+'"]');await click(action('finish-setup'));await click(action('report-intro-skip'));await page.waitForFunction(()=>window.__plSlotAudit.state().started);await flush();};
     await open(1,'new-slot');await choose(2);
     const first=await page.evaluate(()=>window.__plSlotAudit.playDay());
