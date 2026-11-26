@@ -64,7 +64,7 @@ const document={
   addEventListener:(type,callback,capture)=>listeners.push({type,callback,capture:!!capture})
 };
 const window={
-  indexedDB,addEventListener:(type,callback,capture)=>listeners.push({type,callback,capture:!!capture}),scrollTo(){},location:{href:'https://localhost/'}
+  confirm:()=>true,indexedDB,addEventListener:(type,callback,capture)=>listeners.push({type,callback,capture:!!capture}),scrollTo(){},location:{href:'https://localhost/'}
 };
 const localStorage={
   getItem:key=>local.has(key)?local.get(key):null,
@@ -214,6 +214,10 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   dispatch('click',{action:'order190-order',index:'1'});
   const rosterAfter=window.PennantLab.getSnapshot().teams.find(t=>t.id===window.PennantLab.getSnapshot().selectedId).lineup;
   assert.equal(rosterAfter[0],rosterBefore[1]);assert.equal(rosterAfter[1],rosterBefore[0]);
+  dispatch('click',{action:'order190-undo'});
+  assert.deepEqual(window.PennantLab.getSnapshot().teams.find(t=>t.id===window.PennantLab.getSnapshot().selectedId).lineup,rosterBefore);
+  dispatch('click',{action:'order190-auto'});assert.match(app.innerHTML,/直前の変更を元に戻す/);
+  assert.equal(new Set(window.PennantLab.getSnapshot().teams.find(t=>t.id===window.PennantLab.getSnapshot().selectedId).lineup).size,9);
   dispatch('click',{action:'roster-mode',mode:'rotation'});
   assert.match(app.innerHTML,/data-kind="rotation"/);
   assert.match(app.innerHTML,/class="portrait-overall"/);
