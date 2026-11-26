@@ -40,6 +40,21 @@ function createHeadlessEngine(){
    decade:game.pendingDecade??null,opening:game.pendingCeremonyIntro==='opening',
    career:career?{playerId:career.p.id,stage:career.e.type,options:['consult','plan'].includes(career.e.type)?farewellChoices(career.p).map(([key,label,cost])=>({key,label,cost})):[]}:null};
  };
+ const foreignView=()=>{
+  const m=game.foreignMarket?.year===game.year?foreignHydrate(game.foreignMarket):null;
+  if(!m)return {initialized:false,candidates:[],negotiation:null};
+  const conv=m.negotiations[team.id];
+  const project=(c,stage=0)=>{
+   const p=c.player,hidden=secretProspect(p)&&stage!==2,r=foreignReport(m,team,c),tasks=foreignTasks(m,team,c);
+   return {id:c.id,name:hidden?'????':p.name,pos:p.pos,age:p.age,country:c.country,category:playerTitleTheme(p)?.name||null,kind:c.kind,status:c.status,tasks,canBegin:c.status==='available'&&foreignRoom(team,c),confidence:r.confidence,estimate:hidden?null:{low:r.low,high:r.high},abilities:Object.fromEntries(Object.entries(r.values).map(([k,v],i)=>[k,stage===2||stage===1&&i<2?{value:p[k]}:hidden?null:{low:v.low,high:v.high,estimate:v.estimate}])),stats:hidden?null:foreignStats(m,c)};
+  };
+  const c=conv&&m.candidates.find(x=>x.id===conv.candidateId),q=conv?.status==='talk'?FOREIGN_QUESTIONS[conv.answers?.length||0]:null;
+  const opened=conv?.resultOpened===true,stage=opened&&conv.status==='signed'?conv.revealStage||0:0;
+  const result=['signed','refused','rival','rival-pending','overseas'].includes(conv?.status);
+  const status=result&&!opened?'response':conv?.status;
+  return {initialized:true,budget:foreignBudget(team),used:foreignUsed(m,team),research:Object.entries(FOREIGN_TASKS).map(([key,[label,cost]])=>({key,label,cost})),candidates:conv?[]:m.candidates.filter(c=>scoutVisible(c)&&c.status==='available').map(c=>project(c)),
+   negotiation:c?{candidate:{...project(c,stage),status:result&&!opened?'pending':c.status,canBegin:false},status,opened,stage,interest:conv.interest,interpreter:!!conv.interpreter,interpreterCost:FOREIGN_INTERPRETER_COST,answerCount:conv.answers?.length||0,question:q?{text:conv.interpreter?q.q:q.gist,options:q.options.map(([key,label])=>({key,label}))}:null,support:conv.support,offerLevel:conv.offerLevel,offers:conv.status==='talk'&&conv.answers?.length===3?[0,1,2].map(level=>{const o=foreignOffer(m,c,level,conv.support);return {...o,affordable:foreignAffordable(team,o)};}):[],due:conv.dueDate,ready:conv.status==='waiting'&&!conv.waitDays,counter:conv.status==='counter'?{originalSalary:conv.counter.originalSalary,amount:conv.counter.amount,salary:conv.counter.revised.salary,affordable:foreignRoom(team,c)&&foreignAffordable(team,conv.counter.revised)}:null,result:opened&&result?{winner:conv.winner,offer:conv.offer,recovery:foreignRecoveryAllowed(m,team,c,conv)}:null}:null};
+ };
  const commercialJobs=['fan-fest','tv','fanclub','sponsor','broadcast','naming','opening-promo'];
  const annualSupported=['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter',...commercialJobs,'movement-market','booking','self','winter-return','camp','exhibition','opening-promo','offdesk-opening'];
  const draftPending=d=>d.picks.find(x=>x.teamId===team.id&&(x.recoveryPending||x.recoveryCelebration));
@@ -233,6 +248,38 @@ function createHeadlessEngine(){
    pushNews(p.name+'が今季限りの引退を表明。'+(q.options.length?'球団は'+q.options.map(k=>FAREWELL_OPTIONS.find(x=>x[0]===k)[1]).join('・')+'を準備します。':''),e.date);e.type='thanks';
   }else if(input.choice==='dismiss'&&['thanks','farewell'].includes(e.type))careerEventDone(e);
   else throw Error('career decision unavailable');
+  return JSON.stringify(game);
+ }
+ if(op==='foreign'){
+  const f=flowGet(),k=input.choice;
+  if(game.financeCrisis||flowInbox()||game.pendingMonth||game.pendingReview||pendingMilestoneNews().length||game.ceremonyStage||f?.active||game.pendingCeremonyIntro==='opening')throw Error('foreign market blocked by required event');
+  if(k==='init'){
+   if(game.foreignMarket?.year===game.year)throw Error('foreign market already initialized');
+   foreignHydrate(ensureForeignMarket());return JSON.stringify(game);
+  }
+  const m=game.foreignMarket?.year===game.year?foreignHydrate(game.foreignMarket):null;if(!m)throw Error('foreign market unavailable');
+  const conv=m.negotiations[team.id],c=m.candidates.find(x=>x.id===(conv?conv.candidateId:input.playerId));
+  if(!c||!conv&&!scoutVisible(c))throw Error('foreign candidate unavailable');
+  const date=f?.date||calendarNextDay()?.date||game.calendar.endDate;
+  if(k==='research'&&!conv){if(!foreignResearch(m,team,c,input.key))throw Error('foreign research unavailable');}
+  else if(k==='begin'&&!conv){if(!foreignBegin(m,team,c))throw Error('foreign negotiation unavailable');}
+  else if(!conv)throw Error('foreign negotiation unavailable');
+  else if(k==='interpreter'){if(!foreignHireInterpreter(team,conv))throw Error('foreign interpreter unavailable');}
+  else if(k==='reply'){if(!foreignReply(m,team,c,conv,input.key))throw Error('foreign reply unavailable');}
+  else if(k==='support'){if(conv.status!=='talk'||conv.answers.length!==3||!Object.hasOwn(FOREIGN_SUPPORT,input.key))throw Error('foreign support unavailable');conv.support[input.key]=input.enabled;conv.offerLevel=null;}
+  else if(k==='offer'){if(conv.status!=='talk'||conv.answers.length!==3||!foreignAffordable(team,foreignOffer(m,c,input.level,conv.support)))throw Error('foreign offer unavailable');conv.offerLevel=input.level;}
+  else if(k==='submit'){if(conv.offerLevel==null||!foreignSubmit(m,team,c,conv,conv.offerLevel))throw Error('foreign submission unavailable');}
+  else if(k==='open'){
+   if(conv.resultOpened)throw Error('foreign result already opened');
+   if(conv.status==='waiting'&&(conv.waitDays!==0||!foreignSettle(m,team,c,conv,date)))throw Error('foreign response not ready');
+   if(['talk','waiting','counter'].includes(conv.status))throw Error('foreign response not ready');conv.resultOpened=true;
+  }else if(k==='counter'){if(!foreignCounterReply(m,team,c,conv,input.accept,date))throw Error('foreign counter unavailable');}
+  else if(k==='reveal'){if(conv.status!=='signed'||!conv.resultOpened||conv.revealStage>=2)throw Error('foreign reveal unavailable');conv.revealStage++;}
+  else if(k==='finish'){
+   if(!conv.resultOpened||['talk','waiting','counter'].includes(conv.status)||conv.status==='signed'&&conv.revealStage<2)throw Error('foreign result unfinished');
+   if(conv.status==='rival-pending'&&!finalizeForeignRival(m,team,c,conv))throw Error('foreign rival settlement failed');
+   delete m.negotiations[team.id];
+  }else throw Error('foreign command unavailable');
   return JSON.stringify(game);
  }
  if(op==='annual'){
@@ -487,7 +534,7 @@ function createHeadlessEngine(){
   // Verified entitlement is supplied by the authority, not a command or save.
   vipStatusProvider=()=>({verified:true,vip:input.verifiedVip===true});
   if(game.day>=143||game.financeCrisis||flowGet()||game.pendingCeremonyIntro==='opening'||game.pendingDraftReveal||game.pendingDecade!=null)throw Error('pilot season boundary');
-  if(pendingRareNews().length||game.pendingMilestoneIds?.length||game.pendingEvent||game.pendingMonth||game.pendingReview||careerEventPending()||foreignHasCounter())throw Error('pilot event acknowledgement required');
+  if(pendingRareNews().length||game.pendingMilestoneIds?.length||game.pendingEvent||game.pendingMonth||game.pendingReview||careerEventPending()||flowForeignResponse())throw Error('pilot event acknowledgement required');
   const e=processCalendarDay();if(!e)throw Error('calendar ended');
   collectMilestoneNews(e);scoutDiscoveryDaily(e);rareDaily(e);careerDecisionTick(e);
   return JSON.stringify(game);
@@ -542,7 +589,7 @@ function createHeadlessEngine(){
   }
   return JSON.stringify([...entries.values()]);
  }
- if(op==='view')return JSON.stringify({year:game.year,day:game.day,calendarIndex:game.calendarIndex,team:{id:team.id,name:team.name,wins:team.wins,losses:team.losses,ties:team.ties,cash:team.cash},games:game.games.length,inbox:inbox(),annual:annualView(),vipIncome:r2((game.financeLedger?.clubs?.[team.id]?.vipIncome||0)+vipOffTotal(team,game.year)),retirementEligible:retirement().length===1,medical:medical().length,managerEligible:manager().length===1,acknowledgements:{month:!!(game.pendingMonth&&game.monthlyArchive?.some(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id)),milestones:!!game.pendingMilestoneIds?.length},blocked:!!(game.financeCrisis||pendingRareNews().length||game.pendingMilestoneIds?.length||game.pendingEvent||game.pendingMonth||game.pendingReview||careerEventPending()||foreignHasCounter()||game.day>=143)});
+ if(op==='view')return JSON.stringify({year:game.year,day:game.day,calendarIndex:game.calendarIndex,team:{id:team.id,name:team.name,wins:team.wins,losses:team.losses,ties:team.ties,cash:team.cash},games:game.games.length,inbox:inbox(),foreign:foreignView(),annual:annualView(),vipIncome:r2((game.financeLedger?.clubs?.[team.id]?.vipIncome||0)+vipOffTotal(team,game.year)),retirementEligible:retirement().length===1,medical:medical().length,managerEligible:manager().length===1,acknowledgements:{month:!!(game.pendingMonth&&game.monthlyArchive?.some(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id)),milestones:!!game.pendingMilestoneIds?.length},blocked:!!(game.financeCrisis||pendingRareNews().length||game.pendingMilestoneIds?.length||game.pendingEvent||game.pendingMonth||game.pendingReview||careerEventPending()||flowForeignResponse()||game.day>=143)});
  throw Error('unsupported pilot operation');
  `;
  const compiled=new vm.Script(pre+source.replace('(() => {','(() => {')+tail+'})();',{filename:'pennant-lab-headless-pilot.js'});
@@ -564,6 +611,18 @@ function createHeadlessEngine(){
    if(exact(command,['annual'])&&['start','day'].includes(command.annual))return run('annual',state,{choice:command.annual,verifiedVip});
    if(exact(command,['annual','job'])&&['open','complete'].includes(command.annual)&&['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter','fan-fest','tv','fanclub','sponsor','broadcast','naming','booking','self','winter-return','camp','exhibition','opening-promo','offdesk-opening'].includes(command.job))return run('annual',state,{choice:command.annual,job:command.job,verifiedVip});
    if(exact(command,['annual','playerId'])&&command.annual==='cut'&&Number.isSafeInteger(command.playerId))return run('annual',state,{choice:'cut',playerId:command.playerId,verifiedVip});
+   if(command?.foreign){
+    const k=command.foreign,base=['foreign'],pid=Number.isSafeInteger(command.playerId)&&command.playerId>0;
+    let valid=['init','interpreter','submit','open','reveal','finish'].includes(k)&&exact(command,base);
+    if(k==='begin')valid=pid&&exact(command,[...base,'playerId']);
+    if(k==='research')valid=pid&&exact(command,[...base,'playerId','key'])&&['field','analysis','interview'].includes(command.key);
+    if(k==='reply')valid=exact(command,[...base,'key'])&&typeof command.key==='string'&&command.key.length<=30;
+    if(k==='support')valid=exact(command,[...base,'key','enabled'])&&['interpreter','housing'].includes(command.key)&&typeof command.enabled==='boolean';
+    if(k==='offer')valid=exact(command,[...base,'level'])&&[0,1,2].includes(command.level);
+    if(k==='counter')valid=exact(command,[...base,'accept'])&&typeof command.accept==='boolean';
+    if(!valid)throw Error('invalid foreign command');
+    return run('foreign',state,{choice:k,playerId:command.playerId,key:command.key,enabled:command.enabled,level:command.level,accept:command.accept});
+   }
    if(command?.annual==='preseason'){
     const k=command.decision,base=['annual','decision'];
     let valid=['confirm-sites','kickoff','visit-finish','run','finish'].includes(k)&&exact(command,base);
