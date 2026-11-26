@@ -34,6 +34,7 @@ function createAccountService({ledger,authenticate,verifyEvent,verifyEntitlement
     const result=await verifiedRights(account);
     return {verified:true,vip:result.entitlements.vip.active,adSkip:result.entitlements.adSkip.active};
   }
+  async function identitySnapshot(token){return {authenticated:true,account:await identity(token)};}
   async function entitlementSnapshot(token){return verifiedRights(await identity(token));}
   async function restorePurchase(token,store,proof){await identity(token);if(typeof purchaseService?.restore!=='function')throw Error('purchase restoration unavailable');return purchaseService.restore(token,store,proof);}
   const publicState=s=>({tickets:s.tickets,points:s.points,owned:Object.keys(s.owned).filter(k=>s.owned[k]===true),claimCount:s.claimCount,nextAt:s.claimCount>=3?s.lastClaim+rules.HOUR:null});
@@ -73,6 +74,6 @@ function createAccountService({ledger,authenticate,verifyEvent,verifyEntitlement
       return {order:o?{operationId:id,mode:o.mode,status:o.status,attempt:o.attempt??1}:null,wallet:publicState(s)};
     });
   }
-  return {snapshot,entitlementSnapshot,restorePurchase,claim,exchange,reserve,finish,orderStatus};
+  return {snapshot,identitySnapshot,entitlementSnapshot,restorePurchase,claim,exchange,reserve,finish,orderStatus};
 }
 module.exports={openLedger,createAccountService};

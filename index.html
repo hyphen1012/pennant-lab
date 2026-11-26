@@ -2442,8 +2442,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 (() => {
   'use strict';
   const LEGACY_KEY='pennant_lab_v01_save';
-  const SLOT_PREFIX='pennant_lab_v04_slot_';
-  let activeSlot=1;try{activeSlot=Number(localStorage.getItem('pennant_lab_v02_active')||1);}catch(e){}
+  // Namespace is fixed for the lifetime of this game instance. It is provided
+  // only by a native authenticated bootstrap, never by a saved account hint.
+  let accountContext=null,saveAccount=null,SLOT_PREFIX='pennant_lab_v04_slot_',activeSlotHint='pennant_lab_v02_active',activeSlot=1;
+  function accountCurrent(){return !accountContext?(!window.PennantNative?.accountContext):window.PennantNative?.accountContext===accountContext&&accountContext.isCurrent()===true;}
+  function storageKey(slot){return saveAccount===null?slot:JSON.stringify(['account-v1',saveAccount,slot]);}
+  function configureSaveAccount(){
+    accountContext=window.PennantNative?.accountContext??null;
+    if(accountContext!==null){
+      if(typeof accountContext.account!=='string'||!/^[a-f0-9]{64}$/.test(accountContext.account)||typeof accountContext.isCurrent!=='function'||typeof accountContext.openCloud!=='function'||!accountCurrent())throw Error('Authenticated save context unavailable');
+      saveAccount=accountContext.account;
+      SLOT_PREFIX='pennant_lab_account_v1_'+saveAccount+'_slot_';activeSlotHint='pennant_lab_account_v1_'+saveAccount+'_active';
+    }
+    try{activeSlot=Number(localStorage.getItem(activeSlotHint)||1);}catch(e){}
+    if(![1,2,3].includes(activeSlot))activeSlot=1;
+  }
+  // Web/engine harnesses retain the original guest slot hint.
+  if(!window.PennantNative?.accountReady)configureSaveAccount();
   if(![1,2,3].includes(activeSlot))activeSlot=1;
   const KEY=()=>SLOT_PREFIX+activeSlot;
   // Local storage stores small slot summaries only; full saves live in IndexedDB.
@@ -2491,29 +2506,31 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     return rev;
   }
   async function readDatabaseRecord(slot){
-    slot=Number(slot);if(![1,2,3].includes(slot))throw Error('Invalid save slot');
+    slot=Number(slot);if(![1,2,3].includes(slot)||!accountCurrent())throw Error('Invalid save slot or session');
     const db=await openDatabase();
     return new Promise((resolve,reject)=>{
-      const tx=db.transaction(DB_STORE,'readonly'),req=tx.objectStore(DB_STORE).get(slot);let record;
+      const tx=db.transaction(DB_STORE,'readonly'),req=tx.objectStore(DB_STORE).get(storageKey(slot));let record;
       req.onsuccess=()=>{record=req.result;};
-      tx.oncomplete=()=>{try{slotRevisions.set(slot,databaseRevision(record));resolve(record?.data??null);}catch(e){reject(e);}};
+      tx.oncomplete=()=>{try{if(!accountCurrent())throw Error('Save session changed');slotRevisions.set(slot,databaseRevision(record));resolve(record?.data??null);}catch(e){reject(e);}};
       tx.onabort=()=>reject(tx.error||new Error('Read transaction aborted'));
     });
   }
   async function readDatabaseSlot(slot){return decodeSaveRecord(await readDatabaseRecord(slot));}
   async function mutateDatabaseSlot(slot,data){
     slot=Number(slot);
-    if(![1,2,3].includes(slot)||!slotRevisions.has(slot))throw Error('Save slot was not read');
+    if(![1,2,3].includes(slot)||!slotRevisions.has(slot)||!accountCurrent())throw Error('Save slot was not read or session changed');
     const expected=slotRevisions.get(slot);
     if(expected>=Number.MAX_SAFE_INTEGER)throw Error('Save revision exhausted');
     const db=await openDatabase();
     return new Promise((resolve,reject)=>{
-      const tx=db.transaction(DB_STORE,'readwrite'),store=tx.objectStore(DB_STORE),req=store.get(slot);
+      const tx=db.transaction(DB_STORE,'readwrite'),store=tx.objectStore(DB_STORE),req=store.get(storageKey(slot));
       let failure=null,written=false;
       req.onsuccess=()=>{
         try{
-          if(databaseRevision(req.result)!==expected)throw Object.assign(Error('Save revision conflict'),{code:'save_conflict'});
-          store.put({slot,revision:expected+1,data});written=true;
+          if(!accountCurrent()||databaseRevision(req.result)!==expected)throw Object.assign(Error('Save revision conflict or session changed'),{code:'save_conflict'});
+          store.put({slot:storageKey(slot),revision:expected+1,data,updatedAt:Date.now()});
+          if(data===null&&saveAccount!==null)store.delete(JSON.stringify(['recovery-v1',saveAccount,slot]));
+          written=true;
         }catch(e){failure=e;tx.abort();}
       };
       tx.oncomplete=()=>{if(!written){reject(Error('Save not written'));return;}slotRevisions.set(slot,expected+1);resolve();};
@@ -3704,11 +3721,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     try{localStorage.setItem(SLOT_PREFIX+slot,preview);deletedSlotPreviews.delete(slot);return true;}
     catch(e){console.warn('Slot preview unavailable; full save remains authoritative:',e);return false;}
   }
-  function writeActiveSlotHint(slot){try{localStorage.setItem('pennant_lab_v02_active',String(slot));}catch(e){console.warn('Active slot hint unavailable:',e);}}
+  function writeActiveSlotHint(slot){try{localStorage.setItem(activeSlotHint,String(slot));}catch(e){console.warn('Active slot hint unavailable:',e);}}
   function save(){
     // Opening a slot may build a temporary fresh game. Never write that game
     // to the previously active slot while the new selection is unresolved.
     if(slotOpening)return true;
+    if(!accountCurrent()){storageFailure=true;return false;}
     if(!game)return false;
     const revision=++saveRevision;
     let snapshot,preview;
@@ -3744,11 +3762,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       if(!validateSave(data))throw new Error('Incompatible saved data in slot '+activeSlot);
       game=data;ensureGameExtras();return;
     }
-    buildFresh();ensureGameExtras();
+    if(saveAccount!==null){const opening=slotOpening;slotOpening=true;try{buildFresh();ensureGameExtras();}finally{slotOpening=opening;}}else{buildFresh();ensureGameExtras();}
   }
   async function openSlot(i,create,animate=false,origin=null){
     const slot=Number(i);
-    if(slotOpening||slotDeleteDialog||ui.page!=='title'||ui.launchTitle||scenarioLab||![1,2,3].includes(slot))return;
+    if(slotOpening||slotDeleteDialog||ui.page!=='title'||ui.launchTitle||scenarioLab||!accountCurrent()||![1,2,3].includes(slot))return;
     if(storageFailure){showToast('保存エラーのためスロット変更を停止中です。先にバックアップしてください。',true);return;}
     const previousGame=game,previousSlot=activeSlot;
     let opened=false,fresh=false;
@@ -3782,7 +3800,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   // Title-only deletion of one persisted world. No account entitlement changes.
   async function requestSlotDelete(value){
     const slot=Number(value);
-    if(slotOpening||slotDeleteDialog||ui.page!=='title'||ui.rarePreview||ui.busy||ui.rewardBusy||scenarioLab||![1,2,3].includes(slot))return;
+    if(slotOpening||slotDeleteDialog||ui.page!=='title'||ui.rarePreview||ui.busy||ui.rewardBusy||scenarioLab||!accountCurrent()||![1,2,3].includes(slot))return;
     if(storageFailure){showToast('保存エラーのため削除を停止しています。先にバックアップしてください。',true);return;}
     slotOpening=true;render();
     let raw,data=null;
@@ -6336,7 +6354,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   const two=v=>Number(v||0).toLocaleString('ja-JP');
   function appLogo(){return `<div class="app-brand"><span class="brand-mark">⚾</span><span><b>PENNANT<span class="brand-gold"> LAB</span></b><small>BASEBALL GENERAL MANAGER</small></span></div>`}
-  function slotData(i){if(deletedSlotPreviews.has(i))return null;try{const raw=localStorage.getItem(SLOT_PREFIX+i);if(!raw)return null;const d=JSON.parse(raw);return d&&Array.isArray(d.teams)&&d.teams.length===12?d:null}catch(e){return null}}
+  function slotData(i){if(!accountCurrent()||deletedSlotPreviews.has(i))return null;try{const raw=localStorage.getItem(SLOT_PREFIX+i);if(!raw)return null;const d=JSON.parse(raw);return d&&Array.isArray(d.teams)&&d.teams.length===12?d:null}catch(e){return null}}
   // The approved MP4 will be assigned here when the asset is delivered.
   // Official asset paths are fixed; missing media falls back in development.
   // No substitute media is generated. The title text flag must be verified on the original.
@@ -6404,6 +6422,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function startOfficialTitleTransition(){
     if(startupPlaying||launchTransition||ui.page!=='title'||!ui.launchTitle||slotOpening||slotDeleteDialog)return;
     if(window.PennantNative&&!window.PennantNative.ready())return;
+    if(window.PennantNative?.accountRequired&&!accountContext){
+      // The original startup/title comes first. Authentication begins on tap,
+      // before any account or guest save is loaded or displayed.
+      slotOpening=true;render();
+      void (async()=>{try{
+        await window.PennantNative.accountReady();configureSaveAccount();
+        if(!accountContext||!accountCurrent())throw Error('Account authentication required');
+        await load();ensureGameExtras();
+        ui.launchTitle=false;ui.rarePreview=null;
+      }catch(e){storageFailure=true;console.warn('Account initialization failed:',e);showToast('認証またはセーブの確認ができません。再起動してください。',true);}
+      finally{slotOpening=false;render();window.scrollTo(0,0);}})();
+      return;
+    }
     if(!STARTUP_MEDIA.title||titleMediaFailed){ui.launchTitle=false;ui.rarePreview=null;render();window.scrollTo(0,0);return;}
     launchTransition=true; // Silent transition: avoid transient Web Audio noise on mobile.
     const root=document.querySelector('[data-launch-screen]');root?.classList?.add('official-launch-exit');
@@ -6442,7 +6473,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     return `<div class="title-screen save-terminal multiverse-terminal"><header class="save-terminal-head"><span class="title-serial">VERSION 0.9.189 · CLUB LEGACY</span><button class="ghost-btn" data-action="launch-back">‹ タイトル</button></header><div class="title-slot-title">セーブデータを選択</div><div class="multiverse-map" aria-label="セーブデータを選択">${cosmicAtlas()}<div class="title-slots">${[1,2,3].map(i=>{
       const d=slotData(i),t=d?.teams?.find(t=>t.id===d.selectedId),started=!!(d?.started&&t);
       return `<div class="save-slot-group" data-slot-group="${i}" style="--world-tone:${WORLD_TONES[i-1]}"><button class="save-slot world-node ${started?'has-game':'empty-slot'} ${t?leagueClass(t.league):''}" data-action="${started?'continue-slot':'new-slot'}" data-slot="${i}">${worldOrb(i,t,started)}<span class="slot-label world-label"><span class="world-number">DATA 0${i} <i></i></span>${started?`<strong>${h(t.name)}</strong><small>${leagueTag(t.league)}　${d.year}年</small><small>${d.day}/143試合 · ${h(d.gmName||'GM')}</small><small>${t.wins||0}勝　${fmtMoney(t.cash)}</small>`:`<strong>新しい球団で始める</strong><small>空きデータ ${i}</small>`}</span></button><button class="slot-delete-button" data-action="slot-delete" data-slot="${i}" aria-label="DATA ${i} のセーブデータを削除">削除</button></div>`;
-    }).join('')}</div></div><p class="save-terminal-hint">長押し・左スワイプでデータ管理</p><button class="btn outline full" data-action="rare-preview-open">特殊選手の演出確認モード ›</button><div class="title-info">本体データは端末内データベースに保存されます。バックアップは「経営」からJSON形式で書き出せます。<br>v0.3以前のテストセーブは引き継がれません。</div></div>`;
+    }).join('')}</div></div><p class="save-terminal-hint">長押し・左スワイプでデータ管理</p>${accountContext&&accountCurrent()?'<button type="button" class="btn outline full" data-cloud-save-open>クラウドセーブ管理 ›</button><button type="button" class="btn outline full" data-cloud-account-logout>ログアウト</button>':''}<button class="btn outline full" data-action="rare-preview-open">特殊選手の演出確認モード ›</button><div class="title-info">本体データは端末内データベースに保存されます。バックアップは「経営」からJSON形式で書き出せます。<br>v0.3以前のテストセーブは引き継がれません。</div></div>`;
   }
   // Gestures reveal a separate button; never delete or load as a side effect of a gesture.
   let slotGesture=null,slotGestureTimer=null,slotClickBlock=null;
@@ -14914,10 +14945,49 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const performanceRenderBase=render;
   render=function(){performanceRenderBase();if(ui.page==='game'&&ui.busy&&ui.skipProgress){const main=document.querySelector?.('#app main');if(main&&!main.querySelector('.long-skip-progress'))main.insertAdjacentHTML('afterbegin',skipProgressMarkup());}};
 
+  // Cloud management is only available at the save selector. The game holds
+  // its slot-open lock until the dialog closes and all previews are refreshed.
+  document.addEventListener('click',e=>{
+    if(e.target.closest?.('[data-cloud-account-logout]')){
+      e.preventDefault();e.stopImmediatePropagation();
+      if(!accountContext||!accountCurrent()||ui.page!=='title'||ui.launchTitle||slotOpening||slotDeleteDialog||ui.busy||ui.rewardBusy||scenarioLab||storageFailure||typeof window.PennantNative?.logoutAccount!=='function')return;
+      if(!window.confirm('端末のログイン状態を終了します。セーブデータは削除しません。ブラウザ側の認証状態は残る場合があります。ログアウトしますか？'))return;
+      slotOpening=true;render();
+      void (async()=>{try{await saveQueue;if(storageFailure||!accountCurrent())throw Error('Save state unavailable');window.PennantNative.logoutAccount();}catch(e){slotOpening=false;render();showToast('ログアウト前の保存状態を確認できません。',true);}})();
+      return;
+    }
+    if(!e.target.closest?.('[data-cloud-save-open]'))return;
+    e.preventDefault();e.stopImmediatePropagation();
+    if(!accountContext||!accountCurrent()||ui.page!=='title'||ui.launchTitle||ui.rarePreview||ui.busy||ui.rewardBusy||slotOpening||slotDeleteDialog||scenarioLab||storageFailure)return;
+    slotOpening=true;
+    void (async()=>{
+      try{
+        await saveQueue;
+        const canWrite=(account,slot)=>account===saveAccount&&accountCurrent()&&slotOpening&&ui.page==='title'&&!ui.launchTitle&&!ui.busy&&!ui.rewardBusy&&!storageFailure&&[1,2,3].includes(slot);
+        if(!canWrite(saveAccount,activeSlot))throw Error('Cloud save unavailable');
+        await accountContext.openCloud({openDatabase,canWrite});
+        if(!accountCurrent())throw Error('Account session changed');
+        for(const slot of [1,2,3]){
+          const data=await readDatabaseSlot(slot);
+          if(data){if(!validateSave(data))throw Error('Incompatible saved data');writeSlotPreview(slot,JSON.stringify(slotPreview(data)));}
+          else{deletedSlotPreviews.add(slot);try{localStorage.removeItem(SLOT_PREFIX+slot);}catch{}}
+        }
+        // Replace stale in-memory title state before allowing any new save.
+        await load();
+      }catch(e){console.warn('Cloud save management stopped:',e);storageFailure=true;showToast('クラウドセーブの状態を確認できません。上書きせず停止しました。再起動して確認してください。',true);}
+      finally{slotOpening=false;render();}
+    })();
+  },true);
   const appRoot=document.querySelector('#app');
   if(appRoot)appRoot.innerHTML='<div class="title-screen"><h2>セーブデータを読み込んでいます…</h2></div>';
   (async()=>{
-    try{await load();ensureGameExtras();ui.page='title';ui.launchTitle=true;render();showStartupVideo();void loadDefaultPhotoMaps();loadCampusBackground();loadCampusPanorama();}
+    try{
+      if(window.PennantNative?.accountRequired){
+        // Temporary in-memory title state only. Never write an anonymous slot
+        // during authentication or infer identity from a saved preview.
+        slotOpening=true;try{buildFresh();ensureGameExtras();}finally{slotOpening=false;}
+      }else{if(window.PennantNative?.accountReady){await window.PennantNative.accountReady();configureSaveAccount();}await load();ensureGameExtras();}
+      ui.page='title';ui.launchTitle=true;render();showStartupVideo();void loadDefaultPhotoMaps();loadCampusBackground();loadCampusPanorama();}
     catch(e){
       console.warn('Unable to initialize saved data:',e);
       if(appRoot)appRoot.innerHTML='<div class="title-screen"><h2>セーブを読み込めません</h2><p>ブラウザの保存領域にアクセスできないか、データ形式が一致しません。データは自動削除されていません。</p></div>';

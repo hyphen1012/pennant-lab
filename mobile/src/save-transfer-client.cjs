@@ -1,6 +1,6 @@
 // Explicit, session-bound migration staging. The transport and local CAS adapter
 // are not yet connected to the live game. No automatic local writes or deletion.
-function createSaveTransferClient({transport,local,sha256,maxBytes=256*1024*1024}={}){
+function createSaveTransferClient({transport,local,sha256,validatePayload=null,maxBytes=256*1024*1024}={}){
  if(!transport||!local||[transport.setSession,transport.download,local.inspect,local.replace,sha256].some(f=>typeof f!=='function')||!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>256*1024*1024)throw Error('migration adapters required');
  let account=null,generation=0,staged=null,busy=false;
  const integer=x=>Number.isSafeInteger(x)&&x>=0;
@@ -18,11 +18,12 @@ function createSaveTransferClient({transport,local,sha256,maxBytes=256*1024*1024
    if(gen!==generation||!remote||!integer(remote.revision)||remote.revision<1||(sourceRevision!==undefined&&remote.revision!==sourceRevision)||!(remote.payload instanceof Uint8Array)||!remote.payload.length||remote.payload.length>maxBytes||typeof remote.sha!=='string'||!/^[0-9a-f]{64}$/.test(remote.sha))throw Error('invalid migration source');
    const payload=new Uint8Array(remote.payload);
    if(await sha256(payload)!==remote.sha)throw Error('save hash mismatch');
+   const details=validatePayload?await validatePayload(payload):null;
    if(gen!==generation)throw Error('session changed');
    const target=await local.inspect({account:owner,slot:targetSlot});
    if(gen!==generation||!target||!integer(target.revision))throw Error('target changed');
    staged={owner,gen,sourceSlot,targetSlot,sourceRevision:remote.revision,expectedRevision:target.revision,sha:remote.sha,payload};
-   return {sourceSlot,targetSlot,sourceRevision:remote.revision,targetRevision:target.revision,bytes:payload.length,sha:remote.sha};
+   return {sourceSlot,targetSlot,sourceRevision:remote.revision,targetRevision:target.revision,bytes:payload.length,sha:remote.sha,details};
   }finally{busy=false;}
  }
  async function commit({confirmed=false}={}){

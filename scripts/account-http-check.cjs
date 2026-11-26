@@ -10,6 +10,7 @@ const server=createAccountHttp({service,maxBody:1024,allowRequest:async({token})
  const url='http://127.0.0.1:'+server.address().port;
  async function req(path,body={},token='a',extra={}){const r=await fetch(url+'/v1/'+path,{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+token},body:JSON.stringify(body),...extra});return [r.status,await r.json(),r.headers.get('cache-control')];}
  assert.equal((await req('wallet',{},'bad'))[0],403);
+ assert.deepEqual((await req('identity',{},'b'))[1],{authenticated:true,account:'b'});assert.equal((await req('identity',{account:'a'},'b'))[0],400);assert.equal((await req('identity',{},'bad'))[0],403);
  assert.equal((await req('wallet',{},'limited'))[0],429);
  assert.equal((await req('wallet',{},'a',{headers:{'content-type':'application/json'}}))[0],401);
  assert.equal((await req('claim',{eventProof:'event',choice:'ticket',account:'b'}))[0],400);

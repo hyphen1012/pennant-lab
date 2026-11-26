@@ -32,7 +32,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),{chromium}=requ
   assert.equal(result.guest.data.guest,true);assert.equal(result.other.revision,4);assert.equal(result.other.data.value,9);
   // Run the actual game's storage functions in two independent JS closures on
   // the same origin. This exercises the exact DB implementation in index.html.
-  const source=fs.readFileSync('index.html','utf8'),start=source.indexOf("  const DB_NAME='pennant_lab_v04_saves'"),end=source.indexOf('  function validateSave(data){',start);
+  const source=fs.readFileSync('index.html','utf8'),start=source.indexOf('  let accountContext=null,saveAccount=null'),end=source.indexOf('  function validateSave(data){',start);
   assert.ok(start>=0&&end>start);
   const gameStore=source.slice(start,end);
   await page.addScriptTag({content:'window.newGameStore=()=>{'+gameStore+';return {readDatabaseSlot,writeDatabaseSlot,deleteDatabaseSlot};};'});

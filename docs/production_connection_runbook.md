@@ -43,3 +43,14 @@
 - Google Play Billing: https://developer.android.com/google/play/billing/integrate
 - Google Play Billing security: https://developer.android.com/google/play/billing/security
 - AdMob SSV: https://developers.google.com/admob/android/ssv （署名対象の順序、ECDSA/SHA-256、公開鍵更新、transaction_id）
+
+
+## 2026-11-26 — account cloud integration (stacked on PR36)
+
+- Account-scoped IndexedDB game records and preview keys now use the verified account namespace. Numeric guest slots remain separate; no implicit migration. Login is after the original title tap when OAuth is configured. Cloud management is title-only and holds the save-slot lock until completion. The account namespace cannot change during a running game.
+- Cloud dialog: list, server timestamps, source/target slot and revision confirmation, gzip upload/download, previous server revision, local previous generation recovery, cancellation. Existing timestamps are nullable. Local recovery is not an independent backup.
+- OAuth public-client configuration: PL_ACCOUNT_API_URL, PL_OAUTH_AUTHORIZE_URL, PL_OAUTH_TOKEN_URL, PL_OAUTH_ISSUER, PL_OAUTH_CLIENT_ID, PL_OAUTH_SCOPE, PL_OAUTH_REDIRECT_URI. All must be configured together; HTTPS API/endpoints and exact registered redirect required. Provisional redirect jp.pennantlab.game://auth/callback must be updated if app ID changes. Native browser and callback registration are implemented; provider selection, CORS, exact redirect registration, Android/iOS physical-device flow remain unverified. No client secret is placed in the app. Access/refresh tokens are memory-only; cold start reauthentication. Logout clears the app session, not necessarily provider browser SSO.
+- The runtime revalidates identity and invalidates the entitlement lease on suspend, background, connectivity loss, or account changes. No actual paid game effects enabled. Authenticated identity route /v1/identity is not a purchase proof.
+- PR36 verification 45752090316 failed because the old smoke IndexedDB fixture omitted readonly completion. Browser audit 45752090312 failed because old codec/performance fixtures used non-game slots 98/99. Repair fixtures in this branch, not production slot limits; use isolated real scratch DB. PR36 100-season run 45752090358 and native debug 45752084139 succeeded. New branch results are separate.
+- Added native OAuth fixture and real browser game/cloud UI test. Actual external IdP, real store billing, SSV ingestion/reward application, account deletion execution, independent backup and production service remain open. Release blocker stays in place.
+- Facility trial F 45751665717 did not meet the unchanged 50+5 condition across the three seeds; do not adopt it wholesale. Keep latest public version unchanged.

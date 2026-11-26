@@ -128,3 +128,6 @@ jobs:
 
       - run: node scripts/ad-proof-registry-check.cjs
         if: always()
+
+      - run: node scripts/native-oauth-check.cjs
+        if: always()

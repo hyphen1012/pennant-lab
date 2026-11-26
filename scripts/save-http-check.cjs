@@ -28,7 +28,8 @@ async function main(){
   assert.equal((await put('Save3',2)).status,200);
   assert.equal((await put('Save4',3)).status,200);
   assert.equal((await get('/1/history/1')).status,404);
-  assert.deepEqual((await (await get('/1/history')).json()).map(x=>x.revision),[3,2]);
+  const historyRows=await (await get('/1/history')).json();assert.deepEqual(historyRows.map(x=>x.revision),[3,2]);assert.ok(historyRows.every(x=>Number.isSafeInteger(x.updatedAt)&&x.updatedAt>0));
+  assert.ok(Number.isSafeInteger((await (await get()).json())[0].updatedAt));
   const old=await get('/1/history/2');
   assert.equal(old.status,200);assert.equal(old.headers.get('x-save-revision'),'2');
   assert.equal(old.headers.get('cache-control'),'no-store');assert.equal(await old.text(),'Save2');

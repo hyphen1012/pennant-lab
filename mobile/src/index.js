@@ -1,5 +1,10 @@
 import {Capacitor,CapacitorHttp} from '@capacitor/core';
 import {App} from '@capacitor/app';
+import {Browser} from '@capacitor/browser';
+import {createNativeOAuth} from './native-oauth.cjs';
+import {createAccountBootstrap} from './account-bootstrap.cjs';
+import {createEntitlementBridge} from './entitlement-bridge.cjs';
+import {createCommerceLifecycle} from './commerce-lifecycle.cjs';
 import {Filesystem,Directory,Encoding} from '@capacitor/filesystem';
 import {Share} from '@capacitor/share';
 import {AdMob,AdmobConsentStatus} from '@capacitor-community/admob';
@@ -8,7 +13,14 @@ const config=__PL_CONFIG__;
 const native=Capacitor.isNativePlatform();
 if(native){
   let backup=null,overlay=null,content=null,consentInfo=null;
-  function update(online){
+  const accountEnabled=!!(config.accountApi&&config.oauth);
+  let accountAccess=!accountEnabled,accountInitialized=false,authStarted=false,accountEpoch=0,checkingIdentity=null,identityAt=-Infinity;
+  let appActive=true,visible=!document.hidden;
+  let bootstrap=null,provider=null,life=null;
+  function usable(){return gate.ready()&&accountAccess;}
+  // Prior to title tap, only the startup movie and title may be shown.
+  function interfaceReady(){return usable()||(accountEnabled&&!authStarted&&!accountInitialized&&gate.ready());}
+  function paint(online){
     if(!online)window.dispatchEvent(new Event('pl-native-suspend'));
     const root=document.querySelector('#app');if(root)root.inert=!online;
     if(!overlay){
@@ -18,16 +30,89 @@ if(native){
       overlay.innerHTML='<div style="max-width:360px"><h2>PENNANT LAB</h2><p>インターネット接続が必要です。セーブデータを保持したまま進行を停止しています。</p><button id="pl-retry" style="padding:14px 28px">再接続を確認</button><p id="pl-status" aria-live="polite"></p><button id="pl-backup" style="padding:12px" hidden>バックアップを共有</button></div>';
       document.body.appendChild(overlay);
       content=overlay.querySelector('#pl-status');
-      overlay.querySelector('#pl-retry').onclick=async()=>{content.textContent='接続確認中…';const ok=await gate.check(true);content.textContent=ok?'':'接続できません。通信環境を確認してください。';};
-      overlay.querySelector('#pl-backup').onclick=async()=>{try{if(backup)await backup();}catch{content.textContent='バックアップ共有に失敗しました。保存データは保持されています。';}};
+      overlay.querySelector('#pl-retry').onclick=async()=>{
+        if(accountEnabled&&accountInitialized&&!bootstrap.context()){provider.logout();window.location.reload();return;}
+        content.textContent='接続確認中…';
+        await gate.check(true);if(accountEnabled&&accountInitialized)await verifyIdentity();
+        content.textContent=interfaceReady()?'':'接続または認証を確認できません。';
+      };
+      overlay.querySelector('#pl-backup').onclick=async()=>{try{if(backup&&(!accountEnabled||bootstrap?.context()?.isCurrent()))await backup();}catch{content.textContent='バックアップ共有に失敗しました。保存データは保持されています。';}};
     }
-    overlay.hidden=online;overlay.style.display=online?'none':'grid';overlay.querySelector('#pl-backup').hidden=!backup;
+    overlay.hidden=online;overlay.style.display=online?'none':'grid';overlay.querySelector('#pl-backup').hidden=!backup||(accountEnabled&&!bootstrap?.context()?.isCurrent());
+    const lost=accountEnabled&&accountInitialized&&!bootstrap?.context();
+    overlay.querySelector('#pl-retry').textContent=lost?'再ログインする':'再接続を確認';
+    overlay.querySelector('p').textContent=lost?'認証セッションが失効しました。再ログインしてください。保存データは削除していません。':'インターネット接続と認証の確認が必要です。セーブデータを保持したまま進行を停止しています。';
+  }
+  function suspendAccount(){
+    if(!accountEnabled)return;
+    accountEpoch++;accountAccess=false;identityAt=-Infinity;bootstrap?.suspend();life?.invalidate();
+  }
+  async function verifyIdentity(){
+    if(!accountEnabled)return true;
+    if(!accountInitialized||!bootstrap?.context()||!gate.ready()||!appActive||!visible)return false;
+    if(checkingIdentity)return checkingIdentity;
+    const epoch=accountEpoch;
+    const task=(async()=>{
+      const ok=await bootstrap.revalidate();
+      if(epoch!==accountEpoch||!gate.ready()||!appActive||!visible)return false;
+      accountAccess=ok===true;identityAt=accountAccess?performance.now():-Infinity;
+      paint(usable());if(accountAccess)void life.refresh();
+      return accountAccess;
+    })();
+    checkingIdentity=task;try{return await task;}finally{if(checkingIdentity===task)checkingIdentity=null;}
+  }
+  function update(online){
+    life?.setConnected(online===true);
+    if(!online)suspendAccount();
+    if(online&&accountEnabled&&accountInitialized){
+      if(performance.now()-identityAt>=60000)accountAccess=false;
+      if(!accountAccess)void verifyIdentity();
+      else if(!life.status().verified)void life.refresh();
+    }
+    paint(interfaceReady());
   }
   // Monotonic time is independent of manual device clock changes.
   const gate=createGate({now:()=>performance.now(),probe:async()=>{
     const response=await CapacitorHttp.get({url:config.health+'?n='+Date.now(),headers:{'Cache-Control':'no-cache'},connectTimeout:5000,readTimeout:5000,responseType:'text'});
     return response.status===200&&String(response.data).trim()==='PENNANT-LAB-ONLINE-v1';
   },onChange:update});
+  if(accountEnabled){
+    provider=createNativeOAuth({config:config.oauth,openExternal:url=>Browser.open({url}),closeExternal:()=>Browser.close()});
+    const bridge=createEntitlementBridge({baseUrl:config.accountApi});
+    life=createCommerceLifecycle({bridge,online:async()=>usable()});
+    life.setVisible(visible);life.setActive(appActive);
+    bootstrap=createAccountBootstrap({baseUrl:config.accountApi,provider,online:usable,onSession:s=>life.setSession(s)});
+  }
+  let accountReadyTask=null;
+  async function accountReady(){
+    if(!accountEnabled)return;
+    if(accountReadyTask)return accountReadyTask;
+    authStarted=true;paint(false);
+    accountReadyTask=(async()=>{
+      await App.addListener('appUrlOpen',({url})=>{void provider.handleCallback(url);});
+      await Browser.addListener('browserFinished',()=>{setTimeout(()=>provider.cancel(),500);});
+      await new Promise(resolve=>{
+        const dlg=document.createElement('dialog');
+        dlg.style.cssText='width:min(90vw,420px);padding:24px;border-radius:18px;background:#101d32;color:#fff;border:1px solid #8394b1;text-align:center';
+        dlg.setAttribute('aria-label','PENNANT LAB ログイン');
+        dlg.innerHTML='<h2>PENNANT LAB</h2><p>セーブデータを保護するため、アカウントにログインしてください。</p><button class="btn primary full" type="button">ログイン・新規登録</button><p role="status" aria-live="polite"></p>';
+        const btn=dlg.querySelector('button'),status=dlg.querySelector('[role="status"]');
+        dlg.addEventListener('cancel',e=>e.preventDefault());
+        btn.onclick=async()=>{
+          if(btn.disabled)return;btn.disabled=true;status.textContent='認証画面を開いています…';
+          try{
+            await provider.login();
+            const ctx=await bootstrap.start();
+            if(!ctx?.isCurrent())throw Error('identity unavailable');
+            accountInitialized=true;accountAccess=gate.ready()&&appActive&&visible;identityAt=accountAccess?performance.now():-Infinity;
+            dlg.close();dlg.remove();paint(usable());if(accountAccess)void life.refresh();else void gate.check(true);resolve();
+          }catch{provider.logout();bootstrap.invalidate();status.textContent='ログインできませんでした。再度お試しください。';btn.disabled=false;}
+        };
+        document.body.append(dlg);dlg.showModal();
+      });
+    })();
+    return accountReadyTask;
+  }
   let consentPending=null;
   async function refreshConsent(){
     if(consentPending)return consentPending;
@@ -35,7 +120,7 @@ if(native){
     try{consentInfo=await consentPending;return consentInfo;}finally{consentPending=null;}
   }
   const reward=createReward({
-    online:()=>gate.check(true),
+    online:async()=>await gate.check(true)&&usable(),
     consent:async()=>{
       let info=consentInfo||await refreshConsent();
       if(info.isConsentFormAvailable&&info.status===AdmobConsentStatus.REQUIRED)info=await AdMob.showConsentForm();
@@ -46,8 +131,10 @@ if(native){
     show:()=>AdMob.showRewardVideoAd()
   });
   window.PennantNative={
-    ready:gate.ready,check:gate.check,reward:config.production?null:reward, // SDK callback is development-only; no production reward authority
-    setBackup(fn){backup=fn;update(gate.ready());},
+    ready:interfaceReady,check:async force=>await gate.check(force)&&interfaceReady(),accountRequired:accountEnabled,reward:config.production?null:reward,
+    get accountContext(){return bootstrap?.context()??null;},accountReady,
+    logoutAccount(){if(!accountEnabled)return;accountAccess=false;provider.logout();bootstrap.invalidate();suspendAccount();paint(false);window.location.reload();}, // SDK callback is development-only; no production reward authority
+    setBackup(fn){backup=fn;paint(interfaceReady());},
     async exportSave(json,name){
       const path='pennant-'+Date.now()+'-'+name;
       const result=await Filesystem.writeFile({path,data:json,directory:Directory.Cache,encoding:Encoding.UTF8});
@@ -63,12 +150,12 @@ if(native){
     },
     async privacy(){await AdMob.showPrivacyOptionsForm();await refreshConsent();}
   };
-  document.addEventListener('visibilitychange',()=>{gate.setVisible(!document.hidden);if(!document.hidden)void gate.check(true);});
+  document.addEventListener('visibilitychange',()=>{visible=!document.hidden;life?.setVisible(visible);if(!visible)suspendAccount();gate.setVisible(visible);if(visible)void gate.check(true);});
   window.addEventListener('offline',()=>gate.invalidate());
   window.addEventListener('online',()=>void gate.check(true));
-  App.addListener('appStateChange',({isActive})=>{gate.setAppActive(isActive);if(isActive)void gate.check(true);});
+  App.addListener('appStateChange',({isActive})=>{appActive=isActive===true;life?.setActive(appActive);if(!appActive)suspendAccount();gate.setAppActive(appActive);if(appActive)void gate.check(true);});
   // If the main thread was paused, enforce expiry before an app control acts.
-  window.addEventListener('click',e=>{const root=document.querySelector('#app');if(root?.contains(e.target)&&!gate.ready()){gate.expire();e.preventDefault();e.stopImmediatePropagation();void gate.check(true);}},true);
+  window.addEventListener('click',e=>{const root=document.querySelector('#app');if(root?.contains(e.target)&&!interfaceReady()){gate.expire();e.preventDefault();e.stopImmediatePropagation();void gate.check(true);}},true);
   document.addEventListener('click',e=>{if(e.target.closest?.('[data-mobile-privacy]')){e.preventDefault();e.stopImmediatePropagation();void window.PennantNative.privacy().catch(()=>alert('広告のプライバシー設定を開けませんでした。'));}},true);
   gate.setVisible(!document.hidden);
   update(false);
