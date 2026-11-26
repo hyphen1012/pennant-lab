@@ -2,7 +2,7 @@ const assert=require('node:assert/strict');
 const {createEntitlements}=require('./src/entitlements.cjs');
 (async()=>{
  let now=1000,account='a',verified=true,adSkip=true,vip=true,release,delay=false,calls=0;
- const verify=async owner=>{calls++;if(delay)await new Promise(r=>release=r);return {verified,account:owner,verifiedAt:now,entitlements:{adSkip:{active:adSkip,expiresAt:null},vip:{active:vip,expiresAt:now+30},unknown:{active:true,expiresAt:null}}};};
+ const verify=async owner=>{calls++;if(delay)await new Promise(r=>release=r);return {verified,account:owner,verifiedAt:now,serverNow:now,entitlements:{adSkip:{active:adSkip,expiresAt:null},vip:{active:vip,expiresAt:vip?now+30:null},unknown:{active:true,expiresAt:null}}};};
  const disabled=createEntitlements();disabled.setAccount('a');assert.equal((await disabled.refresh()).adSkip,false);assert.equal(disabled.status().available,false);
  const e=createEntitlements({verify,now:()=>now,maxAgeMs:100});
  e.setAccount(account);assert.equal(e.status().adSkip,false);assert.equal((await e.refresh()).adSkip,true);assert.equal(e.status().vip,true);

@@ -2,7 +2,7 @@ const assert=require('node:assert/strict');
 const {openLedger,createAccountService}=require('../server/account-ledger.cjs');
 const {createAccountHttp}=require('../server/account-http.cjs');
 const ledger=openLedger(':memory:');
-const service=createAccountService({ledger,authenticate:async token=>['a','b'].includes(token)?{authenticated:true,account:token}:null,verifyEvent:async(account,p)=>p==='event'?{verified:true,account,eligible:true,id:p}:null,verifyEntitlements:async account=>({verified:true,account,vip:false,adSkip:false}),verifyAction:async(account,p)=>p==='action'?{verified:true,account,eligible:true,id:p}:null,verifyCompletion:async(account,p)=>p==='receipt'?{verified:true,account,id:'action',mode:'ticket',attempt:1,applied:true}:null,now:()=>1000});
+const service=createAccountService({ledger,authenticate:async token=>['a','b'].includes(token)?{authenticated:true,account:token}:null,verifyEvent:async(account,p)=>p==='event'?{verified:true,account,eligible:true,id:p}:null,verifyEntitlements:async account=>({verified:true,account,verifiedAt:1000,entitlements:{adSkip:{active:false,expiresAt:null},vip:{active:false,expiresAt:null}}}),verifyAction:async(account,p)=>p==='action'?{verified:true,account,eligible:true,id:p}:null,verifyCompletion:async(account,p)=>p==='receipt'?{verified:true,account,id:'action',mode:'ticket',attempt:1,applied:true}:null,now:()=>1000});
 assert.throws(()=>createAccountHttp({service}));
 const server=createAccountHttp({service,maxBody:1024,allowRequest:async({token})=>token!=='limited'});
 (async()=>{
@@ -18,6 +18,8 @@ const server=createAccountHttp({service,maxBody:1024,allowRequest:async({token})
  const [x,y]=await Promise.all([req('claim',{eventProof:'event',choice:'ticket'}),req('claim',{eventProof:'event',choice:'ticket'})]);
  assert.equal([x,y].filter(r=>r[1].result.ok).length,1);
  assert.equal((await req('wallet'))[2],'no-store');
+ const [status,rights,cache]=await req('entitlements',{},'b');assert.equal(status,200);assert.equal(cache,'no-store');assert.equal(rights.account,'b');assert.equal(rights.serverNow,1000);assert.equal(rights.entitlements.vip.active,false);
+ assert.equal((await req('entitlements',{account:'b'},'a'))[0],400);assert.equal((await req('entitlements',{},'bad'))[0],403);
  assert.equal((await req('reserve',{actionProof:'action',choice:'ticket'}))[1].status,'pending');
  assert.equal((await req('order',{id:'action'},'b'))[1].order,null);
  assert.equal((await req('order',{id:'action'}))[1].order.attempt,1);
