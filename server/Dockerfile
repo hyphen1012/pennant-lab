@@ -1,6 +1,7 @@
 FROM node:22-bookworm-slim
 WORKDIR /app
 COPY --chown=node:node server ./server
+RUN cd server && npm install --omit=dev --ignore-scripts && npm cache clean --force
 COPY --chown=node:node shared ./shared
 COPY --chown=node:node mobile/src/save-gzip-codec.cjs ./mobile/src/save-gzip-codec.cjs
 USER node

@@ -13,7 +13,7 @@ const {createAdSsvService}=require('./ad-ssv-service.cjs');
 const {openDeletionRequests,createDeletionService}=require('./deletion-requests.cjs');
 const {createAccountHttp}=require('./account-http.cjs'),{createSaveHttp}=require('./save-http.cjs');
 const {createRateLimiter}=require('./rate-limit.cjs'),{createServiceRouter}=require('./service-router.cjs');
-function createServiceRuntime({environment='staging',dataDir,authenticate,verifyRecentReauth,verifyReceipt,verifyCurrent,verifyNotification,verifyEvent,verifyAction,verifyCompletion,units,origins=[],maxBytes=64*1024*1024,maxDecodedBytes=256*1024*1024,resolveKey=createAdMobKeyResolver(),now=Date.now}={}){
+function createServiceRuntime({environment='staging',dataDir,authenticate,verifyRecentReauth,verifyReceipt,verifyCurrent,verifyNotification,verifyEvent,verifyAction,verifyCompletion,storeConfig=null,units,origins=[],maxBytes=64*1024*1024,maxDecodedBytes=256*1024*1024,resolveKey=createAdMobKeyResolver(),now=Date.now}={}){
  if(environment!=='staging'||typeof dataDir!=='string'||!path.isAbsolute(dataDir)||[authenticate,verifyRecentReauth,verifyReceipt,verifyCurrent,verifyNotification,verifyEvent,verifyAction,verifyCompletion].some(x=>typeof x!=='function'))throw Error('staging and trusted adapters required');
  if(!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>256*1024*1024)throw Error('invalid storage limit');
  fs.mkdirSync(dataDir,{recursive:true,mode:0o700});const root=fs.realpathSync(dataDir);
@@ -25,14 +25,15 @@ function createServiceRuntime({environment='staging',dataDir,authenticate,verify
   // An already in-flight request can still finish: deletion workers must drain
   // traffic and quiesce all writes before erasing data.
   const auth=async token=>{const a=await authenticate(token);return a?.authenticated===true&&!deletion.blocked(a.account)?a:{authenticated:false};};
-  const ledger=open(openLedger,'account'),storage=open(openSaveTransfer,'saves',{maxBytes,now}),registry=open(openPurchaseRegistry,'purchases'),proofs=open(openAdProofRegistry,'ad-proofs',{now});
-  const purchases=createPurchaseService({registry,authenticate:auth,verifyReceipt,verifyCurrent,verifyNotification,now});
+  const ledger=open(openLedger,'account'),storage=open(openSaveTransfer,'saves',{maxBytes,now}),registry=open(openPurchaseRegistry,'purchases',{tokenKey:storeConfig?.tokenKey??null}),proofs=open(openAdProofRegistry,'ad-proofs',{now});
+  const store=storeConfig?.create(registry)??{verifyReceipt,verifyCurrent,verifyNotification};
+  const purchases=createPurchaseService({registry,authenticate:auth,...store,now});
   const account=createAccountService({ledger,authenticate:auth,verifyEntitlements:purchases.verifyEntitlements,purchaseService:purchases,verifyEvent,verifyAction,verifyCompletion:async(a,p)=>{const v=await verifyCompletion(a,p);if(v?.verified===true&&v.mode==='ad'&&v.applied===true&&!proofs.hasProof({account:a,operationId:v.id,attempt:v.attempt}))return null;return v;},now});
   const saves=createSaveTransferService({storage,authenticate:auth,validateSave:createGameSaveValidator({maxBytes:maxDecodedBytes})});
   const adService=createAdSsvService({registry:proofs,authenticate:auth,readOrder:(a,o)=>deletion.blocked(a)?null:ledger.readOrder(a,o),verifyCallback:createAdMobVerifier({resolveKey,units:Object.values(units).map(u=>u.unit)}),units});
   const deletionService=createDeletionService({registry:deletion,authenticate,verifyRecentReauth});
   const allowRequest=createRateLimiter({now}),callbackLimit=createRateLimiter({now,ipLimit:600,tokenLimit:600,maxEntries:10000});
-  const router=createServiceRouter({accountHttp:createAccountHttp({service:account,allowRequest}),saveHttp:createSaveHttp({service:saves,allowRequest,maxBytes,maxConcurrent:1}),adService,deletionService,allowRequest:x=>x.route==='ssv'?callbackLimit(x):allowRequest(x),origins});
+  const router=createServiceRouter({accountHttp:createAccountHttp({service:account,allowRequest}),saveHttp:createSaveHttp({service:saves,allowRequest,maxBytes,maxConcurrent:1}),adService,deletionService,storeNotifications:storeConfig?{notification:purchases.notification,verifyGooglePush:storeConfig.verifyGooglePush}:null,allowRequest:x=>x.route==='ssv'?callbackLimit(x):allowRequest(x),origins});
   let closed=false;
   return {...router,close:async()=>{if(closed)return;closed=true;if(router.server.listening)await new Promise((ok,bad)=>router.server.close(e=>e?bad(e):ok()));for(const db of dbs.reverse())db.close();}};
  }catch(e){for(const db of dbs.reverse())db.close();throw e;}
