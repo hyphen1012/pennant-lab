@@ -86,11 +86,11 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
    return {world:r.world,revision:r.revision,order:{operationId:operation,attempt:o.attempt,mode:o.mode,status:o.status,result:row.result===null?null:JSON.parse(row.result)},wallet:publicWallet(s)};
   });
  }
- async function advance(token,slot,expectedRevision,command){
-  const account=await identity(token);if(!n(expectedRevision))throw Error('invalid revision');
+ async function advance(token,slot,expectedWorld,expectedRevision,command){
+  const account=await identity(token);if(typeof expectedWorld!=='string'||!n(expectedRevision))throw Error('invalid world or revision');
   const entitlements=await rights(account);
   return ledger.transact(account,(s,db)=>{
-   const r=world(db,account,slot);if(r.revision!==expectedRevision)throw Error('world revision conflict');
+   const r=world(db,account,slot);if(r.world!==expectedWorld||r.revision!==expectedRevision)throw Error('world revision conflict');
    // No advancement while an unresolved reward exists in this world. Recovery
    // or explicit cancel is required; lost connection is not a cancel.
    const pending=db.prepare('SELECT operation FROM authority_actions WHERE account=? AND world=? AND result IS NULL').all(account,r.world);

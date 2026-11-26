@@ -11,7 +11,7 @@ const {createAccountClient}=require('../mobile/src/account-client.cjs'),{createC
   const base='http://127.0.0.1:'+runtime.server.address().port;
   const fetcher=async(url,options)=>{
    const route=new URL(url).pathname;
-   if(route==='/v1/game/advance')advances++;
+   if(route==='/v1/game/advance'){advances++;const b=JSON.parse(options.body);a.match(b.world,/^[0-9a-f-]{36}$/);a.ok(Number.isSafeInteger(b.revision));}
    if(route==='/v1/game/create')creates++;
    const res=await fetch(base+route,options);
    if(route==='/v1/game/advance'&&lost){lost=false;await res.text();throw Error('fixture lost committed response');}

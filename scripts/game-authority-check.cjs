@@ -20,8 +20,8 @@ const assert=require('node:assert/strict'),{openLedger,createAccountService}=req
  try{
   await assert.rejects(service.create('owner',1,{team:0,state:{}}));
   const w=await service.create('owner',1,{team:0});await service.create('other',1,{team:0});await assert.rejects(service.create('owner',1,{team:0}));
-  await assert.rejects(service.advance('owner',1,w.revision,{step:2}));assert.equal((await service.read('owner',1)).revision,1);
-  for(let i=0;i<4;i++){let r=await service.read('owner',1);await service.advance('owner',1,r.revision,{step:1});}
+  await assert.rejects(service.advance('owner',1,w.world,w.revision,{step:2}));assert.equal((await service.read('owner',1)).revision,1);
+  for(let i=0;i<4;i++){let r=await service.read('owner',1);await service.advance('owner',1,r.world,r.revision,{step:1});}
   const events=await service.achievements('owner',1);assert.equal(events.length,4);
   await assert.rejects(service.claim('other',1,events[0].eventId,'ticket'));
   for(let i=0;i<3;i++)assert.equal((await service.claim('owner',1,events[i].eventId,'ticket')).result.ok,true);
@@ -33,7 +33,7 @@ const assert=require('node:assert/strict'),{openLedger,createAccountService}=req
   const before=await service.read('owner',1),r=await service.reserve('owner',1,med,'ticket');assert.equal(r.mode,'ticket');
   const legacy=createAccountService({ledger,authenticate:async()=>({authenticated:true,account:owner}),verifyEntitlements:async()=>null,verifyEvent:async()=>null,verifyAction:async()=>({verified:true,eligible:true,account:owner,id:med}),verifyCompletion:async()=>({verified:true,account:owner,id:med,mode:'ticket',attempt:r.attempt,applied:true})});
   await assert.rejects(legacy.finish('owner','fixture'),/canonical action/);
-  await assert.rejects(service.advance('owner',1,before.revision,{step:1}));await assert.rejects(service.reserve('owner',1,mgr,'ticket'));
+  await assert.rejects(service.advance('owner',1,before.world,before.revision,{step:1}));await assert.rejects(service.reserve('owner',1,mgr,'ticket'));
   fail=true;await assert.rejects(service.settle('owner',1,med,r.attempt));assert.equal((await service.read('owner',1)).wallet.tickets,4);assert.equal((await service.read('owner',1)).game.days,9);
   fail=false;const treatment=await service.settle('owner',1,med,r.attempt);assert.equal(treatment.result.after,5);assert.equal(treatment.wallet.tickets,3);
   assert.equal((await service.settle('owner',1,med,r.attempt)).replay,true);assert.equal((await service.read('owner',1)).wallet.tickets,3);

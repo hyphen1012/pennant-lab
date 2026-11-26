@@ -51,7 +51,7 @@ function createCanonicalGameSession({client,online=()=>true}={}){
  });}
  function advance(command){
   if(status!=='ready'||!snapshot||snapshot.pending?.length)throw Error('authoritative state or reward reconciliation required');
-  return run('advance',(t,old)=>client.gameAdvance(t.slot,old.revision,command));
+  return run('advance',(t,old)=>client.gameAdvance(t.slot,old.world,old.revision,command));
  }
  async function freePage(command){
   if(status!=='ready'||!snapshot||typeof client.gameFreePage!=='function')throw Error('authoritative state required');
