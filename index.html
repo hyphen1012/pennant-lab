@@ -176,7 +176,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .official-startup-video{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;background:#000;z-index:2147483000;pointer-events:auto}
 .official-launch{position:relative;isolation:isolate;display:grid;place-items:center;width:100%;height:100vh;height:100dvh;overflow:hidden;background:#090510}
 .official-launch-frame{position:relative;width:min(100%,56.25vh);width:min(100%,56.25dvh);aspect-ratio:9/16;overflow:hidden;isolation:isolate}
-.official-launch-frame>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;user-select:none}
+.official-launch-frame>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;user-select:none;-webkit-user-drag:none}
 .official-ambient{position:absolute;inset:0;pointer-events:none;opacity:.16;background:radial-gradient(ellipse at 12% 20%,#9b4be93b,transparent 35%),radial-gradient(ellipse at 88% 65%,#bd83ff2b,transparent 32%);animation:official-ambient-drift 8s ease-in-out infinite alternate}
 .official-title-metal,.official-stadium-lights,.official-crowd,.official-embedded-prompt,.official-title-particles{position:absolute;inset:0;pointer-events:none}
 .official-title-metal{clip-path:polygon(20% 39%,32% 35%,52% 37%,83% 35%,86% 40%,79% 44%,68% 47%,50% 54%,23% 47%,16% 43%);background:linear-gradient(115deg,transparent 30%,#fff2b900 44%,#fff3c55c 50%,transparent 56%);background-size:250% 100%;mix-blend-mode:screen;animation:official-metal 10s ease-in-out infinite}
@@ -6344,9 +6344,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     let video=null,watchdog=null,done=false;
     const finish=()=>{
       if(done)return;done=true;clearTimeout(watchdog);startupPlaying=false;document.body.classList?.remove('official-startup-active');
-      document.removeEventListener('visibilitychange',visibility);
+      document.removeEventListener?.('visibilitychange',visibility);
       window.removeEventListener?.('pl-native-suspend',finish);
-      if(video){video.pause();video.removeAttribute('src');video.load();video.remove();}
+      if(video){video.pause?.();video.removeAttribute?.('src');video.load?.();video.remove();}
     };
     const visibility=()=>{if(document.hidden)finish();};
     const arm=()=>{clearTimeout(watchdog);if(!done)watchdog=setTimeout(finish,12000);};
@@ -6359,7 +6359,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       video=document.createElement('video');
       video.className='official-startup-video';video.setAttribute('aria-label','PARALAB GAMES 起動映像');
       video.playsInline=true;video.setAttribute('playsinline','');video.controls=false;video.disablePictureInPicture=true;
-      video.preload='auto';video.muted=launchMuted();
+      video.preload='auto';video.muted=launchMuted();video.tabIndex=-1;video.disableRemotePlayback=true;
       video.addEventListener('ended',finish,{once:true});video.addEventListener('error',finish,{once:true});
       let lastTime=-1;video.addEventListener('timeupdate',()=>{if(video.currentTime>lastTime){lastTime=video.currentTime;arm();}});
       video.src=STARTUP_MEDIA.video;document.body.appendChild(video);
@@ -6386,8 +6386,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(window.PennantNative&&!window.PennantNative.ready())return;
     if(!STARTUP_MEDIA.title||titleMediaFailed){ui.launchTitle=false;ui.rarePreview=null;render();window.scrollTo(0,0);return;}
     launchTransition=true;launchTapSound();
-    const root=document.querySelector('[data-launch-screen]');root?.classList.add('official-launch-exit');
-    const complete=()=>{launchTransition=false;if(ui.page!=='title'||!ui.launchTitle||document.hidden||(window.PennantNative&&!window.PennantNative.ready())){root?.classList.remove('official-launch-exit');return;}ui.launchTitle=false;ui.rarePreview=null;render();window.scrollTo(0,0);};
+    const root=document.querySelector('[data-launch-screen]');root?.classList?.add('official-launch-exit');
+    const complete=()=>{launchTransition=false;if(ui.page!=='title'||!ui.launchTitle||document.hidden||(window.PennantNative&&!window.PennantNative.ready())){root?.classList?.remove('official-launch-exit');return;}ui.launchTitle=false;ui.rarePreview=null;render();window.scrollTo(0,0);};
     if(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches)complete();else setTimeout(complete,420);
   }
   const WORLD_TONES=['#88bffa','#c7a4ff','#7be4d1'];
