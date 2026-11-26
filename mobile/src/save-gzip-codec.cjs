@@ -22,4 +22,16 @@ async function toGameRecord(bytes,options){
  await decodeGzip(bytes,options);
  return {encoding:'pl-gzip-json-v1',bytes:new Blob([bytes],{type:'application/gzip'})};
 }
-module.exports={validateGameData,decodeGzip,toGameRecord,LIMIT};
+async function exportGameRecord(record,{maxBytes=LIMIT}={}){
+ if(!record)throw Error('no local save');
+ if(record.encoding==='pl-gzip-json-v1'){
+  if(!(record.bytes instanceof Blob)||record.bytes.size>LIMIT)throw Error('invalid compressed save');
+  const bytes=new Uint8Array(await record.bytes.arrayBuffer());const data=await decodeGzip(bytes,{maxBytes});return {bytes,data};
+ }
+ if(!validateGameData(record))throw Error('incompatible save');
+ const raw=new Blob([JSON.stringify(record)],{type:'application/json'});if(raw.size>maxBytes)throw Error('save too large');
+ const blob=await new Response(raw.stream().pipeThrough(new CompressionStream('gzip'))).blob();
+ if(blob.size>LIMIT)throw Error('compressed save too large');
+ return {bytes:new Uint8Array(await blob.arrayBuffer()),data:record};
+}
+module.exports={validateGameData,decodeGzip,toGameRecord,exportGameRecord,LIMIT};
