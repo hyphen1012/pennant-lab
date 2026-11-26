@@ -1,12 +1,15 @@
 // Session/slot-scoped controller for a server-owned game. Never imports a
 // local save, computes results locally or retries a mutation after uncertainty.
+const {createCanonicalRewardFlow}=require('./canonical-reward-flow.cjs');
 function createCanonicalGameSession({client,online=()=>true}={}){
  if(!client||['setSession','gameRead','gameCreate','gameAdvance'].some(k=>typeof client[k]!=='function')||typeof online!=='function')throw Error('canonical client required');
  let generation=0,session=null,slot=null,snapshot=null,status='signed-out',active=null;
+ // Staging ticket/verified entitlement only. Never open an ad or manufacture evidence.
+ const rewardFlow=['gameRead','gameOrder','gameReserve','gameSettle','gameCancel'].every(k=>typeof client[k]==='function')?createCanonicalRewardFlow({client,online,requestAdProof:async()=>false}):null;
  const validSlot=n=>[1,2,3].includes(n);
  const validView=v=>v&&typeof v.world==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v.world)&&Number.isSafeInteger(v.revision)&&v.revision>=1&&v.game&&typeof v.game==='object'&&!Array.isArray(v.game);
  function inspect(){return {slot,status,busy:active!==null,snapshot:snapshot===null?null:structuredClone(snapshot)};}
- function invalidate(nextStatus='refresh-required'){generation++;active=null;snapshot=null;status=nextStatus;}
+ function invalidate(nextStatus='refresh-required'){rewardFlow?.invalidate();generation++;active=null;snapshot=null;status=nextStatus;}
  function setSession(next){client.setSession(next);invalidate(next?'select-slot':'signed-out');session=next?{account:next.account}:null;slot=null;}
  function suspend(){invalidate(session?(slot?'refresh-required':'select-slot'):'signed-out');}
  function select(n){if(!session||!validSlot(n)||active)throw Error('slot selection unavailable');invalidate('refresh-required');slot=n;return inspect();}
@@ -53,6 +56,21 @@ function createCanonicalGameSession({client,online=()=>true}={}){
   if(status!=='ready'||!snapshot||snapshot.pending?.length)throw Error('authoritative state or reward reconciliation required');
   return run('advance',(t,old)=>client.gameAdvance(t.slot,old.world,old.revision,command));
  }
+ async function reward(kind,id,confirmed){
+  if(confirmed!==true||!rewardFlow||status!=='ready'||!snapshot||!['ticket','reconcile','cancel'].includes(kind))throw Error('explicit authoritative reward required');
+  const pending=(snapshot.pending||[]).some(x=>x.operationId===id);
+  if(kind==='ticket'?(snapshot.pending?.length||!snapshot.actions?.some(x=>x.operationId===id&&['available','cancelled'].includes(x.status))):!pending)throw Error('reward unavailable');
+  let outcome;
+  const r=await run('reward',async(t,old)=>{
+   const x=await (kind==='ticket'?rewardFlow.run(t.slot,id,'ticket'):kind==='reconcile'?rewardFlow.reconcile(t.slot,id):rewardFlow.cancel(t.slot,id,true));
+   if(!current(t))throw Error('session changed');
+   outcome=x.status;
+   if(['reconcile_required','busy'].includes(outcome))throw Error('reward observation required');
+   // A read after an explicit action is not a replay of the mutation.
+   return client.gameRead(t.slot);
+  });
+  return {...r,rewardStatus:r.status==='ready'?outcome:null};
+ }
  async function freePage(command){return readPage('gameFreePage',command);}
  async function playerPage(command){return readPage('gamePlayerPage',command);}
  async function readPage(method,command){
@@ -69,6 +87,6 @@ function createCanonicalGameSession({client,online=()=>true}={}){
    snapshot=null;status='refresh-required';return {status};
   }finally{if(current(t))active=null;}
  }
- return Object.freeze({setSession,suspend,select,refresh,create,advance,inspect,freePage,playerPage,listSlots});
+ return Object.freeze({setSession,suspend,select,refresh,create,advance,inspect,freePage,playerPage,listSlots,reward});
 }
 module.exports={createCanonicalGameSession};

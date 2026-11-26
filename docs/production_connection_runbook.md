@@ -262,3 +262,6 @@ Reuse existing news, medical, consult, farewell and join cinema helpers. Archive
 
 ## Consolidated inbox branch
 PR107 retains its stronger disclosure and cinema projection; PR106's packaged browser rookie response-loss fixture, unrelated command guard and decade regression are ported. Do not merge both siblings independently. No production changes.
+
+## Canonical staging rewards screen
+Use existing canonical reward orchestration through the selected session. Explicit ticket/verified entitlement only, no native ad request or fake proof. Pending orders can be reconciled or explicitly cancelled; unknown outcomes require a read, never retry. Screen obtains fresh authoritative wallet/actions before presenting choices. All eight engine reward routes are displayed only when the server lists them; actual ad SDK/SSV, achievements UI, per-route browser validation and production remain pending. Session fixture tests lost settlement response.
