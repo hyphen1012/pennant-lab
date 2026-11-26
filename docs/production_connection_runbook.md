@@ -212,3 +212,8 @@ Expose existing calendar targets and bounded routine report summaries. Authentic
 
 ## Canonical read-only roster and standings slice
 Reuse original player cards and standings table with explicit projection arguments. Render own player portrait, affinity, ability strip, condition and season stats from the server snapshot; never use a local world or expose hidden scout candidates. Standings limited to twelve clubs. No mutation, no history deletion. Career history, player memo, training mutations and full detail parity remain open. Staging only.
+
+
+## Canonical roster operations and paged free market (staging)
+- Add authenticated rotation selection from eligible healthy first-team SP candidates; existing rotation entries swap, server verifies selection and revision. Farm auto/manual and explicit promotion/demotion use existing club commands. Free agents now use the existing authenticated revision-bound free-page route, 30 rows per page with name search, previous/next and explicit cost/salary signing confirmation. No arbitrary client roster state, automatic mutation resend, local saves or production activation. Sign command is now also held until arrival/reveal disclosure permits it.
+- Browser regression covers read-only search/page navigation, failed read hides stale data and recovers by read only, rotation swap and farm mode persistence. Remaining: direct browser verification of promotion/demotion and signing, original presentation parity, full career history/GM memo, annual event integration and performance; CI not yet confirmed. No engine economics changes.

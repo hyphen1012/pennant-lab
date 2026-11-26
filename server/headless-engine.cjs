@@ -90,7 +90,7 @@ function createHeadlessEngine(){
    roster:own(team).map(p=>({id:p.id,name:p.name,pos:p.pos,age:p.age,salary:p.salary,tier:p.farmTier===2?2:1,injured:!!p.injury,energy:p.energy,overall:rating(p),abilities:Object.fromEntries(seasonSkillKeys(p).map(k=>[k,p[k]])),focus:p.trainFocus||'balanced',fielding:team.lineup.includes(p.id)?team.fieldingRoles?.[p.id]||null:null,subPos:p.subPos||null,hand:p.hand,batHand:p.batHand,talent:p.talent,appearanceSeed:p.appearanceSeed,specialCategory:p.specialCategory||null,originCategory:p.originCategory||null,pastLifeAppearance:p.pastLifeAppearance?{seed:p.pastLifeAppearance.seed,baseCategory:p.pastLifeAppearance.baseCategory}:null,injuryDays:p.injury?.daysLeft||0,affinity:p.affinity,batStats:Object.fromEntries(['ab','h','hr','rbi','sb','g','w','l','outs','er','k','sv'].map(k=>[k,p.stats?.[k]||0]))})),
    freeCount:free.length,free:free.slice(0,80).map(freeRow),
    managerCandidates:[1,2,3].map(slot=>{const m=makeManager(team.id,game.year,slot);return {slot,id:m.id,name:m.name,style:m.style,salary:m.salary,contractYears:m.contractYears,fee:r2(m.salary*.3),current:m.id===manager?.id};}),
-   lineup:team.lineup.slice(),rotation:team.rotation.slice(),fieldingRoles:{...team.fieldingRoles},fieldingOptions:team.lineup.map(id=>({id,roles:FIELD_POSITIONS.filter(role=>canAssignFieldingRole(team,id,role))})),
+   lineup:team.lineup.slice(),rotation:team.rotation.slice(),rotationCandidates:own(team).filter(p=>p.pos==='SP'&&p.farmTier!==2&&availableForGame(p)).map(p=>p.id),fieldingRoles:{...team.fieldingRoles},fieldingOptions:team.lineup.map(id=>({id,roles:FIELD_POSITIONS.filter(role=>canAssignFieldingRole(team,id,role))})),
    lineupUndoAvailable:canManage()&&undoAvailable(),
    lineupWarnings:{missing:Math.max(0,9-team.lineup.length),off:team.lineup.filter(id=>fieldingTier(getPlayer(id),team.fieldingRoles[id])==='off')},
    lineupCandidates:firstHitters(team).filter(availableForGame).map(p=>({id:p.id,roles:FIELD_POSITIONS.filter(role=>!roster190Candidate(team,role,p)),reasons:Object.fromEntries(FIELD_POSITIONS.map(role=>[role,roster190Candidate(team,role,p)]))})),
@@ -368,7 +368,7 @@ function createHeadlessEngine(){
   }else if(k==='support'){
    if(!CLUB_SUPPORT[input.key]||CLUB_SUPPORT[input.key].phase||!clubSupportSpend(team,input.key,''))throw Error('club support unavailable');
   }else if(k==='sign'){
-   if(!p||!freeAgents().includes(p)||p.retired||own(team).length>=ROSTER_MAX)throw Error('free agent unavailable');
+   if(!freeVisible()||!p||!freeAgents().includes(p)||p.retired||own(team).length>=ROSTER_MAX)throw Error('free agent unavailable');
    signPlayer(p.id);if(p.teamId!==team.id)throw Error('free agent signing unavailable');
   }else if(k==='release'){
    if(!p||p.teamId!==team.id)throw Error('release unavailable');
