@@ -164,6 +164,23 @@ globalThis.__plAnnualEntryCheck=saved=>{
   a.equal(fixture.movement.deals.filter(d=>d.id===p.id).length,1);
   console.log('PASS isolated actual FA negotiation: delayed counter, required acknowledgement, exact high salary, three-year agreement');
  }
+ // Isolated recorded-event fixture, never injected into the season under test.
+ {
+  const fixture=JSON.parse(JSON.stringify(w)),teamId=fixture.selectedId;
+  const p=fixture.players.find(p=>p.teamId===teamId),other=fixture.players.find(p=>p.teamId>=0&&p.teamId!==teamId);
+  a.ok(p&&other);
+  const key=id=>'memorial:'+require('node:crypto').createHash('sha256').update('memorial:'+id).digest('hex');
+  const base=engine.achievements(w).map(e=>e.key);
+  const feat=year+':fixture-feat:'+p.id,ordinary=year+':fixture-ordinary:'+p.id,rare=year+':awakening:'+p.id,rival=year+':awakening:'+other.id,scout=year+':foreign-discovery:987654321';
+  fixture.milestoneNews=[...(fixture.milestoneNews||[]),{id:ordinary,year,teamId,playerId:p.id,type:'player',title:'Fixture ordinary milestone'},{id:feat,year,teamId,playerId:p.id,type:'player',featKey:'fixture',title:'Fixture special feat'}];
+  fixture.rareNews=[...(fixture.rareNews||[]),{id:rare,year,teamId,playerId:p.id,category:'awakening',title:'Fixture awakening'},{id:rival,year,teamId:other.teamId,playerId:other.id,category:'awakening',title:'Fixture rival'},{id:scout,year,scoutTeamId:teamId,kind:'foreign-discovery',category:'foreign',title:'Fixture public discovery'}];
+  const snapshot=JSON.stringify(fixture),entries=engine.achievements(fixture),keys=new Set(entries.map(e=>e.key));
+  for(const k of base)a.ok(keys.has(k),'prior achievement identity retained');
+  for(const id of ['news:'+ordinary,'news:'+feat,'rare:'+rare,'rare:'+scout])a.ok(keys.has(key(id)),'missing '+id);
+  a.ok(!keys.has(key('rare:'+rival)));a.equal(keys.size,entries.length);
+  a.equal(JSON.stringify(fixture),snapshot,'achievement projection must not mutate world');
+  console.log('PASS canonical achievement identity, ordinary and rare coverage, own-club scope and nonmutation');
+ }
  const market=(decision,extra={})=>step({annual:'market',decision,...extra});
  a.throws(()=>engine.advance(w,{annual:'open',job:'movement-market'}));
  a.throws(()=>engine.advance(w,{annual:'day'}));
