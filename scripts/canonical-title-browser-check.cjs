@@ -161,7 +161,15 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   const travel=(afterDown.game.club.travel+1)%4;page.once('dialog',d=>d.accept());await page.locator('[data-action="canonical-travel"][data-index="'+travel+'"]').click();await page.getByText('サーバーに変更を保存しました。').waitFor();
   const travelled=await post('read',{slot:2});a.equal(travelled.revision,afterDown.revision+1);a.equal(travelled.game.club.travel,travel);
   await page.locator('[data-action="canonical-ops-back"]').click();
-  await page.locator('[data-action="canonical-ops-open"][data-kind="manager"]').click();const order=travelled.game.club.manager.orders[0],policy=order.value==='attack'?'safe':'attack';
+  await page.locator('[data-action="canonical-ops-open"][data-kind="manager"]').click();
+  await page.locator('.manager-entry').waitFor();
+  a.equal(await page.locator('[data-action="canonical-manager-order"]').count(),0);
+  const beforeMeeting=await post('read',{slot:2});a.equal(beforeMeeting.revision,travelled.revision);
+  await page.locator('[data-action="canonical-manager-enter"]').click();
+  await page.locator('.manager-activity-panel').waitFor();
+  a.equal(await page.locator('.manager-sheet .manager-grade').count(),4);
+  const afterMeeting=await post('read',{slot:2});a.equal(afterMeeting.revision,beforeMeeting.revision);a.equal(afterMeeting.game.club.manager.trust,beforeMeeting.game.club.manager.trust);a.equal(afterMeeting.game.club.manager.discontent,beforeMeeting.game.club.manager.discontent);
+  const order=travelled.game.club.manager.orders[0],policy=order.value==='attack'?'safe':'attack';
   await page.locator('[data-action="canonical-manager-order"][data-key="'+order.key+'"][data-value="'+policy+'"]').click();await page.getByText('サーバーに変更を保存しました。').waitFor();
   const ordered=await post('read',{slot:2});a.equal(ordered.revision,travelled.revision+1);a.equal(ordered.game.club.manager.orders[0].value,policy);
   await page.locator('[data-action="canonical-ops-back"]').click();
