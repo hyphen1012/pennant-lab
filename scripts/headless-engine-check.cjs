@@ -5,11 +5,11 @@ const a=require('node:assert/strict'),{createHeadlessEngine}=require('../server/
  try{
   await a.rejects(service.create('a',1,{seed:1937}));await a.rejects(service.create('a',1,{state:{}}));
   const initial=await service.create('a',1,{});a.equal(initial.game.year,2027);a.equal(initial.game.games,0);
-  await service.create('b',1,{});await a.rejects(service.advance('a',1,1,{step:2}));
+  await service.create('b',1,{});await a.rejects(service.advance('a',1,initial.world,1,{step:2}));
   let state=initial;
-  for(let i=0;i<20&&!state.game.blocked&&state.game.games===0;i++)state=await service.advance('a',1,state.revision,{step:1});
+  for(let i=0;i<20&&!state.game.blocked&&state.game.games===0;i++)state=await service.advance('a',1,state.world,state.revision,{step:1});
   a.ok(state.revision>1);a.equal((await service.read('a',1)).revision,state.revision);a.equal((await service.read('b',1)).game.games,0);
-  await a.rejects(service.advance('a',1,1,{step:1}));
+  await a.rejects(service.advance('a',1,initial.world,1,{step:1}));
   const events=await service.achievements('a',1);a.ok(Array.isArray(events));for(const e of events.slice(0,3)){a.equal((await service.claim('a',1,e.eventId,'ticket')).result.ok,true);a.equal((await service.claim('a',1,e.eventId,'ticket')).result.reason,'duplicate');}
   // Test-only injury injection into an isolated server-created world; no HTTP
   // or production path accepts these snapshots. Actual game function executes.

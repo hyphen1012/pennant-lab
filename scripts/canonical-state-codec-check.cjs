@@ -9,9 +9,9 @@ const a=require('node:assert/strict'),{createCanonicalStateCodec}=require('../se
  const ledger=openLedger(':memory:'),owner='a'.repeat(64),engine={newWorld:()=>({year:2027,history:'x'.repeat(400000)}),advance:s=>({...s,year:s.year+1}),view:s=>({year:s.year,size:s.history.length}),actions:()=>[],achievements:()=>[],applyAction:()=>{throw Error('no action');}};
  const svc=createGameAuthority({ledger,engine,authenticate:async()=>({authenticated:true,account:owner}),verifyRights:async()=>({verified:true,adSkip:false,vip:false}),hasAdProof:()=>false});
  try{
-  const w=await svc.create('fixture',1,{});a.equal(w.game.size,400000);a.equal((await svc.advance('fixture',1,1,{})).game.year,2028);
+  const w=await svc.create('fixture',1,{});a.equal(w.game.size,400000);a.equal((await svc.advance('fixture',1,w.world,1,{})).game.year,2028);
   ledger.transact(owner,(s,db)=>{const row=db.prepare('SELECT state FROM authority_worlds WHERE account=? AND slot=1').get(owner);a.ok(row.state.startsWith('pl-gzip-v1:'));a.equal(codec.decode(row.state).year,2028);db.prepare('UPDATE authority_worlds SET state=? WHERE account=? AND slot=1').run(JSON.stringify({year:2030,history:'old'}),owner);});
-  a.equal((await svc.read('fixture',1)).game.size,3);await svc.advance('fixture',1,2,{});
+  a.equal((await svc.read('fixture',1)).game.size,3);await svc.advance('fixture',1,w.world,2,{});
   a.equal((await svc.read('fixture',1)).game.year,2031);
  }finally{ledger.close();}
  console.log('PASS canonical legacy and compressed storage, >32MiB synthetic state, bounded decode, corruption rejection and transactional compatibility');
