@@ -200,7 +200,7 @@ function createHeadlessEngine(){
    return {phase,sites,step:p.step||0,paid:!!p.paid,cost:campCost(sites),visit:p.visit||null,visitPending:!!p.visitPending,options:CAMP_SITES.map(([key,label,cost,,effect])=>({key,label,cost,effect})),report:r?{rows:(r.rows||[]).filter(x=>x.teamId===team.id||x.teamId==null),clubs:(r.clubs||[]).filter(x=>x.teamId===team.id),cost:r.cost,sites:r.sites}:null};
   }
   const r=annualReport(phase);
-  if(phase==='exhibition')return {phase,policy:annualPlan(team,phase).exhibition,meeting:!!j.state.reportMeeting,meetingDone:!!j.state.reportMeetingDone,digestSeen:!!j.state.digestSeen,report:r?{games:r.games.filter(g=>g.home===team.id||g.away===team.id).map(g=>({date:g.date,home:g.home,away:g.away,homeScore:g.homeScore,awayScore:g.awayScore,noContest:!!g.noContest})),rows:(r.rows||[]).filter(x=>x.teamId===team.id),leagueGames:r.games.length}:null};
+  if(phase==='exhibition')return {phase,policy:annualPlan(team,phase).exhibition,meeting:!!j.state.reportMeeting,meetingDone:!!j.state.reportMeetingDone,digestSeen:!!j.state.digestSeen,report:r?{clubs:game.teams.map(t=>({id:t.id,name:t.name,short:t.short,league:t.league,color:t.color,letter:t.letter,emblem:t.emblem||null})),games:r.games.filter(g=>g.home===team.id||g.away===team.id).map(g=>({date:g.date,home:g.home,away:g.away,homeScore:g.homeScore,awayScore:g.awayScore,noContest:!!g.noContest})),rows:(r.rows||[]).filter(x=>x.teamId===team.id),leagueGames:r.games.length}:null};
   return {phase,...trainingView(phase),support:!!j.state.reportSelfSupport,supportOptions:Object.entries(CLUB_SUPPORT).filter(([k,p])=>p.phase?.includes('self')).map(([key,p])=>({key,label:p.label,cost:p.cost,eligible:clubSupportEligible(team,key,'self')}))};
  };
  const annualFinanceView=()=>{
