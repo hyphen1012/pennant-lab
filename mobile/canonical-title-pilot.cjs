@@ -34,7 +34,7 @@ const pilotCode = `
     }catch{return false;}
   }
   function canonicalReset(){
-    canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';
+    canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';
     canonicalPilot.suspend();ui.clubDraft=null;ui.portalSlot=null;ui.portalOrigin=null;slotOpening=false;
     ui.page='title';ui.launchTitle=false;
   }
@@ -95,7 +95,27 @@ const pilotCode = `
     ui.page='canonical-roster';render();window.scrollTo(0,0);
   }
   const canonicalPlayerModel=(p,g)=>({...p,...p.abilities,teamId:g.team.id,farmTier:p.tier,injury:p.injured?{daysLeft:p.injuryDays||1}:null,stats:{...p.batStats}});
-  let canonicalPlayerId=null,canonicalLeague=null;
+  let canonicalPlayerId=null,canonicalLeague=null,canonicalHistory=null;
+  function canonicalHistoryMarkup(p,blocked){
+    const d=canonicalHistory;
+    if(!d||d.playerId!==p.id)return '<section class="panel"><h3>年度別・通算成績と能力推移</h3><button class="btn outline full" data-action="canonical-history-open" '+(slotOpening?'disabled':'')+'>'+(slotOpening?'取得中…':'成績・能力推移・GMメモを表示')+'</button></section>';
+    const growth=d.items.filter(r=>r.overall!==null).slice().reverse(),pts=growth.map((r,i)=>({x:32+i*290/Math.max(1,growth.length-1),y:155-Math.max(0,Math.min(100,r.overall))*1.2,...r}));
+    const chart=pts.length?'<div class="chart-holder"><svg class="growth-svg" viewBox="0 0 360 190" role="img" aria-label="保存された年度別総合能力の推移">'+[0,25,50,75,100].map(n=>'<path d="M32 '+(155-n*1.2)+'H322" stroke="#64748b" stroke-opacity=".45"/><text x="0" y="'+(159-n*1.2)+'" font-size="10" fill="currentColor">'+n+'</text>').join('')+'<polyline points="'+pts.map(r=>r.x+','+r.y).join(' ')+'" fill="none" stroke="#e9b949" stroke-width="3"/>'+pts.map(r=>'<circle cx="'+r.x+'" cy="'+r.y+'" r="4" fill="#36b89a"/><text x="'+r.x+'" y="'+(r.y-8)+'" text-anchor="middle" font-size="11" fill="currentColor">'+r.overall+'</text><text x="'+r.x+'" y="176" text-anchor="middle" font-size="9" fill="currentColor">'+String(r.year).slice(-2)+'</text>').join('')+'</svg></div>':'<p class="small">保存済みの能力推移はありません。</p>';
+    const season=(label,r)=>r?'<h4>'+label+' · '+h(r.team||'所属記録なし')+'</h4>'+statDisplayGrid(p,r.stats,true):'';
+    return '<section class="panel"><h3>一軍通算成績</h3>'+statDisplayGrid(p,d.officialTotal)+(d.hasFarm?'<h3>二軍通算成績</h3>'+statDisplayGrid(p,d.farmTotal):'<p class="small">二軍の記録はまだありません。</p>')+'<p class="small">一軍と二軍は別集計です。未記録の年度は補完しません。</p></section><section class="panel"><h3>保存された総合能力の推移</h3>'+chart+'<p class="small">現在のページに含まれる記録のみ表示します。</p></section><section class="panel"><h3>年度別成績・能力・タイトル</h3><p>'+d.total+'年度中 '+(d.total?d.offset+1:0)+'〜'+(d.offset+d.items.length)+'</p>'+d.items.map(r=>'<details class="club-honor"><summary>'+r.year+'年'+(r.overall===null?'':' · 総合 '+r.overall)+'</summary>'+season('一軍',r.official)+season('二軍',r.farm)+(r.abilities?'<h4>保存能力</h4><div class="annual-ability-strip">'+Object.entries(r.abilities).map(([k,v])=>'<span><small>'+h(DRAFT_LABELS[k]||({breaking:'変化',talent:'精神'})[k]||k)+'</small>'+coloredAbility(v)+'</span>').join('')+'</div>':'<p class="small">個別能力の記録なし</p>')+r.titles.map(t=>'<div class="event">'+h(t.title)+(t.league?' · '+leagueName(t.league):'')+'</div>').join('')+(r.titlesMore?'<p>ほか '+r.titlesMore+'件（元記録は保持）</p>':'')+'</details>').join('')+'<div class="chips"><button class="btn outline" data-action="canonical-history-prev" '+(slotOpening||d.offset===0?'disabled':'')+'>新しい年度</button><button class="btn outline" data-action="canonical-history-next" '+(slotOpening||d.nextOffset===null?'disabled':'')+'>古い年度</button></div></section><section class="panel"><h3>GMメモ</h3><textarea class="player-memo" id="canonical-player-memo" maxlength="2000" '+(blocked?'disabled':'')+'>'+h(d.memo)+'</textarea><button class="btn primary full" data-action="canonical-memo-save" '+(blocked?'disabled':'')+'>メモを保存する</button><p class="small">2000文字以内。明示的に保存します。</p></section>';
+  }
+  async function canonicalLoadHistory(offset){
+    if(slotOpening||ui.page!=='canonical-player'||!accountCurrent()||!canonicalSnapshot?.game?.club?.roster.some(p=>p.id===canonicalPlayerId))return;
+    const epoch=canonicalEpoch,id=canonicalPlayerId,scroll=draftScrollY();
+    slotOpening=true;render();
+    try{
+      const r=await canonicalPilot.playerPage({playerId:id,offset,limit:10});
+      if(epoch!==canonicalEpoch)return;
+      if(r.status!=='ready'||r.page.playerId!==id)throw Error('history observation required');
+      canonicalHistory=r.page;
+    }catch{if(epoch===canonicalEpoch){canonicalSnapshot=null;canonicalHistory=null;}}
+    finally{if(epoch===canonicalEpoch){slotOpening=false;render();draftJump(scroll);}}
+  }
   function canonicalReadOnlyRender(){
     const app=$('#app'),g=canonicalSnapshot?.game,c=g?.club;
     if(!app)return;
@@ -111,7 +131,7 @@ const pilotCode = `
       if(!row)body='<p>選手情報を取得できません。</p>';
       else{const p=canonicalPlayerModel(row,g),blocked=slotOpening||!c.canManage||!!canonicalSnapshot.pending?.length;
         const focus='<section class="panel"><h3>シーズン育成方針</h3><p class="small">重点育成する能力を選択します。</p><div class="chips">'+['balanced',...Object.keys(row.abilities)].map(k=>'<button class="chip '+(row.focus===k?'active':'')+'" data-action="canonical-focus" data-key="'+h(k)+'" '+(blocked||row.focus===k?'disabled':'')+'>'+h(k==='balanced'?'バランス':DRAFT_LABELS[k]||k)+'</button>').join('')+'</div></section>';
-        body='<div class="player-profile"><div class="player-club">'+h(g.team.name)+' · '+positionMarkup(p.pos)+'</div><div class="profile-row profile-upper-row">'+playerUpperPortrait(p)+'<div><h2>'+themedPlayerName(p)+' <small>('+p.age+')</small></h2><div class="profile-meta">'+throwBat(p)+' · '+fmtSalary(p.salary)+'</div><div class="profile-meta">総合 '+rating(p)+' · 愛着 ♥'+p.affinity+'</div></div></div></div><div class="player-detail-condition">'+conditionBar(p)+'</div><section class="panel"><h3>能力・適性</h3>'+annualAbilityStrip(p)+'<p>'+positionMarkup(p.pos)+(p.subPos?' / '+positionMarkup(p.subPos):'')+'</p></section><section class="panel"><h3>今季の公式戦成績</h3>'+statDisplayGrid(p)+'</section>'+focus+'<p class="small">試験接続：能力・今季成績・育成方針。通算成績、メモ等は未接続。</p>';
+        body='<div class="player-profile"><div class="player-club">'+h(g.team.name)+' · '+positionMarkup(p.pos)+'</div><div class="profile-row profile-upper-row">'+playerUpperPortrait(p)+'<div><h2>'+themedPlayerName(p)+' <small>('+p.age+')</small></h2><div class="profile-meta">'+throwBat(p)+' · '+fmtSalary(p.salary)+'</div><div class="profile-meta">総合 '+rating(p)+' · 愛着 ♥'+p.affinity+'</div></div></div></div><div class="player-detail-condition">'+conditionBar(p)+'</div><section class="panel"><h3>能力・適性</h3>'+annualAbilityStrip(p)+'<p>'+positionMarkup(p.pos)+(p.subPos?' / '+positionMarkup(p.subPos):'')+'</p></section><section class="panel"><h3>今季の公式戦成績</h3>'+statDisplayGrid(p)+'</section>'+focus+canonicalHistoryMarkup(p,blocked);
       }
     }else{
       const rows=c.roster.map(p=>canonicalPlayerModel(p,g)).sort((a,b)=>rating(b)-rating(a)||a.id-b.id);
@@ -174,11 +194,12 @@ const pilotCode = `
       const r=await(command?canonicalPilot.advance(command):canonicalPilot.refresh());
       if(epoch!==canonicalEpoch)return;
       if(r.status!=='ready'||r.snapshot.world!==world)throw Error('observation required');
-      canonicalSnapshot=r.snapshot;canonicalRotationSlot=null;canonicalFreePage=null;
+      canonicalSnapshot=r.snapshot;canonicalRotationSlot=null;canonicalFreePage=null;canonicalHistory=null;
       canonicalOpsNote=command?'サーバーに変更を保存しました。':'最新状態を取得しました。';
-    }catch{if(epoch===canonicalEpoch){canonicalSnapshot=null;canonicalFreePage=null;canonicalRotationSlot=null;}}
+    }catch{if(epoch===canonicalEpoch){canonicalSnapshot=null;canonicalFreePage=null;canonicalRotationSlot=null;canonicalHistory=null;}}
     finally{if(epoch===canonicalEpoch){slotOpening=false;render();draftJump(scroll);}}
     if(epoch===canonicalEpoch&&canonicalSnapshot?.game?.club&&ui.page==='canonical-free')void canonicalLoadFree(0,canonicalFreeQuery);
+    if(epoch===canonicalEpoch&&canonicalSnapshot?.game?.club&&ui.page==='canonical-player'&&command?.club==='memo')void canonicalLoadHistory(0);
   }
   async function canonicalLoadFree(offset,query){
     if(slotOpening||!accountCurrent()||ui.page!=='canonical-free'||!canonicalSnapshot?.game?.club)return;
@@ -384,10 +405,17 @@ const pilotCode = `
     else if(ui.page==='canonical-hq'&&act==='canonical-players'&&canonicalSnapshot?.game?.club&&accountCurrent()){ui.page='canonical-players';render();draftJump(0);}
     else if(ui.page==='canonical-hq'&&act==='canonical-standings'&&canonicalSnapshot?.game?.headquarters&&accountCurrent()){canonicalLeague=canonicalSnapshot.game.team.league;ui.page='canonical-standings';render();draftJump(0);}
     else if(ui.page==='canonical-standings'&&act==='canonical-league'&&['E','W'].includes(b.dataset.league)){canonicalLeague=b.dataset.league;render();}
-    else if(ui.page==='canonical-players'&&act==='player-detail'&&canonicalSnapshot?.game?.club?.roster.some(p=>p.id===Number(b.dataset.id))&&accountCurrent()){canonicalPlayerId=Number(b.dataset.id);ui.page='canonical-player';render();draftJump(0);}
+    else if(ui.page==='canonical-players'&&act==='player-detail'&&canonicalSnapshot?.game?.club?.roster.some(p=>p.id===Number(b.dataset.id))&&accountCurrent()){canonicalPlayerId=Number(b.dataset.id);canonicalHistory=null;ui.page='canonical-player';render();draftJump(0);}
+    else if(ui.page==='canonical-player'&&act==='canonical-history-open')void canonicalLoadHistory(0);
+    else if(ui.page==='canonical-player'&&act==='canonical-history-prev'&&canonicalHistory?.offset>0)void canonicalLoadHistory(Math.max(0,canonicalHistory.offset-10));
+    else if(ui.page==='canonical-player'&&act==='canonical-history-next'&&Number.isSafeInteger(canonicalHistory?.nextOffset))void canonicalLoadHistory(canonicalHistory.nextOffset);
+    else if(ui.page==='canonical-player'&&act==='canonical-memo-save'&&canonicalHistory?.playerId===canonicalPlayerId){
+      const c=canonicalSnapshot?.game?.club,p=c?.roster.find(p=>p.id===canonicalPlayerId),v=$('#canonical-player-memo')?.value;
+      if(p&&c.canManage&&!canonicalSnapshot.pending?.length&&typeof v==='string'&&v.length<=2000&&v!==canonicalHistory.memo)void canonicalOpsRequest({club:'memo',playerId:p.id,value:v});
+    }
     else if(ui.page==='canonical-player'&&act==='canonical-focus'){const c=canonicalSnapshot?.game?.club,p=c?.roster.find(p=>p.id===canonicalPlayerId),k=b.dataset.key;if(p&&c.canManage&&!canonicalSnapshot.pending?.length&&['balanced',...Object.keys(p.abilities)].includes(k)&&p.focus!==k)void canonicalOpsRequest({club:'focus',playerId:p.id,key:k});}
     else if(['canonical-players','canonical-player','canonical-standings'].includes(ui.page)&&act==='canonical-info-refresh')void canonicalOpsRequest(null);
-    else if(['canonical-players','canonical-player','canonical-standings'].includes(ui.page)&&act==='canonical-info-back'){ui.page=ui.page==='canonical-player'?'canonical-players':'canonical-hq';canonicalPlayerId=null;canonicalOpsNote='';render();draftJump(0);}
+    else if(['canonical-players','canonical-player','canonical-standings'].includes(ui.page)&&act==='canonical-info-back'){ui.page=ui.page==='canonical-player'?'canonical-players':'canonical-hq';canonicalPlayerId=null;canonicalHistory=null;canonicalOpsNote='';render();draftJump(0);}
     else if(['canonical-ready','canonical-hq'].includes(ui.page)&&act==='canonical-roster-open')canonicalRosterOpen();
     else if(ui.page==='canonical-roster'&&act==='canonical-roster-refresh')void canonicalRosterRequest(null);
     else if(ui.page==='canonical-roster'&&act==='canonical-roster-back'){if(!canonicalSnapshot)void canonicalReturn();else{const dest=canonicalRoster?.returnPage||'canonical-ready';canonicalRoster=null;ui.page=dest;render();window.scrollTo(0,0);}}
