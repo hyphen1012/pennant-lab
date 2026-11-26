@@ -475,6 +475,38 @@ const pilotCode = `
     }
     return out+'</section>';
   }
+  function canonicalMarketMarkup(g,a,held,button){
+    const m=a.market;if(!m)return '';
+    const cmd=(k,label,attrs='',disabled=held)=>button('market-'+k,label,attrs,disabled);
+    const roomLabels={news:'移籍市場ニュース',fa:'国内FA交渉',return:'国内復帰交渉',other:'自由契約・トレード・補償'};
+    const model=r=>({...r,...r.abilities});
+    let out='<section class="panel renewal-room"><h2>移籍市場</h2>'+normalDetailCard('contract','移籍交渉')+'<p>回答待ち '+m.waiting+'件 · 再交渉 '+m.counter+'件 · 未確認回答 '+m.unread+'件</p>'+(m.deadline?'<p>市場期限 '+h(m.deadline)+'</p>':'');
+    if(!m.active)return out+(m.roomOptions||[]).map(k=>cmd('open',roomLabels[k],'data-value="'+k+'"')).join('')+(m.news==='opening-wait'?'<p>交渉解禁日まで日程を進めてください。</p>':'')+'</section>';
+    if(m.room==='news'){
+      const titles={eve:'明日、FA交渉解禁',opening:'FA交渉解禁・国内復帰選手発表',results:'移籍市場・去就決定速報'};
+      out+='<section class="offdesk-news"><h2>'+h(titles[m.news]||'移籍市場速報')+'</h2>'+(m.newsRows||[]).map(r=>'<div class="event">'+h(r.name)+' · '+h(movementRequestLabel(r.kind))+(r.outcome?' · '+h(r.outcome.text):'')+'</div>').join('');
+      if(m.news==='results')out+=m.specialResults.map(r=>'<article class="panel">'+faceMini(model(r))+themedPlayerName(model(r))+rarePanel(model(r),'join',r.outcome.text)+rareCinemaArt(model(r),'join',true)+cmd('special-result',r.seen?'確認済み':'特別速報を確認','data-id="'+r.id+'"',held||r.seen)+'</article>').join('');
+      return out+cmd('news','ニュースを確認して本部へ','',held||m.specialResults.some(r=>!r.seen))+'</section></section>';
+    }
+    if(['fa','return'].includes(m.room)){
+      out+='<h3>'+roomLabels[m.room]+'</h3>'+m.rows.map(r=>{
+        const p=model(r),v=r.talk,o=r.offer,open=r.canApproach&&!r.unread;
+        const act=(key,label,attrs='',disabled=held)=>cmd(key,label,'data-id="'+r.id+'" '+attrs,disabled);
+        const actionRows=[['listen','本人の希望を聞く'],['winning','優勝を目指す'],['chance','出場機会を重視'],['trust','本人の希望を尊重'],['vision','球団の将来像を説明'],...(r.category?[['legacy','その選手だけの物語に触れる']]:[])];
+        return '<article class="panel" data-fa-player="'+r.id+'"><div class="recruit-player">'+faceMini(p,{overall:true})+'<div><strong>'+themedPlayerName(p)+'</strong><p>'+positionMarkup(r.pos)+' · '+r.age+'歳</p></div></div>'+annualAbilityStrip(p)+'<p>希望年俸 '+fmtSalary(r.demand)+' · 獲得時費用 '+fmtMoney(r.cost)+'</p><p>'+h(r.outcome.text)+'</p>'+(o?'<p>提示 '+fmtSalary(o.salary)+' · '+(o.years||1)+'年契約'+(o.due?' · 回答予定 '+h(o.due):'')+(o.counter?' · 再提示希望 '+fmtSalary(o.counter):'')+(o.replyUntil?' · 回答期限 '+h(o.replyUntil):'')+'</p>':'')+(r.unread?act('ack','回答を確認する'):'')+(open?rarePanel(p,'contract')+(v?'<div class="panel"><p>第'+v.round+'回 · '+v.turn+' / '+v.max+'回</p><p>信頼 '+v.trust+' · 満足 '+v.satisfaction+' · 警戒 '+v.caution+'</p><p>'+h(v.speech||'')+'</p></div>':'')+'<div class="chips">'+actionRows.map(([k,n])=>act('talk',n,'data-key="'+k+'"',held||!!v&&v.turn>=v.max)).join('')+'</div><label>提示年俸（百万円）<input class="canonical-fa-salary" type="number" min="'+r.bounds.min+'" max="'+Math.max(r.bounds.min,r.bounds.max)+'" step="1" value="'+Math.round((v?.salary??o?.counter??r.demand)*100)+'"></label>'+act('salary','年俸を提示する','',held||r.bounds.max<r.bounds.min||!!v&&v.turn>=v.max)+'<label>契約年数<select class="canonical-fa-years">'+Array.from({length:10},(_,i)=>'<option value="'+(i+1)+'" '+((v?.years||o?.years||1)===i+1?'selected':'')+'>'+(i+1)+'年</option>').join('')+'</select></label>'+act('years','契約年数を設定')+act('submit','正式オファーを送る','',held||!r.canSubmit)+(o?.status==='counter'?act('withdraw','再交渉を取りやめる'):''):'')+'</article>';
+      }).join('');
+    }else if(m.room==='other'){
+      out+='<h3>合意済みの移籍</h3>'+m.deals.map(d=>'<section class="panel"><p>'+h(movementRequestLabel(d.kind))+' · '+h(d.name||d.players.join(' ↔ '))+(Number.isFinite(d.salary)?' · '+fmtSalary(d.salary):'')+(d.years?' · '+d.years+'年':'')+'</p>'+(m.cpuDone&&d.kind==='fa'?'<p>補償 '+h(d.rank||'')+' · '+fmtMoney(d.comp||0)+' · '+(d.compMode==='player'?'人的補償':'金銭補償')+'</p>'+d.compOptions.map(p=>cmd('comp',h(p.name)+'を人的補償に選ぶ','data-id="'+d.id+'" data-other="'+p.id+'"')).join(''):'')+'</section>').join('');
+      if(!m.cpuDone){
+        out+='<h3>自由契約選手</h3>'+m.free.map(r=>'<article class="panel" data-market-free="'+r.id+'"><strong>'+h(r.name)+'</strong><p>'+positionMarkup(r.pos)+' · 希望 '+fmtSalary(r.demand)+' · 費用 '+fmtMoney(r.cost)+'</p>'+(r.offer?'<p>交渉結果 '+h(r.offer)+'</p>':'<label>提示年俸（万円）<input type="number" min="500" max="50000" step="100" value="'+Math.round(r.demand*10000)+'"></label>'+cmd('free','獲得交渉を行う','data-id="'+r.id+'"'))+'</article>').join('');
+        const mine=m.tradeClubs.find(t=>t.id===g.team.id),rivals=m.tradeClubs.filter(t=>t.id!==g.team.id);
+        const options=list=>'<option value="">選択してください</option>'+list.map(p=>'<option value="'+p.id+'">'+h(p.name)+' · '+h(p.pos)+' · '+p.age+'歳 · 総合 '+p.overall+' · '+fmtSalary(p.salary)+(p.category?' · '+h(p.category):'')+'</option>').join('');
+        out+='<section class="panel"><h3>1対1トレード</h3><p class="small">能力、年齢、年俸、ポジション需要から相手球団が判断します。</p><label>自球団の提示選手<select id="canonical-trade-mine">'+options(mine?.players||[])+'</select></label><label>相手球団の希望選手<select id="canonical-trade-other"><option value="">選択してください</option>'+rivals.map(t=>'<optgroup label="'+h(t.name)+'">'+options(t.players).replace('<option value="">選択してください</option>','')+'</optgroup>').join('')+'</select></label>'+cmd('trade','交換を提案する')+'</section><section class="panel"><h3>交換ドラフト</h3><p>23〜32歳・今季65試合以下・通常選手。各球団1回まで。</p>'+(mine?.players||[]).filter(p=>p.exchange).map(p=>cmd('exchange',h(p.name)+'を交換候補にする','data-id="'+p.id+'"')).join('')+'</section>';
+        out+=cmd('close','CPU交渉を確定し移籍結果へ','',held||m.waiting>0||m.counter>0||m.unread>0);
+      }else out+=cmd('finish','補償を確定して市場を終了');
+    }
+    return out+cmd('home','交渉を中断して本部へ')+'</section>';
+  }
   function canonicalEventRender(){
     const app=$('#app'),g=canonicalSnapshot?.game;if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-events-back">‹ 本部</button></div>';
@@ -490,7 +522,7 @@ const pilotCode = `
     const held=blocked||important||!!inbox.review||!!inbox.monthly||!!inbox.milestoneCount;
     if(a.canStart)body+='<section class="panel"><h3>シーズン全日程終了</h3>'+normalDetailCard('awards','年間表彰・決算')+commandButton('start','オフシーズン業務を開始','',held)+'</section>';
     if(a.mode){
-      body+='<section class="panel desk-panel"><h3>年間業務一覧</h3>'+a.tasks.map(j=>'<div class="event"><b>'+h(canonicalEventLabels[j.id]||j.id)+'</b><p class="small">'+h(j.start)+' · '+h(canonicalEventStatus[j.status]||j.status)+'</p>'+(j.status==='ready'?canonicalAnnualJobs.includes(j.id)?commandButton('open','業務を始める','data-job="'+j.id+'"',held||!!a.active):'<p class="small">専用画面の接続待ち</p>':'')+'</div>').join('')+commandButton('day','オフシーズンの1日を進める','',held||!a.canAdvance)+'</section>';
+      body+='<section class="panel desk-panel"><h3>年間業務一覧</h3>'+a.tasks.map(j=>'<div class="event"><b>'+h(canonicalEventLabels[j.id]||j.id)+'</b><p class="small">'+h(j.start)+' · '+h(canonicalEventStatus[j.status]||j.status)+'</p>'+(j.status==='ready'?j.id==='movement-market'?'':canonicalAnnualJobs.includes(j.id)?commandButton('open','業務を始める','data-job="'+j.id+'"',held||!!a.active):'<p class="small">専用画面の接続待ち</p>':'')+'</div>').join('')+commandButton('day','オフシーズンの1日を進める','',held||!a.canAdvance)+'</section>';
       if(a.active==='awards-all'&&a.awardReport){
         const rows=a.awardReport.awards.filter(r=>canonicalAwardFilter==='all'||r.teamId===g.team.id);
         body+='<section class="review-screen"><header class="edition-heading"><small>'+g.year+' · AWARDS CEREMONY</small><h2>年間表彰式</h2></header>'+normalDetailCard('awards','表彰式会場')+'<div class="chips">'+[['all','全球団'],['own','自球団']].map(([v,t])=>'<button class="chip '+(v===canonicalAwardFilter?'active':'')+'" data-action="canonical-awards-filter" data-value="'+v+'">'+t+'</button>').join('')+'</div>'+rows.map(r=>'<section class="panel award-winner '+leagueClass(r.league)+' achievement-surface" '+achievementAttrs(r.title)+'>'+achievementHeading(r.title)+'<span class="award-medal">🏅 '+h(r.title)+'</span><div class="award-hero" data-own-club="'+(r.teamId===g.team.id)+'">'+(r.player?awardPortrait(r.player,r.title):'')+'<div><strong>'+(r.player?themedPlayerName(r.player):'選手')+'</strong><small>'+h(r.team)+'</small><span class="award-stat">'+h(r.stat)+'</span></div></div></section>').join('')+(rows.length?'':'<p class="empty">受賞者なし</p>')+'<h3>今季の記録</h3>'+a.awardReport.milestones.filter(e=>canonicalAwardFilter==='all'||e.teamId===g.team.id).map(e=>'<p class="event">'+h(e.date)+' '+h(e.title)+'</p>').join('')+commandButton('complete','表彰式を終了する','data-job="awards-all"',held)+'</section>';
@@ -499,12 +531,14 @@ const pilotCode = `
       }else if(a.active==='movement-declarations'){
         const rows=a.requests||[],unresolved=rows.some(r=>['request','refused'].includes(r.status));
         body+='<section class="panel renewal-room"><h2>FA・海外挑戦の相談</h2>'+normalDetailCard('contract','去就相談・残留交渉')+rows.map(r=>{const p=g.club?.roster.find(p=>p.id===r.id),model=p?canonicalPlayerModel(p,g):null,open=['request','refused'].includes(r.status);return '<section class="panel">'+(model?playerUpperPortrait(model)+'<h3>'+themedPlayerName(model)+'</h3>':'')+'<p>'+h(movementRequestLabel(r.kind))+' · '+h(({request:'去就相談',refused:'残留交渉保留',retained:'残留合意',stayed:'挑戦見送り'})[r.status]||r.status)+'</p><p>希望年俸 '+fmtSalary(r.demand)+'</p>'+(open?[['retain','希望額で残留提示',1],['retain','希望額＋15％',1.15],['allow','本人の希望を受け入れる',0],...(r.kind==='posting'?[['deny','ポスティングを認めない',0]]:[])].map(([kind,label,mult])=>commandButton(kind,label,'data-id="'+r.id+'" data-mult="'+mult+'"',held)).join(''):'')+'</section>';}).join('')+(rows.length?'':'<p>対象選手はいません。</p>')+commandButton('complete','相談を終了する','data-job="movement-declarations"',held||unresolved)+'</section>';
-      }else if(a.active==='draft')body+=canonicalDraftMarkup(g,a,held,commandButton);
+      }else if(a.active==='movement-market')body+=canonicalMarketMarkup(g,a,held,commandButton);
+      else if(a.active==='draft')body+=canonicalDraftMarkup(g,a,held,commandButton);
       else if(a.active==='roster-cut')body+=canonicalCutMarkup(g,a,held,commandButton);
       else if(['renewal1','renewal2'].includes(a.active))body+=canonicalRenewalMarkup(g,a,held,commandButton);
       else if(['autumn','winter','self'].includes(a.active))body+=canonicalTrainingMarkup(g,a,held,commandButton);
       else if(['booking','winter-return','camp','exhibition'].includes(a.active))body+=canonicalPreseasonMarkup(g,a,held,commandButton);
       else if(a.active)body+='<p class="warning">現在のイベントの専用画面は未接続です。処理は保持します。</p>';
+      if(!a.active&&a.market)body+=canonicalMarketMarkup(g,a,held,commandButton);
     }else if(!a.canStart&&!inbox.review&&!inbox.monthly&&!inbox.milestoneCount&&!important)body+='<p class="empty">現在対応する年間業務はありません。</p>';
     app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(g.team)+'">'+top+'<main class="main">'+body+'</main></div>';
   }
@@ -565,6 +599,22 @@ const pilotCode = `
       const decision=k.slice(4),v=b.dataset.value;
       if(['confirm-sites','kickoff','visit-finish','run','finish','self-back','digest'].includes(decision)&&(!['confirm-sites','kickoff','run'].includes(decision)||window.confirm('この内容で進めますか？')))cmd={annual:'preseason',decision};
       else if(['visit','policy','support'].includes(decision)&&typeof v==='string'&&(decision==='policy'||window.confirm('この方針を選択しますか？')))cmd={annual:'preseason',decision,value:v};
+    }
+    else if(k.startsWith('market-')&&a.market){
+      const decision=k.slice(7),m=a.market,id=Number(b.dataset.id),r=m.rows.find(r=>r.id===id);
+      if(decision==='open'&&!a.active&&m.roomOptions.includes(b.dataset.value))cmd={annual:'market',decision,room:b.dataset.value};
+      else if(a.active==='movement-market'){
+        if(['home','news','close','finish'].includes(decision)&&(!['close','finish'].includes(decision)||window.confirm('移籍市場のこの処理を確定しますか？')))cmd={annual:'market',decision};
+        else if(decision==='special-result'&&m.specialResults.some(x=>x.id===id&&!x.seen))cmd={annual:'market',decision,playerId:id};
+        else if(r&&decision==='talk')cmd={annual:'market',decision,playerId:id,key:b.dataset.key};
+        else if(r&&decision==='salary'){const million=Number(b.closest('[data-fa-player]')?.querySelector('.canonical-fa-salary')?.value);if(Number.isSafeInteger(million)&&million>=r.bounds.min&&million<=r.bounds.max)cmd={annual:'market',decision,playerId:id,million};else showToast('提示可能な年俸の範囲を確認してください。',true);}
+        else if(r&&decision==='years'){const years=Number(b.closest('[data-fa-player]')?.querySelector('.canonical-fa-years')?.value);if(Number.isInteger(years)&&years>=1&&years<=10)cmd={annual:'market',decision,playerId:id,years};}
+        else if(r&&['ack','submit','withdraw'].includes(decision)&&(decision==='ack'||window.confirm('交渉条件・判断を確定しますか？')))cmd={annual:'market',decision,playerId:id};
+        else if(decision==='free'&&m.free.some(x=>x.id===id&&!x.offer)){const salary=Number(b.closest('[data-market-free]')?.querySelector('input')?.value)/10000;if(Number.isFinite(salary)&&salary>=.05&&salary<=5&&window.confirm('この年俸で提示しますか？'))cmd={annual:'market',decision,playerId:id,salary};}
+        else if(decision==='trade'){const playerId=Number($('#canonical-trade-mine')?.value),otherId=Number($('#canonical-trade-other')?.value);if(m.tradeClubs.find(t=>t.id===g.team.id)?.players.some(p=>p.id===playerId)&&m.tradeClubs.some(t=>t.id!==g.team.id&&t.players.some(p=>p.id===otherId))&&window.confirm('トレードを提案しますか？'))cmd={annual:'market',decision,playerId,otherId};}
+        else if(decision==='exchange'&&m.tradeClubs.find(t=>t.id===g.team.id)?.players.some(p=>p.id===id&&p.exchange)&&window.confirm('交換候補として提示しますか？'))cmd={annual:'market',decision,playerId:id};
+        else if(decision==='comp'){const otherId=Number(b.dataset.other);if(m.deals.some(d=>d.id===id&&d.compOptions.some(p=>p.id===otherId))&&window.confirm('人的補償を確定しますか？'))cmd={annual:'market',decision,playerId:id,otherId};}
+      }
     }
     if(cmd)void canonicalEventRequest(cmd);
   }
