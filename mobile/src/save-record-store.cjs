@@ -40,6 +40,16 @@ function createSaveRecordStore({openDatabase,storeName='slots',encode,validate,s
    tx.onabort=()=>reject(failure||tx.error||Error('replacement aborted'));
   });
  }
- return {inspect,replace};
+ async function read({account,slot}){
+  const k=key(account,slot);if(canWrite(account,slot)!==true)throw Error('save access unavailable');
+  const db=await openDatabase();
+  return new Promise((resolve,reject)=>{
+   const tx=db.transaction(storeName,'readonly'),req=tx.objectStore(storeName).get(k);let row;
+   req.onsuccess=()=>{row=req.result;};
+   tx.oncomplete=()=>{try{if(canWrite(account,slot)!==true)throw Error('session changed');resolve({revision:rev(row),data:row?.data??null,updatedAt:Number.isSafeInteger(row?.updatedAt)?row.updatedAt:null});}catch(e){reject(e);}};
+   tx.onabort=()=>reject(tx.error||Error('read aborted'));
+  });
+ }
+ return {inspect,replace,read};
 }
 module.exports={createSaveRecordStore};
