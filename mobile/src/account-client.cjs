@@ -23,11 +23,17 @@ function createAccountClient({baseUrl,fetcher=globalThis.fetch,timeoutMs=10000}=
  const object=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
  const worldVersion=v=>v&&worldId(v.world)&&integer(v.revision)&&v.revision>0;
  const worldView=v=>worldVersion(v)&&object(v.game);
+ const shortText=(v,max)=>typeof v==='string'&&v.length<=max*2&&!/[\u0000-\u001f\u007f]/.test(v);
+ const color=v=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v);
+ const preview=v=>{
+  const t=v?.team,e=t?.emblem;
+  return object(v)&&integer(v.year)&&v.year>=2027&&integer(v.day)&&v.day<=143&&shortText(v.gmName,22)&&object(t)&&integer(t.id)&&t.id<=11&&shortText(t.name,30)&&shortText(t.short,8)&&['E','W'].includes(t.league)&&color(t.color)&&shortText(t.letter,3)&&integer(t.wins)&&t.wins<=143&&Number.isFinite(t.cash)&&(e===null||object(e)&&color(e.accent)&&['circle','square','shield','diamond','hex'].includes(e.shape)&&['solid','split','stripe','rim'].includes(e.pattern)&&['bold','serif','italic','mono'].includes(e.font)&&['letter','star','vortex','wing','comet','swan','mountain','gear','moon','spark','wave','crest','bolt'].includes(e.motif));
+ };
  const pending=v=>v&&canonicalId(v.operationId)&&modes.includes(v.mode)&&integer(v.attempt)&&v.attempt>0;
  const action=v=>v&&canonicalId(v.operationId)&&['draft-revival','foreign-revival','lottery','fa-retention','fa-sign','retirement','manager','medical'].includes(v.route)&&integer(v.year)&&typeof v.label==='string'&&v.label.length<=160&&['available','pending','cancelled'].includes(v.status);
  const claimResult=v=>wallet(v?.wallet)&&typeof v.result?.ok==='boolean'&&(v.result.ok?['ticket','point'].includes(v.result.kind)&&[1,2].includes(v.result.amount):typeof v.result.reason==='string');
  const checks={
-  'game/slots':v=>Array.isArray(v)&&v.length<=3&&v.every(x=>[1,2,3].includes(x?.slot)&&worldVersion(x))&&new Set(v.map(x=>x.slot)).size===v.length&&new Set(v.map(x=>x.world)).size===v.length,
+  'game/slots':v=>Array.isArray(v)&&v.length<=3&&v.every(x=>[1,2,3].includes(x?.slot)&&worldVersion(x)&&(!Object.hasOwn(x,'preview')||preview(x.preview)))&&new Set(v.map(x=>x.slot)).size===v.length&&new Set(v.map(x=>x.world)).size===v.length,
   'game/create':worldView,'game/advance':worldView,
   'game/free-page':v=>{
    const p=v?.page;

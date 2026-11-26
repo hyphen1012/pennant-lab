@@ -23,7 +23,7 @@ const {createAccountClient}=require('../mobile/src/account-client.cjs'),{createC
   a.deepEqual((await one.listSlots()).slots,[]);
   a.throws(()=>one.create({team:0},false));
   const first=await one.create({team:0},true);a.equal(first.status,'ready');a.equal(first.snapshot.revision,1);
-  const listed=await one.listSlots();a.deepEqual(listed.slots,[{slot:1,world:first.snapshot.world,revision:1}]);
+  const listed=await one.listSlots();a.equal(listed.slots.length,1);const listedSlot=listed.slots[0];a.equal(listedSlot.slot,1);a.equal(listedSlot.world,first.snapshot.world);a.equal(listedSlot.revision,1);a.equal(listedSlot.preview.team.name,first.snapshot.game.team.name);
   a.equal((await two.create({team:1},true)).status,'refresh-required');a.equal(creates,1);
   const read=await two.refresh();a.equal(read.snapshot.world,first.snapshot.world);a.equal(read.snapshot.revision,1);
   const page=await one.freePage({offset:0,limit:40,query:''});a.equal(page.status,'ready');a.equal(page.page.offset,0);a.ok(page.page.items.length<=40);
@@ -46,7 +46,7 @@ const {createAccountClient}=require('../mobile/src/account-client.cjs'),{createC
   one.setSession({account:other,token:'b'});one.select(1);release();a.equal((await old).status,'stale');a.equal(one.inspect().snapshot,null);
   const absent=await one.refresh();a.equal(absent.status,'refresh-required');
   a.deepEqual((await one.listSlots()).slots,[]);
-  const b=await one.create({team:1,identity:{gmName:'B',name:'新球団',short:'NEW',letter:'N',color:'#123456',accent:'#ffffff',shape:'circle',pattern:'solid',font:'bold',motif:'letter'}},true);a.equal(b.status,'ready');a.notEqual(b.snapshot.world,first.snapshot.world);a.equal(b.snapshot.game.team.name,'新球団');a.equal(b.snapshot.game.gmName,'B');
+  const b=await one.create({team:1,identity:{gmName:'B',name:'新球団',short:'NEW',letter:'N',color:'#123456',accent:'#ffffff',shape:'circle',pattern:'solid',font:'bold',motif:'letter'}},true);a.equal(b.status,'ready');a.notEqual(b.snapshot.world,first.snapshot.world);a.equal(b.snapshot.game.team.name,'新球団');a.equal(b.snapshot.game.gmName,'B');const bPreview=(await one.listSlots()).slots[0].preview;a.equal(bPreview.team.name,'新球団');a.equal(bPreview.gmName,'B');
   a.equal((await two.refresh()).snapshot.game.club.travel,2);
   one.suspend();a.equal(one.inspect().snapshot,null);a.throws(()=>one.advance({step:1}));a.equal((await one.refresh()).snapshot.world,b.snapshot.world);
   console.log('PASS real engine HTTP session, explicit create, revision conflict, committed response loss, no replay, offline and identity isolation');

@@ -832,6 +832,14 @@ function createHeadlessEngine(){
    if(exact(command,['career','playerId'])&&command.career==='dismiss'&&Number.isSafeInteger(command.playerId))return run('career',state,{choice:'dismiss',playerId:command.playerId});
    if(exact(command,['acknowledge','playerId'])&&command.acknowledge==='rookie-reveal'&&Number.isSafeInteger(command.playerId))return run('ack',state,{kind:'rookie-reveal',playerId:command.playerId});
    if(exact(command,['acknowledge'])&&['month','milestones','rookie-finish','opening'].includes(command.acknowledge))return run('ack',state,{kind:command.acknowledge});if(!exact(command,['step'])||command.step!==1)throw Error('pilot accepts one calendar day or explicit report acknowledgement');return run('advance',state,{verifiedVip:rights?.verified===true&&rights.vip===true});},
+  // Trusted persisted state, minimal public projection without a VM run or
+  // allocation of the historical world. Never return player or prospect data.
+  preview(state){
+   const t=state?.teams?.find(t=>t.id===state.selectedId);
+   if(!t||state.started!==true)throw Error('invalid canonical preview');
+   const e=t.emblem;
+   return {year:state.year,day:state.day,gmName:state.gmName||'GM',team:{id:t.id,name:t.name,short:t.short,league:t.league,color:t.color,letter:t.letter,emblem:e?{accent:e.accent,shape:e.shape,pattern:e.pattern,font:e.font,motif:e.motif}:null,wins:t.wins,cash:t.cash}};
+  },
   freePage(state,command){
    if(!exact(command,['offset','limit','query'])||!Number.isSafeInteger(command.offset)||command.offset<0||!Number.isSafeInteger(command.limit)||command.limit<1||command.limit>80||typeof command.query!=='string'||command.query.length>80||/[\u0000-\u001f]/.test(command.query))throw Error('invalid free page');
    return run('free-page',state,command);

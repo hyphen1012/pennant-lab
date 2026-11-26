@@ -18,7 +18,7 @@ globalThis.__plSaveProfile=(saved,data)=>{
  const timed=(key,fn)=>{const t=performance.now();try{return fn();}finally{report[key]=Math.round((performance.now()-t)*100)/100;}};
  try{
   const packed=timed('encodeMs',()=>codec.encode(JSON.parse(saved)));report.storedBytes=Buffer.byteLength(packed);
-  const insert=(db,account,slot,id,revision,state)=>db.prepare('INSERT INTO authority_worlds VALUES(?,?,?,?,?)').run(account,slot,id,revision,state);
+  const insert=(db,account,slot,id,revision,state)=>db.prepare('INSERT INTO authority_worlds(account,slot,world,revision,state) VALUES(?,?,?,?,?)').run(account,slot,id,revision,state);
   ledger=openLedger(file);
   timed('writeMs',()=>ledger.transact(owner,(s,db)=>{insert(db,owner,1,world,1,packed);insert(db,owner,2,randomUUID(),1,codec.encode({sentinel:'slot2'}));}));
   ledger.transact(other,(s,db)=>insert(db,other,1,randomUUID(),1,codec.encode({sentinel:'other'})));
