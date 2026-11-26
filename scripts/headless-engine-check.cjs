@@ -62,6 +62,33 @@ const a=require('node:assert/strict'),{createHeadlessEngine}=require('../server/
    }
   }
   a.ok(checkedVip,'actual VIP settlement required');
+  // Use actual generated candidates; only event/offer states are fixtures.
+  // No public command or endpoint accepts these test snapshots.
+  const base=engine.advance(engine.newWorld({}),{step:1});
+  const clone=()=>JSON.parse(JSON.stringify(base));
+  const action=(w,route)=>engine.actions(w).find(x=>x.route===route);
+  const club=w=>w.teams.find(t=>t.id===w.selectedId);
+  const ownPlayer=w=>w.players.find(p=>p.teamId===w.selectedId);
+  const verify=(w,route)=>{const op=action(w,route);a.ok(op,route+' available');const snapshot=JSON.stringify(w);const result=engine.applyAction(w,op);a.equal(JSON.stringify(w),snapshot);a.throws(()=>engine.applyAction(result.state,op),/unavailable/);return result;};
+  const d=clone(),dc=d.draft.candidates.find(c=>c.status==='available'),fee=.1,salary=.2;
+  d.ceremonyStage='draft';d.draft.phase='negotiate';d.draft.picks=[{teamId:d.selectedId,candidateId:dc.id,status:'refused',recoveryPending:true,offers:[{fee,salary,accepted:false}]}];dc.status='refused';
+  const low=JSON.parse(JSON.stringify(d));club(low).cash=0;a.ok(!action(low,'draft-revival'));
+  const wrong=JSON.parse(JSON.stringify(d));wrong.draft.picks[0].teamId=(d.selectedId+1)%12;a.ok(!action(wrong,'draft-revival'));
+  const drafted=verify(d,'draft-revival');a.equal(drafted.state.draft.picks[0].status,'signed');a.ok(Math.abs(club(d).cash-club(drafted.state).cash-fee)<1e-7);
+  const draw=clone(),cid=draw.draft.candidates[0].id;draw.ceremonyStage='draft';Object.assign(draw.draft,{phase:'lottery',round:1,autoRequested:false,lotteryRewardUsed:false,pendingLottery:{stage:'choose',attempt:1,cursor:0,groups:[{cid,ids:[draw.selectedId,(draw.selectedId+1)%12]}]}});
+  const drawn=verify(draw,'lottery');a.equal(drawn.result.winner,draw.selectedId);a.equal(drawn.result.stage,'sealed');a.equal(drawn.state.draft.lotteryRewardUsed,true);
+  const f=clone(),fc=f.foreignMarket.candidates.find(c=>c.status==='available');fc.status='refused';
+  f.foreignMarket.negotiations[f.selectedId]={candidateId:fc.id,resultOpened:true,status:'refused',offer:{fee:.1,salary:.2,level:1,supportCost:0,benefits:{interpreter:false,housing:false}}};
+  const noRoom=JSON.parse(JSON.stringify(f));club(noRoom).cash=0;a.ok(!action(noRoom,'foreign-revival'));
+  const signed=verify(f,'foreign-revival');a.equal(signed.state.players.find(p=>p.id===fc.id).teamId,f.selectedId);a.ok(Math.abs(club(f).cash-club(signed.state).cash-.1)<1e-7);
+  for(const kind of ['fa','posting','overseas-fa']){
+   const w=clone(),p=ownPlayer(w);w.ceremonyStage='movement-declarations';w.movement={year:w.year,requests:[{id:p.id,from:w.selectedId,year:w.year,kind,status:'refused',demand:1,offer:1,minimum:1.1}],deals:[],offers:{},history:[],declared:true,closed:false};
+   const result=verify(w,'fa-retention');a.equal(result.state.movement.requests[0].status,'retained');a.equal(club(w).cash,club(result.state).cash);
+  }
+  const fa=clone(),p=fa.players.find(p=>p.teamId!==fa.selectedId&&p.teamId>=0);
+  fa.ceremonyStage='movement-market';fa.movement={year:fa.year,requests:[{id:p.id,from:p.teamId,year:fa.year,kind:'fa',status:'declared',demand:.2}],deals:[],offers:{[p.id]:{status:'refused',salary:.2,years:3}},history:[],declared:true,closed:false};
+  const rival=JSON.parse(JSON.stringify(fa));rival.movement.deals.push({id:p.id,from:p.teamId,to:(fa.selectedId+1)%12,kind:'fa',salary:.2,years:1});a.ok(!action(rival,'fa-sign'));
+  const deal=verify(fa,'fa-sign');a.equal(deal.state.movement.deals[0].to,fa.selectedId);a.equal(deal.state.movement.deals[0].years,3);
   const archived=engine.newWorld({});archived.pendingMonth={year:archived.year,id:'fixture'};archived.monthlyArchive=[];
   a.throws(()=>engine.advance(archived,{acknowledge:'month'}),/not archived/);
   archived.monthlyArchive.push({...archived.pendingMonth});const ack=engine.advance(archived,{acknowledge:'month'});
