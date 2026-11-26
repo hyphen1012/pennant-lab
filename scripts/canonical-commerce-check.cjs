@@ -14,6 +14,10 @@ globalThis.__plAnnualEntryCheck=saved=>{
  for(const id of ['awards-all','settlement','movement-declarations']){
   ready(id);a.throws(()=>engine.advance(w,{annual:'day'}));step({annual:'open',job:id});
   a.equal(engine.view(w).annual.active,id);a.throws(()=>engine.advance(w,{annual:'day'}));
+  const report=engine.view(w).annual;
+  if(id==='awards-all'){a.ok(report.awardReport);a.equal(report.awardReport.awards.length,w.awards.filter(x=>x.year===w.year).length);a.ok(report.awardReport.awards.length>0);a.ok(report.awardReport.awards.every(x=>x.player&&typeof x.title==='string'&&typeof x.stat==='string'));a.equal(report.financeReport,null);}
+  if(id==='settlement'){const r=report.financeReport;a.ok(r);a.ok([r.income,r.expense,r.net,r.operating,r.cash].every(Number.isFinite));a.ok(Math.abs(r.income-r.expense-r.net)<.021);a.ok(Math.abs(r.incomeRows.reduce((n,x)=>n+x[1],0)-r.income)<.1);a.ok(Math.abs(r.expenseRows.reduce((n,x)=>n+x[1],0)-r.expense)<.1);a.equal(r.cash,w.teams.find(t=>t.id===w.selectedId).cash);a.equal(report.awardReport,null);}
+
   if(id==='movement-declarations'){
    for(const r of engine.view(w).annual.requests.filter(x=>['request','refused'].includes(x.status))){
     a.throws(()=>engine.advance(w,{annual:'complete',job:id}));step({annual:'movement',playerId:r.id,decision:'allow'});
