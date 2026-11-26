@@ -14,6 +14,8 @@ if(first){
  const following=r.rows.slice(i+1,i+6),checks=first.clubs.map(id=>({club:id,maintained:full(r.rows[i].clubs.find(c=>c.id===id))&&following.length===5&&following.every(row=>full(row.clubs.find(c=>c.id===id))&&row.facilityMin?.[id]?.length===8&&row.facilityMin[id].every(l=>l===20))&&first.minAfterReach?.[id]?.length===8&&first.minAfterReach[id].every(l=>l===20)}));
  milestone={firstCheckpoint:first,reached:first.cycleYear,maintainedThrough:following.at(-1)?.year??null,checks,allClubsAtReach:first.allClubs,allClubsAfterFiveYears:following.length===5?following[4].clubs:null};
 }
-const report={targetYears,firstSeason,years:r.years,minCash:r.minCash,reserveTopUps:r.reserveTopUps,best,milestone,last:r.last.clubs};
+// Retain all 12 clubs at year 50 and 55 even when no milestone is reached.
+const checkpoint=season=>{const row=r.rows[season-1];if(!row)return null;return {season,year:row.year,clubs:row.clubs.map(c=>{const park=row.parkDiagnostics?.find(p=>p.id===c.id),economy=row.annualEconomy?.find(p=>p.id===c.id);return {...c,score:c.levels.reduce((n,v)=>n+v,0),park,economy};})};};
+const report={targetYears,firstSeason,years:r.years,minCash:r.minCash,reserveTopUps:r.reserveTopUps,best,milestone,checkpoints:[checkpoint(50),checkpoint(55)],last:r.last.clubs};
 fs.writeFileSync('test-results/facility-endurance.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 assert(milestone&&firstSeason>0&&firstSeason<=targetYears&&milestone.checks.every(x=>x.maintained),'First club(s) must naturally reach all Lv.20 within 50 seasons and maintain through five further complete seasons');

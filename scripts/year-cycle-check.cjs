@@ -3,6 +3,8 @@
 const fs=require('node:fs');
 let s=fs.readFileSync('scripts/long-run.cjs','utf8');
 function patch(a,b){if(!s.includes(a))throw Error('annual harness anchor missing: '+a);s=s.replace(a,b);}
+// Explicit test-only override; regular annual and VIP runs keep original H source.
+if(process.env.FACILITY_TRIAL_I==='1')patch("fs.readFileSync('index.html','utf8')","require('./facility-trial-i.cjs').applyTrialI(fs.readFileSync('index.html','utf8'))");
 patch("const economyMode=process.env.NO_RESERVE==='1';","const economyMode=true;const fixedTeam=Number(process.env.FIXED_TEAM??-1);");
 patch("let reserveTopUps=0,totalGames=0,totalFarmGames=0,foreignSigned=0,minCash=Infinity;\\n","let reserveTopUps=0,totalGames=0,totalFarmGames=0,foreignSigned=0,minCash=Infinity;\\nconst fixed=TEST_FIXED;const aiManager=managerDecision,aiBudget=rivalBudgetPolicy,aiDraft=draftRanked,aiRecruit=faRecruitLearning;managerDecision=(t,k)=>t.id===fixed?rivalManagerBase(t,k):aiManager(t,k);rivalBudgetPolicy=t=>t.id===fixed?RIVAL_BUDGETS[1]:aiBudget(t);draftRanked=(d,t)=>t.id===fixed?rivalDraftBase(d,t):aiDraft(d,t);faRecruitLearning=(t,k)=>t.id===fixed?0:aiRecruit(t,k);\\n");
 patch("'cash shortfall club '+t.id+' '+t.cash","'cash shortfall club '+t.id+' '+t.cash+' calendar '+game.calendarIndex+' payroll '+payroll(t)+' forecast '+cpuForecast(t)");
