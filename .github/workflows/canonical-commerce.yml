@@ -1,0 +1,20 @@
+name: Canonical annual commerce
+on:
+  push:
+    paths:
+      - 'scripts/canonical-commerce-check.cjs'
+      - 'server/headless-engine.cjs'
+      - '.github/workflows/canonical-commerce.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  commerce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/canonical-commerce-check.cjs
