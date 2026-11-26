@@ -23,7 +23,9 @@ function createHeadlessEngine(){
   buildFresh();game.started=true;game.clubLogoSeed=SERVER_SEED;
   // buildFresh consumes the PRNG; preserve the post-generation cursor.
   if(input.team!==undefined){const former=myTeam(),target=getTeam(input.team),nextFans=clubFanCount(target);former.fans=clubFanCount(former);game.selectedId=input.team;game.fans=nextFans;}
-  ensureGameExtras();game.ceremonyStage=null;game.calendarFlow=null;game.pendingCeremonyIntro=null;
+  ensureGameExtras();
+  if(input.identity){const t=myTeam();ui.clubDraft={...input.identity,slot:activeSlot,id:t.id};applyIdentity(t);}
+  game.ceremonyStage=null;game.calendarFlow=null;game.pendingCeremonyIntro=null;
   return JSON.stringify(game);
  }
  game=input.state;ensureGameExtras();
@@ -294,7 +296,9 @@ function createHeadlessEngine(){
  if(op==='club'){
   if(!canManage())throw Error('club operation blocked by required event');
   const k=input.choice,p=input.playerId===undefined?null:getPlayer(input.playerId);
-  if(k==='lineup'||k==='rotation'){
+  if(k==='identity'){
+   ui.clubDraft={...input.identity,slot:activeSlot,id:team.id};applyIdentity(team);
+  }else if(k==='lineup'||k==='rotation'){
    const arr=k==='lineup'?team.lineup:team.rotation,i=input.slot;
    if(!p||p.teamId!==team.id||p.farmTier===2||!availableForGame(p)||(k==='lineup'?isPitch(p):p.pos!=='SP')||i>=arr.length||arr[i]===p.id)throw Error('invalid lineup selection');
    const old=arr[i],other=arr.indexOf(p.id);if(other>=0)arr[other]=old;arr[i]=p.id;
@@ -687,7 +691,7 @@ function createHeadlessEngine(){
   }
   return JSON.stringify([...entries.values()]);
  }
- if(op==='view')return JSON.stringify({year:game.year,day:game.day,calendarIndex:game.calendarIndex,team:{id:team.id,name:team.name,wins:team.wins,losses:team.losses,ties:team.ties,cash:team.cash},games:game.games.length,inbox:inbox(),club:clubView(),foreign:foreignView(),annual:annualView(),vipIncome:r2((game.financeLedger?.clubs?.[team.id]?.vipIncome||0)+vipOffTotal(team,game.year)),retirementEligible:retirement().length===1,medical:medical().length,managerEligible:manager().length===1,acknowledgements:{month:!!(game.pendingMonth&&game.monthlyArchive?.some(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id)),milestones:!!game.pendingMilestoneIds?.length},blocked:!!(game.financeCrisis||pendingRareNews().length||game.pendingMilestoneIds?.length||game.pendingEvent||game.pendingMonth||game.pendingReview||careerEventPending()||flowForeignResponse()||game.day>=143)});
+ if(op==='view')return JSON.stringify({year:game.year,day:game.day,calendarIndex:game.calendarIndex,team:{id:team.id,name:team.name,short:team.short,league:team.league,color:team.color,letter:team.letter,emblem:team.emblem||null,wins:team.wins,losses:team.losses,ties:team.ties,cash:team.cash},gmName:game.gmName||'GM',games:game.games.length,inbox:inbox(),club:clubView(),foreign:foreignView(),annual:annualView(),vipIncome:r2((game.financeLedger?.clubs?.[team.id]?.vipIncome||0)+vipOffTotal(team,game.year)),retirementEligible:retirement().length===1,medical:medical().length,managerEligible:manager().length===1,acknowledgements:{month:!!(game.pendingMonth&&game.monthlyArchive?.some(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id)),milestones:!!game.pendingMilestoneIds?.length},blocked:!!(game.financeCrisis||pendingRareNews().length||game.pendingMilestoneIds?.length||game.pendingEvent||game.pendingMonth||game.pendingReview||careerEventPending()||flowForeignResponse()||game.day>=143)});
  throw Error('unsupported pilot operation');
  `;
  const compiled=new vm.Script(pre+source.replace('(() => {','(() => {')+tail+'})();',{filename:'pennant-lab-headless-pilot.js'});
@@ -701,9 +705,18 @@ function createHeadlessEngine(){
   return JSON.parse(result);
  }
  const exact=(v,k)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===k.length&&k.every(x=>Object.hasOwn(v,x));
+ // Accept only the original editor's fields and enumerated designs; no HTML,
+ // image uploads, CSS, client state, random seed or additional game attributes.
+ const identityKeys=['gmName','name','short','letter','color','accent','shape','pattern','font','motif'];
+ const boundedText=(v,max)=>typeof v==='string'&&Array.from(v.trim()).length<=max&&v.length<=max*2&&!/[\u0000-\u001f\u007f]/.test(v);
+ const validIdentity=v=>exact(v,identityKeys)&&boundedText(v.gmName,22)&&boundedText(v.name,30)&&boundedText(v.short,8)&&boundedText(v.letter,3)&&[v.color,v.accent].every(c=>typeof c==='string'&&/^#[0-9a-f]{6}$/i.test(c))&&['circle','square','shield','diamond','hex'].includes(v.shape)&&['solid','split','stripe','rim'].includes(v.pattern)&&['bold','serif','italic','mono'].includes(v.font)&&['letter','star','vortex','wing','comet','swan','mountain','gear','moon','spark','wave','crest','bolt'].includes(v.motif);
  return Object.freeze({
   sourceHash:hash,
-  newWorld(command){if(exact(command,[]))return run('new',null);if(!exact(command,['team'])||!Number.isSafeInteger(command.team)||command.team<0||command.team>11)throw Error('invalid pilot team');return run('new',null,{team:command.team});},
+  newWorld(command){
+   if(exact(command,[]))return run('new',null);
+   if((!exact(command,['team'])&&!(exact(command,['team','identity'])&&validIdentity(command.identity)))||!Number.isSafeInteger(command.team)||command.team<0||command.team>11)throw Error('invalid pilot team or identity');
+   return run('new',null,{team:command.team,identity:command.identity});
+  },
   advance(state,command,rights){
    const verifiedVip=rights?.verified===true&&rights.vip===true;
    if(exact(command,['annual'])&&['start','day'].includes(command.annual))return run('annual',state,{choice:command.annual,verifiedVip});
@@ -714,6 +727,7 @@ function createHeadlessEngine(){
     const k=command.club,base=['club'],pid=Number.isSafeInteger(command.playerId)&&command.playerId>0;
     let valid=false;
     const slot=v=>Number.isSafeInteger(v)&&v>=0&&v<9;
+    if(k==='identity')valid=exact(command,[...base,'identity','confirmed'])&&command.confirmed===true&&validIdentity(command.identity);
     if(k==='lineup'||k==='rotation')valid=pid&&slot(command.slot)&&exact(command,[...base,'playerId','slot']);
     if(k==='order')valid=exact(command,[...base,'kind','slot','target'])&&['lineup','rotation'].includes(command.kind)&&slot(command.slot)&&slot(command.target);
     if(k==='fielding')valid=pid&&exact(command,[...base,'playerId','key'])&&['C','1B','2B','3B','SS','LF','CF','RF','DH'].includes(command.key);
@@ -729,7 +743,7 @@ function createHeadlessEngine(){
     if(k==='manager-renew')valid=exact(command,[...base,'confirmed'])&&command.confirmed===true;
     if(k==='manager-order')valid=exact(command,[...base,'key','value'])&&typeof command.key==='string'&&command.key.length<=20&&['auto','attack','safe'].includes(command.value);
     if(!valid)throw Error('invalid club command');
-    return run('club',state,{choice:k,playerId:command.playerId,slot:command.slot,target:command.target,kind:command.kind,key:command.key,value:command.value,values:command.values,direction:command.direction});
+    return run('club',state,{choice:k,playerId:command.playerId,slot:command.slot,target:command.target,kind:command.kind,key:command.key,value:command.value,values:command.values,direction:command.direction,identity:command.identity});
    }
    if(command?.foreign){
     const k=command.foreign,base=['foreign'],pid=Number.isSafeInteger(command.playerId)&&command.playerId>0;

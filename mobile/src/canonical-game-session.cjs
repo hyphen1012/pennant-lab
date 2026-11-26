@@ -10,7 +10,7 @@ function createCanonicalGameSession({client,online=()=>true}={}){
  function setSession(next){client.setSession(next);invalidate(next?'select-slot':'signed-out');session=next?{account:next.account}:null;slot=null;}
  function suspend(){invalidate(session?(slot?'refresh-required':'select-slot'):'signed-out');}
  function select(n){if(!session||!validSlot(n)||active)throw Error('slot selection unavailable');invalidate('refresh-required');slot=n;return inspect();}
- function start(){if(!session||!slot||active)throw Error('operation unavailable');const t={generation,slot,account:session.account};active=t;return t;}
+ function start(requireSlot=true){if(!session||(requireSlot&&!slot)||active)throw Error('operation unavailable');const t={generation,slot,account:session.account};active=t;return t;}
  const current=t=>active===t&&t.generation===generation&&t.slot===slot&&t.account===session?.account;
  async function run(kind,fn){
   const t=start(),old=snapshot;
@@ -27,8 +27,28 @@ function createCanonicalGameSession({client,online=()=>true}={}){
    snapshot=null;status='refresh-required';return {status,uncertain:kind!=='read'};
   }finally{if(current(t))active=null;}
  }
+ async function listSlots(){
+  if(typeof client.gameSlots!=='function')throw Error('slot metadata unavailable');
+  const t=start(false);
+  try{
+   if(!await online()||!current(t))throw Error('connection unavailable');
+   const slots=await client.gameSlots();
+   if(!current(t))return {status:'stale'};
+   if(!Array.isArray(slots)||slots.length>3||slots.some(x=>!validSlot(x?.slot)||typeof x.world!=='string'||!Number.isSafeInteger(x.revision)||x.revision<1)||new Set(slots.map(x=>x.slot)).size!==slots.length)throw Error('invalid slots');
+   return {status:'ready',slots:structuredClone(slots)};
+  }catch{
+   if(!current(t))return {status:'stale'};
+   snapshot=null;status=slot?'refresh-required':'select-slot';return {status:'refresh-required'};
+  }finally{if(current(t))active=null;}
+ }
  function refresh(){return run('read',t=>client.gameRead(t.slot));}
- function create(command,confirmed){if(confirmed!==true||snapshot||status!=='refresh-required')throw Error('explicit new game confirmation required');return run('create',t=>client.gameCreate(t.slot,command));}
+ function create(command,confirmed){if(confirmed!==true||snapshot||status!=='refresh-required')throw Error('explicit new game confirmation required');return run('create',async t=>{
+  if(typeof client.gameSlots!=='function')throw Error('slot metadata unavailable');
+  const slots=await client.gameSlots();
+  if(!current(t)||!Array.isArray(slots)||slots.some(x=>x.slot===t.slot))throw Error('canonical slot not confirmed empty');
+  if(!await online()||!current(t))throw Error('connection unavailable');
+  return client.gameCreate(t.slot,command);
+ });}
  function advance(command){
   if(status!=='ready'||!snapshot||snapshot.pending?.length)throw Error('authoritative state or reward reconciliation required');
   return run('advance',(t,old)=>client.gameAdvance(t.slot,old.revision,command));
@@ -47,6 +67,6 @@ function createCanonicalGameSession({client,online=()=>true}={}){
    snapshot=null;status='refresh-required';return {status};
   }finally{if(current(t))active=null;}
  }
- return Object.freeze({setSession,suspend,select,refresh,create,advance,inspect,freePage});
+ return Object.freeze({setSession,suspend,select,refresh,create,advance,inspect,freePage,listSlots});
 }
 module.exports={createCanonicalGameSession};
