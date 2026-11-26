@@ -5,8 +5,11 @@ const {chromium}=require('playwright'),esbuild=require('esbuild');
 const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHeadlessEngine}=require('../server/headless-engine.cjs');
 (async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pl-title-browser-')),owner='a'.repeat(64),deny=async()=>null;
- let clockOffset=0;
- const runtime=createServiceRuntime({now:()=>Date.now()+clockOffset,dataDir:dir,authenticate:async t=>t==='a'?{authenticated:true,account:owner}:{authenticated:false},verifyRecentReauth:deny,verifyReceipt:deny,verifyCurrent:deny,verifyNotification:deny,verifyEvent:deny,verifyAction:deny,verifyCompletion:deny,canonicalEngine:createHeadlessEngine(),units:{android:{unit:'123',item:'ticket',amount:1}},origins:[]});
+ let clockOffset=0,fixtureRookie=false;
+ const engine=createHeadlessEngine();
+ // Isolated third-slot fixture, persisted through the real HTTP authority.
+ const fixtureEngine={...engine,newWorld(command){const w=engine.newWorld(command);if(fixtureRookie){const p=w.players.find(p=>p.teamId===w.selectedId&&!p.retired);a.ok(p);w.pendingDraftReveal={year:w.year-1,entries:[{id:p.id,revealStage:0}]};}return w;}};
+ const runtime=createServiceRuntime({now:()=>Date.now()+clockOffset,dataDir:dir,authenticate:async t=>t==='a'?{authenticated:true,account:owner}:{authenticated:false},verifyRecentReauth:deny,verifyReceipt:deny,verifyCurrent:deny,verifyNotification:deny,verifyEvent:deny,verifyAction:deny,verifyCompletion:deny,canonicalEngine:fixtureEngine,units:{android:{unit:'123',item:'ticket',amount:1}},origins:[]});
  let browser;
  try{
   await new Promise(ok=>runtime.server.listen(0,'127.0.0.1',ok));
@@ -158,7 +161,7 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   await page.locator('[data-action="canonical-info-back"]').click();await page.locator('[data-action="canonical-info-back"]').click();
   await page.locator('[data-action="canonical-return"]').first().click();await slot(3).waitFor();
   clockOffset+=61000;
-  await slot(3).click();await finish.waitFor();lost=true;await finish.click();
+  fixtureRookie=true;await slot(3).click();await finish.waitFor();lost=true;await finish.click();fixtureRookie=false;
   await page.locator('button[data-slot="3"][data-action="continue-slot"]').waitFor();
   a.equal(creates,2);a.equal((await post('read',{slot:3})).revision,1);
   failSlots=true;await page.locator('[data-action="canonical-retry"]').click();
@@ -168,6 +171,31 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   await page.evaluate(()=>window.fixtureOnline(false));await page.getByText('サーバーのセーブ一覧を確認できません。データは変更されていません。').waitFor();
   await page.evaluate(()=>window.fixtureOnline(true));await page.locator('[data-action="canonical-retry"]').click();await slot(1).waitFor();
   a.deepEqual(await page.evaluate(async()=>[localStorage.getItem('pennant_lab_v04_slot_1'),localStorage.getItem('pennant_lab_account_v1_'+'a'.repeat(64)+'_slot_1'),(await indexedDB.databases()).some(d=>d.name==='pennant_lab_v04_saves')]),['guest-sentinel','account-sentinel',false]);
+  // Reopen the saved fixture and exercise the actual packaged event UI.
+  clockOffset+=61000;
+  await slot(3).click();await page.getByText('サーバー保存の確認画面（開発試験）').waitFor();
+  await page.locator('[data-action="canonical-hq-open"]').click();await page.locator('.hero-stadium').waitFor();
+  const initialRookie=await post('read',{slot:3});
+  a.equal(initialRookie.game.club,null);
+  a.equal(initialRookie.game.inbox.rookie.entries[0].stage,0);
+  a.equal(initialRookie.game.inbox.rookie.entries[0].appearanceSeed,null);
+  await page.locator('[data-action="canonical-events-open"]').click();await page.getByRole('heading',{name:'新人入団報告'}).waitFor();
+  const reveal=page.locator('[data-kind="rookie-reveal"]'),finishRookie=page.locator('[data-kind="rookie-finish"]');
+  a.equal(await finishRookie.isDisabled(),true);
+  await page.locator('[data-action="canonical-foreign-toggle"]').click();
+  const foreignButtons=page.locator('[data-kind^="foreign-"]');
+  for(const b of await foreignButtons.all())a.equal(await b.isDisabled(),true);
+  const beforeReveal=advances;
+  lostAdvance=true;await reveal.click();await page.locator('[data-action="canonical-events-refresh"]').waitFor();
+  a.equal(advances,beforeReveal+1);
+  await page.locator('[data-action="canonical-events-refresh"]').click();await reveal.waitFor();
+  const middle=await post('read',{slot:3});a.equal(middle.revision,initialRookie.revision+1);a.equal(middle.game.inbox.rookie.entries[0].stage,1);a.equal(middle.game.inbox.rookie.entries[0].abilities,null);a.equal(middle.game.inbox.rookie.entries[0].appearanceSeed,null);a.equal(await finishRookie.isDisabled(),true);a.equal(advances,beforeReveal+1);
+  await reveal.click();
+  await page.locator('[data-kind="rookie-finish"]:enabled').waitFor();
+  const finalRookie=await post('read',{slot:3});a.equal(finalRookie.revision,middle.revision+1);a.equal(finalRookie.game.inbox.rookie.entries[0].stage,2);a.ok(finalRookie.game.inbox.rookie.entries[0].abilities);
+  await finishRookie.click();await page.getByText('現在対応する年間業務はありません。').waitFor();
+  const finishedRookie=await post('read',{slot:3});a.equal(finishedRookie.revision,finalRookie.revision+1);a.equal(finishedRookie.game.inbox.rookie,null);a.ok(finishedRookie.game.club);
+  console.log('PASS actual browser rookie stages, foreign command hold, lost response recovery without automatic replay');
   a.deepEqual(errors,[]);console.log('PASS packaged canonical title, actual HTTP create/reopen, lost commit recovery, offline and local save isolation');
  }finally{await browser?.close();await runtime.close();fs.rmSync(dir,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});
