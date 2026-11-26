@@ -114,6 +114,15 @@ function createHeadlessEngine(){
   const previous=game.calendar.days[game.calendarIndex-1];
   return {archiveAvailable:archiveAvailable(),lastDay:previous?{date:previous.date,type:previous.type,reason:previous.reason,gameNo:previous.gameNo??null}:null,dateText:getDayText(),fans:game.fans,salary:payroll(team),rank:rankings(team.league).findIndex(t=>t.id===team.id)+1,opponent:opp?.short||null,standings:Object.fromEntries(['E','W'].map(l=>[l,rankings(l).map(t=>({id:t.id,short:t.short,league:t.league,wins:t.wins,losses:t.losses,ties:t.ties,rs:t.rs,ra:t.ra}))])),canStep:canStep(),canCalendar:canCalendar(),goals:Object.fromEntries(['date','weekly','month','season'].map(kind=>[kind,calendarGoalFor(kind,game.calendar.days,game.calendarIndex)])),latestMonth:(game.monthlyArchive||[]).filter(m=>m.teamId===team.id).slice(-1).map(m=>({month:m.month,date:m.date,wins:m.wins,losses:m.losses,ties:m.ties}))[0]||null,latestMilestones:(game.milestoneNews||[]).slice(-5).map(m=>({date:m.date,title:m.title})),lastReport:!game.pendingDraftReveal&&!flowForeignResponse()&&!flowGet()?matchReport(last):null,latestPaper:!game.pendingDraftReveal&&!flowForeignResponse()&&!pendingRareNews().length&&!flowGet()?latestPaper():null,last:last&&lastOpp?{year:last.year,day:last.day,opponent:lastOpp.name,ours:last.home===team.id?last.homeScore:last.awayScore,theirs:last.home===team.id?last.awayScore:last.homeScore}:null};
  };
+ const tradeAvailable=()=>canManage()&&gmTradeOpen()&&!game.pendingDraftReveal&&!flowForeignResponse();
+ const tradePlayer=p=>({id:p.id,name:p.name,pos:p.pos,age:p.age,overall:rating(p),salary:p.salary});
+ if(op==='trade-page'){
+  if(!tradeAvailable())throw Error('trade unavailable');
+  const u=getTeam(input.clubId);if(!u||u.id===team.id)throw Error('invalid trade club');
+  if(input.mode==='list')return JSON.stringify({mode:'list',clubId:u.id,out:own(team).filter(p=>gmTradeEligible(p,team)).map(tradePlayer),in:own(u).filter(p=>gmTradeEligible(p,u)).map(tradePlayer)});
+  const q=gmTradeQuote(u.id,input.out,input.in,input.fee);
+  return JSON.stringify({mode:'quote',clubId:u.id,ok:q.ok,reason:q.ok?null:q.reason,fee:input.fee,outIds:input.out,inIds:input.in,delta:q.ok?q.delta:null});
+ }
  const freeVisible=()=>!game.pendingDraftReveal&&!flowForeignResponse();
  const freeList=()=>freeAgents().filter(p=>!p.retired);
  const freeRow=p=>({id:p.id,name:p.name,pos:p.pos,age:p.age,overall:rating(p),salary:p.salary,cost:signingCost(p)});
@@ -148,7 +157,7 @@ function createHeadlessEngine(){
   // Avoid leaking the signed roster before the mandatory arrival/result scene.
   if(!freeVisible())return null;
   const stadium=stadiumState(team),manager=team.manager,flow=flowGet(),free=freeList();
-  return {canManage:canManage(),date:flow?.date||calendarNextDay()?.date||game.calendar.endDate,rosterLimit:ROSTER_MAX,farmLimit:FARM_LIMIT,farmMode:farmClub(team).mode,
+  return {canManage:canManage(),tradeAvailable:tradeAvailable(),date:flow?.date||calendarNextDay()?.date||game.calendar.endDate,rosterLimit:ROSTER_MAX,farmLimit:FARM_LIMIT,farmMode:farmClub(team).mode,
    roster:own(team).map(p=>({id:p.id,name:p.name,pos:p.pos,age:p.age,salary:p.salary,tier:p.farmTier===2?2:1,injured:!!p.injury,energy:p.energy,overall:rating(p),abilities:Object.fromEntries(seasonSkillKeys(p).map(k=>[k,p[k]])),focus:p.trainFocus||'balanced',canFarmMove:p.farmTier===2?firstPlayers(team).length<FARM_LIMIT&&!p.injury:farmCanDemote(team,p),fielding:team.lineup.includes(p.id)?team.fieldingRoles?.[p.id]||null:null,subPos:p.subPos||null,hand:p.hand,batHand:p.batHand,talent:p.talent,appearanceSeed:p.appearanceSeed,specialCategory:p.specialCategory||null,originCategory:p.originCategory||null,pastLifeAppearance:p.pastLifeAppearance?{seed:p.pastLifeAppearance.seed,baseCategory:p.pastLifeAppearance.baseCategory}:null,injuryDays:p.injury?.daysLeft||0,affinity:p.affinity,batStats:Object.fromEntries(['ab','h','hr','rbi','sb','g','w','l','outs','er','k','sv'].map(k=>[k,p.stats?.[k]||0]))})),
    freeCount:free.length,free:free.slice(0,80).map(freeRow),
    managerCandidates:[1,2,3].map(slot=>{const m=makeManager(team.id,game.year,slot);return {slot,id:m.id,name:m.name,style:m.style,salary:m.salary,contractYears:m.contractYears,fee:r2(m.salary*.3),current:m.id===manager?.id};}),
@@ -458,6 +467,8 @@ function createHeadlessEngine(){
   }else if(k==='release'){
    if(!p||p.teamId!==team.id)throw Error('release unavailable');
    releasePlayer(p.id);if(p.teamId!==null)throw Error('release unavailable');
+  }else if(k==='season-trade'){
+   if(!tradeAvailable())throw Error('trade unavailable');const q=gmTradeExecute(input.clubId,input.out,input.in,input.fee);if(!q.ok)throw Error(q.reason);
   }else if(k==='manager-hire'){
    const m=makeManager(team.id,game.year,input.slot),prior=team.manager,fee=r2(m.salary*.3);
    if(prior?.id===m.id||team.cash<fee)throw Error('manager hiring unavailable');
@@ -856,6 +867,7 @@ function createHeadlessEngine(){
  const identityKeys=['gmName','name','short','letter','color','accent','shape','pattern','font','motif'];
  const boundedText=(v,max)=>typeof v==='string'&&Array.from(v.trim()).length<=max&&v.length<=max*2&&!/[\u0000-\u001f\u007f]/.test(v);
  const validIdentity=v=>exact(v,identityKeys)&&boundedText(v.gmName,22)&&boundedText(v.name,30)&&boundedText(v.short,8)&&boundedText(v.letter,3)&&[v.color,v.accent].every(c=>typeof c==='string'&&/^#[0-9a-f]{6}$/i.test(c))&&['circle','square','shield','diamond','hex'].includes(v.shape)&&['solid','split','stripe','rim'].includes(v.pattern)&&['bold','serif','italic','mono'].includes(v.font)&&['letter','star','vortex','wing','comet','swan','mountain','gear','moon','spark','wave','crest','bolt'].includes(v.motif);
+ const validTrade=(v)=>Number.isSafeInteger(v.clubId)&&v.clubId>=0&&v.clubId<12&&[v.out,v.in].every(ids=>Array.isArray(ids)&&ids.length<=3&&ids.every(id=>Number.isSafeInteger(id)&&id>0))&&v.out.length+v.in.length>0&&new Set([...v.out,...v.in]).size===v.out.length+v.in.length&&Number.isFinite(v.fee)&&Math.abs(v.fee)<=30&&Math.round(v.fee*100)/100===v.fee;
  return Object.freeze({
   sourceHash:hash,
   newWorld(command){
@@ -869,6 +881,10 @@ function createHeadlessEngine(){
    if(exact(command,['annual','job'])&&['open','complete'].includes(command.annual)&&['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter','fan-fest','tv','fanclub','sponsor','broadcast','naming','booking','self','winter-return','camp','exhibition','opening-promo','offdesk-opening'].includes(command.job))return run('annual',state,{choice:command.annual,job:command.job,verifiedVip});
    if(exact(command,['annual','playerId'])&&command.annual==='cut'&&Number.isSafeInteger(command.playerId))return run('annual',state,{choice:'cut',playerId:command.playerId,verifiedVip});
    if(exact(command,['finance','confirmed'])&&command.finance==='gameover'&&command.confirmed===true)return run('finance',state);
+   if(command?.club==='season-trade'){
+    if(!exact(command,['club','clubId','out','in','fee','confirmed'])||command.confirmed!==true||!validTrade(command))throw Error('invalid confirmed trade');
+    return run('club',state,{choice:command.club,clubId:command.clubId,out:command.out,in:command.in,fee:command.fee});
+   }
    if(command?.club){
     const k=command.club,base=['club'],pid=Number.isSafeInteger(command.playerId)&&command.playerId>0;
     let valid=false;
@@ -991,6 +1007,10 @@ function createHeadlessEngine(){
    if(!t||state.started!==true)throw Error('invalid canonical preview');
    const e=t.emblem;
    return {year:state.year,day:state.day,gmName:state.gmName||'GM',team:{id:t.id,name:t.name,short:t.short,league:t.league,color:t.color,letter:t.letter,emblem:e?{accent:e.accent,shape:e.shape,pattern:e.pattern,font:e.font,motif:e.motif}:null,wins:t.wins,cash:t.cash}};
+  },
+  tradePage(state,command){
+   if(!command||!(command.mode==='list'&&exact(command,['mode','clubId'])&&Number.isSafeInteger(command.clubId)&&command.clubId>=0&&command.clubId<12||command.mode==='quote'&&exact(command,['mode','clubId','out','in','fee'])&&validTrade(command)))throw Error('invalid trade page');
+   return run('trade-page',state,command);
   },
   reportPage(state,command){
    if(!exact(command,['kind','year','offset','limit'])||!['matches','papers'].includes(command.kind)||!Number.isSafeInteger(command.year)||command.year!==0&&(command.year<2027||command.year>state.year)||!Number.isSafeInteger(command.offset)||command.offset<0||!Number.isSafeInteger(command.limit)||command.limit<1||command.limit>(command.kind==='matches'?1:3))throw Error('invalid report page');

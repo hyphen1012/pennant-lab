@@ -280,3 +280,6 @@ PR114: year-filtered reverse chronological own-club matches and archived daily/w
 
 ## Ticket exchange and real HTTP reward regression (staging)
 PR116: expose only the existing 1-point ticket exchange, with confirmation, server wallet reread and no automatic retries. Do not expose purchases of unconnected cosmetic benefits. Isolated packaged-browser fixture persists a test memorial record and 8-day injury; exercises actual HTTP claim, exchange, special treatment, deliberately lost settlement response, read-only recovery and exact one-ticket/one-revision deduction. No fake ad proof or production activation. Other reward routes still require browser coverage.
+
+## Regular season trade (staging)
+PR117: explicit rival selection, eligible roster and original gmTradeQuote read via revision-checked endpoint. Confirmed execution uses original gmTradeExecute (max 3 per side, signed fee, July 31, protected players, roster and both budgets). Revalidate quote at commit. No client mutation. Actual engine fixture tests cash conservation, duplicate and confirmation guards. Browser walk-through pending. No production enablement.
