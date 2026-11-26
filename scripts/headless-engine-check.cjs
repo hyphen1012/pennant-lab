@@ -91,6 +91,30 @@ const a=require('node:assert/strict'),{createHeadlessEngine}=require('../server/
   const rival=JSON.parse(JSON.stringify(fa));rival.movement.deals.push({id:p.id,from:p.teamId,to:(fa.selectedId+1)%12,kind:'fa',salary:.2,years:1});a.ok(!action(rival,'fa-sign'));
   const deal=verify(fa,'fa-sign');a.equal(deal.state.movement.deals[0].to,fa.selectedId);a.equal(deal.state.movement.deals[0].years,3);
   }
+  {
+   // Isolated saved inbox fixtures; server API never accepts injected state.
+   const w=engine.newWorld({}),p=w.players.find(x=>x.teamId===w.selectedId),date=w.year+'-04-01';
+   w.pendingEvent={type:'injury',year:w.year,playerId:p.id,teamId:w.selectedId,date,days:40};
+   w.injuryArchive=[{...w.pendingEvent}];p.injury={date,daysLeft:40,totalDays:40,level:'serious'};
+   const key=engine.view(w).inbox.injury.eventKey;
+   a.throws(()=>engine.advance(w,{step:1}));a.throws(()=>engine.advance(w,{acknowledge:'injury',eventKey:'wrong'}));
+   const treated=engine.advance(w,{acknowledge:'injury',eventKey:key});a.equal(treated.pendingEvent,null);a.equal(treated.injuryArchive.length,1);a.equal(treated.players.find(x=>x.id===p.id).injury.daysLeft,40);
+   a.throws(()=>engine.advance(treated,{acknowledge:'injury',eventKey:key}));
+   const x=engine.newWorld({});x.rareNews=[{id:'2027:fixture:1',year:x.year,date:'2027-04-01',category:'STAR',name:'not exposed',title:'fixture'},{id:'2027:fixture:2',year:x.year,date:'2027-04-02',category:'LEGEND',title:'fixture'}];x.pendingRareIds=x.rareNews.map(e=>e.id);
+   a.equal(engine.view(x).inbox.rare.name,undefined);a.throws(()=>engine.advance(x,{acknowledge:'rare',eventKey:x.rareNews[1].id}));
+   const first=engine.advance(x,{acknowledge:'rare',eventKey:x.rareNews[0].id});a.equal(first.rareNews.length,2);a.deepEqual(first.pendingRareIds,[x.rareNews[1].id]);
+   a.throws(()=>engine.advance(first,{step:1}));const second=engine.advance(first,{acknowledge:'rare',eventKey:x.rareNews[1].id});a.equal(second.pendingRareIds.length,0);
+   const c=engine.newWorld({}),cp=c.players.find(x=>x.teamId===c.selectedId);
+   cp.retirePlan={year:c.year,teamId:c.selectedId,status:'consult',options:[],date:'2027-07-01',eventDate:'2027-09-20'};
+   c.careerEventQueue=[{year:c.year,teamId:c.selectedId,id:cp.id,type:'consult',date:cp.retirePlan.date}];
+   a.throws(()=>engine.advance(c,{step:1}));a.throws(()=>engine.advance(c,{career:'dismiss',playerId:cp.id}));a.throws(()=>engine.advance(c,{career:'accept',playerId:cp.id,options:['fake']}));
+   const opt=engine.view(c).inbox.career.options[0];a.ok(opt);
+   const cost=opt.cost,poor=JSON.parse(JSON.stringify(c));poor.teams.find(t=>t.id===poor.selectedId).cash=0;
+   a.throws(()=>engine.advance(poor,{career:'accept',playerId:cp.id,options:[opt.key]}));
+   const result=engine.advance(c,{career:'accept',playerId:cp.id,options:[opt.key]});a.equal(result.careerEventQueue[0].type,'thanks');a.equal(result.players.find(x=>x.id===cp.id).retirePlan.cost,cost);
+   a.throws(()=>engine.advance(result,{career:'accept',playerId:cp.id,options:[]}));
+   const done=engine.advance(result,{career:'dismiss',playerId:cp.id});a.equal(done.careerEventQueue.length,0);a.equal(done.players.find(x=>x.id===cp.id).retirePlan.status,'accepted');
+  }
   const archived=engine.newWorld({});archived.pendingMonth={year:archived.year,id:'fixture'};archived.monthlyArchive=[];
   a.throws(()=>engine.advance(archived,{acknowledge:'month'}),/not archived/);
   archived.monthlyArchive.push({...archived.pendingMonth});const ack=engine.advance(archived,{acknowledge:'month'});
