@@ -18,12 +18,20 @@ function openLedger(filename){
       write.run(account,JSON.stringify(state));db.exec('COMMIT');return result;
     }catch(err){db.exec('ROLLBACK');throw err;}
   }
+  // Coherent read snapshot without rewriting the account's entire wallet.
+  // Always roll back, including accidental writes in trusted callbacks.
+  function inspect(account,fn){
+    if(typeof account!=='string'||!account||account.length>200)throw Error('invalid account');
+    db.exec('BEGIN');
+    try{const row=read.get(account),state=row?JSON.parse(row.payload):rules.newAccount();const result=fn(state,db);if(result&&typeof result.then==='function')throw Error('inspection must be synchronous');return result;}
+    finally{db.exec('ROLLBACK');}
+  }
   function readOrder(account,id){
  if(typeof account!=='string'||!account||typeof id!=='string'||!id)return null;
  const row=read.get(account);if(!row)return null;const s=JSON.parse(row.payload);
  const o=Object.hasOwn(s.orders,id)?s.orders[id]:null;return o?{mode:o.mode,status:o.status,attempt:o.attempt??1}:null;
  }
- return {transact,readOrder,close:()=>db.close()};
+ return {transact,inspect,readOrder,close:()=>db.close()};
 }
 function createAccountService({ledger,authenticate,verifyEvent,verifyEntitlements,verifyAction,verifyCompletion,purchaseService=null,now=Date.now}){
   if(!ledger?.transact||[authenticate,verifyEvent,verifyEntitlements,verifyAction,verifyCompletion].some(f=>typeof f!=='function'))throw Error('trusted adapters required');

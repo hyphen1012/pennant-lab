@@ -16,6 +16,7 @@ function createServiceRouter({accountHttp,saveHttp,adService,deletionService,sto
  // Only a server-injected engine can enable these routes. No client state
  // upload, seed, entitlement flag, or completion proof is accepted.
  const gameRoutes=new Map([
+  ['/v1/game/slots',['slots',[]]],
   ['/v1/game/create',['create',['slot','command']]],
   ['/v1/game/read',['read',['slot']]],
   ['/v1/game/order',['orderStatus',['slot','operationId']]],
@@ -68,7 +69,7 @@ function createServiceRouter({accountHttp,saveHttp,adService,deletionService,sto
     if(!token)return reject(401,'authentication_required');
     if(await allowRequest({token,remoteAddress:req.socket.remoteAddress,route:req.url})!==true)return reject(429,'rate_limited');
     const [method,keys]=gameRoutes.get(req.url),b=await read(req);
-    if(!exact(b,keys)||![1,2,3].includes(b.slot)||('command' in b&&(!b.command||Object.getPrototypeOf(b.command)!==Object.prototype)))return reject(400,'invalid_fields');
+    if(!exact(b,keys)||keys.includes('slot')&&![1,2,3].includes(b.slot)||('command' in b&&(!b.command||Object.getPrototypeOf(b.command)!==Object.prototype)))return reject(400,'invalid_fields');
     return json(res,200,await gameAuthority[method](token,...keys.map(k=>b[k])));
    }
    if(Object.hasOwn(handlers,req.url)){
