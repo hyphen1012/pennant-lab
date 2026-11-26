@@ -192,3 +192,7 @@ Nullable preview migration on authority_worlds, updated atomically with each tru
 
 ## v0.9.190 canonical roster command increment (staging only)
 PR81 UI/test patch ported to the canonical stack in PR82, preserving account and title integration. Add server-side confirmed deterministic recommendation, batting-order insertion and defensive-role replacement using the same original engine helpers. Reject unchanged recommendation, unavailable candidates, invalid roles and blocked/reveal state. Expose bounded eligible player/role pairs and shortage/off-role warning IDs only in the existing visible club projection. Extend real engine and authenticated HTTP lost-response tests. No arbitrary client state, local save or automatic resend; undo journal and actual screen wiring remain open. No public merge or production activation. CI pending.
+
+
+## Canonical one-step lineup undo
+Trusted world stores one bounded previous batting order/fielding assignment and resulting fingerprint. No client snapshot accepted. Require same team/year/day, exact current fingerprint, eligible players and normal management/reveal guards. Clear on successful undo or unrelated game mutation, including reward application; a new roster change replaces the entry. Read-only calls and persistence do not clear it. Revision CAS still applies; invalid or stale operations do not commit. Tests cover reopen, injury, invalid payload, changed roster and HTTP recovery. Actual game screen integration remains open. No production activation.
