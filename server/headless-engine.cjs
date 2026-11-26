@@ -34,8 +34,59 @@ function createHeadlessEngine(){
  const manager=()=>{const m=team.manager;if(!m||managerTenure(team)<7||game.day<98||m.tenureContinuedYear===game.year||game.financeCrisis)return [];return [{route:'manager',year:game.year,eventKey:String(m.id),label:m.name+' 監督慰留'}];};
  // Match the live career-event handler: only the current own-club consultation.
  const retirement=()=>{const e=careerCurrentEvent(),p=e&&getPlayer(e.id),q=p?.retirePlan;if(game.financeCrisis||game.day>=143||e?.type!=='consult'||!p||p.teamId!==team.id||q?.year!==game.year||q.teamId!==team.id||q.status!=='consult')return [];return [{route:'retirement',year:game.year,eventKey:String(p.id),label:p.name+' 引退慰留'}];};
- if(op==='actions')return JSON.stringify([...medical(),...manager(),...retirement()]);
+ // All offers and candidate IDs originate in the server-owned world.
+ const recruitment=()=>{
+  if(game.financeCrisis)return [];
+  const rows=[],add=(route,id,label)=>rows.push({route,year:game.year,eventKey:String(id),label:String(label).slice(0,160)});
+  const d=game.draft,m=game.foreignMarket,move=movementData();
+  if(game.ceremonyStage==='draft'&&d?.year===game.year){
+   for(const row of d.picks||[]){const c=draftCandidate(d,row.candidateId);if(c&&draftRecoveryAllowed(d,team,row,c))add('draft-revival',c.id,c.player.name+' ドラフト交渉復活');}
+   if(lotteryRewardAllowed(d,team.id))add('lottery',draftLotteryGroup(d).cid,'ドラフト抽選');
+  }
+  if(m?.year===game.year){
+   const conv=m.negotiations?.[team.id],c=m.candidates.find(x=>x.id===conv?.candidateId);
+   if(c&&foreignRecoveryAllowed(m,team,c,conv))add('foreign-revival',c.id,c.player.name+' 外国人交渉復活');
+  }
+  if(move&&!move.closed&&game.ceremonyStage==='movement-declarations'){
+   for(const r of move.requests){const p=getPlayer(r.id);if(p?.teamId===team.id&&r.from===team.id&&r.year===game.year&&['fa','posting','overseas-fa'].includes(r.kind)&&r.status==='refused'&&Number.isFinite(r.offer)&&r.offer>0&&team.cash>=r.offer)add('fa-retention',r.id,p.name+' '+movementRequestLabel(r.kind)+' 残留');}
+  }
+  // Refused, still-open FA/return offers only; no displacement of a rival deal.
+  if(move&&!move.closed&&!move.cpuDone&&game.ceremonyStage==='movement-market'){
+   for(const row of movementPool(move)){
+    const o=move.offers[row.id],p=getPlayer(row.id);
+    if(p&&['fa','return'].includes(row.kind)&&o?.status==='refused'&&movementCanSign(move,row,team,o.salary))add('fa-sign',row.id,p.name+' FA交渉復活');
+   }
+  }
+  return rows;
+ };
+ if(op==='actions')return JSON.stringify([...medical(),...manager(),...retirement(),...recruitment()]);
  if(op==='apply'){
+  if(['draft-revival','foreign-revival','lottery','fa-retention','fa-sign'].includes(input.action.route)){
+   const a=recruitment().find(x=>x.route===input.action.route&&x.eventKey===input.action.eventKey);
+   if(!a)throw Error('recruitment reward unavailable');
+   const id=Number(a.eventKey),d=game.draft,m=game.foreignMarket,move=movementData();
+   let result;
+   if(a.route==='draft-revival'){
+    const row=d.picks.find(x=>x.teamId===team.id&&x.candidateId===id),c=draftCandidate(d,id);
+    if(!applyDraftRecovery(d,team,row,c,true))throw Error('draft recovery failed');
+    result={candidateId:id,status:row.status};
+   }else if(a.route==='foreign-revival'){
+    const c=m.candidates.find(x=>x.id===id),conv=m.negotiations[team.id];
+    if(!applyForeignRecovery(m,team,c,conv,true))throw Error('foreign recovery failed');
+    result={candidateId:id,status:conv.status};
+   }else if(a.route==='lottery'){
+    if(!applyLotteryReward(d,team.id,true))throw Error('lottery failed');
+    result={candidateId:id,stage:d.pendingLottery.stage,winner:draftLotteryGroup(d).winner};
+   }else if(a.route==='fa-retention'){
+    const r=move.requests.find(x=>x.id===id&&x.from===team.id);
+    r.status='retained';result={playerId:id,status:r.status,kind:r.kind};
+   }else{
+    const row=movementPool(move).find(x=>x.id===id),o=move.offers[id];
+    if(!movementSign(move,row,team,o.salary,o.years))throw Error('FA signing failed');
+    o.status='signed';result={playerId:id,status:o.status};
+   }
+   return JSON.stringify({state:game,result});
+  }
   if(input.action.route==='retirement'){
    const a=retirement().find(x=>x.eventKey===input.action.eventKey);
    if(!a)throw Error('retirement continuation unavailable');
@@ -118,7 +169,7 @@ function createHeadlessEngine(){
   newWorld(command){if(exact(command,[]))return run('new',null);if(!exact(command,['team'])||!Number.isSafeInteger(command.team)||command.team<0||command.team>11)throw Error('invalid pilot team');return run('new',null,{team:command.team});},
   advance(state,command,rights){if(exact(command,['acknowledge'])&&['month','milestones'].includes(command.acknowledge))return run('ack',state,{kind:command.acknowledge});if(!exact(command,['step'])||command.step!==1)throw Error('pilot accepts one calendar day or explicit report acknowledgement');return run('advance',state,{verifiedVip:rights?.verified===true&&rights.vip===true});},
   actions:state=>run('actions',state),achievements:state=>run('achievements',state).map(e=>e.key.startsWith('memorial:')?{...e,key:'memorial:'+createHash('sha256').update(e.key).digest('hex')}:e),view:state=>run('view',state),
-  applyAction(state,action){if(!['medical','manager','retirement'].includes(action?.route))throw Error('pilot route unavailable');return run('apply',state,{action:{route:action.route,eventKey:action.eventKey}});}
+  applyAction(state,action){if(!['medical','manager','retirement','draft-revival','foreign-revival','lottery','fa-retention','fa-sign'].includes(action?.route))throw Error('pilot route unavailable');return run('apply',state,{action:{route:action.route,eventKey:action.eventKey}});}
  });
 }
 module.exports={createHeadlessEngine};
