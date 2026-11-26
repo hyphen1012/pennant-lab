@@ -1,0 +1,38 @@
+name: Public Pages startup verification
+on:
+  workflow_dispatch:
+  push:
+    branches: [public-startup-audit-v189]
+    paths:
+      - '.github/workflows/public-startup-audit.yml'
+permissions:
+  contents: read
+jobs:
+  public-startup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PL_AUDIT_URL: https://hyphen1012.github.io/pennant-lab/?v=189
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check delivered original assets
+        run: |
+          set -eu
+          target="$(mktemp -d)"
+          mkdir -p "$target/assets/startup"
+          for name in PARALAB_GAMES_startup_v8_SFX_reverb.mp4 PENNANT_LAB_title.webp; do
+            curl --fail --silent --show-error --max-time 90 --retry 2 "https://hyphen1012.github.io/pennant-lab/assets/startup/$name" -o "$target/assets/startup/$name"
+          done
+          node -e "require('./scripts/startup-asset-check.cjs').verifyStartupAssets(process.argv[1])" "$target"
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - name: Actual public video, title, world selection and portal
+        run: node scripts/startup-browser-check.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-startup-audit
+          path: test-results/browser/
