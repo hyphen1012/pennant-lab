@@ -1,0 +1,37 @@
+name: Canonical real-world storage endurance
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/canonical-real-world-endurance.cjs'
+      - '.github/workflows/canonical-real-world-endurance.yml'
+concurrency:
+  group: canonical-real-world-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  storage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        years: [2, 100]
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Actual world checkpoint and restore
+        run: |
+          mkdir -p test-results
+          set -o pipefail
+          node scripts/canonical-real-world-endurance.cjs ${{ matrix.years }} 1937 | tee test-results/canonical-real-world.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: canonical-real-world-${{ matrix.years }}
+          path: test-results/
