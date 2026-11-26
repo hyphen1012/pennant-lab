@@ -1,0 +1,41 @@
+const assert=require('node:assert/strict'),{createHash}=require('node:crypto');
+const {createSaveTransport}=require('../mobile/src/save-transport.cjs');
+const {createSaveTransferClient}=require('../mobile/src/save-transfer-client.cjs');
+const {createSaveImportFlow}=require('../mobile/src/save-import-flow.cjs');
+const sha256=async b=>createHash('sha256').update(b).digest('hex');
+(async()=>{
+ const bytes=new Uint8Array([1,2,3,4]),sha=await sha256(bytes),old=new Uint8Array([8,9]),oldSha=await sha256(old);let calls=0,mode='normal',rev=4,pending,request;
+ const json=x=>new Response(JSON.stringify(x),{headers:{'content-type':'application/json'}});
+ const binary=(payload,revision,digest)=>new Response(payload,{headers:{'content-type':'application/octet-stream','content-length':String(payload.length),'x-save-revision':String(revision),'x-save-sha256':digest}});
+ const fetcher=async(url,options)=>{
+  calls++;request=options;assert.equal(options.redirect,'error');assert.equal(options.credentials,'omit');assert.match(options.headers.Authorization,/^Bearer token-[ab]$/);
+  if(mode==='lost')throw Error('disconnect');
+  if(mode==='conflict')return new Response(null,{status:409});
+  if(mode==='pending')return new Promise(resolve=>pending=resolve);
+  if(options.method==='PUT'){assert.equal(options.headers['X-Save-Confirmed'],'true');assert.equal(options.headers['X-Save-SHA256'],await sha256(options.body));return json({revision:++rev,sha:options.headers['X-Save-SHA256'],unchanged:false});}
+  if(url.endsWith('/history/2'))return binary(old,2,oldSha);
+  if(url.endsWith('/history'))return json([{revision:2,sha:oldSha,bytes:2}]);
+  if(url.endsWith('/1'))return binary(bytes,4,mode==='corrupt'?'0'.repeat(64):sha);
+  return json([{slot:1,revision:4,sha,bytes:4}]);
+ };
+ assert.throws(()=>createSaveTransport({baseUrl:'http://example.invalid',sha256}));
+ const transport=createSaveTransport({baseUrl:'https://example.invalid',fetcher,sha256,maxBytes:16,timeoutMs:1000});
+ await assert.rejects(transport.list(),/authentication/);
+ const session={account:'a',token:'token-a'};transport.setSession(session);
+ assert.equal((await transport.list())[0].slot,1);assert.equal((await transport.history(1))[0].revision,2);assert.deepEqual((await transport.download(1,2)).payload,old);
+ mode='corrupt';await assert.rejects(transport.download(1),/hash_mismatch/);mode='normal';
+ const before=calls;await assert.rejects(transport.upload({slot:1,expectedRevision:4,payload:bytes}),/explicit/);assert.equal(calls,before);
+ assert.equal((await transport.upload({slot:1,expectedRevision:4,payload:bytes,confirmed:true})).revision,5);
+ mode='conflict';await assert.rejects(transport.upload({slot:1,expectedRevision:4,payload:bytes,confirmed:true}),e=>e.code==='revision_conflict'&&!e.uncertain);
+ mode='lost';const count=calls;await assert.rejects(transport.upload({slot:1,expectedRevision:5,payload:bytes,confirmed:true}),e=>e.uncertain);assert.equal(calls,count+1);
+ mode='pending';const p=transport.download(1);while(!pending)await Promise.resolve();const signal=request.signal;transport.setSession({account:'b',token:'token-b'});assert(signal.aborted);pending(binary(bytes,4,sha));await assert.rejects(p,/session_changed/);mode='normal';
+ let localRevision=1,writes=0,backup=null,localData=new Uint8Array([7]);
+ const local={inspect:async()=>({revision:localRevision}),replace:async o=>{if(o.expectedRevision!==localRevision)return {ok:false};backup=localData;localData=o.payload;localRevision++;writes++;return {ok:true};}};
+ const migration=createSaveTransferClient({transport,local,sha256,maxBytes:16}),flow=createSaveImportFlow({transport,migration});
+ flow.setSession(session);await flow.list();assert.equal(flow.status().phase,'list');await flow.history(1);
+ await flow.preview({sourceSlot:1,sourceRevision:2,targetSlot:3});assert.equal(flow.status().summary.sourceRevision,2);assert.equal(writes,0);assert.throws(()=>flow.confirm(false));assert(flow.cancel());assert.throws(()=>flow.confirm(true));assert.equal(writes,0);
+ await flow.preview({sourceSlot:1,targetSlot:3});localRevision++;await assert.rejects(flow.confirm(true),/conflict/);assert.equal(writes,0);
+ await flow.preview({sourceSlot:1,sourceRevision:2,targetSlot:3});flow.setSession({account:'b',token:'token-b'});assert.throws(()=>flow.confirm(true));assert.equal(writes,0);
+ await flow.preview({sourceSlot:1,sourceRevision:2,targetSlot:3});await flow.confirm(true);assert.equal(writes,1);assert.deepEqual(backup,new Uint8Array([7]));assert.deepEqual(localData,old);
+ console.log('PASS HTTPS save transport, hash and revision validation, stale session, ambiguous write, historical import preview/cancel/CAS');
+})().catch(e=>{console.error(e);process.exitCode=1});
