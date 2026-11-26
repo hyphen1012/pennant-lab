@@ -569,9 +569,16 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   for(const row of draft.picks.filter(p=>p.status!=='signed'))assert(!store.get(1).data.players.some(p=>p.id===row.candidateId));
   assert(window.PennantLab.getSnapshot().teams.every(t=>Number.isFinite(t.cash)),'Annual commerce, training and salary cash remains finite');
   assert.equal(window.PennantLab.getSnapshot().day,0);
-  assert(app.innerHTML.includes('data-action="flow-inbox"'),'New-player report is a required inbox event');
-  const entry=app.innerHTML.match(/data-action="flow-inbox" data-key="([^"]+)"/);assert(entry);dispatch('click',{action:'flow-inbox',key:entry[1]});
-  if(app.innerHTML.includes('data-action="draft-reveal-close"')){dispatch('click',{action:'draft-reveal-close'});dispatch('click',{action:'draft-confirm-accept'});}await flush();
+  // A delegated draft may sign nobody for the selected club. No fictitious
+  // new-player report should be created in that case.
+  const rolled=store.get(1).data,ownSigned=draft.picks.filter(p=>p.status==='signed'&&p.teamId===rolled.selectedId);
+  if(ownSigned.length){
+    assert.equal(rolled.pendingDraftReveal?.entries.length,ownSigned.length);
+    assert(app.innerHTML.includes('data-action="flow-inbox"'),'New-player report is a required inbox event');
+    const entry=app.innerHTML.match(/data-action="flow-inbox" data-key="([^"]+)"/);assert(entry);assert.equal(entry[1],'draft-reveal');dispatch('click',{action:'flow-inbox',key:entry[1]});
+    if(app.innerHTML.includes('data-action="draft-reveal-close"')){dispatch('click',{action:'draft-reveal-close'});dispatch('click',{action:'draft-confirm-accept'});}
+  }else{assert.equal(rolled.pendingDraftReveal,null);assert(!app.innerHTML.includes('data-key="draft-reveal"'));}
+  await flush();
   await flush();
   assert.equal(store.get(1).data.pendingCeremonyIntro,null);
   dispatch('click',{action:'tab',tab:'records'});
