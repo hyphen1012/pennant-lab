@@ -76,6 +76,7 @@ function createGoogleAdapter({query,packageName,catalog,vault,lookup,allowTest=f
    // Immediate, single-line-item replacements only. A pending/deferred plan
    // must never revoke the old entitlement early. Ambiguous ownership fails.
    if(r.linkedPurchaseToken!==undefined&&status==='active'){
+    if(rows[0].deferredItemReplacement||rows[0].deferredItemRemoval||rows[0].itemReplacement?.replacementMode==='DEFERRED')throw Error('deferred subscription requires reconciliation');
     if(!tokenId(r.linkedPurchaseToken)||r.linkedPurchaseToken===token)throw Error('invalid linked subscription');
     linkedChain=hash(r.linkedPurchaseToken);
     const old=lookup('google',linkedChain);

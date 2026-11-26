@@ -38,6 +38,10 @@ const {openPurchaseRegistry,createPurchaseService}=require('../server/purchase-r
   t++;replacement={...gs,subscriptionState:'SUBSCRIPTION_STATE_PENDING',linkedPurchaseToken:'sub'};
   await service.restore('owner','google','newsub');a.equal(registry.isSuperseded('google',subchain),false);
   t++;replacement={...replacement,subscriptionState:'SUBSCRIPTION_STATE_ACTIVE'};
+  const activeReplacement=replacement;
+  replacement={...replacement,lineItems:[{...replacement.lineItems[0],deferredItemReplacement:{productId:'vip'}}]};
+  await a.rejects(service.restore('owner','google','newsub'),/deferred subscription/);a.equal(registry.isSuperseded('google',subchain),false);
+  replacement=activeReplacement;
   await service.restore('owner','google','newsub');a.equal(registry.find('google',subchain).status,'revoked');a.equal(registry.find('google',newchain).status,'active');
   a.equal(registry.isSuperseded('google',subchain),true);
   a.equal((await service.authorizeFinish('owner','google','newsub')).authorized,true);
