@@ -7,28 +7,28 @@ function createSaveRecordStore({openDatabase,storeName='slots',encode,validate,s
  const key=(account,slot)=>{if(typeof account!=='string'||!account||account.length>200||![1,2,3].includes(slot))throw Error('invalid account/slot');return JSON.stringify(['account-v1',account,slot]);};
  const rev=r=>{const n=r?.revision??0;if(!Number.isSafeInteger(n)||n<0)throw Error('invalid stored revision');return n;};
  async function inspect({account,slot}){
-  const k=key(account,slot),db=await openDatabase();
+  const k=key(account,slot);if(canWrite(account,slot)!==true)throw Error('save access unavailable');const db=await openDatabase();
   return new Promise((resolve,reject)=>{
    const tx=db.transaction(storeName,'readonly'),req=tx.objectStore(storeName).get(k);let result;
    req.onsuccess=()=>{try{result={revision:rev(req.result),exists:!!req.result?.data};}catch(e){reject(e);tx.abort();}};
-   tx.oncomplete=()=>resolve(result);tx.onabort=()=>reject(tx.error||Error('read aborted'));
+   tx.oncomplete=()=>{if(canWrite(account,slot)!==true)reject(Error('session changed'));else resolve(result);};tx.onabort=()=>reject(tx.error||Error('read aborted'));
   });
  }
  async function replace({account,slot,expectedRevision,sha,payload}){
   const k=key(account,slot);
-  if(!Number.isSafeInteger(expectedRevision)||expectedRevision<0||expectedRevision>=Number.MAX_SAFE_INTEGER||!(payload instanceof Uint8Array)||!payload.length||payload.length>maxBytes||typeof sha!=='string'||!/^[0-9a-f]{64}$/.test(sha)||!canWrite(account,slot))throw Error('invalid or unavailable import');
+  if(!Number.isSafeInteger(expectedRevision)||expectedRevision<0||expectedRevision>=Number.MAX_SAFE_INTEGER||!(payload instanceof Uint8Array)||!payload.length||payload.length>maxBytes||typeof sha!=='string'||!/^[0-9a-f]{64}$/.test(sha)||canWrite(account,slot)!==true)throw Error('invalid or unavailable import');
   const bytes=new Uint8Array(payload);
   if(await sha256(bytes)!==sha)throw Error('save hash mismatch');
   // Codec must perform bounded decompression and full game validation before transaction.
   const data=await encode(bytes);
-  if(!await validate(data))throw Error('invalid game save');
+  if(await validate(data)!==true)throw Error('invalid game save');
   const db=await openDatabase();
-  if(!canWrite(account,slot))throw Error('session or game state changed');
+  if(canWrite(account,slot)!==true)throw Error('session or game state changed');
   return new Promise((resolve,reject)=>{
    const tx=db.transaction(storeName,'readwrite'),store=tx.objectStore(storeName),req=store.get(k);let result={ok:false},failure;
    req.onsuccess=()=>{
     try{
-     if(!canWrite(account,slot)||rev(req.result)!==expectedRevision)return;
+     if(canWrite(account,slot)!==true||rev(req.result)!==expectedRevision)return;
      const old=req.result;
      // Backup and replacement are one transaction. Retain latest prior generation.
      if(old?.data)store.put({...old,slot:JSON.stringify(['recovery-v1',account,slot])});
