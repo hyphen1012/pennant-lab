@@ -34,7 +34,7 @@ const pilotCode = `
     }catch{return false;}
   }
   function canonicalReset(){
-    canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;
+    canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';
     canonicalPilot.suspend();ui.clubDraft=null;ui.portalSlot=null;ui.portalOrigin=null;slotOpening=false;
     ui.page='title';ui.launchTitle=false;
   }
@@ -153,15 +153,21 @@ const pilotCode = `
     if(act==='order190-role'&&s.role&&!s.swap)document.querySelector('.order190 .order-detail')?.scrollIntoView?.({block:'nearest',behavior:'instant'});
     if(act==='order190-exchange'&&s.swap)document.querySelector('.order190 .order-field')?.scrollIntoView?.({block:'nearest',behavior:'instant'});
   }
+  let canonicalPlayback='normal',canonicalTarget=null,canonicalRunning=false,canonicalStop=false;
+  const canonicalCanRun=g=>!!g?.headquarters?.canCalendar&&!canonicalSnapshot?.pending?.length&&accountCurrent();
   function canonicalHqRender(){
     const app=$('#app'),g=canonicalSnapshot?.game,t=g?.team,v=g?.headquarters;if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-return">‹ データ選択</button></div>';
     if(!t||!v){app.innerHTML='<div class="setup-screen">'+top+'<p role="status">確定した日程を取得してください。自動再送は行いません。</p><button class="btn primary full" data-action="canonical-hq-refresh" '+(slotOpening?'disabled':'')+'>最新状態を取得</button></div>';return;}
-    const canStep=v.canStep&&!slotOpening&&!canonicalSnapshot.pending?.length&&accountCurrent();
-    const stop=slotOpening?'日程の確定を確認しています。':canonicalSnapshot.pending?.length?'報酬の確定確認が必要です。':!v.canStep?'確認が必要なイベントまたは日程の区切りです。未接続のイベント処理へは自動進行しません。':'';
+    const canStep=canonicalCanRun(g)&&!slotOpening&&!canonicalRunning;
+    const stop=slotOpening?'日程の確定を確認しています。':canonicalSnapshot.pending?.length?'報酬の確定確認が必要です。':!v.canCalendar?'確認が必要なイベントまたは日程の区切りです。未接続のイベント処理へは自動進行しません。':'';
     const last=v.last,score=last?'<div class="box-result"><span class="tag '+(last.ours>last.theirs?'green':last.ours<last.theirs?'red':'')+'">'+(last.ours>last.theirs?'勝利':last.ours<last.theirs?'敗戦':'引分')+'</span> <span class="small">'+last.year+'年 第'+last.day+'戦 / vs '+h(last.opponent)+'</span><div class="score-big">'+last.ours+' - '+last.theirs+'</div></div>':'<div class="empty">シーズンはまだ始まっていません。</div>';
+    const disabled=canStep?'':'disabled',modeButtons=[['normal','通常'],['fast','倍速'],['skip','日程スキップ']].map(([k,label])=>'<button class="chip '+(canonicalPlayback===k?'active':'')+'" data-action="canonical-hq-mode" data-mode="'+k+'" aria-pressed="'+(canonicalPlayback===k)+'" '+(canonicalRunning?'disabled':'')+'>'+label+'</button>').join('');
+    const targetValid=canonicalTarget&&canonicalTarget.world===canonicalSnapshot.world&&canonicalTarget.year===g.year&&g.calendarIndex<canonicalTarget.goal;
+    const controls='<section class="panel"><div class="panel-head"><h3 class="panel-title">日程を進める</h3><span class="pill">'+h(v.dateText)+'</span></div><div class="calendar-playback"><div class="calendar-speed">'+modeButtons+'</div></div><div class="calendar-target-grid"><button class="btn primary" data-action="canonical-hq-run" data-kind="date" '+disabled+'>▶ 1日進める</button><button class="btn soft" data-action="canonical-hq-run" data-kind="weekly" '+disabled+'>週次報告まで</button><button class="btn soft" data-action="canonical-hq-run" data-kind="month" '+disabled+'>月次報告まで</button></div><button class="btn outline full" data-action="canonical-hq-run" data-kind="season" '+disabled+'>シーズン終了まで進行</button>'+(canonicalRunning?'<button class="btn outline full" data-action="canonical-hq-pause" '+(canonicalStop?'disabled':'')+'>'+(canonicalStop?'停止確認中':'一時停止')+'</button><p role="status">確定済み日程 '+g.calendarIndex+' / '+(canonicalTarget?.goal||g.calendarIndex)+'</p>':targetValid?'<button class="btn primary full" data-action="canonical-hq-run" data-kind="resume" '+disabled+'>▶ 続きから</button>':'')+'<p class="tiny">通常報告は記録に保存し、重要なイベントでは停止します。</p></section>';
+    const reports='<section class="panel"><h3 class="panel-title">保存済み報告</h3>'+(v.latestMonth?'<p>'+h(v.latestMonth.month)+'：'+v.latestMonth.wins+'勝 '+v.latestMonth.losses+'敗 '+v.latestMonth.ties+'分</p>':'<p class="small">月次報告はまだありません。</p>')+v.latestMilestones.map(m=>'<div class="event">'+h(m.date)+' '+h(m.title)+'</div>').join('')+'</section>';
     const hero=frontOfficeHero(t,{year:g.year,gmName:g.gmName,day:g.day,fans:v.fans,salary:v.salary,rank:v.rank,opponent:v.opponent,dateText:v.dateText});
-    app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(t)+'">'+top+'<main class="main">'+hero+'<section class="panel desk-panel"><div class="desk-heading"><div><div class="eyebrow">GM DESK · FRONT OFFICE</div><h3>業務一覧</h3></div><button class="btn primary" data-action="canonical-hq-step" '+(canStep?'':'disabled')+'>▶ 1日進める</button></div>'+(g.club?'<button class="btn outline full" data-action="canonical-roster-open" '+(slotOpening?'disabled':'')+'>スタメン編成</button>':'')+'</section><section class="panel"><div class="panel-head"><h3 class="panel-title">直近の試合結果</h3></div>'+score+'</section>'+(stop?'<p role="status">'+h(stop)+'</p>':'')+'<p class="small">試験環境 · 本部の概要と1日進行のみ接続済み。イベント演出、その他の業務・倍速・スキップは未接続です。</p></main></div>';
+    app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(t)+'">'+top+'<main class="main">'+hero+'<section class="panel desk-panel"><div class="desk-heading"><div><div class="eyebrow">GM DESK · FRONT OFFICE</div><h3>業務一覧</h3></div><button class="btn primary" data-action="canonical-hq-step" '+(canStep?'':'disabled')+'>▶ 1日進める</button></div>'+(g.club?'<button class="btn outline full" data-action="canonical-roster-open" '+(slotOpening?'disabled':'')+'>スタメン編成</button>':'')+'</section>'+controls+'<section class="panel"><div class="panel-head"><h3 class="panel-title">直近の試合結果</h3></div>'+score+'</section>'+reports+(stop?'<p role="status">'+h(stop)+'</p>':'')+'<p class="small">試験環境 · 本部、日程進行、編成を接続済み。試合中継・新聞・全イベント画面は未接続です。</p></main></div>';
   }
   async function canonicalHqRequest(step){
     if(slotOpening||!accountCurrent()||!canonicalSlot)return;
@@ -177,6 +183,28 @@ const pilotCode = `
       if(epoch!==canonicalEpoch)return;
       canonicalSnapshot=null;
     }finally{if(epoch===canonicalEpoch){slotOpening=false;render();draftJump(scroll);}}
+  }
+  async function canonicalRun(kind){
+    const g=canonicalSnapshot?.game,world=canonicalSnapshot?.world;
+    if(slotOpening||canonicalRunning||!canonicalCanRun(g)||!['date','weekly','month','season','resume'].includes(kind))return;
+    if(kind==='season'&&!window.confirm('シーズン終了まで日程を進めますか？ 重要なイベントでは停止します。'))return;
+    if(kind!=='resume')canonicalTarget={world,year:g.year,goal:g.headquarters.goals[kind],kind};
+    const target=canonicalTarget;
+    if(!target||target.world!==world||target.year!==g.year||!Number.isSafeInteger(target.goal)||target.goal<=g.calendarIndex)return;
+    const epoch=canonicalEpoch;canonicalRunning=true;canonicalStop=false;slotOpening=true;render();
+    try{
+      while(epoch===canonicalEpoch&&!canonicalStop&&!document.hidden&&canonicalSnapshot?.world===world&&canonicalSnapshot.game.year===target.year&&canonicalSnapshot.game.calendarIndex<target.goal&&canonicalCanRun(canonicalSnapshot.game)){
+        if(canonicalPlayback!=='skip')await new Promise(resolve=>setTimeout(resolve,canonicalPlayback==='fast'?350:750));
+        if(epoch!==canonicalEpoch||canonicalStop||document.hidden)break;
+        const before=canonicalSnapshot.game.calendarIndex,result=await canonicalPilot.advance({calendar:'day'});
+        if(epoch!==canonicalEpoch)return;
+        if(result.status!=='ready'||result.snapshot.world!==world)throw Error('calendar observation required');
+        canonicalSnapshot=result.snapshot;render();
+        if(canonicalSnapshot.game.calendarIndex===before)break;
+      }
+      if(canonicalSnapshot&&(canonicalSnapshot.game.calendarIndex>=target.goal||canonicalSnapshot.game.year!==target.year))canonicalTarget=null;
+    }catch{if(epoch===canonicalEpoch)canonicalSnapshot=null;}
+    finally{if(epoch===canonicalEpoch){canonicalRunning=false;canonicalStop=false;slotOpening=false;render();}}
   }
   let canonicalHqWorld=null;
   function canonicalHqOpen(){if(!canonicalSnapshot?.game?.headquarters||slotOpening||!accountCurrent())return;canonicalHqWorld=canonicalSnapshot.world;ui.page='canonical-hq';render();window.scrollTo(0,0);}
@@ -199,13 +227,15 @@ const pilotCode = `
   document.addEventListener('click',e=>{
     const b=e.target.closest?.('[data-action]');if(!b)return;
     const act=b.dataset.action;
-    if(slotOpening){e.preventDefault();e.stopImmediatePropagation();return;}
+    if(slotOpening){e.preventDefault();e.stopImmediatePropagation();if(ui.page==='canonical-hq'&&act==='canonical-hq-pause'&&canonicalRunning){canonicalStop=true;render();}return;}
     if(ui.page==='title'&&ui.launchTitle&&['launch-start','launch-back'].includes(act)||ui.page==='title'&&!ui.launchTitle&&act==='launch-back'||ui.page==='setup'&&['setup-league','pick-setup-team','team-color','club-design'].includes(act))return;
     e.preventDefault();e.stopImmediatePropagation();
     if(ui.page==='title'&&!ui.launchTitle&&['new-slot','continue-slot'].includes(act))void openCanonicalSlot(b,act==='new-slot');
     else if(ui.page==='title'&&act==='canonical-retry'||act==='canonical-return'||ui.page==='setup'&&act==='title')void canonicalReturn();
     else if(ui.page==='canonical-ready'&&act==='canonical-hq-open')canonicalHqOpen();
-    else if(ui.page==='canonical-hq'&&act==='canonical-hq-step')void canonicalHqRequest(true);
+    else if(ui.page==='canonical-hq'&&act==='canonical-hq-step')void canonicalRun('date');
+    else if(ui.page==='canonical-hq'&&act==='canonical-hq-run')void canonicalRun(b.dataset.kind);
+    else if(ui.page==='canonical-hq'&&act==='canonical-hq-mode'&&['normal','fast','skip'].includes(b.dataset.mode)){canonicalPlayback=b.dataset.mode;render();}
     else if(ui.page==='canonical-hq'&&act==='canonical-hq-refresh')void canonicalHqRequest(false);
     else if(['canonical-ready','canonical-hq'].includes(ui.page)&&act==='canonical-roster-open')canonicalRosterOpen();
     else if(ui.page==='canonical-roster'&&act==='canonical-roster-refresh')void canonicalRosterRequest(null);

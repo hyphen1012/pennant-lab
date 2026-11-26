@@ -204,3 +204,7 @@ Extract the original v190 field/order markup into a shared renderer. Staging pil
 
 ## Canonical world CAS and headquarters first slice (staging)
 Advance requires the exact world UUID and revision before decoding state. The two remaining direct regression callers were updated. Headquarters pilot reuses the original hero, displays bounded date/rank/payroll/fans/opponent and last score, and sends one calendar-day command. All unsupported event boundaries remain blocked, never acknowledged silently. Lost replies clear the screen until a same-world read; no replay. Full duty navigation, event screens, speed and skip remain open. Public PR81 is independent; no production authority activation.
+
+
+## Canonical calendar playback slice (staging)
+Expose existing calendar targets and bounded routine report summaries. Authenticated day command defers only verified archived non-explicit reports, never important events. Fix invalid milestone deferral function reference. Client loops over individually committed days with normal/fast/skip pacing, explicit season confirmation, pause at request boundary, same-session resume, visibility stop and no mutation retry. Full match/news presentation, full archives, durable cross-session playback target and event UI remain open. Long-term load is not yet qualified; no production activation.

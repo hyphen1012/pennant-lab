@@ -65,6 +65,8 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   lostAdvance=true;await page.locator('[data-action="canonical-hq-step"]').click();await page.getByText('確定した日程を取得してください。自動再送は行いません。').waitFor();a.equal(await page.locator('.hero-stadium').count(),0);a.equal(advances,3);
   await page.locator('[data-action="canonical-hq-refresh"]').click();await page.locator('.hero-stadium').waitFor();
   const afterDay=await post('read',{slot:1});a.equal(afterDay.revision,beforeDay.revision+1);a.equal(afterDay.game.calendarIndex,beforeDay.game.calendarIndex+1);a.equal(advances,3);
+  await page.locator('[data-action="canonical-hq-mode"][data-mode="skip"]').click();const beforeWeekly=await post('read',{slot:1});
+  if(beforeWeekly.game.headquarters.canCalendar){await page.locator('[data-action="canonical-hq-run"][data-kind="weekly"]').click();await page.waitForFunction(()=>!document.querySelector('[data-action="canonical-hq-pause"]'),null,{timeout:30000});const afterWeekly=await post('read',{slot:1});a.ok(afterWeekly.game.calendarIndex>beforeWeekly.game.calendarIndex);a.ok(afterWeekly.game.calendarIndex<=beforeWeekly.game.headquarters.goals.weekly);a.ok(afterWeekly.game.calendarIndex===beforeWeekly.game.headquarters.goals.weekly||!afterWeekly.game.headquarters.canCalendar);a.equal(afterWeekly.revision-beforeWeekly.revision,afterWeekly.game.calendarIndex-beforeWeekly.game.calendarIndex);}
   await page.locator('[data-action="canonical-return"]').first().click();await slot(1).waitFor();
   a.equal(await slot(1).getAttribute('data-action'),'continue-slot');
   await slot(2).click();await page.getByText('サーバー保存の確認画面（開発試験）').waitFor();

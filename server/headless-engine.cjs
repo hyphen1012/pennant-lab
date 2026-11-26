@@ -56,11 +56,20 @@ function createHeadlessEngine(){
  };
  const canManage=()=>team.cash>=0&&!game.financeCrisis&&!flowInbox()&&!game.pendingMonth&&!game.pendingReview&&!pendingMilestoneNews().length&&!flowForeignResponse()&&!game.ceremonyStage&&!flowGet()?.active&&game.pendingCeremonyIntro!=='opening';
  const canStep=()=>!!calendarNextDay()&&game.day<143&&!game.financeCrisis&&!flowGet()&&game.pendingCeremonyIntro!=='opening'&&!game.pendingDraftReveal&&game.pendingDecade==null&&!pendingRareNews().length&&!game.pendingMilestoneIds?.length&&!game.pendingEvent&&!game.pendingMonth&&!game.pendingReview&&!careerEventPending()&&!flowForeignResponse();
+ const archivedMonth=()=>!!(game.pendingMonth&&game.monthlyArchive?.some(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id));
+ const archivedMilestones=()=>!!game.pendingMilestoneIds?.length&&game.pendingMilestoneIds.every(id=>(game.milestoneNews||[]).some(m=>m.id===id));
+ const archivedReview=()=>!!(game.pendingReview&&game.games.some(g=>g.id===game.pendingReview.gameId&&g.year===game.pendingReview.year&&(g.home===team.id||g.away===team.id)));
+ const canCalendar=()=>!!calendarNextDay()&&game.day<143&&!game.financeCrisis&&!flowGet()&&game.pendingCeremonyIntro!=='opening'&&!game.pendingDraftReveal&&game.pendingDecade==null&&!pendingRareNews().length&&!game.pendingEvent&&!careerEventPending()&&!flowForeignResponse()&&(!game.pendingMonth||!game.pendingMonth.explicit&&archivedMonth())&&(!game.pendingReview||!game.pendingReview.explicit&&archivedReview())&&(!game.pendingMilestoneIds?.length||archivedMilestones());
+ const deferRoutine=()=>{
+  if(game.pendingMonth&&!game.pendingMonth.explicit&&archivedMonth())game.pendingMonth=null;
+  if(game.pendingReview&&!game.pendingReview.explicit&&archivedReview())game.pendingReview=null;
+  if(archivedMilestones()){game.pendingMilestoneIds=[];game.milestoneResume=false;game.milestoneEdition=null;game.milestonePage=0;}
+ };
  const headquartersView=()=>{
   const next=game.day<143?game.schedule[game.day]?.find(m=>m.home===team.id||m.away===team.id):null;
   const opp=next?getTeam(next.home===team.id?next.away:next.home):null;
   const last=gameByTeam(team.id),lastOpp=last?getTeam(last.home===team.id?last.away:last.home):null;
-  return {dateText:getDayText(),fans:game.fans,salary:payroll(team),rank:rankings(team.league).findIndex(t=>t.id===team.id)+1,opponent:opp?.short||null,canStep:canStep(),last:last&&lastOpp?{year:last.year,day:last.day,opponent:lastOpp.name,ours:last.home===team.id?last.homeScore:last.awayScore,theirs:last.home===team.id?last.awayScore:last.homeScore}:null};
+  return {dateText:getDayText(),fans:game.fans,salary:payroll(team),rank:rankings(team.league).findIndex(t=>t.id===team.id)+1,opponent:opp?.short||null,canStep:canStep(),canCalendar:canCalendar(),goals:Object.fromEntries(['date','weekly','month','season'].map(kind=>[kind,calendarGoalFor(kind,game.calendar.days,game.calendarIndex)])),latestMonth:(game.monthlyArchive||[]).filter(m=>m.teamId===team.id).slice(-1).map(m=>({month:m.month,date:m.date,wins:m.wins,losses:m.losses,ties:m.ties}))[0]||null,latestMilestones:(game.milestoneNews||[]).slice(-5).map(m=>({date:m.date,title:m.title})),last:last&&lastOpp?{year:last.year,day:last.day,opponent:lastOpp.name,ours:last.home===team.id?last.homeScore:last.awayScore,theirs:last.home===team.id?last.awayScore:last.homeScore}:null};
  };
  const freeVisible=()=>!game.pendingDraftReveal&&!flowForeignResponse();
  const freeList=()=>freeAgents().filter(p=>!p.retired);
@@ -264,7 +273,7 @@ function createHeadlessEngine(){
    game.pendingMonth=null;
   }else if(kind==='milestones'){
    if(!game.pendingMilestoneIds?.length)throw Error('no milestone notices');
-   deferSeasonMilestones(game.pendingMilestoneIds);
+   if(!archivedMilestones())throw Error('milestone notices not archived');
    game.pendingMilestoneIds=[];game.milestoneResume=false;game.milestoneEdition=null;game.milestonePage=0;
    }else if(kind==='injury'){
    const e=injuryNotice();
@@ -669,11 +678,17 @@ function createHeadlessEngine(){
  if(op==='advance'){
   // Verified entitlement is supplied by the authority, not a command or save.
   vipStatusProvider=()=>({verified:true,vip:input.verifiedVip===true});
+  if(input.routine===true){
+   if(!canCalendar())throw Error('calendar boundary');
+   deferRoutine();
+  }
   if(game.day>=143||game.financeCrisis||flowGet()||game.pendingCeremonyIntro==='opening'||game.pendingDraftReveal||game.pendingDecade!=null)throw Error('pilot season boundary');
   if(pendingRareNews().length||game.pendingMilestoneIds?.length||game.pendingEvent||game.pendingMonth||game.pendingReview||careerEventPending()||flowForeignResponse())throw Error('pilot event acknowledgement required');
   if(checkFinanceCrisis(calendarNextDay()?.date||game.calendar.endDate))return JSON.stringify(game);
   const e=processCalendarDay();if(!e)throw Error('calendar ended');
   collectMilestoneNews(e);scoutDiscoveryDaily(e);rareDaily(e);careerDecisionTick(e);
+  if(input.routine===true)deferRoutine();
+  checkFinanceCrisis(calendarNextDay()?.date||game.calendar.endDate);
   return JSON.stringify(game);
  }
  if(op==='achievements'){
@@ -870,7 +885,7 @@ function createHeadlessEngine(){
    if(exact(command,['career','playerId','options'])&&command.career==='accept'&&Number.isSafeInteger(command.playerId)&&Array.isArray(command.options)&&command.options.length<=5&&command.options.every(x=>typeof x==='string'))return run('career',state,{choice:'accept',playerId:command.playerId,options:command.options});
    if(exact(command,['career','playerId'])&&command.career==='dismiss'&&Number.isSafeInteger(command.playerId))return run('career',state,{choice:'dismiss',playerId:command.playerId});
    if(exact(command,['acknowledge','playerId'])&&command.acknowledge==='rookie-reveal'&&Number.isSafeInteger(command.playerId))return run('ack',state,{kind:'rookie-reveal',playerId:command.playerId});
-   if(exact(command,['acknowledge'])&&['month','milestones','rookie-finish','opening'].includes(command.acknowledge))return run('ack',state,{kind:command.acknowledge});if(!exact(command,['step'])||command.step!==1)throw Error('pilot accepts one calendar day or explicit report acknowledgement');return run('advance',state,{verifiedVip:rights?.verified===true&&rights.vip===true});},
+   if(exact(command,['acknowledge'])&&['month','milestones','rookie-finish','opening'].includes(command.acknowledge))return run('ack',state,{kind:command.acknowledge});if(exact(command,['calendar'])&&command.calendar==='day')return run('advance',state,{verifiedVip,routine:true});if(!exact(command,['step'])||command.step!==1)throw Error('pilot accepts one calendar day or explicit report acknowledgement');return run('advance',state,{verifiedVip:rights?.verified===true&&rights.vip===true});},
   // Trusted persisted state, minimal public projection without a VM run or
   // allocation of the historical world. Never return player or prospect data.
   preview(state){
