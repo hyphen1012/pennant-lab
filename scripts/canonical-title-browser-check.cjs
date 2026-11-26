@@ -8,7 +8,7 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
  let clockOffset=0,fixtureRookie=false;
  const engine=createHeadlessEngine();
  // Isolated third-slot fixture, persisted through the real HTTP authority.
- const fixtureEngine={...engine,newWorld(command){const w=engine.newWorld(command);if(fixtureRookie){const p=w.players.find(p=>p.teamId===w.selectedId&&!p.retired);a.ok(p);w.pendingDraftReveal={year:w.year-1,entries:[{id:p.id,revealStage:0}]};}return w;}};
+ const fixtureEngine={...engine,newWorld(command){const w=engine.newWorld(command);if(fixtureRookie){const p=w.players.find(p=>p.teamId===w.selectedId&&!p.retired);a.ok(p);w.pendingDraftReveal={year:w.year-1,entries:[{id:p.id,revealStage:0}]};const injured=w.players.find(q=>q.id!==p.id&&q.teamId===w.selectedId&&!q.retired);a.ok(injured);injured.injury={date:w.year+'-03-01',daysLeft:8,label:'試験用負傷'};w.memorialHistory={...(w.memorialHistory||{}),'fixture:facility':{id:'fixture:facility',year:w.year,teamId:w.selectedId,kind:'facility',title:'試験用施設実績',body:'隔離試験用'}};}return w;}};
  const runtime=createServiceRuntime({now:()=>Date.now()+clockOffset,dataDir:dir,authenticate:async t=>t==='a'?{authenticated:true,account:owner}:{authenticated:false},verifyRecentReauth:deny,verifyReceipt:deny,verifyCurrent:deny,verifyNotification:deny,verifyEvent:deny,verifyAction:deny,verifyCompletion:deny,canonicalEngine:fixtureEngine,units:{android:{unit:'123',item:'ticket',amount:1}},origins:[]});
  let browser;
  try{
@@ -32,7 +32,7 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/native-runtime.js',r=>r.fulfill({contentType:'application/javascript',body:fixture}));
   await page.route('**/*.mp4',r=>r.abort()); // startup video has its own independent audit
-  let creates=0,lost=false,failSlots=false,lostAdvance=false,advances=0,freeReads=0,failFree=false;
+  let creates=0,lost=false,failSlots=false,lostAdvance=false,advances=0,freeReads=0,failFree=false,lostSettle=false,settles=0,reserves=0;
   await page.route('**/canonical-fixture/v1/**',async r=>{
    const q=r.request(),p=new URL(q.url()).pathname.replace('/canonical-fixture','');
    if(p.endsWith('/slots')&&failSlots){await r.abort();return;}
@@ -41,6 +41,8 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
    const body=await response.text();
    if(p.endsWith('/create')){creates++;if(lost){lost=false;a.equal(response.status,200);await r.abort();return;}}
    if(p.endsWith('/advance')){advances++;if(lostAdvance){lostAdvance=false;a.equal(response.status,200);await r.abort();return;}}
+   if(p.endsWith('/game/reserve'))reserves++;
+   if(p.endsWith('/game/settle')){settles++;if(lostSettle){lostSettle=false;a.equal(response.status,200);await r.abort();return;}}
    if(response.status===429)throw Error('Unexpected fixture rate limit: '+p);
    await r.fulfill({status:response.status,contentType:'application/json',body});
   });
@@ -212,6 +214,30 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   await finishRookie.click();await page.getByText('現在対応する年間業務はありません。').waitFor();
   const finishedRookie=await post('read',{slot:3});a.equal(finishedRookie.revision,finalRookie.revision+1);a.equal(finishedRookie.game.inbox.rookie,null);a.ok(finishedRookie.game.club);
   console.log('PASS actual browser rookie stages, foreign command hold, lost response recovery without automatic replay');
+  // Isolated fixture uses persisted injury and memorial evidence, not fake ad proof.
+  clockOffset+=61000;
+  await page.locator('[data-action="canonical-rewards-open"]').click();
+  await page.locator('[data-action="canonical-achievements-open"]').waitFor();
+  const beforeReward=await post('read',{slot:3});
+  a.equal(beforeReward.wallet.tickets,0);a.equal(beforeReward.wallet.points,0);
+  const target=beforeReward.actions.find(x=>x.route==='medical');a.ok(target);
+  const injured=beforeReward.game.club.roster.find(x=>x.injuryDays===8);a.ok(injured);
+  await page.locator('[data-action="canonical-achievements-open"]').click();
+  const claim=page.locator('article.panel').filter({has:page.getByRole('heading',{name:'試験用施設実績'})}).locator('[data-choice="point"]');
+  await claim.waitFor();page.once('dialog',d=>d.accept());await claim.click();
+  await page.getByText('受け取りを確認しました：ポイント 1').waitFor();
+  a.equal((await post('read',{slot:3})).wallet.points,1);
+  await page.locator('[data-action="canonical-achievements-back"]').click();await page.locator('[data-action="canonical-ticket-exchange"]:enabled').waitFor();
+  page.once('dialog',d=>d.accept());await page.locator('[data-action="canonical-ticket-exchange"]').click();await page.getByText('広告券への交換を確認しました。').waitFor();
+  const exchanged=await post('read',{slot:3});a.equal(exchanged.wallet.points,0);a.equal(exchanged.wallet.tickets,1);a.equal(exchanged.revision,beforeReward.revision);
+  const use=page.locator('[data-action="canonical-rewards-command"][data-id="'+target.operationId+'"]');
+  lostSettle=true;page.once('dialog',d=>d.accept());await use.click();
+  await page.getByText('報酬の確定状態を取得してください。自動再送は行いません。').waitFor();
+  a.equal(reserves,1);a.equal(settles,1);
+  await page.locator('[data-action="canonical-rewards-refresh"]').click();await page.locator('[data-action="canonical-achievements-open"]').waitFor();
+  const afterReward=await post('read',{slot:3});a.equal(afterReward.revision,beforeReward.revision+1);a.equal(afterReward.wallet.tickets,0);a.equal(afterReward.game.club.roster.find(x=>x.id===injured.id).injuryDays,4);a.equal(afterReward.pending.length,0);a.equal(afterReward.actions.some(x=>x.operationId===target.operationId),false);a.equal(reserves,1);a.equal(settles,1);
+  const medicalOrder=await post('order',{slot:3,operationId:target.operationId});a.equal(medicalOrder.order.status,'committed');a.equal(medicalOrder.order.result.before,8);a.equal(medicalOrder.order.result.after,4);
+  console.log('PASS real HTTP memorial claim, ticket exchange and treatment, lost committed response without duplicate charge');
   a.deepEqual(errors,[]);console.log('PASS packaged canonical title, actual HTTP create/reopen, lost commit recovery, offline and local save isolation');
  }finally{await browser?.close();await runtime.close();fs.rmSync(dir,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

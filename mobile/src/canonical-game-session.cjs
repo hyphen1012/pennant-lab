@@ -71,6 +71,12 @@ function createCanonicalGameSession({client,online=()=>true}={}){
   });
   return {...r,rewardStatus:r.status==='ready'?outcome:null};
  }
+ async function exchangeTicket(confirmed){
+  if(confirmed!==true||status!=='ready'||!snapshot||snapshot.pending?.length||!snapshot.wallet||snapshot.wallet.points<1||snapshot.wallet.tickets>=30||typeof client.exchange!=='function')throw Error('explicit ticket exchange unavailable');
+  let exchanged=false;
+  const r=await run('exchange',async(t,old)=>{const x=await client.exchange('ticket');if(!current(t))throw Error('session changed');exchanged=x.ok===true;return client.gameRead(t.slot);});
+  return {...r,exchangeOk:r.status==='ready'?exchanged:null};
+ }
  async function reportPage(command){return readPage('gameReportPage',command);}
  async function achievementPage(command){return readPage('gameAchievementPage',command);}
  async function claimAchievement(id,choice,confirmed){
@@ -95,6 +101,6 @@ function createCanonicalGameSession({client,online=()=>true}={}){
    snapshot=null;status='refresh-required';return {status};
   }finally{if(current(t))active=null;}
  }
- return Object.freeze({setSession,suspend,select,refresh,create,advance,inspect,freePage,playerPage,listSlots,reward,achievementPage,claimAchievement,reportPage});
+ return Object.freeze({setSession,suspend,select,refresh,create,advance,inspect,freePage,playerPage,listSlots,reward,achievementPage,claimAchievement,reportPage,exchangeTicket});
 }
 module.exports={createCanonicalGameSession};
