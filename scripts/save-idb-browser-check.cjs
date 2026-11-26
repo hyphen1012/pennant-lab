@@ -30,6 +30,26 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),{chromium}=requ
   assert.equal(result.backup.revision,1);assert.equal(result.backup.data.value,1);assert.equal(result.current.revision,2);
   assert.ok(result.invalid&&result.protectedSlot&&result.protectedGame&&result.switched);
   assert.equal(result.guest.data.guest,true);assert.equal(result.other.revision,4);assert.equal(result.other.data.value,9);
+  // Run the actual game's storage functions in two independent JS closures on
+  // the same origin. This exercises the exact DB implementation in index.html.
+  const source=fs.readFileSync('index.html','utf8'),start=source.indexOf("  const DB_NAME='pennant_lab_v04_saves'"),end=source.indexOf('  function validateSave(data){',start);
+  assert.ok(start>=0&&end>start);
+  const gameStore=source.slice(start,end);
+  await page.addScriptTag({content:'window.newGameStore=()=>{'+gameStore+';return {readDatabaseSlot,writeDatabaseSlot,deleteDatabaseSlot};};'});
+  const guestResult=await page.evaluate(async()=>{
+   const a=newGameStore(),b=newGameStore();
+   await a.readDatabaseSlot(1);await b.readDatabaseSlot(1);
+   await a.writeDatabaseSlot(1,JSON.stringify({saved:1}));
+   let conflict=false;try{await b.writeDatabaseSlot(1,JSON.stringify({saved:2}));}catch(e){conflict=e.code==='save_conflict';}
+   const current=await b.readDatabaseSlot(1);
+   await a.deleteDatabaseSlot(1);
+   let stale=false;try{await b.writeDatabaseSlot(1,JSON.stringify({saved:3}));}catch(e){stale=e.code==='save_conflict';}
+   const deleted=await b.readDatabaseSlot(1);
+   await b.writeDatabaseSlot(1,JSON.stringify({saved:4}));
+   return {conflict,stale,current,deleted,latest:await a.readDatabaseSlot(1)};
+  });
+  assert.ok(guestResult.conflict&&guestResult.stale);
+  assert.deepEqual(guestResult.current,{saved:1});assert.equal(guestResult.deleted,null);assert.deepEqual(guestResult.latest,{saved:4});
   console.log('PASS real Chromium IndexedDB CAS, recovery generation and account isolation');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
