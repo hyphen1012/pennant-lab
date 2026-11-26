@@ -259,3 +259,6 @@ Reuse original player cards and standings table with explicit projection argumen
 
 ### Rare notice / rookie disclosure follow-up (draft)
 Reuse existing news, medical, consult, farewell and join cinema helpers. Archived news text is exposed only for confirmed registered players; unresolved or prospect news is category-only. Rookie past-life appearance is projected only at stage 2, permitting the original composite cinema when eligible. No invented article or asset. No production enablement. Visual/audio parity and device walkthrough remain open.
+
+## Consolidated inbox branch
+PR107 retains its stronger disclosure and cinema projection; PR106's packaged browser rookie response-loss fixture, unrelated command guard and decade regression are ported. Do not merge both siblings independently. No production changes.
