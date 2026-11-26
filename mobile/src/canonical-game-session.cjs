@@ -87,6 +87,18 @@ function createCanonicalGameSession({client,online=()=>true}={}){
   });
   return {...r,rewardStatus:r.status==='ready'?outcome:null};
  }
+ async function readEntitlements(){
+  if(!session||typeof client.entitlements!=='function')throw Error('verified rights unavailable');
+  const t=start(false);
+  try{
+   if(!await online()||!current(t))throw Error('connection unavailable');
+   const r=await client.entitlements();
+   if(!current(t))return {status:'stale'};
+   if(r?.verified!==true||r.account!==t.account||typeof r.entitlements?.adSkip?.active!=='boolean'||typeof r.entitlements?.vip?.active!=='boolean')throw Error('rights unavailable');
+   return {status:'ready',rights:structuredClone({serverNow:r.serverNow,adSkip:r.entitlements.adSkip,vip:r.entitlements.vip})};
+  }catch{return {status:current(t)?'unavailable':'stale'};}
+  finally{if(current(t))active=null;}
+ }
  async function exchangeTicket(confirmed){
   if(confirmed!==true||status!=='ready'||!snapshot||snapshot.pending?.length||!snapshot.wallet||snapshot.wallet.points<1||snapshot.wallet.tickets>=30||typeof client.exchange!=='function')throw Error('explicit ticket exchange unavailable');
   let exchanged=false;
@@ -118,6 +130,6 @@ function createCanonicalGameSession({client,online=()=>true}={}){
    snapshot=null;status='refresh-required';return {status};
   }finally{if(current(t))active=null;}
  }
- return Object.freeze({setSession,suspend,select,refresh,create,deleteWorld,advance,inspect,freePage,playerPage,listSlots,reward,achievementPage,claimAchievement,reportPage,exchangeTicket,tradePage});
+ return Object.freeze({setSession,suspend,select,refresh,create,deleteWorld,advance,inspect,freePage,playerPage,listSlots,reward,achievementPage,claimAchievement,reportPage,exchangeTicket,readEntitlements,tradePage});
 }
 module.exports={createCanonicalGameSession};
