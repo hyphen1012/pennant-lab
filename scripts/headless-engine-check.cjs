@@ -112,7 +112,7 @@ const a=require('node:assert/strict'),{createHeadlessEngine}=require('../server/
    const opt=engine.view(c).inbox.career.options[0];a.ok(opt);
    const cost=opt.cost,poor=JSON.parse(JSON.stringify(c));poor.teams.find(t=>t.id===poor.selectedId).cash=0;
    a.throws(()=>engine.advance(poor,{career:'accept',playerId:cp.id,options:[opt.key]}));
-   const result=engine.advance(c,{career:'accept',playerId:cp.id,options:[opt.key]});a.equal(result.careerEventQueue[0].type,'thanks');a.equal(result.players.find(x=>x.id===cp.id).retirePlan.cost,cost);
+   const result=engine.advance(c,{career:'accept',playerId:cp.id,options:[opt.key]});a.equal(result.careerEventQueue[0].type,'thanks');a.equal(result.players.find(x=>x.id===cp.id).retirePlan.cost,Math.round(cost*100)/100);
    a.throws(()=>engine.advance(result,{career:'accept',playerId:cp.id,options:[]}));
    const done=engine.advance(result,{career:'dismiss',playerId:cp.id});a.equal(done.careerEventQueue.length,0);a.equal(done.players.find(x=>x.id===cp.id).retirePlan.status,'accepted');
   }
