@@ -12225,9 +12225,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const q=items.filter(q=>{
       if(q.lv>=20)return false;
       if(q.k==='park'&&q.lv>=15)return !!park&&park.viable&&t.cash>=park.required;
-      // Trial C: reserve existing earmarked cash against competing elite upgrades only.
-      // Ordinary upgrades and the established operating/park viability checks are unchanged.
-      return q.cost<=(q.lv>=15?capitalBudget:budget)&&t.cash-q.cost>=reserve&&forecast-q.extra>(q.lv>=15?5:1)&&(q.k!=='park'||fill>=.78)&&(q.lv<15||t.cash-q.cost>=r2(eliteOperatingReserve(reserve)+hold));
+      // Trial D: protect half of the existing park earmark against competing elite upgrades.
+      // Compare with trial C's full protection; all shared prices, reserve, and upkeep remain unchanged.
+      return q.cost<=(q.lv>=15?capitalBudget:budget)&&t.cash-q.cost>=reserve&&forecast-q.extra>(q.lv>=15?5:1)&&(q.k!=='park'||fill>=.78)&&(q.lv<15||t.cash-q.cost>=r2(eliteOperatingReserve(reserve)+hold*.5));
     }).sort((p,q)=>(q.k==='park'&&hold>0?1:0)-(p.k==='park'&&hold>0?1:0)||q.score-p.score)[0];
     if(!q)return false;
     if(!(q.stadium?stadiumResize(t,q.k,1):infraUpgrade(t,q.k)))return false;
