@@ -57,7 +57,9 @@ function createPurchaseService({registry,authenticate,verifyReceipt,verifyCurren
  }
  async function notification(store,proof){
   if(!['apple','google'].includes(store)||typeof proof!=='string'||!proof||proof.length>65536)throw Error('invalid notification');
-  const v=fresh(await verifyNotification({store,proof}));
+  const verified=await verifyNotification({store,proof});
+  if(verified?.verified===true&&verified.ignored===true)return {recorded:false,ignored:true};
+  const v=fresh(verified);
   if(v.store!==store||v.verified!==true)throw Error('notification not verified');
   const old=registry.find(store,v.chain);
   // Unknown transactions must first be bound through authenticated restore.

@@ -1,11 +1,11 @@
 // Compose existing authenticated services on one listener behind a TLS ingress.
 const http=require('node:http');
-function createServiceRouter({accountHttp,saveHttp,adService,deletionService,allowRequest,origins=[]}={}){
+function createServiceRouter({accountHttp,saveHttp,adService,deletionService,storeNotifications=null,allowRequest,origins=[]}={}){
  const account=accountHttp?.listeners('request')?.[0],save=saveHttp?.listeners('request')?.[0];
  if(typeof account!=='function'||typeof save!=='function'||!adService||!deletionService||typeof allowRequest!=='function'||!Array.isArray(origins)||origins.some(x=>typeof x!=='string'||!(/^(https:\/\/[^/]+|capacitor:\/\/localhost|http:\/\/localhost)$/.test(x))))throw Error('service router configuration required');
  const allowed=new Set(origins),metrics={requests:0,rejected:0,errors:0};
  const json=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data));};
- async function read(req){if(req.headers['content-encoding']||!/^application\/json(?:;\s*charset=utf-8)?$/i.test(req.headers['content-type']||''))throw Error('json required');let n=0,parts=[];for await(const b of req){n+=b.length;if(n>16384)throw Error('request too large');parts.push(b);}const x=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(parts,n)));if(!x||Object.getPrototypeOf(x)!==Object.prototype)throw Error('invalid json');return x;}
+ async function read(req,limit=16384){if(req.headers['content-encoding']||!/^application\/json(?:;\s*charset=utf-8)?$/i.test(req.headers['content-type']||''))throw Error('json required');let n=0,parts=[];for await(const b of req){n+=b.length;if(n>limit)throw Error('request too large');parts.push(b);}const x=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(parts,n)));if(!x||Object.getPrototypeOf(x)!==Object.prototype)throw Error('invalid json');return x;}
  const exact=(b,keys)=>Object.keys(b).length===keys.length&&keys.every(k=>Object.hasOwn(b,k));
  const handlers={
   '/v1/ads/issue':['issue',['operationId','attempt','platform']],
@@ -29,6 +29,22 @@ function createServiceRouter({accountHttp,saveHttp,adService,deletionService,all
     if(req.method!=='GET'||req.headers['transfer-encoding']||Number(req.headers['content-length']||0)!==0||req.url.length>8300)return reject(400,'invalid_callback');
     if(await allowRequest({token:'admob-callback',remoteAddress:req.socket.remoteAddress,route:'ssv'})!==true)return reject(429,'rate_limited');
     await adService.callback(req.url.slice('/v1/admob/ssv?'.length));return json(res,200,{accepted:true});
+   }
+   if(req.url==='/v1/store/apple-notification'||req.url==='/v1/store/google-notification'){
+    if(!storeNotifications)return reject(503,'store_notifications_disabled');
+    if(req.method!=='POST')return reject(405,'method_not_allowed');
+    if(await allowRequest({token:'store-notification',remoteAddress:req.socket.remoteAddress,route:'ssv'})!==true)return reject(429,'rate_limited');
+    const b=await read(req,131072);
+    if(req.url.includes('apple')){
+     if(!exact(b,['signedPayload'])||typeof b.signedPayload!=='string'||b.signedPayload.length>65536)return reject(400,'invalid_notification');
+     await storeNotifications.notification('apple',b.signedPayload);
+    }else{
+     const token=/^Bearer ([A-Za-z0-9._-]{1,4096})$/.exec(req.headers.authorization||'')?.[1];
+     if(!token)return reject(401,'authentication_required');
+     const proof=await storeNotifications.verifyGooglePush(token,b);
+     if(proof!==null)await storeNotifications.notification('google',JSON.stringify(proof));
+    }
+    res.writeHead(204);return res.end();
    }
    if(/^\/v1\/saves(?:\/|$)/.test(req.url))return await save(req,res);
    if(Object.hasOwn(handlers,req.url)){
