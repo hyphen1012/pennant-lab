@@ -1,0 +1,20 @@
+name: Store provider adapter verification
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'server/**'
+      - 'scripts/store-provider-check.cjs'
+      - '.github/workflows/store-provider.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --prefix server --ignore-scripts
+      - run: node -e "const a=require('./server/node_modules/@apple/app-store-server-library'); const g=require('./server/node_modules/google-auth-library'); if(!a.AppStoreServerAPIClient||!a.SignedDataVerifier||!g.GoogleAuth||!g.OAuth2Client)process.exit(1)"
+      - run: node scripts/store-provider-check.cjs
+      - run: node scripts/service-runtime-check.cjs

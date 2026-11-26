@@ -140,3 +140,6 @@ jobs:
 
       - run: node scripts/deletion-ssv-adapter-check.cjs
         if: always()
+
+      - run: node scripts/store-provider-check.cjs
+        if: always()
