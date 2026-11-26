@@ -17,6 +17,16 @@ on:
       - 'scripts/farm-check.cjs'
       - '.github/workflows/long-run.yml'
 
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'scripts/long-run.cjs'
+      - '.github/workflows/long-run.yml'
+
+concurrency:
+  group: endurance-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
