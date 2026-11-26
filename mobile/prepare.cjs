@@ -48,7 +48,12 @@ replace('<script>','<script src="native-runtime.js"></script>\n<script>');
 // Native-only privacy entry is inserted beside the title slot list.
 html=html.replace('<div class="title-slot-title">','<button type="button" class="btn outline full" data-mobile-privacy>広告プライバシー設定</button><div class="title-slot-title">');
 if(production||canonicalUiPilot)html=require('./release-surface.cjs').releaseSurface(html);
-if(canonicalUiPilot)html=require('./canonical-title-pilot.cjs').canonicalTitlePilot(html);
+if(canonicalUiPilot){
+ html=require('./canonical-title-pilot.cjs').canonicalTitlePilot(html);
+ // Staging only. The approved startup video and its encoded audio are untouched.
+ fs.copyFileSync(path.join(__dirname,'src/scene-audio.js'),path.join(out,'scene-audio.js'));
+ html=html.replace('<script>','<script src="scene-audio.js"></script>\n<script>');
+}
 const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];if(!script)throw Error('game script missing');new Function(script);
 fs.writeFileSync(path.join(out,'index.html'),html);
 esbuild.buildSync({entryPoints:[path.join(__dirname,'src/index.js')],bundle:true,format:'iife',platform:'browser',outfile:path.join(out,'native-runtime.js'),define:{__PL_CONFIG__:JSON.stringify({health,units,production,accountApi,oauth,billingCatalog,deletionEnabled,deletionUrl,canonicalUiPilot})}});
