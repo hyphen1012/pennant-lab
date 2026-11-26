@@ -131,8 +131,43 @@ globalThis.__plAnnualEntryCheck=saved=>{
  a.ok(secondRound);for(const id of ['fan-fest','tv','fanclub','sponsor','broadcast','naming','autumn'])a.ok(completed.has(id),'missing '+id);
  a.equal(w.calendarFlow.jobs['movement-market'].status,'ready');
  console.log('PASS commercial jobs and actual second renewal round',JSON.stringify([...completed]));
+ const market=(decision,extra={})=>step({annual:'market',decision,...extra});
+ a.throws(()=>engine.advance(w,{annual:'open',job:'movement-market'}));
+ a.throws(()=>engine.advance(w,{annual:'day'}));
+ a.throws(()=>engine.advance(w,{annual:'market',decision:'open',room:'other'}));
+ market('open',{room:'news'});a.equal(engine.view(w).annual.market.news,'eve');
+ a.throws(()=>engine.advance(w,{annual:'market',decision:'home'}));
+ market('news');a.equal(w.calendarFlow.jobs['movement-market'].state.news,'opening-wait');
+ a.throws(()=>engine.advance(w,{annual:'market',decision:'open',room:'news'}));
+ step({annual:'day'});a.equal(w.calendarFlow.jobs['movement-market'].state.news,'opening');
+ market('open',{room:'news'});market('news');
+ let dialogue=0;
+ for(const room of ['fa','return']){
+  // Actual generated market may have no candidates in the first season.
+  try{market('open',{room});}catch(e){if(!String(e).includes('market room unavailable'))throw e;continue;}
+  const row=engine.view(w).annual.market.rows.find(r=>r.canApproach);
+  if(row){
+   a.throws(()=>engine.advance(w,{annual:'market',decision:'submit',playerId:row.id}));
+   a.throws(()=>engine.advance(w,{annual:'market',decision:'years',playerId:row.id,years:11}));
+   market('years',{playerId:row.id,years:3});market('talk',{playerId:row.id,key:'listen'});market('talk',{playerId:row.id,key:'trust'});
+   a.equal(engine.view(w).annual.market.rows.find(r=>r.id===row.id).talk.years,3);
+   dialogue++;
+  }
+  market('home');
+ }
+ market('open',{room:'other'});a.throws(()=>engine.advance(w,{annual:'complete',job:'movement-market'}));
+ a.throws(()=>engine.advance(w,{annual:'market',decision:'finish'}));
+ a.throws(()=>engine.advance(w,{annual:'market',decision:'free',playerId:999999999,salary:1}));
+ market('close');a.equal(w.calendarFlow.jobs['movement-market'].state.news,'results');
+ market('open',{room:'news'});
+ for(const r of engine.view(w).annual.market.specialResults){a.throws(()=>engine.advance(w,{annual:'market',decision:'news'}));market('special-result',{playerId:r.id});a.throws(()=>engine.advance(w,{annual:'market',decision:'special-result',playerId:r.id}));}
+ market('news');
+ market('open',{room:'other'});a.equal(engine.view(w).annual.market.cpuDone,true);
+ market('finish');a.equal(w.calendarFlow.jobs['movement-market'].status,'done');
+ a.throws(()=>engine.advance(w,{annual:'market',decision:'finish'}));
+ console.log('PASS actual market opening news, room validation, CPU closure, results and compensation confirmation',JSON.stringify({dialogue,date:w.calendarFlow.date}));
  a.equal(w.financeLedger.through,w.calendar.days.length);
- a.equal(JSON.parse(initial).year,w.year);checked=true;console.log('PASS actual 143-game season to awards, finance and FA declarations through persisted calendar; draft, renewal, training and commerce through second renewal, no rollover');
+ a.equal(JSON.parse(initial).year,w.year);checked=true;console.log('PASS actual 143-game season to awards, finance and FA declarations through persisted calendar; draft, renewal, training and commerce and market through compensation confirmation, no rollover');
 };
 let source=fs.readFileSync('scripts/long-run.cjs','utf8');
 const anchor="  assert(game.day===143&&game.games.length===858,'regular-season game count');";

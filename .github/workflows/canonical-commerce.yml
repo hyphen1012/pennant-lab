@@ -5,6 +5,11 @@ on:
       - 'scripts/canonical-commerce-check.cjs'
       - 'server/headless-engine.cjs'
       - '.github/workflows/canonical-commerce.yml'
+  pull_request:
+    paths:
+      - 'scripts/canonical-commerce-check.cjs'
+      - 'server/headless-engine.cjs'
+      - '.github/workflows/canonical-commerce.yml'
   workflow_dispatch:
 permissions:
   contents: read
