@@ -595,7 +595,15 @@ const pilotCode = `
     if(inbox.review){const r=inbox.review;body+='<section class="panel"><h3>試合結果の確認</h3><p>'+h(r.date)+'</p><div class="score-big">'+r.homeScore+' - '+r.awayScore+'</div><p class="small">ホーム球団 '+h((g.club?.standings||[]).find(t=>t.id===r.home)?.name||String(r.home))+' / ビジター '+h((g.club?.standings||[]).find(t=>t.id===r.away)?.name||String(r.away))+'</p>'+commandButton('review','保存済みの試合結果を確認', '',blocked||important)+'</section>';}
     if(inbox.monthly){const m=inbox.monthly;body+='<section class="panel"><h3>月次報告</h3>'+normalDetailCard('finance','月例会議')+'<p>'+h(m.month)+' · '+m.wins+'勝 '+m.losses+'敗 '+m.ties+'分</p>'+(m.finance?'<p>収入 '+fmtMoney(m.finance.revenue)+' / 報告差額 '+fmtMoney(m.finance.net)+'</p>':'<p class="small">会計内訳の記録なし</p>')+'<p>報告時の保有資金 '+fmtMoney(m.cash)+'</p>'+(m.matches||[]).map(x=>'<div class="event">'+h(x.date)+' · '+h(x.opponent)+' '+x.rs+' - '+x.ra+'</div>').join('')+commandButton('month','保存済み月次報告を確認','',blocked||important||!!inbox.review)+'</section>';}
     if(inbox.milestoneCount){body+='<section class="panel"><h3>記録・ニュース</h3>'+inbox.milestones.map(e=>'<p class="event">'+h(e.date)+' '+h(e.title)+'</p>').join('')+(inbox.milestoneCount>inbox.milestones.length?'<p class="small">ほか '+(inbox.milestoneCount-inbox.milestones.length)+'件は記録に保存されています。</p>':'')+commandButton('milestones','保存済み報告を確認','',blocked||important||!!inbox.review)+'</section>';}
-    if(important)body+='<section class="panel warning"><h3>重要イベントの対応が必要です</h3><p>特殊選手・去就・負傷・入団報告・資金不足など、専用の演出と判断が必要な処理は未接続のまま保持します。</p></section>';
+    if(important){
+      const person=id=>{const p=g.club?.roster.find(p=>p.id===id);if(!p)return '<p>選手の詳細情報は現在非表示です。</p>';const m=canonicalPlayerModel(p,g);return playerUpperPortrait(m)+'<h3>'+themedPlayerName(m)+'</h3>'+rarePanel(m,'news');};
+      if(inbox.finance){const f=inbox.finance;body+='<section class="panel warning"><h2>資金不足</h2><p>'+h(f.date)+' · 不足額 '+fmtMoney(f.shortfall)+'</p><p>銀行融資は未接続です。資金を自動補填しません。</p>'+(f.status==='gameover'?'<p>経営終了 · 保存データは保持されています。</p>':commandButton('finance-end','経営を終了する（取り消し不可）','',blocked))+'</section>';}
+      else if(inbox.rare){const r=inbox.rare;body+='<section class="rare-news-screen"><header class="edition-heading"><small>'+h(r.date)+' · SPECIAL NEWS</small><h2>特別速報</h2></header><p>'+h(r.category||'特別なニュース')+'</p><p class="small">専用演出・記事本文は接続待ちです。確認操作は保存済みの速報のみを対象とします。</p>'+commandButton('rare-ack','速報を確認する')+'</section>';}
+      else if(inbox.injury){const r=inbox.injury;body+='<section class="panel"><h2>重要負傷報告</h2>'+person(r.playerId)+'<p>'+h(r.date)+' · 離脱見込み '+h(r.days)+'日</p><p class="small">特別治療の広告連携は未接続。通常治療は継続します。</p>'+commandButton('injury-ack','負傷報告を確認する')+'</section>';}
+      else if(inbox.career){const r=inbox.career,consult=['consult','plan'].includes(r.stage);body+='<section class="panel"><h2>'+ (consult?'引退・去就相談':r.stage==='farewell'?'引退セレモニー':'選手からの報告')+'</h2>'+person(r.playerId)+(consult?'<p>引退に際して準備する行事を選択してください。選択は最大5件です。</p><fieldset id="canonical-farewell-options">'+r.options.map(o=>'<label class="row"><input type="checkbox" value="'+h(o.key)+'" '+dis+'>'+h(o.label)+' · '+fmtMoney(o.cost)+'</label>').join('')+'</fieldset><p class="small">引退慰留の広告連携は未接続です。選択した費用は確定時に支払います。</p>'+commandButton('career-accept','引退と準備内容を確定する'):['thanks','farewell'].includes(r.stage)?commandButton('career-dismiss','報告を確認する'):'<p>未接続の相談段階です。</p>')+'</section>';}
+      else if(inbox.rookie){const r=inbox.rookie;body+='<section class="panel"><header class="edition-heading"><small>'+h(r.year)+' · ROOKIE ARRIVALS</small><h2>新人入団報告</h2></header>'+r.entries.map((p,i)=>{const m=canonicalDraftModel(p);return '<article class="panel"><h3>新人 '+(i+1)+'</h3>'+rarePanel(m,'join')+(p.stage===2?faceMini(m)+'<h3>'+themedPlayerName(m)+'</h3><div class="annual-ability-strip">'+Object.entries(p.abilities||{}).map(([k,v])=>'<span><small>'+h(DRAFT_LABELS[k]||k)+'</small><b>'+h(v)+'</b></span>').join('')+'</div>':'<p>'+h(p.name||'未公開')+' · '+positionMarkup(p.pos)+'</p>')+ (p.stage===1?rareCinemaArt(m,'join'):'')+(p.stage<2?commandButton('rookie-reveal',p.stage===0?'入団報告を開く':'能力を公開する','data-id="'+p.id+'"'):'')+'</article>';}).join('')+commandButton('rookie-finish','新人入団報告を終了する','',blocked||r.entries.some(p=>p.stage<2))+'</section>';}
+      else if(inbox.decade!=null)body+='<section class="panel"><h2>球団史・節目の報告</h2><p>'+h(inbox.decade)+'年の節目を迎えました。</p><p class="small">球団史の専用演出は接続待ちです。保存済みの記録は削除しません。</p>'+commandButton('decade-ack','節目の報告を確認する')+'</section>';
+    }
     const held=blocked||important||!!g.foreign?.responsePending||!!inbox.review||!!inbox.monthly||!!inbox.milestoneCount;
     body+=canonicalForeignMarkup(g,blocked,commandButton);
     if(inbox.opening)body+='<section class="panel"><h2>新シーズン開幕</h2>'+normalDetailCard('opening','新たなシーズン')+commandButton('opening-ack','新シーズンを始める','',held)+'</section>';
@@ -658,6 +666,20 @@ const pilotCode = `
       else if(decision==='reveal'&&n?.status==='signed'&&n.opened&&n.stage<2)cmd={foreign:decision};
       else if(decision==='finish'&&n?.opened&&(n.status!=='signed'||n.stage===2)&&window.confirm('交渉結果を確定して終了しますか？'))cmd={foreign:decision};
     }
+    else if(k==='finance-end'&&i.finance?.status==='pending'&&window.confirm('融資はまだ利用できません。経営終了を確定しますか？ この操作は取り消せません。'))cmd={finance:'gameover',confirmed:true};
+    else if(k==='rare-ack'&&!i.finance&&i.rare)cmd={acknowledge:'rare',eventKey:i.rare.eventKey};
+    else if(k==='injury-ack'&&!i.finance&&!i.rare&&i.injury)cmd={acknowledge:'injury',eventKey:i.injury.eventKey};
+    else if(k==='career-accept'&&!i.finance&&!i.rare&&!i.injury&&['consult','plan'].includes(i.career?.stage)){
+      const options=Array.from(document.querySelectorAll('#canonical-farewell-options input:checked')).map(x=>x.value);
+      if(options.length>5){showToast('選択できる行事は最大5件です。',true);return;}
+      if(options.some(k=>!i.career.options.some(o=>o.key===k)))return;
+      const cost=i.career.options.filter(o=>options.includes(o.key)).reduce((n,o)=>n+o.cost,0);
+      if(window.confirm('引退を受け入れ、準備費用 '+fmtMoney(cost)+' を確定しますか？'))cmd={career:'accept',playerId:i.career.playerId,options};
+    }
+    else if(k==='career-dismiss'&&!i.finance&&!i.rare&&!i.injury&&['thanks','farewell'].includes(i.career?.stage))cmd={career:'dismiss',playerId:i.career.playerId};
+    else if(k==='rookie-reveal'&&!i.finance&&!i.rare&&!i.injury&&!i.career&&i.rookie?.entries.some(p=>p.id===Number(b.dataset.id)&&p.stage<2))cmd={acknowledge:'rookie-reveal',playerId:Number(b.dataset.id)};
+    else if(k==='rookie-finish'&&!i.finance&&!i.rare&&!i.injury&&!i.career&&i.rookie&&i.rookie.entries.every(p=>p.stage===2))cmd={acknowledge:'rookie-finish'};
+    else if(k==='decade-ack'&&!i.finance&&!i.rare&&!i.injury&&!i.career&&!i.rookie&&i.decade!=null)cmd={acknowledge:'decade',eventKey:String(i.decade)};
     else if(k==='opening-ack'&&i.opening)cmd={acknowledge:'opening'};
     else if(k==='review'&&i.review)cmd={acknowledge:'review',eventKey:i.review.gameId};
     else if(k==='month'&&i.monthly)cmd={acknowledge:'month'};

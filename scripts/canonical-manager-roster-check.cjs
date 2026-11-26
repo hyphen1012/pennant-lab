@@ -52,3 +52,15 @@ a.equal(club().cash,oldCash);a.equal(w.seed,oldSeed);a.equal(w.year,oldYear);a.e
 console.log('PASS canonical custom club creation and identity updates with no simulation or finance changes');
 console.log('PASS bounded free market pagination/search, read-only projection and reveal guard');
 console.log('PASS manager hiring/renewal, ordinary free-agent and release, archived match acknowledgement, terminal finance and guard');
+
+// Isolated rookie disclosure fixture: no premature actual abilities or portrait seed.
+w=engine.newWorld({team:0});
+const rookie=w.players.find(p=>p.teamId===w.selectedId&&!p.retired);
+a.ok(rookie);w.pendingDraftReveal={year:w.year-1,entries:[{id:rookie.id,revealStage:0}]};
+a.equal(v().club,null);a.equal(v().inbox.rookie.entries[0].abilities,null);a.equal(v().inbox.rookie.entries[0].appearanceSeed,null);
+a.throws(()=>engine.advance(w,{acknowledge:'rookie-finish'}));
+a.throws(()=>engine.advance(w,{acknowledge:'rookie-reveal',playerId:-1}));
+go({acknowledge:'rookie-reveal',playerId:rookie.id});a.equal(v().inbox.rookie.entries[0].stage,1);a.equal(v().inbox.rookie.entries[0].abilities,null);a.equal(v().inbox.rookie.entries[0].appearanceSeed,null);
+go({acknowledge:'rookie-reveal',playerId:rookie.id});a.equal(v().inbox.rookie.entries[0].stage,2);a.ok(v().inbox.rookie.entries[0].abilities);a.throws(()=>engine.advance(w,{acknowledge:'rookie-reveal',playerId:rookie.id}));
+go({acknowledge:'rookie-finish'});a.equal(v().inbox.rookie,null);a.ok(v().club);
+console.log('PASS explicit rookie stage progression, early finish denial and ability/portrait disclosure');

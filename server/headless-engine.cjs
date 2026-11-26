@@ -50,7 +50,7 @@ function createHeadlessEngine(){
   return {monthly:monthly?{month:monthly.month,date:monthly.date,wins:monthly.wins,losses:monthly.losses,ties:monthly.ties,cash:monthly.cashAtClose,finance:monthly.actualFinance?{revenue:monthly.actualFinance.revenue,payroll:monthly.actualFinance.payroll,net:monthly.actualFinance.net}:null,matches:(monthly.matches||[]).map(m=>({date:m.date,opponent:m.opponent,rs:m.rs,ra:m.ra}))}:null,milestones:milestones.slice(0,80).map(m=>({title:m.title,date:m.date})),milestoneCount:milestones.length,review:g?{gameId:String(g.id),date:g.date,home:g.home,away:g.away,homeScore:g.homeScore,awayScore:g.awayScore}:null,
    finance:crisis&&crisis.teamId===team.id?{year:crisis.year,date:crisis.date,shortfall:crisis.shortfall,status:crisis.status,loanAvailable:false}:null,injury:injury?{eventKey:String(injury.playerId)+':'+injury.date,playerId:injury.playerId,date:injury.date,days:injury.days}:null,
    rare:rare?{eventKey:rare.id,year:rare.year,date:rare.date,category:rare.category}:null,
-   rookie:game.pendingDraftReveal?{year:game.pendingDraftReveal.year,entries:game.pendingDraftReveal.entries.map(r=>{const p=getPlayer(r.id),stage=r.revealed?2:r.revealStage||0;return {id:r.id,name:p?.name,pos:p?.pos,stage,abilities:stage===2&&p?Object.fromEntries(seasonSkillKeys(p).map(k=>[k,p[k]])):null};})}:null,
+   rookie:game.pendingDraftReveal?{year:game.pendingDraftReveal.year,entries:game.pendingDraftReveal.entries.map(r=>{const p=getPlayer(r.id),stage=r.revealed?2:r.revealStage||0;const hidden=!!p&&secretProspect(p)&&stage!==2;return {id:r.id,name:hidden?'????':p?.name,pos:p?.pos,stage,hidden,specialCategory:p?.specialCategory||null,originCategory:p?.originCategory||null,appearanceSeed:stage===2?p?.appearanceSeed:null,age:stage===2?p?.age:null,abilities:stage===2&&p?Object.fromEntries(seasonSkillKeys(p).map(k=>[k,p[k]])):null};})}:null,
    decade:game.pendingDecade??null,opening:game.pendingCeremonyIntro==='opening',
    career:career?{playerId:career.p.id,stage:career.e.type,options:['consult','plan'].includes(career.e.type)?farewellChoices(career.p).map(([key,label,cost])=>({key,label,cost})):[]}:null};
  };
@@ -328,9 +328,9 @@ function createHeadlessEngine(){
    const r=game.pendingReview,g=r&&game.games.find(x=>x.id===r.gameId&&x.year===r.year);
    if(game.financeCrisis||!g||String(g.id)!==input.eventKey||g.home!==team.id&&g.away!==team.id)throw Error('review acknowledgement unavailable');game.pendingReview=null;
   }else if(kind==='rookie-reveal'){
-   const b=game.pendingDraftReveal,r=b?.entries.find(x=>x.id===input.playerId);if(!r||b.year!==game.year-1||r.revealed||(r.revealStage||0)>=2)throw Error('rookie reveal unavailable');r.revealStage=(r.revealStage||0)+1;
+   const b=game.pendingDraftReveal,r=b?.entries.find(x=>x.id===input.playerId);if(game.financeCrisis||pendingRareNews().length||game.pendingEvent||careerEventPending()||!r||b.year!==game.year-1||r.revealed||(r.revealStage||0)>=2)throw Error('rookie reveal unavailable');r.revealStage=(r.revealStage||0)+1;
   }else if(kind==='rookie-finish'){
-   if(!game.pendingDraftReveal||game.pendingDraftReveal.entries.some(r=>!r.revealed&&(r.revealStage||0)<2))throw Error('rookie report unfinished');game.pendingDraftReveal=null;
+   if(game.financeCrisis||pendingRareNews().length||game.pendingEvent||careerEventPending()||!game.pendingDraftReveal||game.pendingDraftReveal.year!==game.year-1||game.pendingDraftReveal.entries.some(r=>!r.revealed&&(r.revealStage||0)<2))throw Error('rookie report unfinished');game.pendingDraftReveal=null;
   }else if(kind==='decade'){
    if(game.pendingDecade==null||String(game.pendingDecade)!==input.eventKey)throw Error('decade acknowledgement unavailable');game.lastDecadeViewed=game.pendingDecade;game.pendingDecade=null;game.decadeSection=null;
   }else if(kind==='opening'){
