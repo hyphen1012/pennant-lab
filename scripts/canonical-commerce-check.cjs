@@ -131,7 +131,12 @@ globalThis.__plAnnualEntryCheck=saved=>{
    else if(j.id==='broadcast'){commerce('delta',{value:1});}
    else if(j.id==='naming'){commerce('choice',{value:0});}
    else throw Error('unexpected '+j.id);
+   c=engine.view(w).annual.commerce;
+   if(j.id==='sponsor'){a.equal(c.risk.burden,10);a.ok(c.annual>0);}
+   if(j.id==='fanclub'){a.ok(Number.isSafeInteger(c.since)&&c.estimate.members>=0);}
    commerce('confirm');c=engine.view(w).annual.commerce;
+   if(j.id==='fanclub'){a.ok(c.contract&&c.contract.name==='テストファンクラブ');a.equal(c.contract.perk,'towel');a.equal(c.contract.color,2);a.equal(c.contract.font,1);a.equal(c.contract.members,c.estimate.members);}
+   if(j.id==='sponsor')a.equal(c.contract.companies.length,1);
   }
   if(c.stage==='scheduled'){commerce('park');continue;}
   if(c.stage==='live'){commerce(j.id==='tv'?'tv':'live');c=engine.view(w).annual.commerce;}
