@@ -2,11 +2,11 @@
 // Native provider supplies an access token via secure platform storage/PKCE.
 // There is intentionally no password field or development bypass here.
 const {openCloudSaveDialog}=require('./cloud-save-dialog.cjs');
-function createAccountBootstrap({baseUrl,provider,fetcher=globalThis.fetch,online,openDialog=openCloudSaveDialog}={}){
+function createAccountBootstrap({baseUrl,provider,fetcher=globalThis.fetch,online,openDialog=openCloudSaveDialog,onSession=()=>{}}={}){
  const url=new URL(baseUrl);
- if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||typeof provider?.getAccessToken!=='function'||typeof fetcher!=='function'||typeof online!=='function')throw Error('account provider and HTTPS API required');
+ if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||typeof provider?.getAccessToken!=='function'||typeof fetcher!=='function'||typeof online!=='function'||typeof onSession!=='function')throw Error('account provider and HTTPS API required');
  const base=url.href.replace(/\/$/,'');let generation=0,session=null,context=null,dialog=null,request=null,pending=null;
- function invalidate(){generation++;request?.abort();dialog?.abort();request=null;dialog=null;session=null;context=null;pending=null;}
+ function invalidate(){generation++;request?.abort();dialog?.abort();request=null;dialog=null;session=null;context=null;pending=null;onSession(null);}
  function suspend(){dialog?.abort();}
  async function identity(token){
   if(typeof token!=='string'||!/^[A-Za-z0-9._~+\/=-]{1,4096}$/.test(token))throw Error('invalid identity token');
@@ -36,7 +36,7 @@ function createAccountBootstrap({baseUrl,provider,fetcher=globalThis.fetch,onlin
     try{return await openDialog({session:{...session},baseUrl:base,fetcher,openDatabase,canWrite:(a,s)=>current()&&canWrite(a,s),online,signal:ctl.signal});}
     finally{if(dialog===ctl)dialog=null;}
    }});
-   context=ctx;return ctx;
+   context=ctx;onSession({...session});return ctx;
   })();
   pending=task;try{return await task;}finally{if(pending===task)pending=null;}
  }
@@ -46,7 +46,7 @@ function createAccountBootstrap({baseUrl,provider,fetcher=globalThis.fetch,onlin
    const token=await provider.getAccessToken();if(gen!==generation)return false;
    const account=await identity(token);if(gen!==generation)return false;
    if(account!==owner)throw Error('identity changed');
-   if(token!==session.token){suspend();session={account,token};}
+   if(token!==session.token){suspend();session={account,token};onSession({...session});}
    return true;
   }catch{if(gen===generation)invalidate();return false;}
  }
