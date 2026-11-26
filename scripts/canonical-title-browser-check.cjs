@@ -161,8 +161,8 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   await page.locator('[data-action="canonical-info-back"]').click();await page.locator('[data-action="canonical-info-back"]').click();
   await page.locator('[data-action="canonical-return"]').first().click();await slot(3).waitFor();
   clockOffset+=61000;
-  fixtureRookie=true;await slot(3).click();await finish.waitFor();lost=true;await finish.click();fixtureRookie=false;
-  await page.locator('button[data-slot="3"][data-action="continue-slot"]').waitFor();
+  fixtureRookie=true;await slot(3).click();await finish.waitFor();lost=true;await finish.click();
+  await page.locator('button[data-slot="3"][data-action="continue-slot"]').waitFor();fixtureRookie=false;
   a.equal(creates,2);a.equal((await post('read',{slot:3})).revision,1);
   failSlots=true;await page.locator('[data-action="canonical-retry"]').click();
   await page.getByText('サーバーのセーブ一覧を確認できません。データは変更されていません。').waitFor();
