@@ -44,14 +44,14 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
   const key=a.route==='lottery'?String(a.year):a.route==='medical'?a.eventKey:a.year+':'+a.eventKey;
   return digest([r.world,a.route,key]);
  }
- function actions(r){
-  const list=sync(engine.actions(r.state));if(!Array.isArray(list)||list.length>5000)throw Error('invalid canonical actions');
+ function actions(r,projection){
+  const list=projection===undefined?sync(engine.actions(r.state)):projection;if(!Array.isArray(list)||list.length>5000)throw Error('invalid canonical actions');
   const m=new Map();for(const a of list){const key=actionKey(r,a);if(m.has(key))throw Error('duplicate canonical action');m.set(key,JSON.parse(json(a,16384)));}return m;
  }
  function lookup(db,account,operation){return db.prepare('SELECT * FROM authority_actions WHERE account=? AND operation=?').get(account,operation);}
  function checkOperation(operation){if(typeof operation!=='string'||! /^[a-f0-9]{64}$/.test(operation))throw Error('invalid canonical operation');}
- function options(db,r,s){
-  const items=[];for(const [operation,a] of actions(r)){const o=Object.hasOwn(s.orders,operation)?s.orders[operation]:null;if(o?.status==='committed')continue;items.push({operationId:operation,route:a.route,label:a.label,year:a.year,status:o?.status??'available'});}
+ function options(db,r,s,projection){
+  const items=[];for(const [operation,a] of actions(r,projection)){const o=Object.hasOwn(s.orders,operation)?s.orders[operation]:null;if(o?.status==='committed')continue;items.push({operationId:operation,route:a.route,label:a.label,year:a.year,status:o?.status??'available'});}
   return items;
  }
  async function create(token,slot,command){
@@ -80,7 +80,7 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
    return {deleted:true,slot,world:r.world,revision:r.revision};
   });
  }
- async function read(token,slot){const account=await identity(token);return inspect(account,(s,db)=>{const r=world(db,account,slot);return {...view(r),actions:options(db,r,s),pending:db.prepare('SELECT operation,attempt FROM authority_actions WHERE account=? AND world=? AND result IS NULL').all(account,r.world).filter(x=>s.orders[x.operation]?.status==='pending').map(x=>({operationId:x.operation,attempt:x.attempt,mode:s.orders[x.operation].mode})),wallet:publicWallet(s)};});}
+ async function read(token,slot){const account=await identity(token);return inspect(account,(s,db)=>{const r=world(db,account,slot),p=typeof engine.readProjection==='function'?sync(engine.readProjection(r.state)):null;if(p&&(!p.game||!Array.isArray(p.actions)))throw Error('invalid read projection');return {...(p?{world:r.world,revision:r.revision,game:JSON.parse(json(p.game,262144))}:view(r)),actions:options(db,r,s,p?.actions),pending:db.prepare('SELECT operation,attempt FROM authority_actions WHERE account=? AND world=? AND result IS NULL').all(account,r.world).filter(x=>s.orders[x.operation]?.status==='pending').map(x=>({operationId:x.operation,attempt:x.attempt,mode:s.orders[x.operation].mode})),wallet:publicWallet(s)};});}
  // Recover from a lost reserve/settle response without consulting the store
  // or reapplying a game effect. A pending order may no longer be in actions().
  async function freePage(token,slot,worldId,revision,command){
