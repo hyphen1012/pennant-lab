@@ -1393,3 +1393,16 @@ assert.match(html,/camp-compact-picker/);assert.match(html,/data-camp-selected/)
   }
  }
 }
+
+// v185: a pending old successful write must not clear a newer serialization failure.
+(async()=>{
+ const s=inline[1],a=s.indexOf('  function save(){'),b=s.indexOf('  async function load(){',a);assert(a>=0&&b>a);
+ const writes=[],controls=[];
+ const api=vm.runInNewContext('(function(){let game={day:1},activeSlot=1,saveRevision=0,failedSaveRevision=0,storageFailure=false,saveDraining=false,slotOpening=false,saveQueue=Promise.resolve();const pendingSaves=new Map(),ui={page:"game"},scenarioLab=null;const slotPreview=g=>({day:g.day}),writeSlotPreview=()=>{},showToast=()=>{},render=()=>{};'+s.slice(a,b)+'return {save,game:g=>{game=g;},failed:()=>storageFailure,flush:()=>saveQueue};})()', {console:{warn(){}},writeDatabaseSlot:(slot,snapshot)=>new Promise((resolve,reject)=>{writes.push({slot,day:JSON.parse(snapshot).day});controls.push({resolve,reject});})});
+ assert(api.save());const bad={day:2};bad.self=bad;api.game(bad);assert.equal(api.save(),false);assert(api.failed());controls[0].resolve();await api.flush();assert(api.failed(),'old completion must not clear newer failure');
+ api.game({day:3});assert(api.save());controls[1].resolve();await api.flush();assert(!api.failed(),'new successful snapshot recovers');
+ api.game({day:4});assert(api.save());api.game({day:5});assert(api.save());api.game({day:6});assert(api.save());controls[2].resolve();await Promise.resolve();await Promise.resolve();assert.equal(writes.at(-1).day,6);controls[3].resolve();await api.flush();assert.deepEqual(writes.map(x=>x.day),[1,3,4,6]);
+ api.game({day:7});assert(api.save());controls[4].reject(Error('quota'));await api.flush();assert(api.failed());api.game({day:8});assert(api.save());controls[5].resolve();await api.flush();assert(!api.failed());
+ assert.match(html,/skipChunk=0;if\(!save\(\)\)break;updateSkipProgress\(\);[\s\S]{0,240}await saveQueue;/);
+ console.log('PASS: save revision isolation, coalescing, quota failure/recovery, skip checkpoint barrier');
+})().catch(e=>{console.error(e);process.exitCode=1;});
