@@ -238,6 +238,11 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   clockOffset+=61000;
   await page.locator('[data-action="canonical-rewards-open"]').click();
   await page.locator('[data-action="canonical-achievements-open"]').waitFor();
+  await page.locator('[data-action="canonical-rights-refresh"]').click();
+  await page.getByText('永久広告スキップ：未保有または無効',{exact:true}).waitFor();
+  await page.getByText('VIP：未保有または無効',{exact:true}).waitFor();
+  await page.getByText('カード枠 · 3ポイント',{exact:true}).waitFor();
+  await page.getByText('最高級カード · 50ポイント',{exact:true}).waitFor();
   const beforeReward=await post('read',{slot:3});
   a.equal(beforeReward.wallet.tickets,0);a.equal(beforeReward.wallet.points,0);
   const target=beforeReward.actions.find(x=>x.route==='medical');a.ok(target);
