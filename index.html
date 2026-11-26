@@ -12222,8 +12222,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const capitalBudget=Math.max(budget,Math.min(Math.max(0,t.cash-eliteOperatingReserve(reserve)),t.cash*.55));
     const park=x.park>=15&&x.park<20?parkExpansionPlan(t,forecast):null;
     const hold=park?.viable?parkCapitalHold(t,reserve):0;
+    // Trial G: compare the time to fund a viable stadium project before/after
+    // competing elite investment. Use expected ordinary operating surplus;
+    // do not change cash, prices, reserve, maintenance or expansion viability.
+    const parkSavingBudget=park?.viable&&matureParkTarget(t)>0?Math.max(0,forecast):0;
+    const yearsToPark=cash=>Math.max(0,park.required-cash)/Math.max(.8,parkSavingBudget);
+    const delaysPark=q=>parkSavingBudget>0&&q.lv>=15&&q.k!=='park'&&
+      t.cash<park.required&&yearsToPark(t.cash-q.cost)-yearsToPark(t.cash)>[.35,.75,.5][a.style]&&
+      yearsToPark(t.cash)<=4;
     const q=items.filter(q=>{
-      if(q.lv>=20)return false;
+      if(q.lv>=20||delaysPark(q))return false;
       if(q.k==='park'&&q.lv>=15)return !!park&&park.viable&&t.cash>=park.required;
       // Trial D: protect half of the existing park earmark against competing elite upgrades.
       // Compare with trial C's full protection; all shared prices, reserve, and upkeep remain unchanged.
