@@ -208,3 +208,7 @@ Advance requires the exact world UUID and revision before decoding state. The tw
 
 ## Canonical calendar playback slice (staging)
 Expose existing calendar targets and bounded routine report summaries. Authenticated day command defers only verified archived non-explicit reports, never important events. Fix invalid milestone deferral function reference. Client loops over individually committed days with normal/fast/skip pacing, explicit season confirmation, pause at request boundary, same-session resume, visibility stop and no mutation retry. Full match/news presentation, full archives, durable cross-session playback target and event UI remain open. Long-term load is not yet qualified; no production activation.
+
+
+## Canonical read-only roster and standings slice
+Reuse original player cards and standings table with explicit projection arguments. Render own player portrait, affinity, ability strip, condition and season stats from the server snapshot; never use a local world or expose hidden scout candidates. Standings limited to twelve clubs. No mutation, no history deletion. Career history, player memo, training mutations and full detail parity remain open. Staging only.

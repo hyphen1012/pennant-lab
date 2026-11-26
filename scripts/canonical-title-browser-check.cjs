@@ -62,6 +62,11 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   await page.locator('[data-action="canonical-roster-back"]').click();await page.getByText('サーバー保存の確認画面（開発試験）').waitFor();
   await page.locator('[data-action="canonical-hq-open"]').click();await page.locator('.hero-stadium').waitFor();a.equal(await page.locator('.hero-team h2').textContent(),'試験球団');
   const beforeDay=await post('read',{slot:1});a.equal(beforeDay.game.headquarters.canStep,true);
+  await page.locator('[data-action="canonical-players"]').click();a.equal(await page.locator('.player-card').count(),beforeDay.game.club.roster.length);
+  await page.locator('.player-row').first().click();await page.locator('.player-upper-portrait').waitFor();a.equal(await page.locator('.player-stat-grid').count(),1);
+  await page.locator('[data-action="canonical-info-back"]').click();await page.locator('.player-card').first().waitFor();await page.locator('[data-action="canonical-info-back"]').click();
+  await page.locator('[data-action="canonical-standings"]').click();a.equal(await page.locator('tbody tr').count(),6);await page.locator('[data-action="canonical-league"][data-league="W"]').click();a.equal(await page.locator('.league-west tbody tr').count(),6);await page.locator('[data-action="canonical-info-back"]').click();
+  a.equal((await post('read',{slot:1})).revision,beforeDay.revision);a.equal(advances,2);
   lostAdvance=true;await page.locator('[data-action="canonical-hq-step"]').click();await page.getByText('確定した日程を取得してください。自動再送は行いません。').waitFor();a.equal(await page.locator('.hero-stadium').count(),0);a.equal(advances,3);
   await page.locator('[data-action="canonical-hq-refresh"]').click();await page.locator('.hero-stadium').waitFor();
   const afterDay=await post('read',{slot:1});a.equal(afterDay.revision,beforeDay.revision+1);a.equal(afterDay.game.calendarIndex,beforeDay.game.calendarIndex+1);a.equal(advances,3);
