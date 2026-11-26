@@ -1,0 +1,21 @@
+const assert=require('node:assert/strict');
+const {createTokenAuthenticator}=require('../server/auth-introspection.cjs');
+const {createStorePurchaseFlow}=require('../mobile/src/store-purchase-flow.cjs');
+(async()=>{
+ let response={active:true,iss:'https://issuer.example.invalid',aud:'pennant-api',sub:'stable',exp:200,scope:'game'};
+ const auth=createTokenAuthenticator({endpoint:'https://issuer.example.invalid/introspect',issuer:response.iss,audience:'pennant-api',clientId:'test',clientSecret:'fixture',scope:'game',now:()=>100000,fetcher:async()=>new Response(JSON.stringify(response))});
+ const a=await auth('token');assert.equal(a.authenticated,true);assert.match(a.account,/^[a-f0-9]{64}$/);
+ response={...response,sub:'other'};assert.notEqual((await auth('token')).account,a.account);
+ response={...response,aud:'other'};assert.equal((await auth('token')).authenticated,false);
+ response={...response,aud:'pennant-api',exp:100};assert.equal((await auth('token')).authenticated,false);
+ let finish=0,restore=0,mode='pending',verified=false;
+ const bridge={invalidate(){},status:()=>({verified}),restorePurchase:async()=>{restore++;return {verified};}};
+ const sdk={products:async()=>[{id:'test-product',formattedPrice:'TEST'}],purchase:async id=>({id,status:mode,store:'apple',proof:'fixture'}),restore:async()=>[],finish:async()=>{finish++;}};
+ const flow=createStorePurchaseFlow({sdk,bridge,catalog:['test-product']});
+ await assert.rejects(flow.list());flow.setAuthenticated(true);await flow.list();
+ await assert.rejects(flow.purchase('test-product',false));assert.equal((await flow.purchase('test-product',true)).phase,'pending');assert.equal(restore,0);
+ mode='purchased';assert.equal((await flow.purchase('test-product',true)).phase,'verification_required');assert.equal(finish,0);
+ verified=true;assert.equal((await flow.purchase('test-product',true)).phase,'verified');assert.equal(finish,1);
+ flow.invalidate();await assert.rejects(flow.purchase('test-product',true));
+ console.log('auth and purchase boundary checks passed');
+})().catch(e=>{console.error(e);process.exitCode=1;});
