@@ -34,7 +34,7 @@ const pilotCode = `
     }catch{return false;}
   }
   function canonicalReset(){
-    canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';
+    canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';
     canonicalPilot.suspend();ui.clubDraft=null;ui.portalSlot=null;ui.portalOrigin=null;slotOpening=false;
     ui.page='title';ui.launchTitle=false;
   }
@@ -368,8 +368,8 @@ const pilotCode = `
     finally{if(epoch===canonicalEpoch){canonicalRunning=false;canonicalStop=false;slotOpening=false;render();}}
   }
   let canonicalHqWorld=null;
-  const canonicalAnnualJobs=['awards-all','settlement','movement-declarations','draft','roster-cut'];
-  let canonicalAwardFilter='all';
+  const canonicalAnnualJobs=['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter','booking','self','winter-return','camp','exhibition'];
+  let canonicalAwardFilter='all',canonicalCampGroup='first',canonicalWinterPlace='taiwan',canonicalDigestCut=0;
   const canonicalEventLabels={...FLOW_LABEL,'fan-fest':'ファン感謝デー',fanclub:'ファンクラブ',tv:'テレビ出演',sponsor:'スポンサー契約',broadcast:'放映権',naming:'命名権','opening-promo':'開幕戦イベント'};
   const canonicalEventStatus={scheduled:'予定',ready:'対応可能',active:'対応中',waiting:'結果待ち',done:'完了'};
   function canonicalDraftModel(c){
@@ -410,6 +410,71 @@ const pilotCode = `
     const p=r.projection;
     return '<section class="panel"><h2>戦力外通告</h2>'+normalDetailCard('contract','来季の支配下登録')+'<p>来季予定 '+p.projected+' / '+(g.club?.rosterLimit||50)+'名 · 超過 '+p.excess+'名</p><p>指名・合意済み '+p.signed+'名 · 引退予定 '+p.retiring+'名 · 不足補充 '+p.minimumFill+'名</p>'+r.eligible.map(x=>{const model=g.club?.roster.find(p=>p.id===x.id),selected=r.selected.includes(x.id);return '<article class="panel"><div class="recruit-player">'+(model?faceMini(canonicalPlayerModel(model,g),{overall:true}):'')+'<div><strong>'+(model?themedPlayerName(canonicalPlayerModel(model,g)):h(x.name))+'</strong><p>'+positionMarkup(x.pos)+' · 年俸 '+fmtSalary(x.salary)+'</p></div></div>'+(x.warnings||[]).map(w=>'<p class="small">'+h(w)+'</p>').join('')+button('cut',selected?'戦力外候補から外す':'戦力外候補にする','data-id="'+x.id+'"',held)+'</article>';}).join('')+button('complete','戦力外通告を確定する','data-job="roster-cut"',held||p.excess>0)+'</section>';
   }
+  function canonicalAnnualPerson(g,x){
+    const r=g.club?.roster.find(p=>p.id===x.id),p=r?canonicalPlayerModel(r,g):null;
+    return '<div class="annual-person">'+(p?faceMini(p,{overall:true}):'')+'<div><strong>'+(p?themedPlayerName(p):annualReportName(x))+'</strong>'+(x.pos?'<small>'+positionMarkup(x.pos)+'</small>':'')+'</div></div>'+(p?annualAbilityStrip(p):'');
+  }
+  function canonicalRenewalMarkup(g,a,held,button){
+    const d=a.renewal;if(!d)return '<p class="warning">契約更改情報なし</p>';
+    const states={signed:'サイン済',pending:'保留',unoffered:'未提示',released:'自由契約予定','retire-intent':'引退申し出',retired:'引退予定'},rows=d.round===2?d.rows.filter(r=>r.revisit||r.editable||['pending','retire-intent'].includes(r.status)):d.rows;
+    const editable=d.rows.some(r=>r.editable),cmd=(k,label,attrs='',disabled=held)=>button('renewal-'+k,label,attrs,disabled);
+    let out='<section class="panel renewal-room"><h2>契約更改 第'+d.round+'回</h2>'+normalDetailCard('contract','年俸交渉')+'<p>未確定 '+d.unresolved+'名 · 交渉は最大2回</p><p>球団資金 '+fmtMoney(g.team.cash)+'</p>';
+    if(editable)out+='<section class="panel"><h3>一括提示額</h3><div class="chips">'+[['assessment','査定額'],['middle','中間額'],['desired','希望額']].map(([v,n])=>cmd('bulk',n,'data-value="'+v+'"')).join('')+'</div>'+cmd('submit','一括提示する','data-bonus="0"')+cmd('submit','出来高ボーナス付きで一括提示','data-bonus="1"')+'</section>';
+    out+=rows.map(r=>'<article class="panel renewal-card" data-renewal-id="'+r.id+'">'+canonicalAnnualPerson(g,r)+'<p>'+h(states[r.status]||r.status)+'</p><div class="renewal-money"><span>今季<b>'+fmtSalary(r.current)+'</b></span><span>査定額<b>'+fmtSalary(r.assessment)+'</b></span><span>希望額<b>'+fmtSalary(r.desired)+'</b></span></div>'+(r.editable?'<label>提示年俸（万円）<input class="canonical-renewal-salary" type="number" min="500" max="150000" step="100" value="'+Math.round(r.offer*10000)+'" '+(held?'disabled':'')+'></label><details><summary>出来高ボーナスを追加契約</summary>'+r.options.map(o=>'<label class="row"><input class="canonical-renewal-bonus" type="checkbox" value="'+h(o.key)+'" '+((r.bonuses||[]).includes(o.key)?'checked':'')+' '+(held?'disabled':'')+'>'+h(o.label)+' · '+fmtMoney(o.amount)+'</label>').join('')+'</details>'+cmd('offer','この条件で提示','data-id="'+r.id+'"'):'')+(r.status==='retire-intent'?cmd('retire','引退を了承する','data-id="'+r.id+'"'):['pending','unoffered'].includes(r.status)?cmd('release','自由契約とする','data-id="'+r.id+'"'):r.status==='released'?cmd('restore','交渉対象に戻す','data-id="'+r.id+'"'):'')+(r.history||[]).map(x=>'<p class="small">第'+x.round+'回 '+fmtSalary(x.offer)+' · '+h(states[x.status]||x.status)+'</p>').join('')+'</article>').join('');
+    const pendingUnsubmitted=d.rows.some(r=>['unoffered','retire-intent'].includes(r.status));
+    if(d.round===1&&d.unresolved)out+=cmd('next','保留選手は第2回交渉へ','',held||pendingUnsubmitted);
+    if(d.round===2&&d.unresolved)out+=cmd('final-release','未合意選手を自由契約とする','',held||pendingUnsubmitted);
+    if(!d.unresolved)out+=button('complete','契約更改を確定','data-job="'+a.active+'"',held);
+    return out+'</section>';
+  }
+  function canonicalTrainingReport(g,report){
+    if(!report)return '';
+    const rows=report.rows||[];
+    return '<section class="panel"><h3>育成結果報告</h3>'+(Number.isFinite(report.cost)?'<p>費用 '+fmtMoney(report.cost)+'</p>':'')+rows.map(r=>'<article class="panel">'+canonicalAnnualPerson(g,r)+(Number.isFinite(r.before)&&Number.isFinite(r.after)?'<p>総合 '+annualNumberChange(r.before,r.after)+'</p>':'')+(Number.isFinite(r.xp)?'<p>経験値 +'+r.xp+'</p>':'')+(Number.isFinite(r.energyBefore)&&Number.isFinite(r.energyAfter)?'<p>体力 '+annualNumberChange(r.energyBefore,r.energyAfter)+'</p>':'')+((r.abilities||r.deltas||[]).length?'<div class="ref-ability-grid">'+(r.abilities||r.deltas).map(annualAbilityChange).join('')+'</div>':'<p class="small">能力変化の個別記録なし</p>')+'</article>').join('')+(rows.length?'':'<p class="small">対象の育成記録なし</p>')+'</section>';
+  }
+  function canonicalTrainingMarkup(g,a,held,button){
+    const phase=a.active,t=a.training||a.preseason;if(!t)return '<p class="warning">育成情報なし</p>';
+    const preseason=phase==='self',cmd=(k,label,attrs='',disabled=held)=>button('training-'+k,label,attrs,disabled),pre=(k,label,attrs='',disabled=held)=>button('pre-'+k,label,attrs,disabled);
+    let out='<section class="panel annual-phase"><h2>'+h(canonicalEventLabels[phase]||phase)+'</h2>';
+    if(t.report){if(phase==='winter')out+='<h3>世界へ、出発</h3>'+(t.report.entries||[]).map(e=>{const p=g.club?.roster.find(p=>p.id===e.id);return '<div class="panel">'+reportLandscape(e.destination)+(p?canonicalAnnualPerson(g,p):'')+'<p>'+h(winterDest(e.destination)?.[1]||e.destination)+'</p></div>';}).join('')+'<p>1月第2週に帰国予定</p>';
+      else out+=reportLandscape('club')+canonicalTrainingReport(g,t.report);
+      if(phase==='winter')out+='<p>派遣費用 '+fmtMoney(t.report.cost||0)+'</p>';
+      return out+(preseason?pre('finish','結果を確認して本部へ'):button('complete','結果を確認して本部へ','data-job="'+phase+'"',held))+'</section>';
+    }
+    if(phase==='winter'){
+      const plan=t.assignments||{},n=Object.keys(plan).length,selected=t.destinations.find(d=>d.key===canonicalWinterPlace)||t.destinations[0];
+      out+='<p>派遣枠 '+n+' / 4 · 費用 '+fmtMoney(t.cost)+'</p>'+winterMap(plan,selected.key).replace(/data-action="ref-winter-place"/g,'data-action="canonical-winter-place"')+'<h3>'+h(selected.label)+'</h3>'+reportLandscape(selected.key)+'<p>'+h(selected.effect)+'</p>'+t.eligible.map(p=>{const current=plan[p.id],same=current===selected.key;return '<article class="panel">'+canonicalAnnualPerson(g,p)+'<p>'+(current?'派遣先 '+h(winterDest(current)?.[1]||current):'未選択')+'</p>'+cmd('assign',same?'派遣を解除':'この選手を派遣','data-id="'+p.id+'" data-value="'+(same?'none':selected.key)+'"',held||!current&&n>=4)+'</article>';}).join('')+cmd('run','派遣を確定する','',held||t.cost>g.team.cash);
+    }else if(preseason&&t.support){
+      out+='<h3>球団支援・待遇改善を実施しますか？</h3><p>育成方針決定後の任意支援です。</p>'+t.supportOptions.map(x=>pre('support',h(x.label)+' · '+fmtMoney(x.cost),'data-value="'+h(x.key)+'"',held||!x.eligible)).join('')+pre('run','支援の選択を終えて育成を実施する')+pre('self-back','育成方針を見直す');
+    }else{
+      out+=reportLandscape('club')+t.players.map(p=>'<article class="panel" data-training-id="'+p.id+'">'+canonicalAnnualPerson(g,p)+'<label>重点育成<select class="canonical-training-focus" '+(held?'disabled':'')+'>'+p.focus.map(k=>'<option value="'+h(k)+'" '+(k===p.menu.focus?'selected':'')+'>'+h(k==='balanced'?'バランス':DRAFT_LABELS[k]||k)+'</option>').join('')+'</select></label><label>練習強度<select class="canonical-training-intensity" '+(held?'disabled':'')+'>'+[['rest','休養'],['light','軽め'],['normal','通常'],['hard','強化']].filter(([k])=>!p.injured||k==='rest').map(([k,v])=>'<option value="'+k+'" '+(k===p.menu.intensity?'selected':'')+'>'+v+'</option>').join('')+'</select></label>'+cmd('menu','育成方針を保存','data-id="'+p.id+'"')+'</article>').join('')+(preseason?pre('run','育成方針を決定して支援の選択へ'):cmd('run','秋季キャンプを開始する'));
+    }
+    return out+'</section>';
+  }
+  function canonicalPreseasonMarkup(g,a,held,button){
+    const p=a.preseason,phase=a.active;if(!p)return '<p class="warning">イベント情報なし</p>';
+    const cmd=(k,label,attrs='',disabled=held)=>button('pre-'+k,label,attrs,disabled);
+    let out='<section class="panel annual-phase"><h2>'+h(canonicalEventLabels[phase]||phase)+'</h2>';
+    if(phase==='winter-return')return out+(p.report?canonicalTrainingReport(g,p.report)+cmd('finish','帰国報告を確認する'):'<p>帰国報告待ち</p>')+'</section>';
+    if(['booking','camp'].includes(phase)){
+      if(p.report)return out+reportCampTraining(p.sites)+canonicalTrainingReport(g,p.report)+cmd('finish','キャンプ結果を確認する')+'</section>';
+      if(!p.paid&&!p.step){out+='<div class="chips">'+[['first','一軍'],['farm','二軍']].map(([k,n])=>'<button class="chip '+(canonicalCampGroup===k?'active':'')+'" data-action="canonical-camp-group" data-value="'+k+'">'+n+'</button>').join('')+'</div>'+campDestinationMap(p.sites,canonicalCampGroup).replace(/data-action="ref-site"/g,'data-action="canonical-camp-site"')+'<p>合計費用 '+fmtMoney(p.cost)+'</p>'+cmd('confirm-sites','キャンプ地を確定','',held||p.cost>g.team.cash);}
+      else if(phase==='camp'&&p.step===1)out+=reportCampTraining(p.sites)+cmd('kickoff','キャンプイン');
+      else if(phase==='camp'&&p.step===2){
+        const options=[['inside','室内でファンへサイン','ファン +250人','contract'],['outside','屋外でファンへサイン','ファン +500人／現場評価 -2','stadium'],['rest','休養に充てる','キャンプ終了時に体力を最大10回復','rest'],['meeting','チームミーティング','現場評価 +2','meeting']];
+        const scene=k=>k==='rest'?'<img class="report-scene" src="./assets/scenes/camp-rest.svg" alt="宿舎で休養する選手">':k==='meeting'?'<img class="report-scene" src="./assets/scenes/preseason-meeting.svg" alt="チームミーティング">':salesScene(k);
+        out+='<h3>春季キャンプ視察</h3>'+reportLandscape(p.sites.first)+'<p>天候が悪くなりそうです。指示を選択してください。</p>'+options.filter(x=>!p.visitPending||x[0]===p.visit).map(([k,n,d,v])=>'<div class="panel">'+scene(v)+'<h3>'+n+'</h3><p>'+d+'</p>'+(p.visitPending?'':cmd('visit','選択する','data-value="'+k+'"'))+'</div>').join('')+(p.visitPending?cmd('visit-finish','確認して本部へ戻る'):'');
+      }else if(phase==='camp'&&p.step===3)out+=reportCampTraining(p.sites)+cmd('run','キャンプ終了報告へ進む');
+    }else if(phase==='exhibition'){
+      if(p.report&&!p.digestSeen){const [key,title]=REPORT_DIGEST_CUTS[Math.min(canonicalDigestCut,REPORT_DIGEST_CUTS.length-1)];out+='<div class="preseason-montage"><h3>オープン戦ダイジェスト</h3><div class="montage-frame"><img src="./assets/scenes/preseason-'+key+'.svg" alt="'+h(title)+'"><div class="montage-label">'+h(title)+'</div></div><p>'+(canonicalDigestCut+1)+' / '+REPORT_DIGEST_CUTS.length+' · 試合のイメージ映像</p>'+(canonicalDigestCut<REPORT_DIGEST_CUTS.length-1?'<button class="btn primary full" data-action="canonical-digest-next" '+(held?'disabled':'')+'>次のシーン</button>':cmd('digest','試合結果へ'))+cmd('digest','ダイジェストをスキップして結果へ')+'</div>';}
+      else if(p.report){
+        const side=id=>{const t=p.report.clubs?.find(t=>t.id===id);return t?'<span class="preseason-score-team" style="--score-club:'+clubAccessible(clubIdentity(t).color,'#142536','#ffffff')+'">'+teamBadge(t,'mini-logo')+'<strong>'+h(t.short)+'</strong></span>':h(String(id));};
+        out+='<h3>全試合結果</h3>'+p.report.games.map(m=>'<article class="preseason-score-card"><p>'+h(m.date)+'</p><div class="preseason-score-line">'+side(m.away)+'<b>'+(m.noContest||!Number.isFinite(m.awayScore)?'—':m.awayScore)+' − '+(m.noContest||!Number.isFinite(m.homeScore)?'—':m.homeScore)+'</b>'+side(m.home)+'</div></article>').join('')+canonicalTrainingReport(g,p.report)+cmd('finish','オープン戦の結果を確認する');
+      }else if(p.meeting)out+='<img class="report-scene" src="./assets/scenes/preseason-meeting.svg" alt="監督と選手の作戦会議"><h3>オープン戦方針を共有しました</h3>'+cmd('run','ミーティングを終えて本部へ');
+      else out+='<h3>オープン戦方針</h3>'+[['balanced','バランス重視'],['first','主力調整'],['youth','若手育成']].map(([k,n])=>cmd('policy',n+(p.policy===k?' ✓':''),'data-value="'+k+'"',held||p.policy===k||p.meetingDone)).join('')+cmd('run','ミーティングへ');
+    }
+    return out+'</section>';
+  }
   function canonicalEventRender(){
     const app=$('#app'),g=canonicalSnapshot?.game;if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-events-back">‹ 本部</button></div>';
@@ -436,6 +501,9 @@ const pilotCode = `
         body+='<section class="panel renewal-room"><h2>FA・海外挑戦の相談</h2>'+normalDetailCard('contract','去就相談・残留交渉')+rows.map(r=>{const p=g.club?.roster.find(p=>p.id===r.id),model=p?canonicalPlayerModel(p,g):null,open=['request','refused'].includes(r.status);return '<section class="panel">'+(model?playerUpperPortrait(model)+'<h3>'+themedPlayerName(model)+'</h3>':'')+'<p>'+h(movementRequestLabel(r.kind))+' · '+h(({request:'去就相談',refused:'残留交渉保留',retained:'残留合意',stayed:'挑戦見送り'})[r.status]||r.status)+'</p><p>希望年俸 '+fmtSalary(r.demand)+'</p>'+(open?[['retain','希望額で残留提示',1],['retain','希望額＋15％',1.15],['allow','本人の希望を受け入れる',0],...(r.kind==='posting'?[['deny','ポスティングを認めない',0]]:[])].map(([kind,label,mult])=>commandButton(kind,label,'data-id="'+r.id+'" data-mult="'+mult+'"',held)).join(''):'')+'</section>';}).join('')+(rows.length?'':'<p>対象選手はいません。</p>')+commandButton('complete','相談を終了する','data-job="movement-declarations"',held||unresolved)+'</section>';
       }else if(a.active==='draft')body+=canonicalDraftMarkup(g,a,held,commandButton);
       else if(a.active==='roster-cut')body+=canonicalCutMarkup(g,a,held,commandButton);
+      else if(['renewal1','renewal2'].includes(a.active))body+=canonicalRenewalMarkup(g,a,held,commandButton);
+      else if(['autumn','winter','self'].includes(a.active))body+=canonicalTrainingMarkup(g,a,held,commandButton);
+      else if(['booking','winter-return','camp','exhibition'].includes(a.active))body+=canonicalPreseasonMarkup(g,a,held,commandButton);
       else if(a.active)body+='<p class="warning">現在のイベントの専用画面は未接続です。処理は保持します。</p>';
     }else if(!a.canStart&&!inbox.review&&!inbox.monthly&&!inbox.milestoneCount&&!important)body+='<p class="empty">現在対応する年間業務はありません。</p>';
     app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(g.team)+'">'+top+'<main class="main">'+body+'</main></div>';
@@ -453,6 +521,10 @@ const pilotCode = `
     if(act==='canonical-events-refresh'){void canonicalEventRequest(null);return;}
     if(!g||!accountCurrent()||slotOpening)return;
     if(act==='canonical-awards-filter'&&['all','own'].includes(b.dataset.value)){canonicalAwardFilter=b.dataset.value;render();return;}
+    if(act==='canonical-winter-place'&&a.active==='winter'&&a.training?.destinations?.some(d=>d.key===b.dataset.value)){canonicalWinterPlace=b.dataset.value;render();return;}
+    if(act==='canonical-camp-group'&&['booking','camp'].includes(a.active)&&['first','farm'].includes(b.dataset.value)){canonicalCampGroup=b.dataset.value;render();return;}
+    if(act==='canonical-camp-site'&&['booking','camp'].includes(a.active)&&!canonicalSnapshot.pending?.length&&!a.preseason?.paid){const v=b.dataset.value;if(a.preseason?.options.some(x=>x.key===v))void canonicalEventRequest({annual:'preseason',decision:'site',group:canonicalCampGroup,value:v});return;}
+    if(act==='canonical-digest-next'&&a.active==='exhibition'&&a.preseason?.report&&!a.preseason.digestSeen){canonicalDigestCut=Math.min(REPORT_DIGEST_CUTS.length-1,canonicalDigestCut+1);render();return;}
     if(act!=='canonical-event-command'||canonicalSnapshot.pending?.length)return;
     const k=b.dataset.kind,job=b.dataset.job;
     let cmd=null;
@@ -462,7 +534,7 @@ const pilotCode = `
     else if(k==='start'&&a.canStart)cmd={annual:'start'};
     else if(k==='day'&&a.canAdvance)cmd={annual:'day'};
     else if(k==='open'&&canonicalAnnualJobs.includes(job)&&a.tasks?.some(j=>j.id===job&&j.status==='ready')&&!a.active)cmd={annual:'open',job};
-    else if(k==='complete'&&a.active===job&&canonicalAnnualJobs.includes(job)&&(job!=='roster-cut'||window.confirm('戦力外通告を確定しますか？')))cmd={annual:'complete',job};
+    else if(k==='complete'&&a.active===job&&canonicalAnnualJobs.includes(job)&&(!['roster-cut','renewal1','renewal2'].includes(job)||window.confirm('この業務を確定しますか？')))cmd={annual:'complete',job};
     else if(a.active==='movement-declarations'&&['retain','allow','deny'].includes(k)){
       const r=a.requests.find(r=>r.id===Number(b.dataset.id)&&['request','refused'].includes(r.status)),m=Number(b.dataset.mult);
       if(r&&(k!=='deny'||r.kind==='posting')&&(k!=='retain'||[1,1.15].includes(m))&&window.confirm('選手の去就について、この判断を確定しますか？'))cmd={annual:'movement',playerId:r.id,decision:k,...(k==='retain'?{multiplier:m}:{})};
@@ -477,6 +549,23 @@ const pilotCode = `
       else if(decision==='offer'&&d?.negotiation?.id===id){const role=$('#canonical-draft-role')?.value,level=Number(b.dataset.level);if(['chance','develop'].includes(role)&&[0,1,2].includes(level)&&window.confirm('この条件を正式に提示しますか？'))cmd={annual:'draft',decision,playerId:id,level,role};}
       else if(['dismiss','withdraw','delegate-contract'].includes(decision)&&d?.negotiation?.id===id&&(decision==='dismiss'||window.confirm('交渉の判断を確定しますか？')))cmd={annual:'draft',decision,playerId:id};
     }else if(a.active==='roster-cut'&&k==='cut'&&a.roster?.eligible.some(p=>p.id===Number(b.dataset.id)))cmd={annual:'cut',playerId:Number(b.dataset.id)};
+    else if(['renewal1','renewal2'].includes(a.active)&&k.startsWith('renewal-')){
+      const decision=k.slice(8),id=Number(b.dataset.id),d=a.renewal,r=d?.rows.find(x=>x.id===id);
+      if(decision==='bulk'&&['assessment','middle','desired'].includes(b.dataset.value))cmd={annual:'renewal',decision,mode:b.dataset.value};
+      else if(decision==='submit'&&window.confirm('一括提示額を確定しますか？'))cmd={annual:'renewal',decision,bonus:b.dataset.bonus==='1'};
+      else if(decision==='offer'&&r?.editable){const el=b.closest('[data-renewal-id]'),salary=Number(el?.querySelector('.canonical-renewal-salary')?.value)/10000,bonuses=[...el.querySelectorAll('.canonical-renewal-bonus:checked')].map(e=>e.value);if(Number.isFinite(salary)&&salary>=.05&&salary<=15&&Math.abs(Math.round(salary*100)-salary*100)<1e-7&&bonuses.every(x=>r.options.some(o=>o.key===x))&&window.confirm('提示年俸・出来高条件を確定しますか？'))cmd={annual:'renewal',decision,playerId:id,salary,bonuses};else if(!Number.isFinite(salary)||salary<.05||salary>15)showToast('年俸は500〜150000万円です。',true);}
+      else if(['release','restore','retire'].includes(decision)&&r&&window.confirm('選手の契約判断を確定しますか？'))cmd={annual:'renewal',decision,playerId:id};
+      else if(['next','final-release'].includes(decision)&&window.confirm('残りの契約交渉を進めますか？'))cmd={annual:'renewal',decision};
+    }else if(['autumn','winter','self'].includes(a.active)&&k.startsWith('training-')){
+      const decision=k.slice(9),t=a.training||a.preseason,id=Number(b.dataset.id);
+      if(decision==='menu'){const p=t?.players?.find(x=>x.id===id),el=b.closest('[data-training-id]'),focus=el?.querySelector('.canonical-training-focus')?.value,intensity=el?.querySelector('.canonical-training-intensity')?.value;if(p&&p.focus.includes(focus)&&['rest','light','normal','hard'].includes(intensity))cmd={annual:'training',decision,playerId:id,focus,intensity};}
+      else if(decision==='assign'&&t?.eligible?.some(x=>x.id===id))cmd={annual:'training',decision,playerId:id,destination:b.dataset.value};
+      else if(decision==='run'&&window.confirm('現在の育成・派遣計画を確定しますか？'))cmd={annual:'training',decision};
+    }else if(['booking','self','winter-return','camp','exhibition'].includes(a.active)&&k.startsWith('pre-')){
+      const decision=k.slice(4),v=b.dataset.value;
+      if(['confirm-sites','kickoff','visit-finish','run','finish','self-back','digest'].includes(decision)&&(!['confirm-sites','kickoff','run'].includes(decision)||window.confirm('この内容で進めますか？')))cmd={annual:'preseason',decision};
+      else if(['visit','policy','support'].includes(decision)&&typeof v==='string'&&(decision==='policy'||window.confirm('この方針を選択しますか？')))cmd={annual:'preseason',decision,value:v};
+    }
     if(cmd)void canonicalEventRequest(cmd);
   }
   function canonicalHqOpen(){if(!canonicalSnapshot?.game?.headquarters||slotOpening||!accountCurrent())return;canonicalHqWorld=canonicalSnapshot.world;ui.page='canonical-hq';render();window.scrollTo(0,0);}
