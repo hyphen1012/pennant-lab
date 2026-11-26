@@ -80,7 +80,7 @@ function createHeadlessEngine(){
    const p=getPlayer(r.id),o=d.offers[r.id],v=faTalk(d,r);
    return {id:r.id,name:p.name,pos:p.pos,kind:r.kind,demand:r.demand,category:playerTitleTheme(p)?.name||null,outcome:faOutcome(d,r),canApproach:faCanApproach(d,r),offer:o?{status:o.status,salary:o.salary,years:o.years,due:o.due,counter:o.counter,replyUntil:o.replyUntil,seen:!!o.seen}:null,talk:v?{round:v.round,turn:v.turn,max:v.max,salary:v.salary,years:v.years,role:v.role,speech:v.speech,trust:v.trust,satisfaction:v.satisfaction,caution:v.caution}:null};
   }):[];
-  return {active,news:x?x.news:'eve',room:active?x.view:null,cpuDone:!!d?.cpuDone,deadline:d?.faClock?.deadline,rows,
+  return {active,news:x?x.news:'eve',room:active?x.view:null,specialResults:active&&x.view==='news'&&x.news==='results'?(d.eventRows||[]).filter(r=>playerTitleTheme(getPlayer(r.id))).map(r=>({id:r.id,name:getPlayer(r.id).name,category:playerTitleTheme(getPlayer(r.id)).name,outcome:faOutcome(d,r),seen:!!x.faNewsSeen?.includes(r.id)})):[],cpuDone:!!d?.cpuDone,deadline:d?.faClock?.deadline,rows,
    unread:d?faUnreadRows(d).length:0,waiting:d?Object.values(d.offers).filter(o=>o.status==='waiting').length:0,counter:d?Object.values(d.offers).filter(o=>o.status==='counter').length:0,
    deals:active&&d?(d.deals||[]).filter(a=>a.from===team.id||a.to===team.id).map(a=>({id:a.id,kind:a.kind,from:a.from,to:a.to,salary:a.salary,years:a.years,rank:a.rank,comp:a.comp,compMode:a.compMode,compOptions:d.cpuDone?movementCompOptions(d,a).map(p=>({id:p.id,name:p.name,pos:p.pos})):[]})):[],
    free:active&&x.view==='other'&&!x.news&&!d.cpuDone?movementPool(d).filter(r=>r.kind==='free').map(r=>({id:r.id,name:getPlayer(r.id).name,demand:r.demand})):[]};
@@ -264,8 +264,11 @@ function createHeadlessEngine(){
       // Same persisted transitions as offdesk-news-eve/open/results, without DOM event guards.
       if(x.news==='eve')x.news='opening-wait';
       else if(x.news==='opening'){x.marketOpened??=f.date;faClock(d,x);faOpeningDraw(f.date);x.news=null;}
-      else x.news=null;
+      else {if((d.eventRows||[]).some(r=>playerTitleTheme(getPlayer(r.id))&&!x.faNewsSeen?.includes(r.id)))throw Error('special market result acknowledgement required');x.news=null;}
       x.open=false;flowPark(f,j,'ready');
+     }else if(k==='special-result'){
+      if(x.view!=='news'||x.news!=='results'||!(d.eventRows||[]).some(r=>r.id===input.playerId&&playerTitleTheme(getPlayer(r.id)))||x.faNewsSeen?.includes(input.playerId))throw Error('special result unavailable');
+      (x.faNewsSeen??=[]).push(input.playerId);
      }else if(k==='home'){
       if(x.news)throw Error('market news acknowledgement required');
       flowPark(f,j,'ready');
@@ -299,8 +302,8 @@ function createHeadlessEngine(){
        if(!faUnread(o))throw Error('FA reply unavailable');o.seen=true;
       }else{
        if(!faCanApproach(d,row)||faUnread(o))throw Error('FA negotiation unavailable');
-       if(k==='talk'){
-        if(!faTalkCommand(d,row,input.key))throw Error('FA dialogue rejected');
+       if(k==='talk'||k==='salary'){
+        if(!faTalkCommand(d,row,k==='salary'?'million:'+input.million:input.key))throw Error('FA dialogue rejected');
        }else if(k==='years'){
         const v=faTalk(d,row,true);v.years=input.years;
        }else if(k==='submit'){
@@ -466,13 +469,14 @@ function createHeadlessEngine(){
     const k=command.decision,base=['annual','decision'],id=n=>Number.isSafeInteger(n)&&n>0;
     let valid=['news','home','close','finish'].includes(k)&&exact(command,base);
     if(k==='open')valid=exact(command,[...base,'room'])&&['news','fa','return','other'].includes(command.room);
-    if(['ack','submit','withdraw','exchange'].includes(k))valid=exact(command,[...base,'playerId'])&&id(command.playerId);
+    if(['ack','submit','withdraw','exchange','special-result'].includes(k))valid=exact(command,[...base,'playerId'])&&id(command.playerId);
     if(k==='talk')valid=exact(command,[...base,'playerId','key'])&&id(command.playerId)&&['listen','winning','chance','trust','vision','legacy','salary:90','salary:100','salary:115','salary:130','salary:145'].includes(command.key);
+    if(k==='salary')valid=exact(command,[...base,'playerId','million'])&&id(command.playerId)&&Number.isSafeInteger(command.million)&&command.million>=5&&command.million<=500;
     if(k==='years')valid=exact(command,[...base,'playerId','years'])&&id(command.playerId)&&Number.isSafeInteger(command.years)&&command.years>=1&&command.years<=10;
     if(k==='free')valid=exact(command,[...base,'playerId','salary'])&&id(command.playerId)&&Number.isFinite(command.salary)&&command.salary>=.05&&command.salary<=5;
     if(['trade','comp'].includes(k))valid=exact(command,[...base,'playerId','otherId'])&&id(command.playerId)&&id(command.otherId)&&command.playerId!==command.otherId;
     if(!valid)throw Error('invalid market command');
-    return run('annual',state,{choice:'market',decision:k,room:command.room,playerId:command.playerId,otherId:command.otherId,key:command.key,years:command.years,salary:command.salary,verifiedVip});
+    return run('annual',state,{choice:'market',decision:k,room:command.room,playerId:command.playerId,otherId:command.otherId,key:command.key,million:command.million,years:command.years,salary:command.salary,verifiedVip});
    }
    if(command?.annual==='commerce'){
     const k=command.decision,base=['annual','decision'],v=command.value;
