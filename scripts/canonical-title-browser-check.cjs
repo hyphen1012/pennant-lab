@@ -65,6 +65,7 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   await page.locator('[data-action="canonical-roster-back"]').click();await page.getByText('サーバー保存の確認画面（開発試験）').waitFor();
   await page.locator('[data-action="canonical-hq-open"]').click();await page.locator('.hero-stadium').waitFor();a.equal(await page.locator('.hero-team h2').textContent(),'試験球団');
   const beforeDay=await post('read',{slot:1});a.equal(beforeDay.game.headquarters.canStep,true);
+  await page.locator('[data-action="canonical-events-open"]').click();await page.getByText('現在対応する年間業務はありません。').waitFor();a.equal(await page.locator('[data-action="canonical-event-command"]').count(),0);await page.locator('[data-action="canonical-events-back"]').click();a.equal((await post('read',{slot:1})).revision,beforeDay.revision);
   await page.locator('[data-action="canonical-players"]').click();a.equal(await page.locator('.player-card').count(),beforeDay.game.club.roster.length);
   await page.locator('.player-row').first().click();await page.locator('.player-upper-portrait').waitFor();a.equal(await page.locator('.player-stat-grid').count(),1);
   await page.locator('[data-action="canonical-info-back"]').click();await page.locator('.player-card').first().waitFor();await page.locator('[data-action="canonical-info-back"]').click();
