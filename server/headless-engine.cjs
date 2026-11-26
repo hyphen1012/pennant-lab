@@ -802,7 +802,7 @@ function createHeadlessEngine(){
  }
  if(op==='achievements'){
   const entries=new Map();
-  const win=(year,day)=>{if(Number.isSafeInteger(year)&&year>=2027&&Number.isSafeInteger(day)&&day>=1&&day<=143){const key='win:'+year+':'+day;entries.set(key,{key,label:'試合勝利 '+year+' / '+day,eligible:true});}};
+  const win=(year,day)=>{if(Number.isSafeInteger(year)&&year>=2027&&Number.isSafeInteger(day)&&day>=1&&day<=143){const key='win:'+year+':'+day;entries.set(key,{key,label:'試合勝利 '+year+' / '+day,eligible:true,art:{year,kind:'win'}});}};
   for(const g of game.games)if((g.home===team.id&&g.homeScore>g.awayScore)||(g.away===team.id&&g.awayScore>g.homeScore))win(g.year,g.day);
   // Existing memorial album is generated from actual game records. Only
   // own-club entries with a supported source and explicit team ID qualify.
@@ -817,7 +817,7 @@ function createHeadlessEngine(){
    // album events, not sharing actions or another club's headline.
    if(!['award','facility','championship','league-championship','retirement','farewell','club-record'].includes(e.kind)&&!e.featKey&&!e.recordKey&&!e.anniversary&&!(e.id.startsWith('news:')&&memorialNewsEligible(e,team)))continue;
    const key='memorial:'+e.id;
-   if(!entries.has(key))entries.set(key,{key,label:e.title.slice(0,160),eligible:true});
+   if(!entries.has(key))entries.set(key,{key,label:e.title.slice(0,160),eligible:true,art:{year:e.year,kind:e.anniversary?'anniversary':['facility','championship','league-championship','award','retirement','farewell','club-record'].includes(e.kind)?e.kind:'record'}});
   }
   // Special news and the ordinary record edition sometimes describe the
   // same achievement. Reuse the ordinary key rather than granting twice.
