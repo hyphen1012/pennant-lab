@@ -1,0 +1,24 @@
+'use strict';
+const a=require('node:assert/strict'),{performance}=require('node:perf_hooks'),{createHash}=require('node:crypto');
+const {createHeadlessEngine}=require('../server/headless-engine.cjs');
+const {createProjectionWorkerTrial}=require('../server/projection-worker-trial.cjs');
+const hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
+(async()=>{
+ const engine=createHeadlessEngine(),world=engine.newWorld({team:0});
+ const p=world.players.find(x=>x.teamId===world.selectedId&&!x.retired);a.ok(p);p.injury={date:'2027-03-01',daysLeft:8,label:'fixture'};
+ const expected=engine.readProjection(world),original=hash(world),trial=createProjectionWorkerTrial();
+ const start=performance.now(),pending=trial.project(world);
+ await a.rejects(trial.project(world),/busy/);
+ let ticks=0;const interval=setInterval(()=>ticks++,5);
+ let result;try{result=await pending;}finally{clearInterval(interval);}
+ a.deepEqual(result,expected);a.equal(hash(world),original);a.ok(result.actions.some(x=>x.route==='medical'));
+ a.ok(ticks>0,'event loop must make progress while worker runs');
+ const ms=performance.now()-start;
+ await a.rejects(trial.project({}),/failed|exited/);
+ await a.rejects(trial.project({bad:()=>{}}));
+ a.deepEqual(await trial.project(world),expected,'lane must recover after invalid work');
+ const tiny=createProjectionWorkerTrial({timeoutMs:1});
+ await a.rejects(tiny.project(world),/timeout/);
+ await a.rejects(tiny.project(world),/timeout/);
+ console.log(JSON.stringify({result:'PASS isolated read projection, equal output, unchanged state, busy rejection, timeout and recovery',ms,ticks,rss:process.memoryUsage().rss}));
+})().catch(e=>{console.error(e);process.exitCode=1;});
