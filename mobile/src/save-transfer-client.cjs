@@ -10,12 +10,12 @@ function createSaveTransferClient({transport,local,sha256,maxBytes=256*1024*1024
   if(session!==null&&(!session||typeof session.account!=='string'||!session.account||session.account.length>200))throw Error('invalid account');
   transport.setSession(session);account=session?.account??null;invalidate();
  }
- async function stage({sourceSlot,targetSlot}={}){
-  if(busy||!account||!validSlot(sourceSlot)||!validSlot(targetSlot))throw Error('migration unavailable');
+ async function stage({sourceSlot,targetSlot,sourceRevision}={}){
+  if(busy||!account||!validSlot(sourceSlot)||!validSlot(targetSlot)||(sourceRevision!==undefined&&(!integer(sourceRevision)||sourceRevision<1)))throw Error('migration unavailable');
   busy=true;staged=null;const owner=account,gen=generation;
   try{
-   const remote=await transport.download(sourceSlot);
-   if(gen!==generation||!remote||!integer(remote.revision)||remote.revision<1||!(remote.payload instanceof Uint8Array)||!remote.payload.length||remote.payload.length>maxBytes||typeof remote.sha!=='string'||!/^[0-9a-f]{64}$/.test(remote.sha))throw Error('invalid migration source');
+   const remote=await transport.download(sourceSlot,sourceRevision);
+   if(gen!==generation||!remote||!integer(remote.revision)||remote.revision<1||(sourceRevision!==undefined&&remote.revision!==sourceRevision)||!(remote.payload instanceof Uint8Array)||!remote.payload.length||remote.payload.length>maxBytes||typeof remote.sha!=='string'||!/^[0-9a-f]{64}$/.test(remote.sha))throw Error('invalid migration source');
    const payload=new Uint8Array(remote.payload);
    if(await sha256(payload)!==remote.sha)throw Error('save hash mismatch');
    if(gen!==generation)throw Error('session changed');
@@ -37,6 +37,6 @@ function createSaveTransferClient({transport,local,sha256,maxBytes=256*1024*1024
    return {ok:true,slot:s.targetSlot};
   }finally{busy=false;}
  }
- return {setSession,invalidate,stage,commit};
+ return {setSession,invalidate,stage,commit,cancel:()=>{staged=null;generation++;}};
 }
 module.exports={createSaveTransferClient};
