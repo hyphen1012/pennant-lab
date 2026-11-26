@@ -43,7 +43,7 @@ function createSaveTransport({baseUrl,fetcher=globalThis.fetch,sha256,timeoutMs=
   if(!/^application\/json(?:;|$)/i.test(response.headers.get('content-type')||''))throw fail('invalid_response');
   return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(await read(response,16384)));
  }
- const meta=x=>x&&rev(x.revision)&&x.revision>0&&hash(x.sha)&&size(x.bytes);
+ const meta=x=>x&&rev(x.revision)&&x.revision>0&&hash(x.sha)&&size(x.bytes)&&(x.updatedAt===undefined||x.updatedAt===null||(rev(x.updatedAt)&&x.updatedAt>0));
  function list(){return request('',{parse:async r=>{const x=await json(r);if(!Array.isArray(x)||x.length>3||!x.every(a=>meta(a)&&validSlot(a.slot))||new Set(x.map(a=>a.slot)).size!==x.length)throw fail('invalid_response');return x;}});}
  function history(slot){if(!validSlot(slot))throw fail('invalid_slot');return request('/'+slot+'/history',{parse:async r=>{const x=await json(r);if(!Array.isArray(x)||x.length>10||!x.every(meta)||new Set(x.map(a=>a.revision)).size!==x.length)throw fail('invalid_response');return x;}});}
  function download(slot,revision){
