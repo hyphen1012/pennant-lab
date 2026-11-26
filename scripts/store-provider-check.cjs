@@ -12,7 +12,8 @@ const {openPurchaseRegistry,createPurchaseService}=require('../server/purchase-r
  const apple=createAppleAdapter({api,verifier,bundleId,environment,catalog,lookup,now});
  let gp={kind:'androidpublisher#productPurchaseV2',obfuscatedExternalAccountId:owner,productLineItem:[{productId:'perm',productOfferDetails:{quantity:1,refundableQuantity:1,consumptionState:'CONSUMPTION_STATE_YET_TO_BE_CONSUMED'}}],purchaseStateContext:{purchaseState:'PURCHASED'}};
  let gs={kind:'androidpublisher#subscriptionPurchaseV2',externalAccountIdentifiers:{obfuscatedExternalAccountId:owner},lineItems:[{productId:'vip',expiryTime:new Date(t+200000).toISOString()}],subscriptionState:'SUBSCRIPTION_STATE_ACTIVE'};
- const google=createGoogleAdapter({query:async p=>{if(p.endsWith('/tokens/one')&&p.includes('/productsv2/'))return gp;if(p.endsWith('/tokens/sub')&&p.includes('/subscriptionsv2/'))return gs;throw Object.assign(Error('not found'),{status:404});},packageName:bundleId,catalog,vault:registry.vault,lookup,now});
+ let replacement=null,third=null;
+ const google=createGoogleAdapter({query:async p=>{if(p.endsWith('/tokens/one')&&p.includes('/productsv2/'))return gp;if(p.endsWith('/tokens/sub')&&p.includes('/subscriptionsv2/'))return gs;if(p.endsWith('/tokens/newsub')&&p.includes('/subscriptionsv2/')&&replacement)return replacement;if(p.endsWith('/tokens/third')&&p.includes('/subscriptionsv2/')&&third)return third;throw Object.assign(Error('not found'),{status:404});},packageName:bundleId,catalog,vault:registry.vault,lookup,now});
  const choose=s=>s==='apple'?apple:google,service=createPurchaseService({registry,authenticate:async token=>({authenticated:true,account:token==='owner'?owner:other}),verifyReceipt:x=>choose(x.store).receipt(x),verifyCurrent:x=>choose(x.store).current(x),verifyNotification:async({store,proof})=>await choose(store).notification(store==='google'?JSON.parse(proof):proof)||{verified:true,ignored:true},now});
  try{
   await a.rejects(service.restore('other','apple','perm'));await a.rejects(service.restore('owner','apple','forged'));
@@ -32,6 +33,24 @@ const {openPurchaseRegistry,createPurchaseService}=require('../server/purchase-r
   await service.notification('google',JSON.stringify({purchaseToken:'one'}));const revoked=await service.verifyEntitlements(owner);a.equal(revoked.entitlements.adSkip.active,false);a.equal(revoked.entitlements.vip.active,false);
   t++;gs.subscriptionState='SUBSCRIPTION_STATE_CANCELED';a.equal((await google.receipt({account:owner,proof:'sub'})).status,'active');
   gs.linkedPurchaseToken='previous';await a.rejects(google.receipt({account:owner,proof:'sub'}),/linked subscription/);
+  delete gs.linkedPurchaseToken;
+  const subchain=createHash('sha256').update('sub').digest('hex'),newchain=createHash('sha256').update('newsub').digest('hex');
+  t++;replacement={...gs,subscriptionState:'SUBSCRIPTION_STATE_PENDING',linkedPurchaseToken:'sub'};
+  await service.restore('owner','google','newsub');a.equal(registry.isSuperseded('google',subchain),false);
+  t++;replacement={...replacement,subscriptionState:'SUBSCRIPTION_STATE_ACTIVE'};
+  await service.restore('owner','google','newsub');a.equal(registry.find('google',subchain).status,'revoked');a.equal(registry.find('google',newchain).status,'active');
+  a.equal(registry.isSuperseded('google',subchain),true);
+  a.equal((await service.authorizeFinish('owner','google','newsub')).authorized,true);
+  t++;gs.subscriptionState='SUBSCRIPTION_STATE_ACTIVE'; // stale old-token response
+  a.equal((await service.restore('owner','google','sub')).recorded,false);
+  await a.rejects(service.authorizeFinish('owner','google','sub'),/not active|superseded/);
+  await service.notification('google',JSON.stringify({purchaseToken:'sub'}));a.equal(registry.find('google',subchain).status,'revoked');
+  third={...replacement,externalAccountIdentifiers:{obfuscatedExternalAccountId:other},linkedPurchaseToken:'newsub'};
+  await a.rejects(service.restore('other','google','third'),/ownership unavailable/);
+  third={...replacement,linkedPurchaseToken:'sub'};await a.rejects(service.restore('owner','google','third'),/conflict/);
+  t++;replacement={...replacement,subscriptionState:'SUBSCRIPTION_STATE_EXPIRED'};
+  a.equal((await service.verifyEntitlements(owner)).entitlements.vip.active,false);
+  a.equal(registry.find('google',subchain).status,'revoked');
   gp.testPurchaseContext={fopType:'TEST'};await a.rejects(google.receipt({account:owner,proof:'one'}));
   a.equal((await service.notification('google',JSON.stringify({purchaseToken:'unknown'}))).ignored,true);
   console.log('PASS current Apple/Google queries, account binding, grace/expiry/refund, encrypted token vault and notification requery');

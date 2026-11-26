@@ -7,6 +7,11 @@ const int=v=>Number.isSafeInteger(v)&&v>=0;
 function openPurchaseRegistry(filename,{tokenKey=null}={}){
  const db=new DatabaseSync(filename);
  db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS purchases (store TEXT NOT NULL, chain TEXT NOT NULL, account TEXT NOT NULL, product TEXT NOT NULL, revision INTEGER NOT NULL, status TEXT NOT NULL, expires INTEGER, PRIMARY KEY(store,chain)); CREATE INDEX IF NOT EXISTS purchase_account ON purchases(account)');
+ // Immutable Google replacement fence. Keep this with purchase ownership
+ // evidence through backup and the reviewed legal-retention process.
+ db.exec('CREATE TABLE IF NOT EXISTS google_supersession (old_chain TEXT PRIMARY KEY, new_chain TEXT UNIQUE NOT NULL, account TEXT NOT NULL)');
+ const predecessor=db.prepare('SELECT * FROM google_supersession WHERE new_chain=?'),successor=db.prepare('SELECT * FROM google_supersession WHERE old_chain=?'),link=db.prepare('INSERT INTO google_supersession VALUES(?,?,?)');
+ const isSuperseded=(store,chain)=>store==='google'&&!!successor.get(chain);
  const vault=tokenKey?require('./store-token-vault.cjs').createTokenVault({db,key:tokenKey}):null;
  const find=db.prepare('SELECT * FROM purchases WHERE store=? AND chain=?');
  const byAccount=db.prepare('SELECT * FROM purchases WHERE account=? ORDER BY store,chain');
@@ -14,19 +19,40 @@ function openPurchaseRegistry(filename,{tokenKey=null}={}){
  function atomic(fn){db.exec('BEGIN IMMEDIATE');try{const result=fn();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}}
  function validate(v,account){
   if(v?.verified!==true||!id(account)||v.account!==account||!['apple','google'].includes(v.store)||!id(v.chain)||!['permanent','vip'].includes(v.product)||!int(v.revision)||!['active','revoked','expired','pending'].includes(v.status)||!(v.product==='permanent'?v.expiresAt===null:int(v.expiresAt)))throw Error('unverified purchase');
+  if(v.linkedChain!==undefined&&!(v.store==='google'&&v.product==='vip'&&v.status==='active'&&/^[a-f0-9]{64}$/.test(v.chain)&&/^[a-f0-9]{64}$/.test(v.linkedChain)&&v.chain!==v.linkedChain))throw Error('invalid linked subscription');
   return v;
  }
  function put(v,account){
   validate(v,account);const old=find.get(v.store,v.chain);
   if(old&&(old.account!==account||old.product!==v.product))throw Error('purchase binding conflict');
+  if(isSuperseded(v.store,v.chain)){
+   const fence=successor.get(v.chain);
+   if(!old||fence.account!==account||old.status!=='revoked')throw Error('supersession invariant');
+   // No provider replay or late notification may reactivate this old token.
+   return false;
+  }
   if(old&&v.revision<old.revision)throw Error('stale purchase revision');
+  let replaced=false;
+  if(v.linkedChain!==undefined){
+   const previous=find.get('google',v.linkedChain),existing=successor.get(v.linkedChain),parent=predecessor.get(v.chain);
+   if(!previous||previous.account!==account||previous.product!=='vip')throw Error('linked subscription ownership unavailable');
+   if((existing&&(existing.new_chain!==v.chain||existing.account!==account))||(parent&&(parent.old_chain!==v.linkedChain||parent.account!==account)))throw Error('linked subscription conflict');
+   // For new links, reject stale provider observations rather than overwrite a
+   // more recent old-token observation. Existing links remain immutable.
+   if(!existing){
+    if(v.revision<previous.revision)throw Error('stale subscription replacement');
+    link.run(v.linkedChain,v.chain,account);
+    write.run('google',previous.chain,account,'vip',v.revision,'revoked',previous.expires);
+    replaced=true;
+   }
+  }
   if(old&&v.revision===old.revision){
    if(old.status!==v.status||old.expires!==v.expiresAt)throw Error('conflicting purchase revision');
-   return false;
+   return replaced;
   }
   write.run(v.store,v.chain,account,v.product,v.revision,v.status,v.expiresAt);return true;
  }
- return {vault,record:(v,account)=>atomic(()=>put(v,account)),find:(store,chain)=>find.get(store,chain),list:account=>byAccount.all(account),reconcile:(account,expected,values)=>atomic(()=>{
+ return {vault,isSuperseded,record:(v,account)=>atomic(()=>put(v,account)),find:(store,chain)=>find.get(store,chain),list:account=>byAccount.all(account),reconcile:(account,expected,values)=>atomic(()=>{
   const current=byAccount.all(account);
   if(JSON.stringify(current)!==JSON.stringify(expected))throw Error('purchase registry changed; refresh required');
   if(values.length!==current.length)throw Error('incomplete purchase verification');
@@ -51,8 +77,9 @@ function createPurchaseService({registry,authenticate,verifyReceipt,verifyCurren
   const account=await identity(token);
   if(!['apple','google'].includes(store)||typeof proof!=='string'||!proof||proof.length>65536)throw Error('invalid receipt');
   const v=fresh(await verifyReceipt({account,store,proof}));
-  if(v.store!==store||v.status!=='active'||v.product==='vip'&&v.expiresAt<=now())throw Error('purchase not active');
+  if(v.store!==store||v.status!=='active'||v.product==='vip'&&v.expiresAt<=now()||registry.isSuperseded(store,v.chain))throw Error('purchase not active');
   registry.record(v,account);
+  if(registry.isSuperseded(store,v.chain))throw Error('purchase superseded');
   return {authorized:true};
  }
  async function notification(store,proof){
@@ -70,7 +97,9 @@ function createPurchaseService({registry,authenticate,verifyReceipt,verifyCurren
   if(!id(account))throw Error('invalid account');
   const start=now();if(!int(start))throw Error('invalid server time');
   const rows=registry.list(account);
-  const values=await Promise.all(rows.map(async x=>fresh(await verifyCurrent({account,store:x.store,chain:x.chain,product:x.product,expiresAt:x.expires,status:x.status}))));
+  const values=await Promise.all(rows.map(async x=>registry.isSuperseded(x.store,x.chain)
+   ?{verified:true,verifiedAt:start,revision:x.revision,account,store:x.store,chain:x.chain,product:x.product,status:'revoked',expiresAt:x.expires}
+   :fresh(await verifyCurrent({account,store:x.store,chain:x.chain,product:x.product,expiresAt:x.expires,status:x.status}))));
   const t=now(),verifiedAt=values.reduce((at,v)=>Math.min(at,v.verifiedAt),start);
   if(!int(t)||t<start||t-verifiedAt>=MAX_AGE_MS)throw Error('stale purchase reconciliation');
   const current=registry.reconcile(account,rows,values);

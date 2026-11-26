@@ -59,7 +59,7 @@ function createGoogleAdapter({query,packageName,catalog,vault,lookup,allowTest=f
   if(!tokenId(token)||!accountId(account))throw Error('invalid Google proof');
   const revision=clock(),r=await query(path(kind,token)),chain=hash(token);
   if(!r||typeof r!=='object')throw Error('invalid Google response');
-  let product,status,expiresAt=null;
+  let product,status,expiresAt=null,linkedChain;
   if(kind==='productsv2'){
    const row=r.productLineItem;if(r.kind!=='androidpublisher#productPurchaseV2'||r.obfuscatedExternalAccountId!==account||!Array.isArray(row)||row.length!==1||products.get(row[0].productId)!=='permanent'||r.testPurchaseContext&&!allowTest)throw Error('Google one-time binding mismatch');
    product='permanent';const p=r.purchaseStateContext?.purchaseState,o=row[0].productOfferDetails;
@@ -72,12 +72,17 @@ function createGoogleAdapter({query,packageName,catalog,vault,lookup,allowTest=f
    if(!['PENDING','ACTIVE','PAUSED','IN_GRACE_PERIOD','ON_HOLD','CANCELED','EXPIRED','PENDING_PURCHASE_CANCELED'].map(s=>'SUBSCRIPTION_STATE_'+s).includes(p))throw Error('invalid Google subscription state');
    expiresAt=rows[0].expiryTime?Date.parse(rows[0].expiryTime):0;if(!timestamp(expiresAt))throw Error('invalid Google expiry');
    const eligible=['SUBSCRIPTION_STATE_ACTIVE','SUBSCRIPTION_STATE_IN_GRACE_PERIOD','SUBSCRIPTION_STATE_CANCELED'].includes(p)&&expiresAt>clock();
-   // Linked token upgrades require atomic supersession. Fail closed until
-   // supported; do not reassign old ownership or accept two paid chains.
-   if(r.linkedPurchaseToken&&eligible)throw Error('linked subscription requires reconciliation');
    status=r.canceledStateContext?.replacementCancellation?'revoked':eligible?'active':p==='SUBSCRIPTION_STATE_PENDING'?'pending':'expired';
+   // Immediate, single-line-item replacements only. A pending/deferred plan
+   // must never revoke the old entitlement early. Ambiguous ownership fails.
+   if(r.linkedPurchaseToken!==undefined&&status==='active'){
+    if(!tokenId(r.linkedPurchaseToken)||r.linkedPurchaseToken===token)throw Error('invalid linked subscription');
+    linkedChain=hash(r.linkedPurchaseToken);
+    const old=lookup('google',linkedChain);
+    if(!old||old.account!==account||old.product!=='vip')throw Error('linked subscription ownership unavailable');
+   }
   }else throw Error('unknown Google query');
-  return {verified:true,verifiedAt:revision,revision,account,store:'google',chain,product,status,expiresAt};
+  return {verified:true,verifiedAt:revision,revision,account,store:'google',chain,product,status,expiresAt,...(linkedChain?{linkedChain}:{})};
  }
  async function current({account,chain,product,expiresAt:oldExpiry,status:oldStatus}){
   const token=vault.get(chain,account);if(!token||hash(token)!==chain)throw Error('Google token unavailable');
