@@ -1,0 +1,25 @@
+name: Canonical club operations
+on:
+  push:
+    paths:
+      - 'server/headless-engine.cjs'
+      - 'scripts/canonical-club-check.cjs'
+      - '.github/workflows/canonical-club.yml'
+  pull_request:
+    paths:
+      - 'server/headless-engine.cjs'
+      - 'scripts/canonical-club-check.cjs'
+      - '.github/workflows/canonical-club.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  club:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/canonical-club-check.cjs
