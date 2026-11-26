@@ -16,6 +16,7 @@ const auth=async token=>['a','b'].includes(token)?{authenticated:true,account:to
   const make=()=>createPurchaseService({registry:reg,...adapters});let purchases=make();
   rows.set(key('apple','perm'),row('a','apple','perm','permanent',1));
   a.equal((await purchases.restore('a','apple','perm')).recorded,true);
+  a.deepEqual(await purchases.authorizeFinish('a','apple','perm'),{authorized:true});await a.rejects(purchases.authorizeFinish('b','apple','perm'));
   a.equal((await purchases.restore('a','apple','perm')).recorded,false);
   await a.rejects(purchases.restore('b','apple','perm'),/binding conflict/);
   await a.rejects(purchases.restore('a','apple','unknown'));
@@ -27,6 +28,7 @@ const auth=async token=>['a','b'].includes(token)?{authenticated:true,account:to
   a.equal((await purchases.verifyEntitlements('b')).entitlements.adSkip.active,false);
   const old=rows.get(key('apple','perm'));rows.set(key('apple','perm'),row('a','apple','perm','permanent',2,'revoked'));
   a.equal((await purchases.notification('apple','perm')).recorded,true);
+  await a.rejects(purchases.authorizeFinish('a','apple','perm'));
   a.equal((await purchases.notification('apple','perm')).recorded,false);
   a.equal((await purchases.verifyEntitlements('a')).entitlements.adSkip.active,false);
   rows.set(key('apple','perm'),old);await a.rejects(purchases.restore('a','apple','perm'),/stale purchase revision/);

@@ -21,3 +21,34 @@ if(oauth){
   }
  }
 }
+
+ // Register native store SDKs in the generated projects. No product IDs or
+ // purchase UI are enabled merely by compiling these plugins.
+ const appId=require('./capacitor.config.json').appId;
+ if(!/^[a-z][a-z0-9]*(?:\.[a-z0-9]+)+$/.test(appId))throw Error('invalid app id');
+ const nativeDir=path.join(__dirname,'native');
+ if(fs.existsSync(manifest)){
+  const javaDir=path.join(__dirname,'android/app/src/main/java',...appId.split('.'));
+  const main=path.join(javaDir,'MainActivity.java'),gradle=path.join(__dirname,'android/app/build.gradle');
+  let j=fs.readFileSync(main,'utf8');
+  if(!j.includes('registerPlugin(PennantBillingPlugin.class)')){
+   const anchor=/public class MainActivity extends BridgeActivity\s*\{\s*\}/;
+   if(!anchor.test(j))throw Error('review custom MainActivity before registering billing');
+   j=j.replace(anchor,'public class MainActivity extends BridgeActivity {\n    @Override public void onCreate(android.os.Bundle savedInstanceState) {\n        registerPlugin(PennantBillingPlugin.class);\n        super.onCreate(savedInstanceState);\n    }\n}');
+   fs.writeFileSync(main,j);
+  }
+  fs.writeFileSync(path.join(javaDir,'PennantBillingPlugin.java'),fs.readFileSync(path.join(nativeDir,'PennantBillingPlugin.java'),'utf8').replace('__APP_PACKAGE__',appId));
+  let g=fs.readFileSync(gradle,'utf8');
+  if(!g.includes('com.android.billingclient:billing:9.1.0')){if(!g.includes('dependencies {'))throw Error('billing gradle anchor');g=g.replace('dependencies {','dependencies {\n    implementation "com.android.billingclient:billing:9.1.0"');fs.writeFileSync(gradle,g);}
+ }
+ if(fs.existsSync(plist)){
+  const delegate=path.join(__dirname,'ios/App/App/AppDelegate.swift'),story=path.join(__dirname,'ios/App/App/Base.lproj/Main.storyboard');
+  let s=fs.readFileSync(delegate,'utf8');
+  if(!s.includes('class PennantBillingPlugin'))fs.writeFileSync(delegate,s+'\n'+fs.readFileSync(path.join(nativeDir,'PennantBillingPlugin.swift'),'utf8'));
+  let xml=fs.readFileSync(story,'utf8');
+  if(!xml.includes('customClass="PennantBillingViewController"')){
+   if(!xml.includes('customClass="CAPBridgeViewController"'))throw Error('billing storyboard anchor');
+   xml=xml.replace(/customClass="CAPBridgeViewController"(?: customModule="[^"]*")?(?: customModuleProvider="[^"]*")?/,'customClass="PennantBillingViewController" customModule="App" customModuleProvider="target"');
+   fs.writeFileSync(story,xml);
+  }
+ }

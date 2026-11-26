@@ -45,6 +45,15 @@ function createPurchaseService({registry,authenticate,verifyReceipt,verifyCurren
   if(v.store!==store)throw Error('store mismatch');
   return {recorded:registry.record(v,account)};
  }
+ // Re-verify this specific receipt; a generic active VIP is not sufficient.
+ async function authorizeFinish(token,store,proof){
+  const account=await identity(token);
+  if(!['apple','google'].includes(store)||typeof proof!=='string'||!proof||proof.length>65536)throw Error('invalid receipt');
+  const v=fresh(await verifyReceipt({account,store,proof}));
+  if(v.store!==store||v.status!=='active'||v.product==='vip'&&v.expiresAt<=now())throw Error('purchase not active');
+  registry.record(v,account);
+  return {authorized:true};
+ }
  async function notification(store,proof){
   if(!['apple','google'].includes(store)||typeof proof!=='string'||!proof||proof.length>65536)throw Error('invalid notification');
   const v=fresh(await verifyNotification({store,proof}));
@@ -66,6 +75,6 @@ function createPurchaseService({registry,authenticate,verifyReceipt,verifyCurren
   const expiry=Math.max(0,...active.filter(x=>x.product==='vip'&&x.expires>t).map(x=>x.expires));
   return {verified:true,account,verifiedAt,entitlements:{adSkip:{active:active.some(x=>x.product==='permanent'),expiresAt:null},vip:{active:expiry>0,expiresAt:expiry||null}}};
  }
- return {restore,notification,verifyEntitlements};
+ return {restore,authorizeFinish,notification,verifyEntitlements};
 }
 module.exports={openPurchaseRegistry,createPurchaseService};

@@ -134,3 +134,6 @@ jobs:
 
       - run: node scripts/service-runtime-check.cjs
         if: always()
+
+      - run: node scripts/native-billing-adapter-check.cjs
+        if: always()

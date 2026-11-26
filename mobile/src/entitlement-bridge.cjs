@@ -22,6 +22,6 @@ function createEntitlementBridge(options={}){
   if(gen!==generation)throw Error('session changed');
   return lease.refresh(); // fresh verified server rights, never a receipt response alone
  }
- return {setSession,status:lease.status,refresh:lease.refresh,invalidate:suspend,restorePurchase,reward,migration};
+ return {authorizeFinish:async receipt=>{const gen=generation,r=await client.authorizeFinish(receipt.store,receipt.proof);return gen===generation&&r?.authorized===true;},setSession,status:lease.status,refresh:lease.refresh,invalidate:suspend,restorePurchase,reward,migration};
 }
 module.exports={createEntitlementBridge};
