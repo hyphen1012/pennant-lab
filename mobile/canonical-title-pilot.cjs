@@ -323,13 +323,40 @@ const pilotCode = `
   let canonicalPlayback='normal',canonicalTarget=null,canonicalRunning=false,canonicalStop=false;
   const canonicalCanRun=g=>!!g?.headquarters?.canCalendar&&!canonicalSnapshot?.pending?.length&&accountCurrent();
   let canonicalRewardReturn='canonical-hq',canonicalRewardNote='';
+  let canonicalAchievementPage=null,canonicalAchievementNote='';
+  function canonicalAchievementRender(){
+    const app=$('#app'),snap=canonicalSnapshot,g=snap?.game,p=canonicalAchievementPage;if(!app)return;
+    const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-achievements-back">‹ 報酬へ</button></div>';
+    const dis=slotOpening||!snap||!!snap.pending?.length;
+    const btn=(label,choice,id)=>'<button class="btn outline" data-action="canonical-achievements-claim" data-choice="'+choice+'" data-id="'+h(id)+'" '+(dis?'disabled':'')+'>'+label+'</button>';
+    const body='<h2 class="page-title">記念実績・報酬</h2>'+(snap?.wallet?'<p>広告券 '+snap.wallet.tickets+' / 30 · ポイント '+snap.wallet.points+'</p>':'')+'<p class="small">サーバーに記録された自球団の実績のみ対象です。権利や受け取り制限はサーバーが判定します。SNS共有・記念アートは未接続です。</p>'+(canonicalAchievementNote?'<p role="status">'+h(canonicalAchievementNote)+'</p>':'')+(p&&snap?'<p>'+(p.total?p.offset+1:0)+'〜'+(p.offset+p.items.length)+' / '+p.total+'件</p>'+p.items.map(e=>'<article class="panel"><h3>'+h(e.label)+'</h3>'+(e.claimed?'<p>受け取り済み</p>':'<div class="chips">'+btn('広告券を希望','ticket',e.eventId)+btn('ポイントを希望','point',e.eventId)+'</div>')+'</article>').join('')+'<div class="chips"><button class="btn outline" data-action="canonical-achievements-prev" '+(slotOpening||p.offset===0?'disabled':'')+'>前のページ</button><button class="btn outline" data-action="canonical-achievements-next" '+(slotOpening||p.nextOffset===null?'disabled':'')+'>次のページ</button></div>':'<p role="status">'+(slotOpening?'実績を確認しています。':'最新状態を取得してください。自動再送は行いません。')+'</p>')+'<button class="btn outline full" data-action="canonical-achievements-refresh" '+(slotOpening?'disabled':'')+'>最新状態を取得</button>';
+    app.innerHTML='<div class="app-shell" '+(g?'style="'+clubThemeStyle(g.team)+'"':'')+'>'+top+'<main class="main">'+body+'</main></div>';
+  }
+  async function canonicalAchievementRequest(offset,claim=null,refresh=false){
+    if(slotOpening||!accountCurrent()||!canonicalSlot)return;
+    const epoch=canonicalEpoch,world=canonicalSnapshot?.world||canonicalHqWorld;slotOpening=true;canonicalAchievementNote='';canonicalAchievementPage=null;render();
+    try{
+      if(claim||refresh||!canonicalSnapshot){const r=await(claim?canonicalPilot.claimAchievement(claim.id,claim.choice,true):canonicalPilot.refresh());if(epoch!==canonicalEpoch)return;if(r.status!=='ready'||r.snapshot.world!==world)throw Error('achievement observation required');canonicalSnapshot=r.snapshot;if(claim){const v=r.claimResult;canonicalAchievementNote=v?.ok?'受け取りを確認しました：'+(v.kind==='ticket'?'広告券':'ポイント')+' '+v.amount:({duplicate:'受け取り済みです。',cooldown:'受け取り制限中です。',capacity:'広告券が上限に達しています。'})[v?.reason]||'受け取り状況を確認してください。';}}
+      const r=await canonicalPilot.achievementPage({offset,limit:30});if(epoch!==canonicalEpoch)return;if(r.status!=='ready')throw Error('achievement page required');canonicalAchievementPage=r.page;
+    }catch{if(epoch===canonicalEpoch){canonicalSnapshot=null;canonicalAchievementPage=null;}}
+    finally{if(epoch===canonicalEpoch){slotOpening=false;render();draftJump(0);}}
+  }
+  function canonicalAchievementClick(b){
+    const act=b.dataset.action,p=canonicalAchievementPage;
+    if(act==='canonical-achievements-back'){ui.page='canonical-rewards';void canonicalRewardRequest(null);return;}
+    if(act==='canonical-achievements-refresh'){void canonicalAchievementRequest(0,null,true);return;}
+    if(!p||!canonicalSnapshot)return;
+    if(act==='canonical-achievements-prev'&&p.offset>0)void canonicalAchievementRequest(Math.max(0,p.offset-30));
+    else if(act==='canonical-achievements-next'&&p.nextOffset!==null)void canonicalAchievementRequest(p.nextOffset);
+    else if(act==='canonical-achievements-claim'&&!canonicalSnapshot.pending?.length&&p.items.some(e=>e.eventId===b.dataset.id&&!e.claimed)&&['ticket','point'].includes(b.dataset.choice)&&window.confirm('この実績の報酬を受け取りますか？'))void canonicalAchievementRequest(p.offset,{id:b.dataset.id,choice:b.dataset.choice});
+  }
   function canonicalRewardLink(){return '<button class="btn outline full" data-action="canonical-rewards-open">広告券・報酬・慰留</button>';}
   function canonicalRewardRender(){
     const app=$('#app'),snap=canonicalSnapshot,g=snap?.game;if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-rewards-back">‹ 戻る</button></div>';
     if(!g||!snap.wallet||!Array.isArray(snap.actions)||!Array.isArray(snap.pending)){app.innerHTML='<div class="setup-screen">'+top+'<p role="status">報酬の確定状態を取得してください。自動再送は行いません。</p><button class="btn primary full" data-action="canonical-rewards-refresh" '+(slotOpening?'disabled':'')+'>最新状態を取得</button></div>';return;}
     const pending=snap.pending,dis=slotOpening?'disabled':'',btn=(kind,id,label,disabled=false)=>'<button class="btn outline full" data-action="canonical-rewards-command" data-kind="'+kind+'" data-id="'+h(id)+'" '+(disabled||slotOpening?'disabled':'')+'>'+label+'</button>';
-    const body='<h2 class="page-title">広告券・報酬</h2><section class="panel"><p>広告券 <b>'+snap.wallet.tickets+' / 30</b>　ポイント <b>'+snap.wallet.points+'</b></p><p class="small">試験環境：広告券、サーバーで確認済みの広告スキップ権利のみ利用できます。実広告は未接続です。</p></section>'+(canonicalRewardNote?'<p role="status">'+h(canonicalRewardNote)+'</p>':'')+pending.map(p=>'<section class="panel warning"><h3>未確定の報酬</h3><p>結果を確認するまで日程進行は停止します。</p>'+btn('reconcile',p.operationId,'確定結果を照合する')+btn('cancel',p.operationId,'予約の取り消しを申請する')+'</section>').join('')+'<section class="panel"><h3>現在利用可能な報酬</h3>'+snap.actions.filter(a=>['available','cancelled'].includes(a.status)).map(a=>'<article class="event"><strong>'+h(a.label)+'</strong>'+btn('ticket',a.operationId,'広告券・確認済み権利で実行',pending.length>0)+'</article>').join('')+(!snap.actions.some(a=>['available','cancelled'].includes(a.status))?'<p>現在利用できる報酬はありません。</p>':'')+'</section><button class="btn outline full" data-action="canonical-rewards-refresh" '+dis+'>最新状態を取得</button>';
+    const body='<h2 class="page-title">広告券・報酬</h2><section class="panel"><p>広告券 <b>'+snap.wallet.tickets+' / 30</b>　ポイント <b>'+snap.wallet.points+'</b></p><p class="small">試験環境：広告券、サーバーで確認済みの広告スキップ権利のみ利用できます。実広告は未接続です。</p><button class="btn outline full" data-action="canonical-achievements-open">記念実績・報酬を受け取る</button></section>'+(canonicalRewardNote?'<p role="status">'+h(canonicalRewardNote)+'</p>':'')+pending.map(p=>'<section class="panel warning"><h3>未確定の報酬</h3><p>結果を確認するまで日程進行は停止します。</p>'+btn('reconcile',p.operationId,'確定結果を照合する')+btn('cancel',p.operationId,'予約の取り消しを申請する')+'</section>').join('')+'<section class="panel"><h3>現在利用可能な報酬</h3>'+snap.actions.filter(a=>['available','cancelled'].includes(a.status)).map(a=>'<article class="event"><strong>'+h(a.label)+'</strong>'+btn('ticket',a.operationId,'広告券・確認済み権利で実行',pending.length>0)+'</article>').join('')+(!snap.actions.some(a=>['available','cancelled'].includes(a.status))?'<p>現在利用できる報酬はありません。</p>':'')+'</section><button class="btn outline full" data-action="canonical-rewards-refresh" '+dis+'>最新状態を取得</button>';
     app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(g.team)+'">'+top+'<main class="main">'+body+'</main></div>';
   }
   async function canonicalRewardRequest(kind,id){
@@ -803,6 +830,7 @@ const pilotCode = `
   render=function(){
     if(['canonical-players','canonical-player','canonical-standings'].includes(ui.page)){canonicalReadOnlyRender();return;}
     if(ui.page==='canonical-reports'){canonicalReportsRender();return;}
+    if(ui.page==='canonical-achievements'){canonicalAchievementRender();return;}
     if(ui.page==='canonical-rewards'){canonicalRewardRender();return;}
     if(ui.page==='canonical-events'){canonicalEventRender();return;}
     if(canonicalOpsPages.includes(ui.page)){canonicalOpsRender();return;}
@@ -837,6 +865,8 @@ const pilotCode = `
     else if(ui.page==='canonical-reports'&&act==='canonical-reports-back'){ui.page='canonical-hq';render();draftJump(0);}
     else if(ui.page==='canonical-hq'&&act==='canonical-events-open'&&canonicalSnapshot?.game&&accountCurrent()){canonicalAwardFilter='all';canonicalForeignOpen=false;ui.page='canonical-events';render();draftJump(0);}
     else if(['canonical-hq','canonical-events'].includes(ui.page)&&act==='canonical-rewards-open'&&canonicalSnapshot?.game&&accountCurrent()){canonicalRewardReturn=ui.page;ui.page='canonical-rewards';void canonicalRewardRequest(null);draftJump(0);}
+    else if(ui.page==='canonical-rewards'&&act==='canonical-achievements-open'&&canonicalSnapshot?.wallet&&accountCurrent()){ui.page='canonical-achievements';void canonicalAchievementRequest(0);}
+    else if(ui.page==='canonical-achievements')canonicalAchievementClick(b);
     else if(ui.page==='canonical-rewards')canonicalRewardClick(b);
     else if(ui.page==='canonical-events')canonicalEventClick(b);
     else if(ui.page==='canonical-hq'&&act==='canonical-ops-open'&&['rotation','farm','free','facilities','manager'].includes(b.dataset.kind)&&canonicalSnapshot?.game?.club&&accountCurrent()){canonicalOpsNote='';canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;ui.page='canonical-'+b.dataset.kind;render();draftJump(0);if(b.dataset.kind==='free')void canonicalLoadFree(0,'');}

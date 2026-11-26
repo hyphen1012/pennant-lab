@@ -71,6 +71,13 @@ function createCanonicalGameSession({client,online=()=>true}={}){
   });
   return {...r,rewardStatus:r.status==='ready'?outcome:null};
  }
+ async function achievementPage(command){return readPage('gameAchievementPage',command);}
+ async function claimAchievement(id,choice,confirmed){
+  if(confirmed!==true||status!=='ready'||!snapshot||snapshot.pending?.length||typeof client.gameClaim!=='function'||typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id)||!['ticket','point'].includes(choice))throw Error('explicit achievement claim required');
+  let result;
+  const r=await run('claim',async(t,old)=>{const x=await client.gameClaim(t.slot,id,choice);if(!current(t))throw Error('session changed');result=x.result;return client.gameRead(t.slot);});
+  return {...r,claimResult:r.status==='ready'?result:null};
+ }
  async function freePage(command){return readPage('gameFreePage',command);}
  async function playerPage(command){return readPage('gamePlayerPage',command);}
  async function readPage(method,command){
@@ -87,6 +94,6 @@ function createCanonicalGameSession({client,online=()=>true}={}){
    snapshot=null;status='refresh-required';return {status};
   }finally{if(current(t))active=null;}
  }
- return Object.freeze({setSession,suspend,select,refresh,create,advance,inspect,freePage,playerPage,listSlots,reward});
+ return Object.freeze({setSession,suspend,select,refresh,create,advance,inspect,freePage,playerPage,listSlots,reward,achievementPage,claimAchievement});
 }
 module.exports={createCanonicalGameSession};

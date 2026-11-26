@@ -268,3 +268,6 @@ Use existing canonical reward orchestration through the selected session. Explic
 
 ## Archived match and latest newspaper (staging)
 Project a bounded actual last own-club match (innings, score, teams/emblems, events, box stats and two-entry default bench report) and the last recorded daily/weekly paper. Read-only screen; no client simulation and no synthetic match stats. No full historical pagination, live inning playback, weekly mail detail or original cinematic equivalence yet. Existing engine fixture checks exact scores and read-only state. No public or production activation.
+
+## Memorial achievement wallet UI (staging)
+Bounded 1–40 item achievement-page endpoint with world/revision check. Reuses existing verified event IDs and own-club eligibility; no new rewards for sharing or client-asserted events. Explicit claim choice, server wallet refresh, duplicate/cooldown/capacity messages, unknown outcome refresh without replay. Current implementation still scans the existing achievement index before slicing; persistent indexed history and SNS art/share remain open. HTTP projection and confirmation regression added; per-claim browser and provider tests remain open. No production activation.
