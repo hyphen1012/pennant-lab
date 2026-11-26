@@ -34,7 +34,7 @@ const pilotCode = `
     }catch{return false;}
   }
   function canonicalReset(){
-    canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';
+    canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';
     canonicalPilot.suspend();ui.clubDraft=null;ui.portalSlot=null;ui.portalOrigin=null;slotOpening=false;
     ui.page='title';ui.launchTitle=false;
   }
@@ -368,7 +368,8 @@ const pilotCode = `
     finally{if(epoch===canonicalEpoch){canonicalRunning=false;canonicalStop=false;slotOpening=false;render();}}
   }
   let canonicalHqWorld=null;
-  const canonicalAnnualJobs=['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter','booking','self','winter-return','camp','exhibition'];
+  const canonicalCommerceJobs=['fan-fest','fanclub','tv','sponsor','broadcast','naming','opening-promo'];
+  const canonicalAnnualJobs=['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter','booking','self','winter-return','camp','exhibition',...canonicalCommerceJobs,'offdesk-opening'];
   let canonicalAwardFilter='all',canonicalCampGroup='first',canonicalWinterPlace='taiwan',canonicalDigestCut=0;
   const canonicalEventLabels={...FLOW_LABEL,'fan-fest':'ファン感謝デー',fanclub:'ファンクラブ',tv:'テレビ出演',sponsor:'スポンサー契約',broadcast:'放映権',naming:'命名権','opening-promo':'開幕戦イベント'};
   const canonicalEventStatus={scheduled:'予定',ready:'対応可能',active:'対応中',waiting:'結果待ち',done:'完了'};
@@ -507,6 +508,52 @@ const pilotCode = `
     }
     return out+cmd('home','交渉を中断して本部へ')+'</section>';
   }
+  function canonicalFanCard(s,t){
+    const fonts=['sans-serif','serif','"Hiragino Maru Gothic ProN",sans-serif','monospace'],color=FAN_COLORS[s.color]||FAN_COLORS[0],ink=s.color===5?'#382a17':'#fff6d9';
+    return '<div class="fan-card deluxe-card" style="--fc-color:'+color+';--fc-ink:'+ink+';font-family:'+fonts[s.font||0].replaceAll('"','&quot;')+'"><div class="fc-watermark">'+teamBadge(t)+'</div><div class="fc-top"><span>PENNANT LAB<br><b>OFFICIAL FAN CLUB</b></span><span class="fc-emblem">'+teamBadge(t)+'</span></div><div class="fc-name">'+h(s.name)+'</div><div class="fc-metal"><i></i><i></i><i></i><i></i></div><div class="fc-bottom"><span>MEMBER NO.<b>000001</b></span><span>SINCE<b>'+s.since+'</b></span><span>ANNUAL FEE<b>¥'+s.fee.toLocaleString()+'</b></span></div><div class="fc-footer">OFFICIAL MEMBERSHIP · '+h(t.short||t.name)+'</div></div>';
+  }
+  function canonicalCommerceMarkup(g,a,held,button){
+    const s=a.commerce;if(!s)return '<p class="warning">営業情報なし</p>';
+    const id=s.job,cmd=(k,label,attrs='',disabled=held)=>button('commerce-'+k,label,attrs,disabled),choices=(k,rows,selected)=>'<div class="commerce-options">'+rows.map(([v,n])=>cmd(k,h(n)+(String(v)===String(selected)?' ✓':''),'data-value="'+h(String(v))+'"',held||String(v)===String(selected))).join('')+'</div>',title=canonicalEventLabels[id]||id;
+    const head='<section class="panel"><h2>'+h(title)+'</h2>';
+    if(['brief','briefing'].includes(s.stage))return head+normalDetailCard(id==='sponsor'?'sponsor':'contract','営業部からの報告')+'<p>'+s.year+'年の営業計画を決定します。</p>'+cmd('start','業務を開始する')+cmd('back','本部へ戻る')+'</section>';
+    if(s.stage==='selection'){
+      let out=head;
+      if(id==='sponsor'){out+=normalDetailCard('sponsor','協賛契約')+'<p>年間契約額は12回に分けて入金。契約社数に応じて不祥事時の影響が増加します。</p>'+s.candidates.map(c=>'<button class="sponsor-choice '+(s.selected.includes(c.id)?'chosen':'')+'" data-action="canonical-event-command" data-kind="commerce-toggle" data-value="'+h(c.id)+'" '+(held?'disabled':'')+'><span class="sponsor-check">'+(s.selected.includes(c.id)?'✓':'○')+'</span><span><strong>'+h(c.name)+'</strong><small>'+h(c.industry)+'</small></span><b>'+fmtMoney(c.annual)+'</b></button>').join('')+'<div class="sponsor-risk"><p>不祥事時のファン離れの影響 ＋'+s.risk.burden+'% ／ 各社解除率 '+s.risk.cancellation+'%</p></div><p>契約 '+s.selected.length+'社 · 年額 '+fmtMoney(s.annual)+'</p>';}
+      else if(id==='fanclub'){out+='<div class="fan-preview-sticky">'+canonicalFanCard(s,g.team)+'</div><label>クラブ名<input id="canonical-fan-name" maxlength="30" value="'+h(s.name)+'"></label>'+cmd('name','クラブ名を保存')+'<h3>カードデザイン</h3>'+choices('font',[[0,'ゴシック'],[1,'明朝'],[2,'丸ゴシック'],[3,'等幅']],s.font)+choices('color',FAN_COLORS.map((_,i)=>[i,['紺','赤','緑','黒','紫','金'][i]]),s.color)+'<h3>年会費 ¥'+s.fee.toLocaleString()+'</h3>'+choices('fee',[[-500,'−500円'],[500,'＋500円']],null)+'<h3>入会特典</h3><div class="fan-perk-grid">'+s.perks.map(p=>'<button class="fan-perk '+(s.perk===p.key?'chosen':'')+'" data-action="canonical-event-command" data-kind="commerce-perk" data-value="'+h(p.key)+'" '+(held?'disabled':'')+'>'+fanPerkArt(p.key)+'<b>'+h(p.label)+'</b><small>原価 '+p.cost.toLocaleString()+'円 / 人</small></button>').join('')+'</div><p>予想入会 '+s.estimate.members.toLocaleString()+'名 · 年間利益見込み '+fmtMoney(s.estimate.income-s.estimate.cost)+'</p>';}
+      else if(id==='broadcast')out+=salesScene('contract')+'<p>放送局の提示 年額 '+fmtMoney(s.base)+'</p><p>希望額 '+fmtMoney(s.base+s.delta)+' · 成立見込み '+s.chance+'%</p>'+choices('delta',[[0,'提示額'],[1,'＋1億円'],[2,'＋2億円'],[3,'＋3億円']],s.delta)+'<p class="small">交渉不成立時は減額条件で契約。</p>';
+      else if(id==='naming')out+=salesScene('stadium')+(s.contract?'<p>契約継続中 '+h(s.contract.name)+' · '+s.contract.end+'年まで</p>':choices('choice',[[-1,'契約しない'],...s.options.map((n,i)=>[i,n.name+' · '+n.years+'年 · 年額 '+fmtMoney(n.annual)])],s.choice));
+      else if(id==='tv'){out+=salesScene('tv')+'<p>出演メンバー '+s.players.length+' / 5名 · タップで選択、長押しで選手詳細</p><div class="commerce-players">'+s.eligible.map(r=>{const p=g.club?.roster.find(p=>p.id===r.id),model=p?canonicalPlayerModel(p,g):null;return '<button class="btn '+(s.players.includes(r.id)?'primary':'outline')+'" data-action="canonical-event-command" data-kind="commerce-player" data-value="'+r.id+'" data-canonical-tv="'+r.id+'" '+(held?'disabled':'')+'>'+(model?tvFace(model):'')+'<small>'+(model?themedPlayerName(model):h(r.name))+'</small></button>';}).join('')+'</div>';}
+      else if(['fan-fest','opening-promo'].includes(id)){out+=s.plans.map(p=>'<article class="fest-plan '+(p.index===s.plan?'chosen':'')+'">'+(id==='fan-fest'?fanFestPhoto(p.photo):salesScene('stadium'))+'<h3>'+h(p.title)+'</h3><p>'+h(p.desc||'')+'</p>'+cmd('plan',h(p.name)+' · '+fmtMoney(p.cost),'data-value="'+p.index+'"')+'</article>').join('')+'<p class="small">'+(id==='fan-fest'?'開催は企画確定の7日後。費用は開催時に精算します。':'開幕戦当日に開催します。')+'</p>';}
+      return out+cmd('confirm','この内容で確定する','',held||id==='tv'&&s.players.length!==5||['fan-fest','opening-promo'].includes(id)&&s.plans[s.plan]?.cost>g.team.cash)+(['fan-fest','tv','opening-promo'].includes(id)?cmd('decline','今回は見送る'):'')+cmd('back','本部へ戻る')+'</section>';
+    }
+    const guests=()=>'<div class="commerce-players">'+(s.players||[]).map(id=>{const p=g.club?.roster.find(p=>p.id===id);if(!p)return '';const model=canonicalPlayerModel(p,g),v=tvSpecial(model);return '<article class="tv-guest" style="--tv-ring:'+v.ring+';--tv-accent:'+v.accent+'">'+faceMini(model,{overall:true})+themedPlayerName(model)+(v.cat?'<p>'+h(v.line)+'</p>'+rareCinemaArt(model,'join',true):'')+'</article>';}).join('')+'</div>';
+    const scene=id==='fan-fest'?fanFestPhoto(s.plans?.[s.plan]?.photo??3):salesScene(id==='tv'?'tv':'stadium');
+    if(s.stage==='scheduled')return head+scene+'<p>開催・出演予定日 '+h(s.due)+'</p>'+(id==='tv'?guests():'')+cmd('park','計画を確認して本部へ')+'</section>';
+    if(s.stage==='live')return head+scene+(id==='tv'?guests():'')+cmd(id==='tv'?'tv':id==='fan-fest'?'live':'opening','開催・出演結果を確認する')+'</section>';
+    if(s.stage==='result'){
+      let out=head;
+      if(id==='fanclub'&&s.contract){const q=s.contract;out='<section class="panel"><h2>'+(q.first?'ファンクラブ設立！！':'ファンクラブが更新されました！！')+'</h2>'+salesCelebration('celebration')+canonicalFanCard(q,g.team)+salesMetrics([['新規入会',q.newMembers+'名'],['継続会員',q.retained+'名'],['合計会員',q.members+'名'],['年会費','¥'+q.fee.toLocaleString()],['会費収入',fmtMoney(q.income)],['特典原価',fmtMoney(q.cost)]])+fanPerkArt(q.perk);}
+      else if(id==='sponsor'&&s.contract){out+=salesScene('contract')+'<h3>'+s.contract.companies.length+'社との契約確定</h3>'+s.contract.companies.map(c=>offdeskMoneyRow(c.name,c.annual)).join('');}
+      else if(id==='broadcast'&&s.contract)out+=salesScene('contract')+'<p>'+h(s.result)+'</p>'+salesMetrics([['先方提示',fmtMoney(s.contract.base)],['希望額',fmtMoney(s.contract.asked)],['成立額',fmtMoney(s.contract.annual)]]);
+      else if(id==='naming')out+=salesScene('stadium')+'<p>'+h(s.result||'契約なし')+'</p>'+(s.contract?'<p>'+s.contract.start+'〜'+s.contract.end+'年 · 年額 '+fmtMoney(s.contract.annual)+'</p>':'');
+      else {const r=s.report;out+=(r?.declined?'':id==='fan-fest'?fanFestPhoto(3):scene)+(id==='tv'&&!r?.declined?guests():'')+'<h3>'+h(s.result||'業務完了')+'</h3>'+(r?salesMetrics([['ファン増加','＋'+(r.gain||0)+'人'],['収入',fmtMoney(r.income||0)],['支出',fmtMoney(r.cost||0)],...(Number.isFinite(r.attendance)?[['来場者数',r.attendance+'人'],['満足度',r.satisfaction+'/100']]:[])]):'');}
+      return out+cmd('finish','業務を完了する')+'</section>';
+    }
+    return head+'<p>未対応の営業状態です。確定状態を維持します。</p></section>';
+  }
+  let canonicalTvPress=null,canonicalTvSuppressed=null;
+  function canonicalTvClear(){if(canonicalTvPress?.timer)clearTimeout(canonicalTvPress.timer);canonicalTvPress=null;}
+  function canonicalTvDetails(id){
+    const g=canonicalSnapshot?.game,p=g?.club?.roster.find(p=>p.id===id);
+    if(ui.page!=='canonical-events'||g?.annual?.active!=='tv'||!p||slotOpening||document.querySelector('.canonical-tv-detail'))return;
+    const model=canonicalPlayerModel(p,g),dlg=document.createElement('dialog');
+    dlg.className='tv-detail-dialog canonical-tv-detail';dlg.innerHTML='<section class="panel"><button class="btn outline full" data-tv-close>閉じる</button>'+playerUpperPortrait(model)+'<h2>'+themedPlayerName(model)+'</h2>'+annualAbilityStrip(model)+statDisplayGrid(model)+'</section>';
+    dlg.addEventListener('click',e=>{if(e.target.closest('[data-tv-close]'))dlg.close();});dlg.addEventListener('close',()=>dlg.remove(),{once:true});document.body.appendChild(dlg);dlg.showModal();
+  }
+  window.addEventListener('pointerdown',e=>{const b=e.target.closest?.('[data-canonical-tv]');if(ui.page!=='canonical-events'||!b||b.disabled||slotOpening)return;canonicalTvClear();const p={id:Number(b.dataset.canonicalTv),x:e.clientX,y:e.clientY,epoch:canonicalEpoch};canonicalTvPress=p;p.timer=setTimeout(()=>{if(canonicalTvPress!==p||canonicalEpoch!==p.epoch)return;canonicalTvSuppressed={id:p.id,until:Date.now()+900};canonicalTvDetails(p.id);canonicalTvClear();},550);},true);
+  window.addEventListener('pointermove',e=>{const p=canonicalTvPress;if(p&&Math.hypot(e.clientX-p.x,e.clientY-p.y)>12)canonicalTvClear();},true);
+  for(const name of ['pointerup','pointercancel','scroll'])window.addEventListener(name,canonicalTvClear,true);
   function canonicalEventRender(){
     const app=$('#app'),g=canonicalSnapshot?.game;if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-events-back">‹ 本部</button></div>';
@@ -520,6 +567,7 @@ const pilotCode = `
     if(inbox.milestoneCount){body+='<section class="panel"><h3>記録・ニュース</h3>'+inbox.milestones.map(e=>'<p class="event">'+h(e.date)+' '+h(e.title)+'</p>').join('')+(inbox.milestoneCount>inbox.milestones.length?'<p class="small">ほか '+(inbox.milestoneCount-inbox.milestones.length)+'件は記録に保存されています。</p>':'')+commandButton('milestones','保存済み報告を確認','',blocked||important||!!inbox.review)+'</section>';}
     if(important)body+='<section class="panel warning"><h3>重要イベントの対応が必要です</h3><p>特殊選手・去就・負傷・入団報告・資金不足など、専用の演出と判断が必要な処理は未接続のまま保持します。</p></section>';
     const held=blocked||important||!!inbox.review||!!inbox.monthly||!!inbox.milestoneCount;
+    if(inbox.opening)body+='<section class="panel"><h2>新シーズン開幕</h2>'+normalDetailCard('opening','新たなシーズン')+commandButton('opening-ack','新シーズンを始める','',held)+'</section>';
     if(a.canStart)body+='<section class="panel"><h3>シーズン全日程終了</h3>'+normalDetailCard('awards','年間表彰・決算')+commandButton('start','オフシーズン業務を開始','',held)+'</section>';
     if(a.mode){
       body+='<section class="panel desk-panel"><h3>年間業務一覧</h3>'+a.tasks.map(j=>'<div class="event"><b>'+h(canonicalEventLabels[j.id]||j.id)+'</b><p class="small">'+h(j.start)+' · '+h(canonicalEventStatus[j.status]||j.status)+'</p>'+(j.status==='ready'?j.id==='movement-market'?'':canonicalAnnualJobs.includes(j.id)?commandButton('open','業務を始める','data-job="'+j.id+'"',held||!!a.active):'<p class="small">専用画面の接続待ち</p>':'')+'</div>').join('')+commandButton('day','オフシーズンの1日を進める','',held||!a.canAdvance)+'</section>';
@@ -537,9 +585,10 @@ const pilotCode = `
       else if(['renewal1','renewal2'].includes(a.active))body+=canonicalRenewalMarkup(g,a,held,commandButton);
       else if(['autumn','winter','self'].includes(a.active))body+=canonicalTrainingMarkup(g,a,held,commandButton);
       else if(['booking','winter-return','camp','exhibition'].includes(a.active))body+=canonicalPreseasonMarkup(g,a,held,commandButton);
+      else if(canonicalCommerceJobs.includes(a.active))body+=canonicalCommerceMarkup(g,a,held,commandButton);
       else if(a.active)body+='<p class="warning">現在のイベントの専用画面は未接続です。処理は保持します。</p>';
       if(!a.active&&a.market)body+=canonicalMarketMarkup(g,a,held,commandButton);
-    }else if(!a.canStart&&!inbox.review&&!inbox.monthly&&!inbox.milestoneCount&&!important)body+='<p class="empty">現在対応する年間業務はありません。</p>';
+    }else if(!a.canStart&&!inbox.opening&&!inbox.review&&!inbox.monthly&&!inbox.milestoneCount&&!important)body+='<p class="empty">現在対応する年間業務はありません。</p>';
     app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(g.team)+'">'+top+'<main class="main">'+body+'</main></div>';
   }
   async function canonicalEventRequest(command){
@@ -562,7 +611,8 @@ const pilotCode = `
     if(act!=='canonical-event-command'||canonicalSnapshot.pending?.length)return;
     const k=b.dataset.kind,job=b.dataset.job;
     let cmd=null;
-    if(k==='review'&&i.review)cmd={acknowledge:'review',eventKey:i.review.gameId};
+    if(k==='opening-ack'&&i.opening)cmd={acknowledge:'opening'};
+    else if(k==='review'&&i.review)cmd={acknowledge:'review',eventKey:i.review.gameId};
     else if(k==='month'&&i.monthly)cmd={acknowledge:'month'};
     else if(k==='milestones'&&i.milestoneCount)cmd={acknowledge:'milestones'};
     else if(k==='start'&&a.canStart)cmd={annual:'start'};
@@ -615,6 +665,15 @@ const pilotCode = `
         else if(decision==='exchange'&&m.tradeClubs.find(t=>t.id===g.team.id)?.players.some(p=>p.id===id&&p.exchange)&&window.confirm('交換候補として提示しますか？'))cmd={annual:'market',decision,playerId:id};
         else if(decision==='comp'){const otherId=Number(b.dataset.other);if(m.deals.some(d=>d.id===id&&d.compOptions.some(p=>p.id===otherId))&&window.confirm('人的補償を確定しますか？'))cmd={annual:'market',decision,playerId:id,otherId};}
       }
+    }
+    else if(canonicalCommerceJobs.includes(a.active)&&k.startsWith('commerce-')){
+      const decision=k.slice(9),s=a.commerce,raw=b.dataset.value;
+      if(decision==='player'&&canonicalTvSuppressed?.id===Number(raw)&&Date.now()<canonicalTvSuppressed.until){canonicalTvSuppressed=null;return;}
+      if(['start','back','finish','park','live','tv','opening'].includes(decision))cmd={annual:'commerce',decision};
+      else if(['confirm','decline'].includes(decision)&&window.confirm('この営業判断を確定しますか？'))cmd={annual:'commerce',decision};
+      else if(decision==='name'){const value=String($('#canonical-fan-name')?.value||'').trim();if(value&&value.length<=30)cmd={annual:'commerce',decision,value};}
+      else if(['toggle','perk'].includes(decision)&&typeof raw==='string')cmd={annual:'commerce',decision,value:raw};
+      else if(['player','fee','color','font','delta','choice','plan'].includes(decision)&&Number.isSafeInteger(Number(raw)))cmd={annual:'commerce',decision,value:Number(raw)};
     }
     if(cmd)void canonicalEventRequest(cmd);
   }
