@@ -12,7 +12,8 @@ const storeConfig=require('./store-provider-config.cjs').createStoreProviderConf
 const canonicalFlag=env.PL_CANONICAL_GAME_ENABLED||'0';
 if(!['0','1'].includes(canonicalFlag))throw Error('invalid canonical staging flag');
 const canonicalEngine=canonicalFlag==='1'?require('./headless-engine.cjs').createHeadlessEngine():null;
-const runtime=createServiceRuntime({canonicalEngine,dataDir:need('PL_DATA_DIR'),authenticate,verifyRecentReauth:env.PL_REAUTH_ENABLED==='1'?createRecentReauthVerifier({authenticate}):deny,verifyReceipt:deny,verifyCurrent:deny,verifyNotification:deny,verifyEvent:deny,verifyAction:deny,verifyCompletion:deny,storeConfig,units,origins});
+const gameLimits={heavyLimit:Number(env.PL_GAME_HEAVY_LIMIT||4),metadataLimit:Number(env.PL_GAME_METADATA_LIMIT||4)};
+const runtime=createServiceRuntime({canonicalEngine,gameLimits,dataDir:need('PL_DATA_DIR'),authenticate,verifyRecentReauth:env.PL_REAUTH_ENABLED==='1'?createRecentReauthVerifier({authenticate}):deny,verifyReceipt:deny,verifyCurrent:deny,verifyNotification:deny,verifyEvent:deny,verifyAction:deny,verifyCompletion:deny,storeConfig,units,origins});
 const port=Number(env.PL_PORT||8787);if(!Number.isSafeInteger(port)||port<1024||port>65535)throw Error('invalid port');
 runtime.server.listen(port,'127.0.0.1',()=>console.log('PENNANT LAB staging loopback ready'));
 runtime.server.on('error',()=>{console.error('Staging listener failed');process.exitCode=1;void runtime.close();});

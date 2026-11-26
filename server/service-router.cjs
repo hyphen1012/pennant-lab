@@ -1,8 +1,10 @@
 // Compose existing authenticated services on one listener behind a TLS ingress.
 const http=require('node:http');
-function createServiceRouter({accountHttp,saveHttp,adService,deletionService,storeNotifications=null,gameAuthority=null,allowRequest,origins=[]}={}){
+const {createGameAdmission}=require('./game-admission.cjs');
+function createServiceRouter({accountHttp,saveHttp,adService,deletionService,storeNotifications=null,gameAuthority=null,allowRequest,origins=[],gameLimits={}}={}){
  const account=accountHttp?.listeners('request')?.[0],save=saveHttp?.listeners('request')?.[0];
  if(typeof account!=='function'||typeof save!=='function'||!adService||!deletionService||typeof allowRequest!=='function'||!Array.isArray(origins)||origins.some(x=>typeof x!=='string'||!(/^(https:\/\/[^/]+|capacitor:\/\/localhost|http:\/\/localhost)$/.test(x))))throw Error('service router configuration required');
+ const admission=createGameAdmission(gameLimits);
  const allowed=new Set(origins),metrics={requests:0,rejected:0,errors:0};
  const json=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data));};
  async function read(req,limit=16384){if(req.headers['content-encoding']||!/^application\/json(?:;\s*charset=utf-8)?$/i.test(req.headers['content-type']||''))throw Error('json required');let n=0,parts=[];for await(const b of req){n+=b.length;if(n>limit)throw Error('request too large');parts.push(b);}const x=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(parts,n)));if(!x||Object.getPrototypeOf(x)!==Object.prototype)throw Error('invalid json');return x;}
@@ -73,10 +75,17 @@ function createServiceRouter({accountHttp,saveHttp,adService,deletionService,sto
     if(req.method!=='POST')return reject(405,'method_not_allowed');
     const token=/^Bearer ([A-Za-z0-9._~+\/=-]{1,4096})$/.exec(req.headers.authorization||'')?.[1];
     if(!token)return reject(401,'authentication_required');
-    if(await allowRequest({token,remoteAddress:req.socket.remoteAddress,route:req.url})!==true)return reject(429,'rate_limited');
-    const [method,keys]=gameRoutes.get(req.url),b=await read(req);
-    if(!exact(b,keys)||keys.includes('slot')&&![1,2,3].includes(b.slot)||('command' in b&&(!b.command||Object.getPrototypeOf(b.command)!==Object.prototype)))return reject(400,'invalid_fields');
-    return json(res,200,await gameAuthority[method](token,...keys.map(k=>b[k])));
+    const lane=['/v1/game/slots','/v1/game/order'].includes(req.url)?'metadata':'heavy';
+    const release=admission.enter(lane);if(!release){res.setHeader('Retry-After','2');return reject(503,'game_busy');}
+    let success=false;
+    try{
+     if(await allowRequest({token,remoteAddress:req.socket.remoteAddress,route:req.url})!==true)return reject(429,'rate_limited');
+     const [method,keys]=gameRoutes.get(req.url),b=await read(req);
+     if(!exact(b,keys)||keys.includes('slot')&&![1,2,3].includes(b.slot)||('command' in b&&(!b.command||Object.getPrototypeOf(b.command)!==Object.prototype)))return reject(400,'invalid_fields');
+     if(req.aborted||res.destroyed)return;
+     const result=await gameAuthority[method](token,...keys.map(k=>b[k]));success=true;
+     if(!res.destroyed) return json(res,200,result);
+    }finally{release(success);}
    }
    if(Object.hasOwn(handlers,req.url)){
     if(req.method!=='POST')return reject(405,'method_not_allowed');
@@ -92,6 +101,6 @@ function createServiceRouter({accountHttp,saveHttp,adService,deletionService,sto
    return reject(404,'not_found');
   }catch(e){metrics.errors++;if(!res.destroyed&&!res.headersSent&&!res.writableEnded)reject(403,'request_not_verified');else if(!res.writableEnded)res.destroy();}
  });
- return {server,metrics:()=>({...metrics})};
+ return {server,metrics:()=>({...metrics,gameAdmission:admission.metrics()})};
 }
 module.exports={createServiceRouter};
