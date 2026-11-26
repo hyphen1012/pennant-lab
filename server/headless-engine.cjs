@@ -854,14 +854,25 @@ function createHeadlessEngine(){
  throw Error('unsupported pilot operation');
  `;
  const compiled=new vm.Script(pre+source.replace('(() => {','(() => {')+tail+'})();',{filename:'pennant-lab-headless-pilot.js'});
- function run(op,state,extra={}){
-  if(op!=='new'&&(!state||typeof state!=='object'||state.started!==true||!Array.isArray(state.teams)||!Array.isArray(state.players)||!Array.isArray(state.games)))throw Error('invalid server world');
-  const seed=op==='new'?randomInt(1,0xffffffff):state.seed;
-  if(!Number.isSafeInteger(seed)||seed<0||seed>0xffffffff)throw Error('invalid server seed');
-  const context={SERVER_SEED:seed||1,SERVER_INPUT:JSON.stringify({op,state,...extra})};
+ function validateWorld(state){
+  if(!state||typeof state!=='object'||state.started!==true||!Array.isArray(state.teams)||!Array.isArray(state.players)||!Array.isArray(state.games))throw Error('invalid server world');
+  const seed=state.seed;if(!Number.isSafeInteger(seed)||seed<0||seed>0xffffffff)throw Error('invalid server seed');return seed;
+ }
+ function execute(seed,input){
+  const context={SERVER_SEED:seed||1,SERVER_INPUT:input};
   const result=compiled.runInNewContext(context,{timeout:10000,microtaskMode:'afterEvaluate',contextCodeGeneration:{strings:false,wasm:false}});
   if(typeof result!=='string')throw Error('engine did not return a state');
   return JSON.parse(result);
+ }
+ function run(op,state,extra={}){
+  const seed=op==='new'?randomInt(1,0xffffffff):validateWorld(state);
+  return execute(seed,JSON.stringify({op,state,...extra}));
+ }
+ // Serialize a large persisted world only once; retain independent VM contexts
+ // so view normalization cannot affect action eligibility or vice versa.
+ function readProjection(state){
+  const seed=validateWorld(state),encoded=JSON.stringify(state);
+  return {game:execute(seed,'{"op":"view","state":'+encoded+'}'),actions:execute(seed,'{"op":"actions","state":'+encoded+'}')};
  }
  const exact=(v,k)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===k.length&&k.every(x=>Object.hasOwn(v,x));
  // Accept only the original editor's fields and enumerated designs; no HTML,
@@ -871,7 +882,7 @@ function createHeadlessEngine(){
  const validIdentity=v=>exact(v,identityKeys)&&boundedText(v.gmName,22)&&boundedText(v.name,30)&&boundedText(v.short,8)&&boundedText(v.letter,3)&&[v.color,v.accent].every(c=>typeof c==='string'&&/^#[0-9a-f]{6}$/i.test(c))&&['circle','square','shield','diamond','hex'].includes(v.shape)&&['solid','split','stripe','rim'].includes(v.pattern)&&['bold','serif','italic','mono'].includes(v.font)&&['letter','star','vortex','wing','comet','swan','mountain','gear','moon','spark','wave','crest','bolt'].includes(v.motif);
  const validTrade=(v)=>Number.isSafeInteger(v.clubId)&&v.clubId>=0&&v.clubId<12&&[v.out,v.in].every(ids=>Array.isArray(ids)&&ids.length<=3&&ids.every(id=>Number.isSafeInteger(id)&&id>0))&&v.out.length+v.in.length>0&&new Set([...v.out,...v.in]).size===v.out.length+v.in.length&&Number.isFinite(v.fee)&&Math.abs(v.fee)<=30&&Math.round(v.fee*100)/100===v.fee;
  return Object.freeze({
-  sourceHash:hash,
+  sourceHash:hash,readProjection,
   newWorld(command){
    if(exact(command,[]))return run('new',null);
    if((!exact(command,['team'])&&!(exact(command,['team','identity'])&&validIdentity(command.identity)))||!Number.isSafeInteger(command.team)||command.team<0||command.team>11)throw Error('invalid pilot team or identity');
