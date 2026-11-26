@@ -34,7 +34,7 @@ function createHeadlessEngine(){
  // Any successful unrelated mutation (including reward application) invalidates it.
  const rosterEdit=op==='club'&&(['lineup','fielding','lineup-recommend','lineup-move','lineup-replace'].includes(input.choice)||input.choice==='order'&&input.kind==='lineup');
  const rosterUndo=op==='club'&&input.choice==='lineup-undo';
- if(!['view','actions','achievements','free-page'].includes(op)&&!rosterUndo)delete game.canonicalRosterUndo;
+ if(!['view','actions','achievements','free-page','player-page'].includes(op)&&!rosterUndo)delete game.canonicalRosterUndo;
  const undoAvailable=()=>{
   const u=game.canonicalRosterUndo,b=u?.before;
   return !!(u&&u.team===team.id&&u.year===game.year&&u.day===game.day&&u.after===roster190Fingerprint(team)&&b&&Array.isArray(b.lineup)&&b.lineup.length<=9&&b.fieldingRoles&&new Set(b.lineup).size===b.lineup.length&&Object.keys(b.fieldingRoles).length===b.lineup.length&&new Set(Object.values(b.fieldingRoles)).size===b.lineup.length&&b.lineup.every(id=>FIELD_POSITIONS.includes(b.fieldingRoles[id])&&firstHitters(team).some(p=>p.id===id&&availableForGame(p))));
@@ -81,6 +81,25 @@ function createHeadlessEngine(){
   if(input.offset>matches.length)throw Error('free page offset out of range');
   const items=matches.slice(input.offset,input.offset+input.limit).map(freeRow),end=input.offset+items.length;
   return JSON.stringify({offset:input.offset,total:matches.length,nextOffset:end<matches.length?end:null,items});
+ }
+ if(op==='player-page'){
+  if(!freeVisible())throw Error('player history unavailable before reveal');
+  const p=own(team).find(p=>p.id===input.playerId);if(!p)throw Error('own player required');
+  const pitch=isPitch(p),statKeys=Object.keys(newStats(pitch));
+  const validYear=r=>Number.isSafeInteger(r?.year)&&r.year>=2027&&r.year<=game.year;
+  const uniqueRows=rows=>[...new Map(rows.filter(validYear).map(r=>[r.year,r])).values()];
+  const official=careerRows(p,game.year).filter(validYear),farm=uniqueRows(p.farmHistory||[]);
+  if(p.farmYear===game.year&&!farm.some(r=>r.year===game.year)&&(p.farmStats?.g||p.farmTrainingDays))farm.push({year:game.year,teamId:p.farmClubId,stats:p.farmStats,trainingDays:p.farmTrainingDays});
+  const overall=uniqueRows(p.overallHistory||[]),abilities=uniqueRows(p.abilityHistory||[]),titles=(p.titles||[]).filter(validYear);
+  const indexed=rows=>new Map(rows.map(r=>[r.year,r])),o=indexed(official),f=indexed(farm),g=indexed(overall),a=indexed(abilities),t=new Map();
+  for(const r of titles){if(!t.has(r.year))t.set(r.year,[]);t.get(r.year).push({title:String(r.title).slice(0,120),league:r.league==='E'||r.league==='W'?r.league:null});}
+  const years=[...new Set([...o.keys(),...f.keys(),...g.keys(),...a.keys(),...t.keys()])].sort((x,y)=>y-x);
+  if(input.offset>years.length)throw Error('history offset out of range');
+  const stats=st=>Object.fromEntries(statKeys.filter(k=>Number.isFinite(st?.[k])).map(k=>[k,st[k]]));
+  const resultRow=r=>r?{teamId:r.teamId??null,team:getTeam(r.teamId)?.short||null,stats:stats(r.stats)}:null;
+  const items=years.slice(input.offset,input.offset+input.limit).map(year=>{const ab=a.get(year),v=g.get(year)?.overall??ab?.overall;return {year,official:resultRow(o.get(year)),farm:resultRow(f.get(year)),overall:Number.isFinite(v)?v:null,abilities:ab?Object.fromEntries(['stuff','control','breaking','stamina','contact','power','speed','defense','arm','talent'].filter(k=>Number.isFinite(ab.abilities?.[k])).map(k=>[k,ab.abilities[k]])):null,titles:(t.get(year)||[]).slice(0,64),titlesMore:Math.max(0,(t.get(year)||[]).length-64)};});
+  const end=input.offset+items.length;
+  return JSON.stringify({playerId:p.id,offset:input.offset,total:years.length,nextOffset:end<years.length?end:null,items,officialTotal:stats(careerTotals(official,pitch)),farmTotal:stats(careerTotals(farm,pitch)),hasFarm:farm.length>0,memo:String(p.memo||'').slice(0,2000)});
  }
  const clubView=()=>{
   // Avoid leaking the signed roster before the mandatory arrival/result scene.
@@ -358,6 +377,8 @@ function createHeadlessEngine(){
    farmClub(team).mode=input.value;if(input.value==='auto')farmBalance(team);repairTeam(team);
   }else if(k==='focus'){
    if(!p||p.teamId!==team.id||!['balanced',...seasonSkillKeys(p)].includes(input.key))throw Error('invalid training focus');p.trainFocus=input.key;
+  }else if(k==='memo'){
+   if(!freeVisible()||!p||p.teamId!==team.id)throw Error('own player memo unavailable');p.memo=input.value;
   }else if(k==='facility'){
    const ok=Object.hasOwn(INFRA_LABELS,input.key)?(input.direction===1?infraUpgrade(team,input.key):infraDowngrade(team,input.key)):stadiumResize(team,input.key,input.direction);
    if(!ok)throw Error('facility change unavailable');
@@ -788,6 +809,7 @@ function createHeadlessEngine(){
     if(k==='farm-move')valid=pid&&exact(command,[...base,'playerId']);
     if(k==='farm-mode')valid=exact(command,[...base,'value'])&&['auto','manual'].includes(command.value);
     if(k==='focus')valid=pid&&exact(command,[...base,'playerId','key'])&&typeof command.key==='string'&&command.key.length<=20;
+    if(k==='memo')valid=pid&&exact(command,[...base,'playerId','value'])&&typeof command.value==='string'&&command.value.length<=2000&&Array.from(command.value).every(ch=>{const code=ch.charCodeAt(0);return code>=32&&code!==127||[9,10,13].includes(code);});
     if(k==='facility')valid=exact(command,[...base,'key','direction'])&&['training','indoor','medical','draft','foreign','park','food','goods'].includes(command.key)&&[-1,1].includes(command.direction);
     if(k==='prices')valid=exact(command,[...base,'values'])&&Array.isArray(command.values)&&command.values.length===5&&command.values.every(v=>Number.isSafeInteger(v)&&v>=500&&v<=20000&&v%100===0);
     if(k==='travel')valid=exact(command,[...base,'value'])&&[0,1,2,3].includes(command.value);
@@ -893,6 +915,10 @@ function createHeadlessEngine(){
    if(!t||state.started!==true)throw Error('invalid canonical preview');
    const e=t.emblem;
    return {year:state.year,day:state.day,gmName:state.gmName||'GM',team:{id:t.id,name:t.name,short:t.short,league:t.league,color:t.color,letter:t.letter,emblem:e?{accent:e.accent,shape:e.shape,pattern:e.pattern,font:e.font,motif:e.motif}:null,wins:t.wins,cash:t.cash}};
+  },
+  playerPage(state,command){
+   if(!exact(command,['playerId','offset','limit'])||!Number.isSafeInteger(command.playerId)||command.playerId<1||!Number.isSafeInteger(command.offset)||command.offset<0||!Number.isSafeInteger(command.limit)||command.limit<1||command.limit>10)throw Error('invalid player history page');
+   return run('player-page',state,command);
   },
   freePage(state,command){
    if(!exact(command,['offset','limit','query'])||!Number.isSafeInteger(command.offset)||command.offset<0||!Number.isSafeInteger(command.limit)||command.limit<1||command.limit>80||typeof command.query!=='string'||command.query.length>80||/[\u0000-\u001f]/.test(command.query))throw Error('invalid free page');

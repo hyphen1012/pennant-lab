@@ -21,6 +21,7 @@ function createServiceRouter({accountHttp,saveHttp,adService,deletionService,sto
   ['/v1/game/read',['read',['slot']]],
   ['/v1/game/order',['orderStatus',['slot','operationId']]],
   ['/v1/game/free-page',['freePage',['slot','world','revision','command']]],
+  ['/v1/game/player-page',['playerPage',['slot','world','revision','command']]],
   ['/v1/game/advance',['advance',['slot','world','revision','command']]],
   ['/v1/game/reserve',['reserve',['slot','operationId','choice']]],
   ['/v1/game/settle',['settle',['slot','operationId','attempt']]],

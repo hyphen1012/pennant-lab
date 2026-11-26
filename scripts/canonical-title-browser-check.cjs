@@ -146,6 +146,14 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   await page.locator('[data-action="canonical-players"]').click();await page.locator('.player-row').first().click();const focus=page.locator('[data-action="canonical-focus"]:enabled').first();const key=await focus.getAttribute('data-key');
   await focus.click();await page.getByText('サーバーに変更を保存しました。').waitFor();const focused=await post('read',{slot:2});a.equal(focused.revision,ordered.revision+1);
   a.equal(focused.game.club.roster.filter(p=>p.focus!==ordered.game.club.roster.find(q=>q.id===p.id)?.focus&&p.focus===key).length,1);
+  clockOffset+=61000;
+  await page.locator('[data-action="canonical-history-open"]').click();await page.locator('#canonical-player-memo').waitFor();
+  a.equal((await post('read',{slot:2})).revision,focused.revision);
+  const memo='来季の構想：重点育成 <script>文字列</script> '+ 'あ'.repeat(1500);
+  await page.locator('#canonical-player-memo').fill(memo);await page.locator('[data-action="canonical-memo-save"]').click();await page.locator('#canonical-player-memo').waitFor();a.equal(await page.locator('#canonical-player-memo').inputValue(),memo);
+  const memoed=await post('read',{slot:2});a.equal(memoed.revision,focused.revision+1);
+  const focusPlayer=focused.game.club.roster.find(p=>p.focus!==ordered.game.club.roster.find(q=>q.id===p.id)?.focus);
+  const persisted=await post('player-page',{slot:2,world:memoed.world,revision:memoed.revision,command:{playerId:focusPlayer.id,offset:0,limit:10}});a.equal(persisted.page.memo,memo);
   await page.locator('[data-action="canonical-info-back"]').click();await page.locator('[data-action="canonical-info-back"]').click();
   await page.locator('[data-action="canonical-return"]').first().click();await slot(3).waitFor();
   clockOffset+=61000;

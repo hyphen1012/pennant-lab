@@ -77,6 +77,15 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
    return {world:r.world,revision:r.revision,page:JSON.parse(json(sync(engine.freePage(r.state,JSON.parse(json(command,4096)))),65536))};
   });
  }
+ async function playerPage(token,slot,worldId,revision,command){
+  const account=await identity(token);
+  if(typeof worldId!=='string'||!n(revision)||revision<1||typeof engine.playerPage!=='function')throw Error('invalid player page request');
+  return inspect(account,(s,db)=>{
+   const r=world(db,account,slot);
+   if(r.world!==worldId||r.revision!==revision)throw Error('canonical revision conflict');
+   return {world:r.world,revision:r.revision,page:JSON.parse(json(sync(engine.playerPage(r.state,JSON.parse(json(command,4096)))),262144))};
+  });
+ }
  async function orderStatus(token,slot,operation){
   const account=await identity(token);checkOperation(operation);
   return inspect(account,(s,db)=>{
@@ -95,7 +104,7 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
    // or explicit cancel is required; lost connection is not a cancel.
    const pending=db.prepare('SELECT operation FROM authority_actions WHERE account=? AND world=? AND result IS NULL').all(account,r.world);
    if(pending.some(x=>s.orders[x.operation]?.status==='pending'))throw Error('reward reconciliation required');
-   const next=sync(engine.advance(r.state,JSON.parse(json(command,4096)),entitlements));commitWorld(db,r,next);
+   const next=sync(engine.advance(r.state,JSON.parse(json(command,command?.club==='memo'?16384:4096)),entitlements));commitWorld(db,r,next);
    return view({...r,state:next,revision:r.revision+1});
   });
  }
@@ -162,6 +171,6 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
   const r=world(db,account,slot),events=sync(engine.achievements(r.state));if(!Array.isArray(events)||events.length>50000)throw Error('invalid canonical achievements');
   return events.filter(e=>e?.eligible===true&&id(e.key)&&typeof e.label==='string'&&e.label.length<=160).map(e=>{const eventId=digest([r.world,e.key]);return {eventId,label:e.label,claimed:Object.hasOwn(s.claims,eventId)};});
  });}
- return {create,read,advance,reserve,settle,cancel,claim,achievements,orderStatus,slots,freePage};
+ return {create,read,advance,reserve,settle,cancel,claim,achievements,orderStatus,slots,freePage,playerPage};
 }
 module.exports={installAuthorityTables,createGameAuthority};
