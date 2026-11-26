@@ -22,15 +22,20 @@ const {createAccountClient}=require('../mobile/src/account-client.cjs'),{createC
   a.throws(()=>one.create({team:0},false));
   const first=await one.create({team:0},true);a.equal(first.status,'ready');a.equal(first.snapshot.revision,1);
   const read=await two.refresh();a.equal(read.snapshot.world,first.snapshot.world);a.equal(read.snapshot.revision,1);
+  const page=await one.freePage({offset:0,limit:40,query:''});a.equal(page.status,'ready');a.equal(page.page.offset,0);a.ok(page.page.items.length<=40);
   const updated=await one.advance({club:'travel',value:1});a.equal(updated.snapshot.revision,2);a.equal(updated.snapshot.game.club.travel,1);
-  const stale=await two.advance({club:'travel',value:3});a.equal(stale.status,'refresh-required');a.equal(two.inspect().snapshot,null);a.throws(()=>two.advance({club:'travel',value:3}));
-  const after=await two.refresh();a.equal(after.snapshot.revision,2);a.equal(after.snapshot.game.club.travel,1);
+  const stalePage=await two.freePage({offset:0,limit:40,query:''});a.equal(stalePage.status,'refresh-required');a.equal(two.inspect().snapshot,null);
+  // A separate stale read must still be rejected by the mutation CAS.
+  const three=create();three.setSession({account:owner,token:'a'});three.select(1);await three.refresh();
+  const changed=await one.advance({club:'travel',value:1});a.equal(changed.snapshot.revision,3);
+  const stale=await three.advance({club:'travel',value:3});a.equal(stale.status,'refresh-required');a.equal(three.inspect().snapshot,null);a.throws(()=>three.advance({club:'travel',value:3}));
+  const after=await two.refresh();a.equal(after.snapshot.revision,3);a.equal(after.snapshot.game.club.travel,1);
   const n=advances;lost=true;const uncertain=await one.advance({club:'travel',value:2});a.equal(uncertain.status,'refresh-required');a.equal(uncertain.uncertain,true);a.equal(advances,n+1);
   a.throws(()=>one.advance({club:'travel',value:2}));
-  const recovered=await one.refresh();a.equal(recovered.snapshot.revision,3);a.equal(recovered.snapshot.game.club.travel,2);a.equal(advances,n+1);
+  const recovered=await one.refresh();a.equal(recovered.snapshot.revision,4);a.equal(recovered.snapshot.game.club.travel,2);a.equal(advances,n+1);
   const copy=one.inspect();copy.snapshot.game.club.travel=99;a.equal(one.inspect().snapshot.game.club.travel,2);
   online=false;const offline=await one.advance({club:'travel',value:0});a.equal(offline.status,'refresh-required');a.equal(advances,n+1);online=true;
-  const reload=await one.refresh();a.equal(reload.snapshot.revision,3);
+  const reload=await one.refresh();a.equal(reload.snapshot.revision,4);
   // Session change while a read is outstanding: never expose account A's data
   // under account B. A separate authenticated account has no slot yet.
   let release;delayRead=new Promise(ok=>release=ok);const old=one.refresh();

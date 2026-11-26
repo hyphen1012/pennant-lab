@@ -33,6 +33,20 @@ function createCanonicalGameSession({client,online=()=>true}={}){
   if(status!=='ready'||!snapshot||snapshot.pending?.length)throw Error('authoritative state or reward reconciliation required');
   return run('advance',(t,old)=>client.gameAdvance(t.slot,old.revision,command));
  }
- return Object.freeze({setSession,suspend,select,refresh,create,advance,inspect});
+ async function freePage(command){
+  if(status!=='ready'||!snapshot||typeof client.gameFreePage!=='function')throw Error('authoritative state required');
+  const t=start(),old=snapshot;
+  try{
+   if(!await online()||!current(t))throw Error('connection unavailable');
+   const result=await client.gameFreePage(t.slot,old.world,old.revision,command);
+   if(!current(t))return {status:'stale'};
+   if(result.world!==old.world||result.revision!==old.revision)throw Error('unexpected canonical revision');
+   return {status:'ready',page:structuredClone(result.page)};
+  }catch{
+   if(!current(t))return {status:'stale'};
+   snapshot=null;status='refresh-required';return {status};
+  }finally{if(current(t))active=null;}
+ }
+ return Object.freeze({setSession,suspend,select,refresh,create,advance,inspect,freePage});
 }
 module.exports={createCanonicalGameSession};

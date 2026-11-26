@@ -64,6 +64,15 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
  async function read(token,slot){const account=await identity(token);return inspect(account,(s,db)=>{const r=world(db,account,slot);return {...view(r),actions:options(db,r,s),pending:db.prepare('SELECT operation,attempt FROM authority_actions WHERE account=? AND world=? AND result IS NULL').all(account,r.world).filter(x=>s.orders[x.operation]?.status==='pending').map(x=>({operationId:x.operation,attempt:x.attempt,mode:s.orders[x.operation].mode})),wallet:publicWallet(s)};});}
  // Recover from a lost reserve/settle response without consulting the store
  // or reapplying a game effect. A pending order may no longer be in actions().
+ async function freePage(token,slot,worldId,revision,command){
+  const account=await identity(token);
+  if(typeof worldId!=='string'||!n(revision)||revision<1||typeof engine.freePage!=='function')throw Error('invalid free page request');
+  return inspect(account,(s,db)=>{
+   const r=world(db,account,slot);
+   if(r.world!==worldId||r.revision!==revision)throw Error('canonical revision conflict');
+   return {world:r.world,revision:r.revision,page:JSON.parse(json(sync(engine.freePage(r.state,JSON.parse(json(command,4096)))),65536))};
+  });
+ }
  async function orderStatus(token,slot,operation){
   const account=await identity(token);checkOperation(operation);
   return inspect(account,(s,db)=>{
@@ -149,6 +158,6 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
   const r=world(db,account,slot),events=sync(engine.achievements(r.state));if(!Array.isArray(events)||events.length>50000)throw Error('invalid canonical achievements');
   return events.filter(e=>e?.eligible===true&&id(e.key)&&typeof e.label==='string'&&e.label.length<=160).map(e=>{const eventId=digest([r.world,e.key]);return {eventId,label:e.label,claimed:Object.hasOwn(s.claims,eventId)};});
  });}
- return {create,read,advance,reserve,settle,cancel,claim,achievements,orderStatus,slots};
+ return {create,read,advance,reserve,settle,cancel,claim,achievements,orderStatus,slots,freePage};
 }
 module.exports={installAuthorityTables,createGameAuthority};

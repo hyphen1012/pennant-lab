@@ -44,13 +44,24 @@ function createHeadlessEngine(){
    career:career?{playerId:career.p.id,stage:career.e.type,options:['consult','plan'].includes(career.e.type)?farewellChoices(career.p).map(([key,label,cost])=>({key,label,cost})):[]}:null};
  };
  const canManage=()=>team.cash>=0&&!game.financeCrisis&&!flowInbox()&&!game.pendingMonth&&!game.pendingReview&&!pendingMilestoneNews().length&&!flowForeignResponse()&&!game.ceremonyStage&&!flowGet()?.active&&game.pendingCeremonyIntro!=='opening';
+ const freeVisible=()=>!game.pendingDraftReveal&&!flowForeignResponse();
+ const freeList=()=>freeAgents().filter(p=>!p.retired);
+ const freeRow=p=>({id:p.id,name:p.name,pos:p.pos,age:p.age,overall:rating(p),salary:p.salary,cost:signingCost(p)});
+ if(op==='free-page'){
+  if(!freeVisible())throw Error('free market projection unavailable');
+  const q=input.query.normalize('NFKC').toLowerCase().trim();
+  const matches=freeList().filter(p=>!q||String(p.name).normalize('NFKC').toLowerCase().includes(q));
+  if(input.offset>matches.length)throw Error('free page offset out of range');
+  const items=matches.slice(input.offset,input.offset+input.limit).map(freeRow),end=input.offset+items.length;
+  return JSON.stringify({offset:input.offset,total:matches.length,nextOffset:end<matches.length?end:null,items});
+ }
  const clubView=()=>{
   // Avoid leaking the signed roster before the mandatory arrival/result scene.
-  if(game.pendingDraftReveal||flowForeignResponse())return null;
-  const stadium=stadiumState(team),manager=team.manager,flow=flowGet(),free=freeAgents().filter(p=>!p.retired);
+  if(!freeVisible())return null;
+  const stadium=stadiumState(team),manager=team.manager,flow=flowGet(),free=freeList();
   return {canManage:canManage(),date:flow?.date||calendarNextDay()?.date||game.calendar.endDate,rosterLimit:ROSTER_MAX,farmLimit:FARM_LIMIT,farmMode:farmClub(team).mode,
    roster:own(team).map(p=>({id:p.id,name:p.name,pos:p.pos,age:p.age,salary:p.salary,tier:p.farmTier===2?2:1,injured:!!p.injury,energy:p.energy,overall:rating(p),abilities:Object.fromEntries(seasonSkillKeys(p).map(k=>[k,p[k]])),focus:p.trainFocus||'balanced',fielding:team.lineup.includes(p.id)?team.fieldingRoles?.[p.id]||null:null})),
-   freeCount:free.length,free:free.slice(0,80).map(p=>({id:p.id,name:p.name,pos:p.pos,age:p.age,overall:rating(p),salary:p.salary,cost:signingCost(p)})),
+   freeCount:free.length,free:free.slice(0,80).map(freeRow),
    managerCandidates:[1,2,3].map(slot=>{const m=makeManager(team.id,game.year,slot);return {slot,id:m.id,name:m.name,style:m.style,salary:m.salary,contractYears:m.contractYears,fee:r2(m.salary*.3),current:m.id===manager?.id};}),
    lineup:team.lineup.slice(),rotation:team.rotation.slice(),fieldingRoles:{...team.fieldingRoles},fieldingOptions:team.lineup.map(id=>({id,roles:FIELD_POSITIONS.filter(role=>canAssignFieldingRole(team,id,role))})),
    facilities:[...Object.entries(INFRA_LABELS),...Object.entries(STADIUM_KEYS)].map(([key,label])=>{const lv=Object.hasOwn(INFRA_LABELS,key)?infraLevel(team,key):stadium[key];return {key,label,level:lv,upkeep:facilityUpkeep(key,lv),nextCost:lv<20?facilityCost(key,lv):null,nextUpkeep:lv<20?facilityUpkeep(key,lv+1):null};}),
@@ -807,6 +818,10 @@ function createHeadlessEngine(){
    if(exact(command,['career','playerId'])&&command.career==='dismiss'&&Number.isSafeInteger(command.playerId))return run('career',state,{choice:'dismiss',playerId:command.playerId});
    if(exact(command,['acknowledge','playerId'])&&command.acknowledge==='rookie-reveal'&&Number.isSafeInteger(command.playerId))return run('ack',state,{kind:'rookie-reveal',playerId:command.playerId});
    if(exact(command,['acknowledge'])&&['month','milestones','rookie-finish','opening'].includes(command.acknowledge))return run('ack',state,{kind:command.acknowledge});if(!exact(command,['step'])||command.step!==1)throw Error('pilot accepts one calendar day or explicit report acknowledgement');return run('advance',state,{verifiedVip:rights?.verified===true&&rights.vip===true});},
+  freePage(state,command){
+   if(!exact(command,['offset','limit','query'])||!Number.isSafeInteger(command.offset)||command.offset<0||!Number.isSafeInteger(command.limit)||command.limit<1||command.limit>80||typeof command.query!=='string'||command.query.length>80||/[\u0000-\u001f]/.test(command.query))throw Error('invalid free page');
+   return run('free-page',state,command);
+  },
   actions:state=>run('actions',state),achievements:state=>run('achievements',state).map(e=>e.key.startsWith('memorial:')?{...e,key:'memorial:'+createHash('sha256').update(e.key).digest('hex')}:e),view:state=>run('view',state),
   applyAction(state,action){if(!['medical','manager','retirement','draft-revival','foreign-revival','lottery','fa-retention','fa-sign'].includes(action?.route))throw Error('pilot route unavailable');return run('apply',state,{action:{route:action.route,eventKey:action.eventKey}});}
  });
