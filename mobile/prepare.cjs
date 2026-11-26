@@ -15,6 +15,8 @@ const oauthEnabled=!!accountApi||Object.values(oauthFields).some(Boolean);
 const validHttps=s=>{try{const u=new URL(s);return u.protocol==='https:'&&!u.username&&!u.password&&!u.search&&!u.hash;}catch{return false;}};
 if(oauthEnabled&&(!validHttps(accountApi)||!['authorizeUrl','tokenUrl','issuer'].every(k=>validHttps(oauthFields[k]))||!oauthFields.clientId||!oauthFields.scope||oauthFields.redirectUri!==require('./capacitor.config.json').appId+'://auth/callback'))throw Error('Complete valid OAuth/API configuration required');
 const oauth=oauthEnabled?oauthFields:null;
+const canonicalUiPilot=process.env.PL_CANONICAL_UI_PILOT==='1';
+if(canonicalUiPilot&&(production||!oauthEnabled))throw Error('Canonical UI pilot requires staging authentication, never production');
 const deletionEnabled=process.env.PL_DELETION_ENABLED==='1',deletionUrl=process.env.PL_DELETION_URL||null;
 if((deletionEnabled||deletionUrl)&&(!oauthEnabled||!deletionEnabled||!validHttps(deletionUrl)))throw Error('deletion requires vetted identity configuration and HTTPS external deletion resource');
 const billingCatalog=process.env.PL_BILLING_CATALOG_JSON?JSON.parse(process.env.PL_BILLING_CATALOG_JSON):null;
@@ -41,13 +43,14 @@ replace('    if(!offDayCanStart(f))return false;\n    const token=', '    if(!of
 replace('const valid=game===token.owner&&flowGet()===token.flow&&token.flow.date===token.from&&!document.hidden;', 'const valid=game===token.owner&&flowGet()===token.flow&&token.flow.date===token.from&&!document.hidden&&window.PennantNative?.ready();');
 replace('      f.date=calendarOffsetDate(f.date,1);flowTick(f);\n      if(flowGet()!==f', '      if(!window.PennantNative?.ready())break;\n      f.date=calendarOffsetDate(f.date,1);flowTick(f);\n      if(flowGet()!==f');
 replace("    if(act==='export-save'){", "    if(act==='export-save'){\n      if(window.PennantNative){void window.PennantNative.exportSave(JSON.stringify(game), 'PENNANT_LAB_'+game.year+'_save.json').catch(()=>showToast('バックアップ共有に失敗しました',true));return;}");
-replace("  const appRoot=document.querySelector('#app');","  const appRoot=document.querySelector('#app');\n  window.PennantNative?.setBackup(()=>{if(!game||ui.busy||scenarioLab)throw Error('busy');save();return window.PennantNative.exportSave(JSON.stringify(game),'PENNANT_LAB_'+game.year+'_save.json');});");
+replace("  const appRoot=document.querySelector('#app');","  const appRoot=document.querySelector('#app');\n  if(!window.PennantNative?.canonicalGame)window.PennantNative?.setBackup(()=>{if(!game||ui.busy||scenarioLab)throw Error('busy');save();return window.PennantNative.exportSave(JSON.stringify(game),'PENNANT_LAB_'+game.year+'_save.json');});");
 replace('<script>','<script src="native-runtime.js"></script>\n<script>');
 // Native-only privacy entry is inserted beside the title slot list.
 html=html.replace('<div class="title-slot-title">','<button type="button" class="btn outline full" data-mobile-privacy>広告プライバシー設定</button><div class="title-slot-title">');
-if(production)html=require('./release-surface.cjs').releaseSurface(html);
+if(production||canonicalUiPilot)html=require('./release-surface.cjs').releaseSurface(html);
+if(canonicalUiPilot)html=require('./canonical-title-pilot.cjs').canonicalTitlePilot(html);
 const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];if(!script)throw Error('game script missing');new Function(script);
 fs.writeFileSync(path.join(out,'index.html'),html);
-esbuild.buildSync({entryPoints:[path.join(__dirname,'src/index.js')],bundle:true,format:'iife',platform:'browser',outfile:path.join(out,'native-runtime.js'),define:{__PL_CONFIG__:JSON.stringify({health,units,production,accountApi,oauth,billingCatalog,deletionEnabled,deletionUrl})}});
+esbuild.buildSync({entryPoints:[path.join(__dirname,'src/index.js')],bundle:true,format:'iife',platform:'browser',outfile:path.join(out,'native-runtime.js'),define:{__PL_CONFIG__:JSON.stringify({health,units,production,accountApi,oauth,billingCatalog,deletionEnabled,deletionUrl,canonicalUiPilot})}});
 fs.writeFileSync(path.join(__dirname,'native-build-config.json'),JSON.stringify({apps,production,oauth},null,2));
 console.log('Prepared native web assets',production?'production configuration':'Google test ads');

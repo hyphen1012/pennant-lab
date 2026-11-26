@@ -161,3 +161,6 @@ jobs:
 
       - run: node scripts/canonical-state-codec-check.cjs
         if: always()
+
+      - run: node mobile/canonical-title-pilot-check.cjs
+        if: always()
