@@ -33,7 +33,7 @@ function openLedger(filename){
  }
  return {transact,inspect,readOrder,close:()=>db.close()};
 }
-function createAccountService({ledger,authenticate,verifyEvent,verifyEntitlements,verifyAction,verifyCompletion,purchaseService=null,now=Date.now}){
+function createAccountService({ledger,authenticate,verifyEvent,verifyEntitlements,verifyAction,verifyCompletion,purchaseService=null,exchangeAvailable=()=>true,now=Date.now}){
   if(!ledger?.transact||[authenticate,verifyEvent,verifyEntitlements,verifyAction,verifyCompletion].some(f=>typeof f!=='function'))throw Error('trusted adapters required');
   async function identity(token){
     const auth=await authenticate(token);
@@ -65,7 +65,7 @@ function createAccountService({ledger,authenticate,verifyEvent,verifyEntitlement
   }
   async function exchange(token,key){
     const account=await identity(token);
-    return ledger.transact(account,s=>({ok:rules.exchange(s,key),wallet:publicState(s)}));
+    return ledger.transact(account,s=>({ok:exchangeAvailable(key)===true&&rules.exchange(s,key),wallet:publicState(s)}));
   }
   async function reserve(token,actionProof,choice){
     const account=await identity(token),action=await verifyAction(account,actionProof);
