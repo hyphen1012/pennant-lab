@@ -11,6 +11,16 @@ const health=process.env.PL_HEALTH_URL||'https://hyphen1012.github.io/pennant-la
 if(!health.startsWith('https://'))throw Error('HTTPS health endpoint required');
 fs.rmSync(out,{recursive:true,force:true});fs.mkdirSync(out,{recursive:true});fs.cpSync(path.join(root,'assets'),path.join(out,'assets'),{recursive:true});
 let html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+// Release packaging must not silently ship the temporary title or an absent video.
+if(production){
+ const media=html.match(/const STARTUP_MEDIA=Object\.freeze\(\{video:'([^']*)',title:'([^']*)',hasStartText:(?:true|false)\}\);/);
+ if(!media||!media[1]||!media[2])throw Error('Official startup video and title image are required for production');
+ for(const name of media.slice(1,3)){
+  if(!/^assets\/startup\/[A-Za-z0-9_.-]+$/.test(name))throw Error('Invalid official startup asset path');
+  const file=path.join(out,name);if(!fs.existsSync(file)||!fs.statSync(file).isFile()||!fs.statSync(file).size)throw Error('Missing bundled startup asset: '+name);
+ }
+}
+
 function replace(a,b){if(html.split(a).length!==2)throw Error('native integration anchor missing: '+a);html=html.replace(a,b);}
 replace('  const rewardAdProvider=null;', '  const rewardAdProvider=window.PennantNative?.reward||null;');
 replace('      const entry=processCalendarDay();','      if(!window.PennantNative||!await window.PennantNative.check()||ui.pauseRequested||document.hidden||storageFailure||!window.PennantNative.ready())break;\n      const entry=processCalendarDay();');
