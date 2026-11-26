@@ -28,10 +28,11 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/native-runtime.js',r=>r.fulfill({contentType:'application/javascript',body:fixture}));
   await page.route('**/*.mp4',r=>r.abort()); // startup video has its own independent audit
-  let creates=0,lost=false,failSlots=false,lostAdvance=false,advances=0;
+  let creates=0,lost=false,failSlots=false,lostAdvance=false,advances=0,freeReads=0,failFree=false;
   await page.route('**/canonical-fixture/v1/**',async r=>{
    const q=r.request(),p=new URL(q.url()).pathname.replace('/canonical-fixture','');
    if(p.endsWith('/slots')&&failSlots){await r.abort();return;}
+   if(p.endsWith('/free-page')){freeReads++;if(failFree){await r.abort();return;}}
    const response=await fetch(base+p,{method:'POST',headers:{Authorization:q.headers().authorization,'Content-Type':'application/json'},body:q.postData()});
    const body=await response.text();
    if(p.endsWith('/create')){creates++;if(lost){lost=false;a.equal(response.status,200);await r.abort();return;}}
@@ -66,6 +67,15 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   await page.locator('.player-row').first().click();await page.locator('.player-upper-portrait').waitFor();a.equal(await page.locator('.player-stat-grid').count(),1);
   await page.locator('[data-action="canonical-info-back"]').click();await page.locator('.player-card').first().waitFor();await page.locator('[data-action="canonical-info-back"]').click();
   await page.locator('[data-action="canonical-standings"]').click();a.equal(await page.locator('tbody tr').count(),6);await page.locator('[data-action="canonical-league"][data-league="W"]').click();a.equal(await page.locator('.league-west tbody tr').count(),6);await page.locator('[data-action="canonical-info-back"]').click();
+  await page.locator('[data-action="canonical-ops-open"][data-kind="free"]').click();
+  await page.locator('[data-action="canonical-free-next"]').waitFor();
+  a.equal(freeReads,1);a.ok(await page.locator('.player-card').count()<=30);
+  const freeFirst=await post('free-page',{slot:1,world:beforeDay.world,revision:beforeDay.revision,command:{offset:0,limit:30,query:''}});
+  a.equal(await page.locator('.player-card').count(),freeFirst.page.items.length);
+  if(freeFirst.page.nextOffset!==null){await page.locator('[data-action="canonical-free-next"]').click();await page.locator('[data-action="canonical-free-prev"]:enabled').waitFor();a.ok(await page.locator('.player-card').count()<=30);await page.locator('[data-action="canonical-free-prev"]').click();await page.locator('[data-action="canonical-free-prev"]:disabled').waitFor();}
+  await page.locator('#canonical-free-query').fill('zzzz無一致候補zzz');await page.locator('[data-action="canonical-free-search"]').click();await page.getByText('該当する選手はいません。').waitFor();
+  failFree=true;await page.locator('[data-action="canonical-free-search"]').click();await page.locator('[data-action="canonical-ops-refresh"]').waitFor();a.equal(await page.locator('.player-card').count(),0);failFree=false;
+  await page.locator('[data-action="canonical-ops-back"]').click();await page.locator('[data-action="canonical-hq-refresh"]').click();await page.locator('.hero-stadium').waitFor();
   a.equal((await post('read',{slot:1})).revision,beforeDay.revision);a.equal(advances,2);
   lostAdvance=true;await page.locator('[data-action="canonical-hq-step"]').click();await page.getByText('確定した日程を取得してください。自動再送は行いません。').waitFor();a.equal(await page.locator('.hero-stadium').count(),0);a.equal(advances,3);
   await page.locator('[data-action="canonical-hq-refresh"]').click();await page.locator('.hero-stadium').waitFor();
@@ -76,6 +86,21 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   a.equal(await slot(1).getAttribute('data-action'),'continue-slot');
   await slot(2).click();await page.getByText('サーバー保存の確認画面（開発試験）').waitFor();
   a.equal((await post('read',{slot:2})).world,seeded.world);
+  await page.locator('[data-action="canonical-hq-open"]').click();await page.locator('.hero-stadium').waitFor();
+  const beforeOps=await post('read',{slot:2});
+  await page.locator('[data-action="canonical-ops-open"][data-kind="rotation"]').click();
+  await page.locator('[data-action="canonical-rotation-slot"][data-slot="0"]').click();
+  const rotation=beforeOps.game.club.rotation,eligible=beforeOps.game.club.rotationCandidates;
+  const swapId=rotation.slice(1).find(id=>eligible.includes(id));a.ok(swapId!==undefined);
+  await page.locator('[data-action="canonical-rotation-pick"][data-id="'+swapId+'"]').click();await page.getByText('サーバーに変更を保存しました。').waitFor();
+  let afterOps=await post('read',{slot:2});a.equal(afterOps.revision,beforeOps.revision+1);a.equal(afterOps.game.club.rotation[0],swapId);a.equal(afterOps.game.club.rotation[rotation.indexOf(swapId)],rotation[0]);
+  await page.locator('[data-action="canonical-ops-back"]').click();
+  await page.locator('[data-action="canonical-ops-open"][data-kind="farm"]').click();
+  a.equal(await page.locator('.player-card').count(),afterOps.game.club.roster.length);
+  const targetMode=afterOps.game.club.farmMode==='manual'?'auto':'manual';
+  page.once('dialog',d=>d.accept());await page.locator('[data-action="canonical-farm-mode"][data-mode="'+targetMode+'"]').click();await page.getByText('サーバーに変更を保存しました。').waitFor();
+  const afterFarm=await post('read',{slot:2});a.equal(afterFarm.revision,afterOps.revision+1);a.equal(afterFarm.game.club.farmMode,targetMode);
+  await page.locator('[data-action="canonical-ops-back"]').click();
   await page.locator('[data-action="canonical-return"]').first().click();await slot(3).waitFor();
   await slot(3).click();await finish.waitFor();lost=true;await finish.click();
   await page.locator('button[data-slot="3"][data-action="continue-slot"]').waitFor();
