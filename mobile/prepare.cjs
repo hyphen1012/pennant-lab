@@ -1,6 +1,7 @@
 const fs=require('node:fs'),path=require('node:path'),esbuild=require('esbuild');
 const root=path.resolve(__dirname,'..'),out=path.join(__dirname,'www');
 const production=process.env.PL_PRODUCTION==='1';
+if(production)require('./production-readiness.cjs').assertProductionReady();
 const sample='ca-app-pub-3940256099942544';
 const units={android:process.env.PL_ADMOB_ANDROID_UNIT||sample+'/5224354917',ios:process.env.PL_ADMOB_IOS_UNIT||sample+'/1712485313'};
 const apps={android:process.env.PL_ADMOB_ANDROID_APP||sample+'~3347511713',ios:process.env.PL_ADMOB_IOS_APP||sample+'~1458002511'};
