@@ -8504,13 +8504,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const returnToHQ=!!ui.autoExitToHQ;
     ui.skipProgress=false;
     if(oneDayResult&&!returnToHQ)game.pendingReview=oneDayResult;
-    ui.busy=false;ui.pauseRequested=false;ui.autoPaused=false;ui.autoExitToHQ=false;ui.autoWait=null;
+    // Keep input locked until the final skip checkpoint finishes.
+    ui.busy=skip;ui.pauseRequested=false;ui.autoPaused=false;ui.autoExitToHQ=false;ui.autoWait=null;
     clearPendingNewsTap();
     if(!hasMore())game.advanceTarget=null;
     // The requested date is the only ordinary stopping point. Return to a usable HQ.
     ui.autoDay=null;ui.weeklyPaperDate=null;ui.tab='hq';ui.watchGame=null;
     if(flowForeignResponse()||flowInbox()){ui.autoDay=null;ui.tab='hq';game.rareResume=false;game.milestoneResume=false;}
-    save();render();window.scrollTo({top:0,behavior:'instant'});
+    save();if(skip)await saveQueue;
+    ui.busy=false;ui.pauseRequested=false;
+    render();window.scrollTo({top:0,behavior:'instant'});
     if(interrupted&&!returnToHQ&&!game.financeCrisis&&!game.pendingReview&&!game.pendingMonth)
       showToast('日程の進行を停止しました。タップで再開できます');
   };
@@ -14564,7 +14567,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function skipProgressText(){const t=game.advanceTarget,done=Number.isInteger(t?.calendarGoal)?game.calendarIndex:game.day,total=Number.isInteger(t?.calendarGoal)?t.calendarGoal:t?.goal||SEASON_GAMES;return {done,total,label:game.day+' / '+SEASON_GAMES+'試合 · '+(calendarNextDay()?.date?formatCalendarDate(calendarNextDay().date):'日程終了')};}
   function skipProgressMarkup(){
     const q=skipProgressText();
-    return '<section class="panel long-skip-progress" role="region" aria-label="日程スキップ"><div class="eyebrow">CALENDAR · SKIP</div><h3>日程を処理中</h3><p data-skip-date aria-live="polite">'+h(q.label)+'</p><progress data-skip-bar value="'+q.done+'" max="'+Math.max(1,q.total)+'"></progress><p class="small">4暦日ごとに保存完了を確認。試合途中では停止しません。</p><button class="btn outline full" data-action="pause-calendar">処理を中断して本部に戻る</button></section>';
+    return '<section class="panel long-skip-progress" role="region" aria-label="日程スキップ"><div class="eyebrow">CALENDAR · SKIP</div><h3>日程を処理中</h3><p data-skip-date aria-live="polite">'+h(q.label)+'</p><progress data-skip-bar value="'+q.done+'" max="'+Math.max(1,q.total)+'"></progress><p class="small">4暦日ごとと終了時に保存完了を確認。試合途中では停止しません。</p><button class="btn outline full" data-action="pause-calendar">処理を中断して本部に戻る</button></section>';
   }
   function updateSkipProgress(){const q=skipProgressText(),label=document.querySelector?.('[data-skip-date]'),bar=document.querySelector?.('[data-skip-bar]');if(label)label.textContent=q.label;if(bar){bar.max=Math.max(1,q.total);bar.value=q.done;}}
   const performanceRenderBase=render;
