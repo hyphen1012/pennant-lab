@@ -157,7 +157,7 @@ function createHeadlessEngine(){
  };
  const renewalView=()=>{
   const d=renewalData(team);if(!d)return null;
-  return {round:d.round,confirmed:d.confirmed,waiting:!!d.waiting,rows:d.rows.map(r=>{const p=getPlayer(r.id);return {id:r.id,name:p?.name,pos:p?.pos,status:r.status,current:r.current,assessment:r.assessment,desired:r.desired,offer:r.offer,editable:renewalEditable(d,r),bonuses:r.bonuses,options:p?renewalBonusOptions(p).map(([key,target,amount,label])=>({key,target,amount,label})):[],history:r.history};})};
+  return {round:d.round,confirmed:d.confirmed,waiting:!!d.waiting,unresolved:renewalUnresolved(d).length,rows:d.rows.map(r=>{const p=getPlayer(r.id);return {id:r.id,name:p?.name,pos:p?.pos,status:r.status,revisit:!!r.revisit,current:r.current,assessment:r.assessment,desired:r.desired,offer:r.offer,editable:renewalEditable(d,r),bonuses:r.bonuses,options:p?renewalBonusOptions(p).map(([key,target,amount,label])=>({key,target,amount,label})):[],history:r.history};})};
  };
  const trainingView=phase=>{
   const report=annualReport(phase);
@@ -193,14 +193,14 @@ function createHeadlessEngine(){
   if(!['booking','self','winter-return','camp','exhibition'].includes(phase))return null;
   if(phase==='winter-return'){
    const r=game.annualTraining?.results?.[(game.year-1)+':winter'];
-   return {phase,report:r?.returned?{rows:r.rows||[],entries:(r.entries||[]).filter(e=>e.teamId===team.id)}:null};
+   return {phase,report:r?.returned?{rows:(r.rows||[]).filter(x=>x.teamId===team.id),entries:(r.entries||[]).filter(e=>e.teamId===team.id)}:null};
   }
   if(['booking','camp'].includes(phase)){
    const p=annualPlan(team,'camp'),sites=campChoice(team),r=annualReport('camp');
-   return {phase,sites,step:p.step||0,paid:!!p.paid,cost:campCost(sites),visit:p.visit||null,visitPending:!!p.visitPending,options:CAMP_SITES.map(([key,label,cost])=>({key,label,cost})),report:r?{rows:r.rows,clubs:r.clubs,cost:r.cost,sites:r.sites}:null};
+   return {phase,sites,step:p.step||0,paid:!!p.paid,cost:campCost(sites),visit:p.visit||null,visitPending:!!p.visitPending,options:CAMP_SITES.map(([key,label,cost,,effect])=>({key,label,cost,effect})),report:r?{rows:(r.rows||[]).filter(x=>x.teamId===team.id||x.teamId==null),clubs:(r.clubs||[]).filter(x=>x.teamId===team.id),cost:r.cost,sites:r.sites}:null};
   }
   const r=annualReport(phase);
-  if(phase==='exhibition')return {phase,policy:annualPlan(team,phase).exhibition,meeting:!!j.state.reportMeeting,report:r?{games:r.games.filter(g=>g.home===team.id||g.away===team.id),rows:r.rows,leagueGames:r.games.length}:null};
+  if(phase==='exhibition')return {phase,policy:annualPlan(team,phase).exhibition,meeting:!!j.state.reportMeeting,meetingDone:!!j.state.reportMeetingDone,digestSeen:!!j.state.digestSeen,report:r?{games:r.games.filter(g=>g.home===team.id||g.away===team.id).map(g=>({date:g.date,home:g.home,away:g.away,homeScore:g.homeScore,awayScore:g.awayScore,noContest:!!g.noContest})),rows:(r.rows||[]).filter(x=>x.teamId===team.id),leagueGames:r.games.length}:null};
   return {phase,...trainingView(phase),support:!!j.state.reportSelfSupport,supportOptions:Object.entries(CLUB_SUPPORT).filter(([k,p])=>p.phase?.includes('self')).map(([key,p])=>({key,label:p.label,cost:p.cost,eligible:clubSupportEligible(team,key,'self')}))};
  };
  const annualFinanceView=()=>{
@@ -532,6 +532,10 @@ function createHeadlessEngine(){
      j.state.waiting='visit';j.state.due=annualDate('camp');if(j.state.due<=f.date)j.state.due=calendarOffsetDate(f.date,1);flowPark(f,j,'waiting');
     }else if(k==='policy'&&phase==='exhibition'){
      if(j.state.reportMeeting||annualReport(phase))throw Error('exhibition policy locked');annualPlan(team,phase,true).exhibition=input.value;
+    }else if(k==='self-back'&&phase==='self'){
+     if(!j.state.reportSelfSupport||annualReport(phase))throw Error('self training review unavailable');j.state.reportSelfSupport=false;
+    }else if(k==='digest'&&phase==='exhibition'){
+     if(!annualReport(phase)||j.state.digestSeen)throw Error('exhibition digest unavailable');j.state.digestSeen=true;
     }else if(k==='support'&&phase==='self'){
      if(!j.state.reportSelfSupport||annualReport(phase)||!CLUB_SUPPORT[input.value]?.phase?.includes('self')||!clubSupportSpend(team,input.value,'self'))throw Error('training support unavailable');
     }else if(k==='run'&&['self','camp','exhibition'].includes(phase)){
@@ -543,6 +547,7 @@ function createHeadlessEngine(){
      if(phase==='winter-return'){
       const r=game.annualTraining?.results?.[(game.year-1)+':winter'];if(!r?.returned)throw Error('winter return report missing');
      }else if(!['self','camp','exhibition'].includes(phase)||!annualReport(phase))throw Error('preseason report missing');
+     if(phase==='exhibition'&&!j.state.digestSeen)throw Error('exhibition digest confirmation required');
      flowComplete(f,j);
     }else throw Error('preseason decision unavailable');
    }else if(input.choice==='market'){
@@ -856,7 +861,7 @@ function createHeadlessEngine(){
    }
    if(command?.annual==='preseason'){
     const k=command.decision,base=['annual','decision'];
-    let valid=['confirm-sites','kickoff','visit-finish','run','finish'].includes(k)&&exact(command,base);
+    let valid=['confirm-sites','kickoff','visit-finish','run','finish','self-back','digest'].includes(k)&&exact(command,base);
     if(k==='site')valid=exact(command,[...base,'group','value'])&&['first','farm'].includes(command.group)&&['usa','miyazaki','ginowan','naha','korea','taiwan','ishigaki','miyako','kagoshima','ehime','amami','club','none'].includes(command.value);
     if(k==='visit')valid=exact(command,[...base,'value'])&&['inside','outside','rest','meeting'].includes(command.value);
     if(k==='policy')valid=exact(command,[...base,'value'])&&['balanced','first','youth'].includes(command.value);
