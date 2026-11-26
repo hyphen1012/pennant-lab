@@ -8,6 +8,23 @@ globalThis.__plAnnualEntryCheck=saved=>{
  // Test harness already acknowledged ordinary and rare reports as part of its simulation.
  // If a durable event remains, do not silently clear it.
  a.ok(engine.view(w).annual.canStart,'actual full season must allow annual entry');
+ // Use the real completed season's saved match and monthly archive, then reattach ordinary pointers in a fixture.
+ const match=w.games.find(g=>g.home===w.selectedId||g.away===w.selectedId);
+ const month=w.monthlyArchive?.find(m=>m.teamId===w.selectedId&&m.year===year);
+ a.ok(match&&month,'real saved match/month report required');
+ const routine=structuredClone(w);routine.pendingReview={year:match.year,gameId:match.id,explicit:false};routine.pendingMonth={year:month.year,id:month.id,explicit:false};
+ a.equal(engine.view(routine).annual.routineClearable,true);a.equal(engine.view(routine).annual.canStart,true);
+ const deferred=engine.advance(routine,{annual:'start'});a.equal(deferred.pendingReview,null);a.equal(deferred.pendingMonth,null);
+ a.deepEqual(deferred.games,routine.games);a.deepEqual(deferred.monthlyArchive,routine.monthlyArchive);
+ for(const invalid of [ {...routine,pendingReview:{...routine.pendingReview,explicit:true}}, {...routine,pendingMonth:{...routine.pendingMonth,explicit:true}}, {...routine,pendingReview:{...routine.pendingReview,gameId:'absent'}}, {...routine,pendingMonth:{...routine.pendingMonth,id:'absent'}}, {...routine,pendingMilestoneIds:['absent']} ]){
+  a.equal(engine.view(invalid).annual.canStart,false);a.throws(()=>engine.advance(invalid,{annual:'start'}),/inbox unresolved/);
+ }
+ const important={...routine,pendingDecade:year};a.equal(engine.view(important).annual.canStart,false);a.throws(()=>engine.advance(important,{annual:'start'}),/inbox unresolved/);
+ const off={...deferred,pendingReview:{...routine.pendingReview},pendingMonth:{...routine.pendingMonth}};
+ const readyTask=engine.view(off).annual.tasks.find(j=>j.status==='ready');a.ok(engine.view(off).annual.routineClearable);
+ const routineNext=readyTask?engine.advance(off,{annual:'open',job:readyTask.id}):engine.advance(off,{annual:'day'});
+ a.equal(routineNext.pendingReview,null);a.equal(routineNext.pendingMonth,null);a.deepEqual(routineNext.games,off.games);
+ console.log('PASS annual boundary ordinary reports defer, archive preserved, explicit/missing/important notices block');
  const initial=JSON.stringify(w),step=(cmd)=>{w=engine.advance(w,cmd);a.equal(w.year,year);a.equal(w.games.length,858);a.equal(w.day,143);};
  step({annual:'start'});a.equal(engine.view(w).annual.mode,'off');a.throws(()=>engine.advance(w,{annual:'start'}));a.throws(()=>engine.advance(w,{annual:'open',job:'settlement'}));a.throws(()=>engine.advance(w,{step:1}));
  const ready=id=>{for(let i=0;i<100&&engine.view(w).annual.tasks.find(j=>j.id===id).status!=='ready';i++)step({annual:'day'});a.equal(engine.view(w).annual.tasks.find(j=>j.id===id).status,'ready');};
