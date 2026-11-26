@@ -5,13 +5,18 @@ const {DatabaseSync}=require('node:sqlite'),{createHash}=require('node:crypto');
 const digest=b=>createHash('sha256').update(b).digest('hex');
 const id=v=>typeof v==='string'&&v.length>0&&v.length<=200;
 const rev=v=>Number.isSafeInteger(v)&&v>=0;
-function openSaveTransfer(filename,{maxBytes=256*1024*1024}={}){
+function openSaveTransfer(filename,{maxBytes=256*1024*1024,retainGenerations=3}={}){
  if(!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>256*1024*1024)throw Error('invalid size limit');
+ if(!Number.isSafeInteger(retainGenerations)||retainGenerations<1||retainGenerations>10)throw Error('invalid backup retention');
  const db=new DatabaseSync(filename);
- db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS transfers(account TEXT NOT NULL, slot INTEGER NOT NULL, revision INTEGER NOT NULL, sha TEXT NOT NULL, payload BLOB NOT NULL, PRIMARY KEY(account,slot))');
+ db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS transfers(account TEXT NOT NULL, slot INTEGER NOT NULL, revision INTEGER NOT NULL, sha TEXT NOT NULL, payload BLOB NOT NULL, PRIMARY KEY(account,slot)); CREATE TABLE IF NOT EXISTS transfer_history(account TEXT NOT NULL,slot INTEGER NOT NULL,revision INTEGER NOT NULL,sha TEXT NOT NULL,payload BLOB NOT NULL,PRIMARY KEY(account,slot,revision))');
  const find=db.prepare('SELECT revision,sha,payload FROM transfers WHERE account=? AND slot=?');
  const meta=db.prepare('SELECT slot,revision,sha,length(payload) AS bytes FROM transfers WHERE account=? ORDER BY slot');
  const write=db.prepare('INSERT INTO transfers(account,slot,revision,sha,payload) VALUES(?,?,?,?,?) ON CONFLICT(account,slot) DO UPDATE SET revision=excluded.revision,sha=excluded.sha,payload=excluded.payload');
+ const archive=db.prepare('INSERT INTO transfer_history(account,slot,revision,sha,payload) SELECT account,slot,revision,sha,payload FROM transfers WHERE account=? AND slot=?');
+ const prune=db.prepare('DELETE FROM transfer_history WHERE account=? AND slot=? AND revision NOT IN (SELECT revision FROM transfer_history WHERE account=? AND slot=? ORDER BY revision DESC LIMIT ?)');
+ const history=db.prepare('SELECT revision,sha,length(payload) AS bytes FROM transfer_history WHERE account=? AND slot=? ORDER BY revision DESC');
+ const historical=db.prepare('SELECT revision,sha,payload FROM transfer_history WHERE account=? AND slot=? AND revision=?');
  function key(account,slot){if(!id(account)||![1,2,3].includes(slot))throw Error('invalid save destination');}
  function put(account,slot,expectedRevision,payload,sha){
   key(account,slot);if(!rev(expectedRevision)||!Buffer.isBuffer(payload)||!payload.length||payload.length>maxBytes||typeof sha!=='string'||digest(payload)!==sha)throw Error('invalid save payload');
@@ -20,11 +25,14 @@ function openSaveTransfer(filename,{maxBytes=256*1024*1024}={}){
    const old=find.get(account,slot),revision=old?.revision??0;
    if(revision!==expectedRevision)throw Error('save revision conflict');
    if(!Number.isSafeInteger(revision+1))throw Error('revision exhausted');
+   if(old&&digest(Buffer.from(old.payload))!==old.sha)throw Error('corrupt current save');
    if(old&&old.sha===sha){db.exec('COMMIT');return {revision,sha,unchanged:true};}
+   if(old){archive.run(account,slot);prune.run(account,slot,account,slot,retainGenerations);}
    write.run(account,slot,revision+1,sha,payload);db.exec('COMMIT');return {revision:revision+1,sha,unchanged:false};
   }catch(e){db.exec('ROLLBACK');throw e;}
  }
- return {put,maxBytes,list:account=>{if(!id(account))throw Error('invalid account');return meta.all(account);},get:(account,slot)=>{key(account,slot);const row=find.get(account,slot);if(!row)return null;const payload=Buffer.from(row.payload);if(digest(payload)!==row.sha)throw Error('corrupt stored save');return {revision:row.revision,sha:row.sha,payload};},close:()=>db.close()};
+ function backup(account,slot,revision){key(account,slot);if(!rev(revision)||revision<1)throw Error('invalid backup revision');const row=historical.get(account,slot,revision);if(!row)return null;const payload=Buffer.from(row.payload);if(digest(payload)!==row.sha)throw Error('corrupt backup');return {revision:row.revision,sha:row.sha,payload};}
+ return {put,maxBytes,backup,history:(account,slot)=>{key(account,slot);return history.all(account,slot);},list:account=>{if(!id(account))throw Error('invalid account');return meta.all(account);},get:(account,slot)=>{key(account,slot);const row=find.get(account,slot);if(!row)return null;const payload=Buffer.from(row.payload);if(digest(payload)!==row.sha)throw Error('corrupt stored save');return {revision:row.revision,sha:row.sha,payload};},close:()=>db.close()};
 }
 function createSaveTransferService({storage,authenticate,validateSave}={}){
  if(!storage||typeof authenticate!=='function'||typeof validateSave!=='function')throw Error('trusted adapters required');
@@ -32,6 +40,8 @@ function createSaveTransferService({storage,authenticate,validateSave}={}){
  return {
   list:async token=>storage.list(await owner(token)),
   download:async(token,slot)=>storage.get(await owner(token),slot),
+  history:async(token,slot)=>storage.history(await owner(token),slot),
+  downloadBackup:async(token,slot,revision)=>storage.backup(await owner(token),slot,revision),
   importSave:async(token,{slot,expectedRevision,payload,sha,confirmed}={})=>{
    const account=await owner(token);
    if(confirmed!==true||![1,2,3].includes(slot)||!rev(expectedRevision)||!Buffer.isBuffer(payload)||!payload.length||payload.length>storage.maxBytes||digest(payload)!==sha)throw Error('explicit valid import required');
