@@ -40,7 +40,7 @@ const pilotCode = `
     }catch{return false;}
   }
   function canonicalReset(){
-    canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';
+    canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalForeignOpen=false;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';
     canonicalPilot.suspend();ui.clubDraft=null;ui.portalSlot=null;ui.portalOrigin=null;slotOpening=false;
     ui.page='title';ui.launchTitle=false;
   }
@@ -376,7 +376,7 @@ const pilotCode = `
   let canonicalHqWorld=null;
   const canonicalCommerceJobs=['fan-fest','fanclub','tv','sponsor','broadcast','naming','opening-promo'];
   const canonicalAnnualJobs=['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter','booking','self','winter-return','camp','exhibition',...canonicalCommerceJobs,'offdesk-opening'];
-  let canonicalAwardFilter='all',canonicalCampGroup='first',canonicalWinterPlace='taiwan',canonicalDigestCut=0;
+  let canonicalAwardFilter='all',canonicalCampGroup='first',canonicalWinterPlace='taiwan',canonicalDigestCut=0,canonicalForeignOpen=false;
   const canonicalEventLabels={...FLOW_LABEL,'fan-fest':'ファン感謝デー',fanclub:'ファンクラブ',tv:'テレビ出演',sponsor:'スポンサー契約',broadcast:'放映権',naming:'命名権','opening-promo':'開幕戦イベント'};
   const canonicalEventStatus={scheduled:'予定',ready:'対応可能',active:'対応中',waiting:'結果待ち',done:'完了'};
   function canonicalDraftModel(c){
@@ -560,19 +560,44 @@ const pilotCode = `
   window.addEventListener('pointerdown',e=>{const b=e.target.closest?.('[data-canonical-tv]');if(ui.page!=='canonical-events'||!b||b.disabled||slotOpening)return;canonicalTvClear();const p={id:Number(b.dataset.canonicalTv),x:e.clientX,y:e.clientY,epoch:canonicalEpoch};canonicalTvPress=p;p.timer=setTimeout(()=>{if(canonicalTvPress!==p||canonicalEpoch!==p.epoch)return;canonicalTvSuppressed={id:p.id,until:Date.now()+900};canonicalTvDetails(p.id);canonicalTvClear();},550);},true);
   window.addEventListener('pointermove',e=>{const p=canonicalTvPress;if(p&&Math.hypot(e.clientX-p.x,e.clientY-p.y)>12)canonicalTvClear();},true);
   for(const name of ['pointerup','pointercancel','scroll'])window.addEventListener(name,canonicalTvClear,true);
+  function canonicalForeignMarkup(g,blocked,button){
+    const f=g.foreign;if(!f)return '';
+    const held=blocked||!f.canOperate,cmd=(k,label,attrs='',disable=held)=>button('foreign-'+k,label,attrs,disable);
+    const toggle='<button class="btn outline full" data-action="canonical-foreign-toggle">'+(canonicalForeignOpen?'海外スカウトを閉じる':'海外スカウト・外国人選手獲得')+'</button>';
+    if(!canonicalForeignOpen&&!f.responsePending)return '<section class="panel">'+toggle+'</section>';
+    const model=p=>({...p,age:p.age||25,teamId:null,scoutingHidden:p.hidden===true,abilitiesHidden:p.hidden===true});
+    const prospect=p=>'<div class="recruit-player">'+faceMini(model(p))+'<div><strong>'+themedPlayerName(model(p))+'</strong><p>'+h(p.country)+' · '+positionMarkup(p.pos)+(p.age?' · '+p.age+'歳':'')+'</p></div></div>'+(p.hidden?'<p>能力・本人情報は非公開</p>':p.estimate?'<p>推定総合 '+p.estimate.low+'〜'+p.estimate.high+' · 確度 '+h(p.confidence)+'</p>':'')+'<div class="annual-ability-strip">'+Object.entries(p.abilities||{}).map(([k,v])=>'<span><small>'+h(DRAFT_LABELS[k]||k)+'</small><b>'+(v?.value!=null?v.value:v?v.low+'〜'+v.high:'?')+'</b></span>').join('')+'</div>'+((p.stats||[]).length?'<div class="grid2">'+p.stats.map(([k,v])=>'<p>'+h(k)+' '+h(v)+'</p>').join('')+'</div>':'');
+    let out='<section class="panel"><h2>海外スカウト・外国人選手獲得</h2>'+toggle+normalDetailCard('foreign','海外選手調査')+(held?'<p class="small">現在は別の重要業務・報告の対応が必要です。</p>':'');
+    if(!f.initialized)return out+cmd('init','海外スカウトを開始')+'</section>';
+    out+='<p>調査回数 '+f.used+' / '+f.budget+'</p>';
+    const n=f.negotiation;
+    if(!n)return out+(f.candidates.length?f.candidates.map(p=>'<article class="panel draft-card">'+prospect(p)+f.research.map(t=>cmd('research',h(t.label)+' '+fmtMoney(t.cost)+(p.tasks.includes(t.key)?' ✓':''),'data-id="'+p.id+'" data-key="'+t.key+'"',held||p.tasks.includes(t.key)||f.used>=f.budget||g.team.cash<t.cost)).join('')+cmd('begin','獲得交渉に進む','data-id="'+p.id+'"',held||!p.canBegin)+'</article>').join(''):'<p>現在確認できる候補者はありません。</p>')+'</section>';
+    const p=n.candidate;out+='<article class="panel">'+prospect(p)+rareCinemaArt(model(p),'negotiation')+'<p>交渉状況 · '+h(({talk:'交渉中',waiting:'回答待ち',counter:'再交渉',response:'回答到着',signed:'契約成立',refused:'交渉不成立',rival:'他球団契約','rival-pending':'他球団契約',overseas:'海外残留'})[n.status]||n.status)+'</p>';
+    if(n.status==='talk'){
+      out+='<p>交渉意欲 '+n.interest+' · 会話 '+n.answerCount+' / 3</p>'+(!n.interpreter?cmd('interpreter','交渉通訳を依頼 '+fmtMoney(n.interpreterCost),'',held||g.team.cash<n.interpreterCost):'<p>通訳あり</p>');
+      if(n.question)out+='<h3>'+h(n.question.text)+'</h3>'+n.question.options.map(x=>cmd('reply',h(x.label),'data-key="'+h(x.key)+'"')).join('');
+      else if(n.answerCount===3){out+='<h3>生活・待遇支援</h3>'+f.supportOptions.map(x=>cmd('support',h(x.label)+' '+fmtMoney(x.cost)+(n.support?.[x.key]?' ✓':''),'data-key="'+x.key+'" data-enabled="'+(!n.support?.[x.key])+'"')).join('')+'<h3>契約条件</h3>'+n.offers.map(o=>cmd('offer',['基本条件','標準条件','好条件'][o.level]+' · 契約金 '+fmtMoney(o.fee)+' · 年俸 '+fmtMoney(o.salary)+' · 支援 '+fmtMoney(o.supportCost)+(n.offerLevel===o.level?' ✓':''),'data-level="'+o.level+'"',held||!o.affordable)).join('')+cmd('submit','正式オファーを提出','',held||n.offerLevel==null);}
+    }else if(n.status==='waiting'){out+='<p>回答予定 '+h(n.due||'未定')+'</p>'+(n.ready?cmd('open','回答を確認する'):'<p>本部に戻って日程を進めてください。</p>');}
+    else if(n.status==='counter'&&n.counter){out+='<p>当初年俸 '+fmtMoney(n.counter.originalSalary)+' → 希望年俸 '+fmtMoney(n.counter.salary)+'</p>'+cmd('counter','希望額を受け入れる','data-accept="true"',held||!n.counter.affordable)+cmd('counter','当初の条件を維持','data-accept="false"');}
+    else if(!n.opened)out+=cmd('open','回答を確認する');
+    else if(n.status==='signed'){out+='<h3>契約成立</h3>'+rareCinemaArt(model(p),'join',n.stage===2)+(n.result?.offer?'<p>契約金 '+fmtMoney(n.result.offer.fee)+' · 年俸 '+fmtMoney(n.result.offer.salary)+'</p>':'')+(n.stage<2?cmd('reveal','能力を段階公開する（'+(n.stage+1)+'/2）'):cmd('finish','入団報告を完了する'));}
+    else {out+='<p>交渉結果を確認してください。</p>'+(n.result?.recovery?'<p class="small">広告・チケットによる復活交渉は報酬画面の接続待ちです。</p>':'')+cmd('finish','この交渉を終了する');}
+    return out+'</article></section>';
+  }
   function canonicalEventRender(){
     const app=$('#app'),g=canonicalSnapshot?.game;if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-events-back">‹ 本部</button></div>';
     if(!g||!accountCurrent()){app.innerHTML='<div class="setup-screen">'+top+'<p role="status">確定状態を取得してください。自動再送は行いません。</p><button class="btn primary full" data-action="canonical-events-refresh" '+(slotOpening?'disabled':'')+'>最新状態を取得</button></div>';return;}
     const a=g.annual||{},inbox=g.inbox||{},blocked=slotOpening||!!canonicalSnapshot.pending?.length,dis=blocked?'disabled':'';
-    const important=!!(inbox.finance||inbox.rare||inbox.injury||inbox.career||inbox.rookie||inbox.decade!==null&&inbox.decade!==undefined||g.foreign?.negotiation?.status==='accepted');
+    const important=!!(inbox.finance||inbox.rare||inbox.injury||inbox.career||inbox.rookie||inbox.decade!==null&&inbox.decade!==undefined);
     const commandButton=(key,label,extra='',disabled=blocked)=>'<button class="btn primary full" data-action="canonical-event-command" data-kind="'+key+'" '+extra+' '+(disabled?'disabled':'')+'>'+label+'</button>';
     let body='<h2 class="page-title">イベント・年間業務</h2><p class="page-sub">'+h(a.date||g.headquarters.dateText)+'</p>';
     if(inbox.review){const r=inbox.review;body+='<section class="panel"><h3>試合結果の確認</h3><p>'+h(r.date)+'</p><div class="score-big">'+r.homeScore+' - '+r.awayScore+'</div><p class="small">ホーム球団 '+h((g.club?.standings||[]).find(t=>t.id===r.home)?.name||String(r.home))+' / ビジター '+h((g.club?.standings||[]).find(t=>t.id===r.away)?.name||String(r.away))+'</p>'+commandButton('review','保存済みの試合結果を確認', '',blocked||important)+'</section>';}
     if(inbox.monthly){const m=inbox.monthly;body+='<section class="panel"><h3>月次報告</h3>'+normalDetailCard('finance','月例会議')+'<p>'+h(m.month)+' · '+m.wins+'勝 '+m.losses+'敗 '+m.ties+'分</p>'+(m.finance?'<p>収入 '+fmtMoney(m.finance.revenue)+' / 報告差額 '+fmtMoney(m.finance.net)+'</p>':'<p class="small">会計内訳の記録なし</p>')+'<p>報告時の保有資金 '+fmtMoney(m.cash)+'</p>'+(m.matches||[]).map(x=>'<div class="event">'+h(x.date)+' · '+h(x.opponent)+' '+x.rs+' - '+x.ra+'</div>').join('')+commandButton('month','保存済み月次報告を確認','',blocked||important||!!inbox.review)+'</section>';}
     if(inbox.milestoneCount){body+='<section class="panel"><h3>記録・ニュース</h3>'+inbox.milestones.map(e=>'<p class="event">'+h(e.date)+' '+h(e.title)+'</p>').join('')+(inbox.milestoneCount>inbox.milestones.length?'<p class="small">ほか '+(inbox.milestoneCount-inbox.milestones.length)+'件は記録に保存されています。</p>':'')+commandButton('milestones','保存済み報告を確認','',blocked||important||!!inbox.review)+'</section>';}
     if(important)body+='<section class="panel warning"><h3>重要イベントの対応が必要です</h3><p>特殊選手・去就・負傷・入団報告・資金不足など、専用の演出と判断が必要な処理は未接続のまま保持します。</p></section>';
-    const held=blocked||important||!!inbox.review||!!inbox.monthly||!!inbox.milestoneCount;
+    const held=blocked||important||!!g.foreign?.responsePending||!!inbox.review||!!inbox.monthly||!!inbox.milestoneCount;
+    body+=canonicalForeignMarkup(g,blocked,commandButton);
     if(inbox.opening)body+='<section class="panel"><h2>新シーズン開幕</h2>'+normalDetailCard('opening','新たなシーズン')+commandButton('opening-ack','新シーズンを始める','',held)+'</section>';
     if(a.canStart)body+='<section class="panel"><h3>シーズン全日程終了</h3>'+normalDetailCard('awards','年間表彰・決算')+commandButton('start','オフシーズン業務を開始','',held)+'</section>';
     if(a.mode){
@@ -609,6 +634,7 @@ const pilotCode = `
     if(act==='canonical-events-back'){ui.page='canonical-hq';render();draftJump(0);return;}
     if(act==='canonical-events-refresh'){void canonicalEventRequest(null);return;}
     if(!g||!accountCurrent()||slotOpening)return;
+    if(act==='canonical-foreign-toggle'){canonicalForeignOpen=!canonicalForeignOpen;render();return;}
     if(act==='canonical-awards-filter'&&['all','own'].includes(b.dataset.value)){canonicalAwardFilter=b.dataset.value;render();return;}
     if(act==='canonical-winter-place'&&a.active==='winter'&&a.training?.destinations?.some(d=>d.key===b.dataset.value)){canonicalWinterPlace=b.dataset.value;render();return;}
     if(act==='canonical-camp-group'&&['booking','camp'].includes(a.active)&&['first','farm'].includes(b.dataset.value)){canonicalCampGroup=b.dataset.value;render();return;}
@@ -617,7 +643,22 @@ const pilotCode = `
     if(act!=='canonical-event-command'||canonicalSnapshot.pending?.length)return;
     const k=b.dataset.kind,job=b.dataset.job;
     let cmd=null;
-    if(k==='opening-ack'&&i.opening)cmd={acknowledge:'opening'};
+    if(k.startsWith('foreign-')&&g.foreign?.canOperate){
+      const decision=k.slice(8),f=g.foreign,n=f.negotiation,id=Number(b.dataset.id),key=b.dataset.key,level=Number(b.dataset.level);canonicalForeignOpen=true;
+      if(decision==='init'&&!f.initialized)cmd={foreign:decision};
+      else if(decision==='begin'&&!n&&f.candidates.some(p=>p.id===id&&p.canBegin))cmd={foreign:decision,playerId:id};
+      else if(decision==='research'&&!n&&f.candidates.some(p=>p.id===id&&!p.tasks.includes(key))&&f.research.some(t=>t.key===key))cmd={foreign:decision,playerId:id,key};
+      else if(decision==='interpreter'&&n?.status==='talk'&&!n.interpreter)cmd={foreign:decision};
+      else if(decision==='reply'&&n?.question?.options.some(o=>o.key===key))cmd={foreign:decision,key};
+      else if(decision==='support'&&n?.status==='talk'&&n.answerCount===3&&f.supportOptions.some(o=>o.key===key))cmd={foreign:decision,key,enabled:b.dataset.enabled==='true'};
+      else if(decision==='offer'&&n?.offers.some(o=>o.level===level&&o.affordable))cmd={foreign:decision,level};
+      else if(decision==='submit'&&n?.status==='talk'&&n.offerLevel!=null&&window.confirm('正式オファーを提出しますか？'))cmd={foreign:decision};
+      else if(decision==='open'&&n&&!n.opened&&(n.ready||n.status==='response'))cmd={foreign:decision};
+      else if(decision==='counter'&&n?.counter&&(b.dataset.accept==='false'||n.counter.affordable)&&window.confirm('再交渉の条件を確定しますか？'))cmd={foreign:decision,accept:b.dataset.accept==='true'};
+      else if(decision==='reveal'&&n?.status==='signed'&&n.opened&&n.stage<2)cmd={foreign:decision};
+      else if(decision==='finish'&&n?.opened&&(n.status!=='signed'||n.stage===2)&&window.confirm('交渉結果を確定して終了しますか？'))cmd={foreign:decision};
+    }
+    else if(k==='opening-ack'&&i.opening)cmd={acknowledge:'opening'};
     else if(k==='review'&&i.review)cmd={acknowledge:'review',eventKey:i.review.gameId};
     else if(k==='month'&&i.monthly)cmd={acknowledge:'month'};
     else if(k==='milestones'&&i.milestoneCount)cmd={acknowledge:'milestones'};
@@ -716,7 +757,7 @@ const pilotCode = `
     else if(ui.page==='canonical-hq'&&act==='canonical-hq-run')void canonicalRun(b.dataset.kind);
     else if(ui.page==='canonical-hq'&&act==='canonical-hq-mode'&&['normal','fast','skip'].includes(b.dataset.mode)){canonicalPlayback=b.dataset.mode;render();}
     else if(ui.page==='canonical-hq'&&act==='canonical-hq-refresh')void canonicalHqRequest(false);
-    else if(ui.page==='canonical-hq'&&act==='canonical-events-open'&&canonicalSnapshot?.game&&accountCurrent()){canonicalAwardFilter='all';ui.page='canonical-events';render();draftJump(0);}
+    else if(ui.page==='canonical-hq'&&act==='canonical-events-open'&&canonicalSnapshot?.game&&accountCurrent()){canonicalAwardFilter='all';canonicalForeignOpen=false;ui.page='canonical-events';render();draftJump(0);}
     else if(ui.page==='canonical-events')canonicalEventClick(b);
     else if(ui.page==='canonical-hq'&&act==='canonical-ops-open'&&['rotation','farm','free','facilities','manager'].includes(b.dataset.kind)&&canonicalSnapshot?.game?.club&&accountCurrent()){canonicalOpsNote='';canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;ui.page='canonical-'+b.dataset.kind;render();draftJump(0);if(b.dataset.kind==='free')void canonicalLoadFree(0,'');}
     else if(canonicalOpsPages.includes(ui.page))canonicalOpsClick(b);
