@@ -6,6 +6,16 @@ on:
       - 'index.html'
       - 'scripts/browser-audit.cjs'
       - '.github/workflows/browser-audit.yml'
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'scripts/browser-audit.cjs'
+      - '.github/workflows/browser-audit.yml'
+
+concurrency:
+  group: browser-audit-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   audit:
     runs-on: ubuntu-latest
