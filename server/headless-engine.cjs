@@ -74,10 +74,19 @@ function createHeadlessEngine(){
  // Bounded, read-only presentation of actual saved results. No new simulation.
  const reportClub=id=>{const t=getTeam(id);return t?{id:t.id,name:t.name,short:t.short,league:t.league,color:t.color,letter:t.letter,emblem:t.emblem||null}:null;};
  const reportName=id=>{const p=getPlayer(id);return p?{name:p.name,specialCategory:p.specialCategory||null,originCategory:p.originCategory||null}:null;};
+ const committedReplay=g=>{
+  if(!Array.isArray(g.inningsA)||!Array.isArray(g.inningsH))return null;
+  const steps=watchReplaySteps(g);
+  if(steps.length>160)return null;
+  const clean=steps.map(x=>({inning:x.inning,side:x.side,teamId:x.teamId,runs:x.runs,phase:x.phase,runsAfter:x.runsAfter??null,play:x.play?{kind:x.play.kind,batterName:x.play.batterName,runs:x.play.runs,rbi:x.play.rbi??null,fieldTeamId:x.play.fieldTeamId??null,title:watchScoringTitle(x.play)}:null}));
+  const valid=clean.every(x=>Number.isInteger(x.inning)&&x.inning>=1&&x.inning<=30&&[g.home,g.away].includes(x.teamId)&&['end','score','strike'].includes(x.phase)&&Number.isInteger(x.runs)&&x.runs>=0&&(x.phase==='end'||Number.isInteger(x.runsAfter)&&x.runsAfter>=0&&x.runsAfter<=x.runs));
+  const sum=id=>clean.filter(x=>x.phase==='end'&&x.teamId===id).reduce((n,x)=>n+x.runs,0);
+  return valid&&sum(g.home)===g.homeScore&&sum(g.away)===g.awayScore?clean:null;
+ };
  const matchReport=g=>{
   if(!g||g.home!==team.id&&g.away!==team.id)return null;
   const box=(rows,keys)=>(rows||[]).slice(0,80).map(x=>({id:x.id,teamId:x.teamId,player:reportName(x.id),...Object.fromEntries(keys.filter(k=>Number.isFinite(x[k])).map(k=>[k,x[k]]))}));
-  return {gameId:String(g.id),year:g.year,day:g.day,date:g.date,home:reportClub(g.home),away:reportClub(g.away),homeScore:g.homeScore,awayScore:g.awayScore,inningsH:(g.inningsH||[]).slice(0,30),inningsA:(g.inningsA||[]).slice(0,30),events:(g.events||[]).slice(0,8).map(String),spHome:reportName(g.spHome),spAway:reportName(g.spAway),
+  return {gameId:String(g.id),year:g.year,day:g.day,date:g.date,home:reportClub(g.home),away:reportClub(g.away),homeScore:g.homeScore,awayScore:g.awayScore,inningsH:(g.inningsH||[]).slice(0,30),inningsA:(g.inningsA||[]).slice(0,30),events:(g.events||[]).slice(0,8).map(String),replay:committedReplay(g),spHome:reportName(g.spHome),spAway:reportName(g.spAway),
    box:g.box?{bat:box(g.box.bat,['ab','h','hr','rbi','bb','sb']),pitch:box(g.box.pitch,['outs','pitches','h','er','k','bb','w','l','sv'])}:null,
    moves:Array.isArray(g.managerMoves)?g.managerMoves.slice(0,80).map(m=>({inning:m.inning,side:m.side,team:reportClub(m.teamId)?.short||'',type:m.type,inName:m.inName,outName:m.outName,role:m.role,reason:m.reason,pitchCount:m.pitchCount})):null};
  };
@@ -92,7 +101,8 @@ function createHeadlessEngine(){
   const next=game.day<143?game.schedule[game.day]?.find(m=>m.home===team.id||m.away===team.id):null;
   const opp=next?getTeam(next.home===team.id?next.away:next.home):null;
   const last=gameByTeam(team.id),lastOpp=last?getTeam(last.home===team.id?last.away:last.home):null;
-  return {dateText:getDayText(),fans:game.fans,salary:payroll(team),rank:rankings(team.league).findIndex(t=>t.id===team.id)+1,opponent:opp?.short||null,standings:Object.fromEntries(['E','W'].map(l=>[l,rankings(l).map(t=>({id:t.id,short:t.short,league:t.league,wins:t.wins,losses:t.losses,ties:t.ties,rs:t.rs,ra:t.ra}))])),canStep:canStep(),canCalendar:canCalendar(),goals:Object.fromEntries(['date','weekly','month','season'].map(kind=>[kind,calendarGoalFor(kind,game.calendar.days,game.calendarIndex)])),latestMonth:(game.monthlyArchive||[]).filter(m=>m.teamId===team.id).slice(-1).map(m=>({month:m.month,date:m.date,wins:m.wins,losses:m.losses,ties:m.ties}))[0]||null,latestMilestones:(game.milestoneNews||[]).slice(-5).map(m=>({date:m.date,title:m.title})),lastReport:!game.pendingDraftReveal&&!flowForeignResponse()&&!flowGet()?matchReport(last):null,latestPaper:!game.pendingDraftReveal&&!flowForeignResponse()&&!pendingRareNews().length&&!flowGet()?latestPaper():null,last:last&&lastOpp?{year:last.year,day:last.day,opponent:lastOpp.name,ours:last.home===team.id?last.homeScore:last.awayScore,theirs:last.home===team.id?last.awayScore:last.homeScore}:null};
+  const previous=game.calendar.days[game.calendarIndex-1];
+  return {lastDay:previous?{date:previous.date,type:previous.type,reason:previous.reason,gameNo:previous.gameNo??null}:null,dateText:getDayText(),fans:game.fans,salary:payroll(team),rank:rankings(team.league).findIndex(t=>t.id===team.id)+1,opponent:opp?.short||null,standings:Object.fromEntries(['E','W'].map(l=>[l,rankings(l).map(t=>({id:t.id,short:t.short,league:t.league,wins:t.wins,losses:t.losses,ties:t.ties,rs:t.rs,ra:t.ra}))])),canStep:canStep(),canCalendar:canCalendar(),goals:Object.fromEntries(['date','weekly','month','season'].map(kind=>[kind,calendarGoalFor(kind,game.calendar.days,game.calendarIndex)])),latestMonth:(game.monthlyArchive||[]).filter(m=>m.teamId===team.id).slice(-1).map(m=>({month:m.month,date:m.date,wins:m.wins,losses:m.losses,ties:m.ties}))[0]||null,latestMilestones:(game.milestoneNews||[]).slice(-5).map(m=>({date:m.date,title:m.title})),lastReport:!game.pendingDraftReveal&&!flowForeignResponse()&&!flowGet()?matchReport(last):null,latestPaper:!game.pendingDraftReveal&&!flowForeignResponse()&&!pendingRareNews().length&&!flowGet()?latestPaper():null,last:last&&lastOpp?{year:last.year,day:last.day,opponent:lastOpp.name,ours:last.home===team.id?last.homeScore:last.awayScore,theirs:last.home===team.id?last.awayScore:last.homeScore}:null};
  };
  const freeVisible=()=>!game.pendingDraftReveal&&!flowForeignResponse();
  const freeList=()=>freeAgents().filter(p=>!p.retired);

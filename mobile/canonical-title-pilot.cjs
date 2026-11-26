@@ -40,7 +40,7 @@ const pilotCode = `
     }catch{return false;}
   }
   function canonicalReset(){
-    canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalForeignOpen=false;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';
+    canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalForeignOpen=false;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';canonicalReplay=null;canonicalReplaySkip=false;canonicalAchievementPage=null;canonicalAchievementNote='';canonicalRewardNote='';
     canonicalPilot.suspend();ui.clubDraft=null;ui.portalSlot=null;ui.portalOrigin=null;slotOpening=false;
     ui.page='title';ui.launchTitle=false;
   }
@@ -393,6 +393,39 @@ const pilotCode = `
     const [main,...rest]=p.articles,w=p.weekly;
     return '<section class="daily-newspaper"><div class="paper-dateline"><span>PENNANT LAB SPORTS EDITION</span><span>'+h(p.date)+'</span></div><div class="paper-masthead"><span class="paper-icon">⚾</span><div><small>BASEBALL JOURNAL</small><h1>'+(w?'週刊 球界ニュース':'本日の球界ニュース')+'</h1></div></div><div class="paper-stories"><article class="paper-lead"><div class="paper-kicker">'+h(main.tag)+'</div><h2>'+h(main.headline)+'</h2><p>'+h(main.body)+'</p><div class="paper-highlight">'+h(main.stat||'')+'</div></article><div class="paper-briefs">'+rest.map(a=>'<article class="paper-brief"><div class="paper-kicker">'+h(a.tag)+'</div><h3>'+h(a.headline)+'</h3><p>'+h(a.body)+'</p><b>'+h(a.stat||'')+'</b></article>').join('')+'</div></div>'+(w?'<div class="weekly-section"><h2>'+h(w.teamName)+' · 週間成績</h2><p>'+h(w.start)+' ～ '+h(w.end)+'</p><p>'+w.record.w+'勝 '+w.record.l+'敗 '+w.record.t+'分</p>'+w.scores.map(x=>'<div class="event">'+h(x.date)+' · '+h(x.opponent)+' '+x.rs+' − '+x.ra+'</div>').join('')+'</div>':'')+'<div class="paper-next"><strong>NEXT GAME</strong><span>'+h(p.nextDate||'全日程終了')+' '+h(p.nextOpponent||'')+'</span></div></section>';
   }
+  let canonicalReplay=null,canonicalReplaySkip=false;
+  function canonicalReplayMarkup(){
+    const x=canonicalReplay,r=x?.report;
+    if(!x)return '';
+    const controls='<div class="watch-controls"><button class="btn outline" data-action="canonical-hq-pause" '+(canonicalStop?'disabled':'')+'>⏸ 日程を一時停止</button><button class="btn primary" data-action="canonical-replay-skip">演出をスキップ ›</button></div>';
+    if(x.phase==='date')return '<section class="calendar-date-intro"><div class="calendar-date-kicker">PENNANT SEASON · 確定済み日程</div><div class="calendar-date-window"><div class="calendar-date-current"><span>'+h(formatCalendarDate(x.date,true))+'</span></div></div><div class="calendar-date-caption">'+h(x.label)+'</div></section>'+controls;
+    if(x.phase==='paper')return canonicalPaperMarkup(x.paper)+controls;
+    if(x.phase==='final')return canonicalMatchReport(r,canonicalSnapshot.game)+controls;
+    const shown=r.replay.slice(0,x.step),last=shown.at(-1),completed=shown.filter(v=>v.phase==='end'),active=last&&last.phase!=='end'?last:null;
+    const total=id=>completed.filter(v=>v.teamId===id).reduce((n,v)=>n+v.runs,0)+(active?.teamId===id?active.runsAfter:0);
+    const side=t=>'<div>'+teamBadge(t)+'<span class="watch-club '+leagueClass(t.league)+'">'+h(t.short)+'</span><strong>'+total(t.id)+'</strong></div>';
+    const table=(from,to,totals)=>'<table class="watch-table"><thead><tr><th>球団</th>'+Array.from({length:to-from+1},(_,i)=>'<th>'+(from+i)+'</th>').join('')+(totals?'<th>計</th>':'')+'</tr></thead><tbody>'+[r.away,r.home].map(t=>'<tr><th class="watch-team '+leagueClass(t.league)+'">'+h(t.short)+'</th>'+Array.from({length:to-from+1},(_,i)=>{const n=completed.find(v=>v.inning===from+i&&v.teamId===t.id)?.runs??(active?.inning===from+i&&active?.teamId===t.id?active.runsAfter:null);return '<td class="'+(n===null?'':'played')+'">'+(n===null?'·':n)+'</td>';}).join('')+(totals?'<td class="watch-total">'+total(t.id)+'</td>':'')+'</tr>').join('')+'</tbody></table>';
+    const current=last&&(last.teamId===r.away.id?r.away:r.home),label=last?last.inning+'回'+last.side+' · '+current.short+(active?'':' 攻撃終了'):'プレーボール';
+    const flash=active?.play?'<div class="watch-scoring-flash watch-scoring-'+(active.play.kind==='hr'?'homer':'strike')+'"><div class="watch-scoring-kicker">'+(active.play.kind==='hr'?'HOME RUN!':'TEN STRIKEOUTS IN A ROW!')+'</div><div class="watch-scoring-player"><span class="watch-scorer-ball">⚾</span><div><strong>'+h(active.play.batterName)+'</strong><b>'+h(active.play.title)+'</b></div></div></div>':'';
+    return '<div class="watch-game-screen '+(active?'watch-scored':'')+'"><div class="review-kicker">PENNANT LAB · INNING WATCH</div><section class="panel watch-hero"><div class="watch-overline">保存済み試合の再生 · '+h(r.date)+'</div><div class="watch-score">'+side(r.away)+'<span class="watch-separator">–</span>'+side(r.home)+'</div><div class="watch-inning-info"><strong>'+h(label)+'</strong></div>'+flash+'<div class="watch-progress"><i style="width:'+Math.round(x.step/Math.max(1,r.replay.length)*100)+'%"></i></div></section><section class="panel watch-scoreboard"><h3>イニング別スコア</h3><div class="table-wrap">'+table(1,9,true)+(last?.inning>9?'<div class="watch-extra-label">延長戦</div>'+table(10,last.inning,false):'')+'</div></section><p class="small">サーバーで確定済みの記録を再生しています。</p>'+controls+'</div>';
+  }
+  async function canonicalPresentDay(g,epoch,full){
+    const v=g.headquarters,day=v.lastDay;
+    if(!day?.date||canonicalPlayback==='skip'||window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches)return;
+    const live=()=>epoch===canonicalEpoch&&!canonicalStop&&!canonicalReplaySkip&&!document.hidden;
+    const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+    const fast=canonicalPlayback==='fast';canonicalReplaySkip=false;
+    try{
+      if(!live())return;
+      canonicalReplay={phase:'date',date:day.date,label:day.type==='game'?'第'+day.gameNo+'戦':day.reason||'休養日'};render();await wait(fast?180:350);
+      if(!live())return;
+      const r=v.lastReport,p=v.latestPaper;
+      if(day.type==='game'&&r?.date===day.date){
+        if(full&&Array.isArray(r.replay)&&r.replay.length){canonicalReplay={phase:'watch',report:r,step:0};render();await wait(fast?80:180);for(let i=1;i<=r.replay.length&&live();i++){canonicalReplay.step=i;render();await wait(r.replay[i-1].phase==='end'?(fast?70:130):(fast?220:500));}}
+        if(live()){canonicalReplay={phase:'final',report:r};render();await wait(full?(fast?350:700):(fast?120:250));}
+      }else if(p?.date===day.date){canonicalReplay={phase:'paper',paper:p};render();await wait(full?(fast?500:1000):(fast?150:300));}
+    }finally{if(epoch===canonicalEpoch){canonicalReplay=null;canonicalReplaySkip=false;}}
+  }
   function canonicalReportsRender(){
     const app=$('#app'),g=canonicalSnapshot?.game;if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-reports-back">‹ 本部</button></div>';
@@ -403,6 +436,7 @@ const pilotCode = `
     const app=$('#app'),g=canonicalSnapshot?.game,t=g?.team,v=g?.headquarters;if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-return">‹ データ選択</button></div>';
     if(!t||!v){app.innerHTML='<div class="setup-screen">'+top+'<p role="status">確定した日程を取得してください。自動再送は行いません。</p><button class="btn primary full" data-action="canonical-hq-refresh" '+(slotOpening?'disabled':'')+'>最新状態を取得</button></div>';return;}
+    if(canonicalReplay){app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(t)+'"><main class="main">'+canonicalReplayMarkup()+'</main></div>';return;}
     const canStep=canonicalCanRun(g)&&!slotOpening&&!canonicalRunning;
     const stop=slotOpening?'日程の確定を確認しています。':canonicalSnapshot.pending?.length?'報酬の確定確認が必要です。':!v.canCalendar?'確認が必要なイベントまたは日程の区切りです。未接続のイベント処理へは自動進行しません。':'';
     const last=v.last,score=last?'<div class="box-result"><span class="tag '+(last.ours>last.theirs?'green':last.ours<last.theirs?'red':'')+'">'+(last.ours>last.theirs?'勝利':last.ours<last.theirs?'敗戦':'引分')+'</span> <span class="small">'+last.year+'年 第'+last.day+'戦 / vs '+h(last.opponent)+'</span><div class="score-big">'+last.ours+' - '+last.theirs+'</div></div>':'<div class="empty">シーズンはまだ始まっていません。</div>';
@@ -411,7 +445,7 @@ const pilotCode = `
     const controls='<section class="panel"><div class="panel-head"><h3 class="panel-title">日程を進める</h3><span class="pill">'+h(v.dateText)+'</span></div><div class="calendar-playback"><div class="calendar-speed">'+modeButtons+'</div></div><div class="calendar-target-grid"><button class="btn primary" data-action="canonical-hq-run" data-kind="date" '+disabled+'>▶ 1日進める</button><button class="btn soft" data-action="canonical-hq-run" data-kind="weekly" '+disabled+'>週次報告まで</button><button class="btn soft" data-action="canonical-hq-run" data-kind="month" '+disabled+'>月次報告まで</button></div><button class="btn outline full" data-action="canonical-hq-run" data-kind="season" '+disabled+'>シーズン終了まで進行</button>'+(canonicalRunning?'<button class="btn outline full" data-action="canonical-hq-pause" '+(canonicalStop?'disabled':'')+'>'+(canonicalStop?'停止確認中':'一時停止')+'</button><p role="status">確定済み日程 '+g.calendarIndex+' / '+(canonicalTarget?.goal||g.calendarIndex)+'</p>':targetValid?'<button class="btn primary full" data-action="canonical-hq-run" data-kind="resume" '+disabled+'>▶ 続きから</button>':'')+'<p class="tiny">通常報告は記録に保存し、重要なイベントでは停止します。</p></section>';
     const reports='<section class="panel"><h3 class="panel-title">保存済み報告</h3>'+(v.latestMonth?'<p>'+h(v.latestMonth.month)+'：'+v.latestMonth.wins+'勝 '+v.latestMonth.losses+'敗 '+v.latestMonth.ties+'分</p>':'<p class="small">月次報告はまだありません。</p>')+v.latestMilestones.map(m=>'<div class="event">'+h(m.date)+' '+h(m.title)+'</div>').join('')+'</section>';
     const hero=frontOfficeHero(t,{year:g.year,gmName:g.gmName,day:g.day,fans:v.fans,salary:v.salary,rank:v.rank,opponent:v.opponent,dateText:v.dateText});
-    app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(t)+'">'+top+'<main class="main">'+hero+'<section class="panel desk-panel"><div class="desk-heading"><div><div class="eyebrow">GM DESK · FRONT OFFICE</div><h3>業務一覧</h3></div><button class="btn primary" data-action="canonical-hq-step" '+(canStep?'':'disabled')+'>▶ 1日進める</button></div>'+(g.club?'<button class="btn outline full" data-action="canonical-roster-open" '+(slotOpening?'disabled':'')+'>スタメン編成</button>':'')+(g.club?'<button class="btn outline full" data-action="canonical-players">全選手・選手詳細</button>':'')+(g.club?'<button class="btn outline full" data-action="canonical-ops-open" data-kind="rotation">先発ローテーション</button><button class="btn outline full" data-action="canonical-ops-open" data-kind="farm">一軍・二軍管理</button><button class="btn outline full" data-action="canonical-ops-open" data-kind="free">自由契約選手の獲得</button><button class="btn outline full" data-action="canonical-ops-open" data-kind="facilities">球団施設・球場経営</button><button class="btn outline full" data-action="canonical-ops-open" data-kind="manager">監督室</button>':'')+'<button class="btn outline full" data-action="canonical-standings">東西リーグ順位表</button><button class="btn outline full" data-action="canonical-events-open">イベント・年間業務</button>'+canonicalRewardLink()+'</section>'+controls+'<section class="panel"><div class="panel-head"><h3 class="panel-title">直近の試合結果</h3></div>'+score+'<button class="btn outline full" data-action="canonical-reports-open">試合詳細・新聞を読む</button></section>'+reports+(stop?'<p role="status">'+h(stop)+'</p>':'')+'<p class="small">試験環境 · 本部、日程進行、編成を接続済み。保存済み試合詳細・最新新聞を接続済み。ライブ中継・全履歴の閲覧は追加開発中です。</p></main></div>';
+    app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(t)+'">'+top+'<main class="main">'+hero+'<section class="panel desk-panel"><div class="desk-heading"><div><div class="eyebrow">GM DESK · FRONT OFFICE</div><h3>業務一覧</h3></div><button class="btn primary" data-action="canonical-hq-step" '+(canStep?'':'disabled')+'>▶ 1日進める</button></div>'+(g.club?'<button class="btn outline full" data-action="canonical-roster-open" '+(slotOpening?'disabled':'')+'>スタメン編成</button>':'')+(g.club?'<button class="btn outline full" data-action="canonical-players">全選手・選手詳細</button>':'')+(g.club?'<button class="btn outline full" data-action="canonical-ops-open" data-kind="rotation">先発ローテーション</button><button class="btn outline full" data-action="canonical-ops-open" data-kind="farm">一軍・二軍管理</button><button class="btn outline full" data-action="canonical-ops-open" data-kind="free">自由契約選手の獲得</button><button class="btn outline full" data-action="canonical-ops-open" data-kind="facilities">球団施設・球場経営</button><button class="btn outline full" data-action="canonical-ops-open" data-kind="manager">監督室</button>':'')+'<button class="btn outline full" data-action="canonical-standings">東西リーグ順位表</button><button class="btn outline full" data-action="canonical-events-open">イベント・年間業務</button>'+canonicalRewardLink()+'</section>'+controls+'<section class="panel"><div class="panel-head"><h3 class="panel-title">直近の試合結果</h3></div>'+score+'<button class="btn outline full" data-action="canonical-reports-open">試合詳細・新聞を読む</button></section>'+reports+(stop?'<p role="status">'+h(stop)+'</p>':'')+'<p class="small">試験環境 · 本部、日程進行、編成を接続済み。保存済み試合詳細・最新新聞を接続済み。通常・倍速は確定済み日程と試合を再生します。全履歴の閲覧は追加開発中です。</p></main></div>';
   }
   async function canonicalHqRequest(step){
     if(slotOpening||!accountCurrent()||!canonicalSlot)return;
@@ -445,6 +479,8 @@ const pilotCode = `
         if(result.status!=='ready'||result.snapshot.world!==world)throw Error('calendar observation required');
         canonicalSnapshot=result.snapshot;render();
         if(canonicalSnapshot.game.calendarIndex===before)break;
+        await canonicalPresentDay(canonicalSnapshot.game,epoch,target.kind==='date');
+        if(epoch!==canonicalEpoch)return;render();
       }
       if(canonicalSnapshot&&(canonicalSnapshot.game.calendarIndex>=target.goal||canonicalSnapshot.game.year!==target.year))canonicalTarget=null;
     }catch{if(epoch===canonicalEpoch)canonicalSnapshot=null;}
@@ -851,7 +887,7 @@ const pilotCode = `
   document.addEventListener('click',e=>{
     const b=e.target.closest?.('[data-action]');if(!b)return;
     const act=b.dataset.action;
-    if(slotOpening){e.preventDefault();e.stopImmediatePropagation();if(ui.page==='canonical-hq'&&act==='canonical-hq-pause'&&canonicalRunning){canonicalStop=true;render();}return;}
+    if(slotOpening){e.preventDefault();e.stopImmediatePropagation();if(ui.page==='canonical-hq'&&act==='canonical-hq-pause'&&canonicalRunning){canonicalStop=true;render();}else if(ui.page==='canonical-hq'&&act==='canonical-replay-skip'&&canonicalReplay){canonicalReplaySkip=true;}return;}
     if(ui.page==='title'&&ui.launchTitle&&['launch-start','launch-back'].includes(act)||ui.page==='title'&&!ui.launchTitle&&act==='launch-back'||ui.page==='setup'&&['setup-league','pick-setup-team','team-color','club-design'].includes(act))return;
     e.preventDefault();e.stopImmediatePropagation();
     if(ui.page==='title'&&!ui.launchTitle&&['new-slot','continue-slot'].includes(act))void openCanonicalSlot(b,act==='new-slot');
