@@ -232,3 +232,8 @@ Reuse original player cards and standings table with explicit projection argumen
 ## Canonical annual office first slice (staging)
 - Add dated job board with scheduled/ready/active/waiting/done labels, offseason start/day commands, first three explicitly supported events (awards, settlement, FA/overseas departure requests) and archived review/month/milestone summaries. Awards reuse original portrait and achievement styling; annual finance uses the original annual arithmetic, with no additional payments. Important pending events and unsupported jobs remain held and never auto-completed. No full annual UI parity or production activation.
 - Real 143-game season harness verifies award and finance projections and existing lifecycle checks. Browser verifies fresh season board and unchanged revision; actual annual browser traversal, full report visual/audio parity, draft, renewal, training, recruitment and reward event UI remain open.
+
+
+## Canonical draft and roster-cut UI (staging)
+- Wire original draft phases, server-side three-task scouting budget, estimated ranges (secret prospects return no real ability, name or appearance), per-announcement confirmation or explicit summary, sealed lottery stages, three-question recruitment, offer levels and role, roster projection and explicit cut confirmation. Reuse existing rare cinema and portrait styling. Unresolved ad recovery remains optional but provider UI is not connected. No fake ad success or automatic draw selection.
+- Real annual engine regression now covers research budget/idempotent rejection and sequential announcement cursor. Full browser traversal, original timed animations/audio, complete pre-draft season scouting and rare recovery UI remain open. Staging only; no production activation.

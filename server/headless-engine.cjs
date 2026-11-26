@@ -139,14 +139,20 @@ function createHeadlessEngine(){
  const annualSupported=['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter',...commercialJobs,'movement-market','booking','self','winter-return','camp','exhibition','opening-promo','offdesk-opening'];
  const draftPending=d=>d.picks.find(x=>x.teamId===team.id&&(x.recoveryPending||x.recoveryCelebration));
  const draftOwnRow=d=>d.picks.find(x=>x.teamId===team.id&&x.status==='rights');
- const candidateView=c=>({id:c.id,name:secretProspect(c.player)?'????':c.player.name,pos:c.player.pos,type:c.type,category:playerTitleTheme(c.player)?.name||null});
+ const candidateView=(c,d,detail=false)=>{
+  const p=c.player,hidden=secretProspect(p),base={id:c.id,name:hidden?'????':p.name,pos:p.pos,type:c.type,category:playerTitleTheme(p)?.name||null,specialCategory:p.specialCategory||null,originCategory:p.originCategory||null,hidden};
+  if(!detail)return base;
+  const r=hidden?null:draftReport(d,team,c),tasks=scoutTasks(d,team,c);
+  return {...base,school:hidden?null:c.school,age:hidden?null:p.age,appearanceSeed:hidden?null:p.appearanceSeed,report:r?{low:r.low,high:r.high,confidence:r.confidence,values:r.values,preference:r.preference,abroad:r.abroad}:null,tasks,hints:hidden?[]:draftInterviewHints(d,team,c),canResearch:c.status==='available'&&scoutVisible(c)&&draftResearchUsed(d,team)<draftScoutBudget(team)&&draftResearchLevel(d,team,c)<3};
+ };
  const draftView=d=>{
   if(!d||d.year!==game.year)return null;
   const g=draftLotteryGroup(d),row=draftPending(d)||draftOwnRow(d),c=row&&draftCandidate(d,row.candidateId),questions=RECRUIT_QUESTIONS[row?.conversation?.answers?.length||0];
-  const options=['scout','first','later'].includes(d.phase)?draftOptions(d,team).filter(scoutVisible).map(candidateView):[];
-  return {phase:d.phase,round:d.round,rareIntro:!!d.rareIntro,announcement:!!d.announcement,canNominate:d.phase==='first'?d.active.includes(team.id):d.phase==='later'&&draftLaterOrder(d)[d.cursor]===team.id,
-   candidates:options,lottery:d.phase==='lottery'&&g?{stage:d.pendingLottery.stage,candidateId:g.cid,own:g.ids.includes(team.id),tickets:g.ids.length,...(d.pendingLottery.stage==='revealed'?{winner:g.winner}:{})}:null,
-   negotiation:d.phase==='negotiate'&&c?{...candidateView(c),status:row.status,recoveryPending:!!row.recoveryPending,recoveryCelebration:!!row.recoveryCelebration,answers:row.conversation?.answers||[],question:row.status==='rights'&&questions?{options:questions.options.map(x=>({key:x[0],label:x[1]}))}:null}:null,
+  const options=['scout','first','later'].includes(d.phase)?draftOptions(d,team).filter(scoutVisible).map(c=>candidateView(c,d,true)):[];
+  const priority=['再来','PARALLEL','STAR','転生','異界転生','星煌転生','LEGEND','伝説転生','IMMORTAL','輪廻転生'],rare=d.rareIntro?d.candidates.filter(c=>playerTitleTheme(c.player)).sort((a,b)=>priority.indexOf(playerTitleTheme(b.player).name)-priority.indexOf(playerTitleTheme(a.player).name))[0]:null,ann=d.announcement,annRow=ann?.rows[ann.cursor];
+  return {phase:d.phase,round:d.round,rareIntro:!!d.rareIntro,introCandidate:rare?candidateView(rare,d):null,announcement:!!ann,announcementRow:annRow?{round:annRow.round,team:getTeam(annRow.teamId)?.name,teamId:annRow.teamId,candidate:annRow.candidateId===null?null:candidateView(draftCandidate(d,annRow.candidateId),d),contested:!!annRow.contested,cursor:ann.cursor,total:ann.rows.length}:null,researchUsed:draftResearchUsed(d,team),researchBudget:draftScoutBudget(team),canNominate:d.phase==='first'?d.active.includes(team.id):d.phase==='later'&&draftLaterOrder(d)[d.cursor]===team.id,
+   candidates:options,lottery:d.phase==='lottery'&&g?{stage:d.pendingLottery.stage,candidateId:g.cid,candidate:candidateView(draftCandidate(d,g.cid),d),clubs:g.ids.map(id=>({id,name:getTeam(id)?.name||'球団'})),own:g.ids.includes(team.id),tickets:g.ids.length,...(d.pendingLottery.stage==='revealed'?{winner:g.winner,winnerName:getTeam(g.winner)?.name||'球団'}:{})}:null,
+   negotiation:d.phase==='negotiate'&&c?{...candidateView(c,d,true),status:row.status,feedback:row.feedback||null,offers:row.status==='rights'?[0,1,2].map(level=>({...draftOffer(c,level,'develop'),level})):[],recoveryPending:!!row.recoveryPending,recoveryCelebration:!!row.recoveryCelebration,answers:row.conversation?.answers||[],question:row.status==='rights'&&questions?{text:questions.q,options:questions.options.map(x=>({key:x[0],label:x[1]}))}:null}:null,
    picks:d.picks.map(x=>({round:x.round,teamId:x.teamId,candidateId:x.candidateId,status:x.status,pos:x.pos,name:secretProspect(draftCandidate(d,x.candidateId)?.player)?'????':x.name}))};
  };
  const renewalView=()=>{
@@ -664,9 +670,15 @@ function createHeadlessEngine(){
     if(f.active!=='draft'||game.ceremonyStage!=='draft'||d?.year!==game.year)throw Error('draft stage unavailable');
     const pending=draftPending(d);
     if(d.rareIntro){if(k!=='intro')throw Error('draft intro required');d.rareIntro=false;}
-    else if(d.announcement){if(k!=='announcement')throw Error('draft announcement required');d.announcement=null;}
+    else if(d.announcement){if(k==='announcement')d.announcement=null;else if(k==='announcement-next')draftAdvanceAnnouncement(d);else throw Error('draft announcement required');}
     else if(pending){if(k!=='dismiss'||input.playerId!==pending.candidateId)throw Error('draft recovery decision required');pending.recoveryPending=false;pending.recoveryCelebration=false;}
-    else if(k==='start'&&d.phase==='scout'){
+    else if(k==='research'&&['scout','first','later'].includes(d.phase)){
+     const c=draftCandidate(d,input.playerId);
+     if(!c||!scoutVisible(c)||c.status!=='available'||draftResearchUsed(d,team)>=draftScoutBudget(team)||draftResearchLevel(d,team,c)>=3)throw Error('draft research unavailable');
+     const tasks=scoutTasks(d,team,c),key=input.key;
+     if(!Object.hasOwn(SCOUT_TASKS,key)||tasks.includes(key))throw Error('draft research already performed');
+     d.scoutTasks??={};d.scoutTasks[team.id]??={};d.scoutTasks[team.id][c.id]=[...tasks,key];d.research??={};d.research[team.id]??={};d.research[team.id][c.id]=draftResearchLevel(d,team,c)+1;
+    }else if(k==='start'&&d.phase==='scout'){
      draftStart(d);if(d.candidates.some(c=>playerTitleTheme(c.player))&&!d.rareIntroSeen){d.rareIntroSeen=true;d.rareIntro=true;}
     }else if(k==='nominate'||k==='pass'||k==='cpu'){
      const id=k==='nominate'?input.playerId:null,phase=d.phase,round=d.round,pickStart=d.picks.length,passStart=d.passed.length;
@@ -901,14 +913,15 @@ function createHeadlessEngine(){
    }
    if(command?.annual==='draft'){
     const k=command.decision,base=['annual','decision'];
-    const simple=['start','intro','announcement','pass','cpu','delegate','reveal','next-draw','next-round','finish'];
+    const simple=['start','intro','announcement','announcement-next','pass','cpu','delegate','reveal','next-draw','next-round','finish'];
     const player=['nominate','dismiss','withdraw','delegate-contract'];
     let valid=simple.includes(k)&&exact(command,base)||player.includes(k)&&exact(command,[...base,'playerId'])&&Number.isSafeInteger(command.playerId);
+    if(k==='research')valid=exact(command,[...base,'playerId','key'])&&Number.isSafeInteger(command.playerId)&&['field','analysis','interview'].includes(command.key);
     if(k==='ticket')valid=exact(command,[...base,'ticket'])&&Number.isSafeInteger(command.ticket)&&command.ticket>=0&&command.ticket<12;
     if(k==='reply')valid=exact(command,[...base,'playerId','answer'])&&Number.isSafeInteger(command.playerId)&&typeof command.answer==='string'&&command.answer.length<=40;
     if(k==='offer')valid=exact(command,[...base,'playerId','level','role'])&&Number.isSafeInteger(command.playerId)&&[0,1,2].includes(command.level)&&['chance','develop'].includes(command.role);
     if(!valid)throw Error('invalid draft command');
-    return run('annual',state,{choice:'draft',decision:k,playerId:command.playerId,ticket:command.ticket,answer:command.answer,level:command.level,role:command.role,verifiedVip});
+    return run('annual',state,{choice:'draft',decision:k,playerId:command.playerId,key:command.key,ticket:command.ticket,answer:command.answer,level:command.level,role:command.role,verifiedVip});
    }
    if(exact(command,['annual','playerId','decision'])&&command.annual==='movement'&&Number.isSafeInteger(command.playerId)&&['allow','deny'].includes(command.decision))return run('annual',state,{choice:'movement',playerId:command.playerId,decision:command.decision,verifiedVip});
    if(exact(command,['annual','playerId','decision','multiplier'])&&command.annual==='movement'&&Number.isSafeInteger(command.playerId)&&command.decision==='retain'&&[1,1.15].includes(command.multiplier))return run('annual',state,{choice:'movement',playerId:command.playerId,decision:command.decision,multiplier:command.multiplier,verifiedVip});

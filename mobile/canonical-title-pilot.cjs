@@ -368,10 +368,48 @@ const pilotCode = `
     finally{if(epoch===canonicalEpoch){canonicalRunning=false;canonicalStop=false;slotOpening=false;render();}}
   }
   let canonicalHqWorld=null;
-  const canonicalAnnualJobs=['awards-all','settlement','movement-declarations'];
+  const canonicalAnnualJobs=['awards-all','settlement','movement-declarations','draft','roster-cut'];
   let canonicalAwardFilter='all';
   const canonicalEventLabels={...FLOW_LABEL,'fan-fest':'ファン感謝デー',fanclub:'ファンクラブ',tv:'テレビ出演',sponsor:'スポンサー契約',broadcast:'放映権',naming:'命名権','opening-promo':'開幕戦イベント'};
   const canonicalEventStatus={scheduled:'予定',ready:'対応可能',active:'対応中',waiting:'結果待ち',done:'完了'};
+  function canonicalDraftModel(c){
+    if(!c)return null;
+    return {id:c.id,name:c.name,pos:c.pos,age:c.age||18,teamId:null,specialCategory:c.specialCategory,originCategory:c.originCategory,appearanceSeed:c.appearanceSeed,scoutingHidden:c.hidden===true,abilitiesHidden:true};
+  }
+  function canonicalDraftMarkup(g,a,held,button){
+    const d=a.draft;if(!d)return '<p class="warning">ドラフト情報を取得できません。</p>';
+    const cmd=(key,label,attrs='',disable=held)=>button('draft-'+key,label,attrs,disable);
+    const name=c=>c?themedPlayerName(canonicalDraftModel(c)):'指名見送り';
+    const art=(c,kind)=>c?rareCinemaArt(canonicalDraftModel(c),kind):'';
+    const card=c=>'<article class="panel draft-card" data-draft-card="'+c.id+'"><div class="recruit-player">'+faceMini(canonicalDraftModel(c))+'<div class="recruit-identity"><strong>'+name(c)+'</strong><small>'+h(c.type)+' · '+positionMarkup(c.pos)+(c.school?' · '+h(c.school):'')+'</small></div></div>'+(c.hidden?'<p>能力・本人情報は非公開</p>':c.report?'<p>推定総合 '+c.report.low+'〜'+c.report.high+' · 確度 '+h(c.report.confidence)+'</p><div class="annual-ability-strip">'+Object.entries(c.report.values).map(([k,v])=>'<span><small>'+h(DRAFT_LABELS[k]||k)+'</small><b>'+v.low+'〜'+v.high+'</b></span>').join('')+'</div><p class="small">'+h(c.report.preference)+' · '+h(c.report.abroad)+'</p>'+c.hints.map(x=>'<p class="event">'+h(x.quote)+'</p>').join(''):'')+'<div class="chips">'+Object.entries(SCOUT_TASKS).map(([key,v])=>cmd('research',h(v[0])+(c.tasks.includes(key)?' ✓':''),'data-id="'+c.id+'" data-key="'+key+'"',held||!c.canResearch||c.tasks.includes(key))).join('')+'</div>'+((d.phase==='first'||d.phase==='later')&&d.canNominate?cmd('nominate','この選手を指名','data-id="'+c.id+'"'):'')+'</article>';
+    let out='<section class="draft-room draft-event"><header class="draft-stage-head"><small>PENNANT LAB · '+g.year+'</small><div class="draft-stage-emblem">◆</div><h1>ドラフト会議</h1><p>'+d.round+'巡目</p></header>';
+    if(d.rareIntro){const c=d.introCandidate;out+='<section class="rare-news-screen"><h2>特別スカウト報告</h2>'+rarePanel(canonicalDraftModel(c),'scout',c?.hidden?'……説明のつかない選手がいます。':'今年は特別な選手が候補にいるようです。')+art(c,'nomination')+cmd('intro','指名会議へ進む')+'</section>';}
+    else if(d.announcement&&d.announcementRow){const r=d.announcementRow;out+='<section class="draft-announcement-focus" data-own="'+(r.teamId===g.team.id)+'"><small>'+r.round+'巡目 · '+(r.cursor+1)+' / '+r.total+'</small><h2>'+h(r.team)+'</h2><h3>'+name(r.candidate)+'</h3>'+art(r.candidate,'nomination')+'<p>'+(r.contested?'指名発表':r.candidate?'交渉権獲得':'指名見送り')+'</p>'+cmd('announcement-next','次の発表')+cmd('announcement','発表をまとめて確認')+'</section>';}
+    else if(d.phase==='lottery'&&d.lottery){const l=d.lottery;out+='<section class="draft-draw-stage" data-stage="'+h(l.stage)+'" data-own-draw="'+l.own+'"><header><h2>'+l.tickets+'球団競合</h2><h3>'+name(l.candidate)+'</h3>'+art(l.candidate,'lottery')+'</header><p>'+l.clubs.map(t=>h(t.name)).join(' / ')+'</p>';
+      if(l.stage==='choose'){out+='<p>交渉権を決める抽選を行います。</p><div class="draft-ticket-grid">'+(l.own?Array.from({length:l.tickets},(_,i)=>'<button class="draft-ticket" data-action="canonical-event-command" data-kind="draft-ticket" data-ticket="'+i+'" '+(held?'disabled':'')+'><span class="ticket-seal">◆</span><strong>くじ '+(i+1)+'</strong></button>').join(''):'')+'</div>'+cmd('delegate',l.own?'監督に抽選を任せる':'他球団の抽選を進める');}
+      else if(l.stage==='sealed')out+=cmd('reveal','くじを開封する');
+      else if(l.stage==='revealed')out+='<h2>'+h(l.winnerName)+' 交渉権獲得</h2>'+art(l.candidate,l.winner===g.team.id?'win':'loss')+cmd('next-draw','次の抽選・結果へ');
+      out+='</section>';
+    }else if(d.phase==='first-result'){out+='<h2>1巡目の指名結果</h2>'+cmd('next-round','次の指名へ');}
+    else if(d.phase==='negotiate'){const n=d.negotiation;if(!n){out+=cmd('finish','入団交渉を終了する');}
+      else{out+='<section class="panel draft-negotiation">'+rarePanel(canonicalDraftModel(n),'contract')+'<div class="recruit-player">'+faceMini(canonicalDraftModel(n))+'<h3>'+name(n)+'</h3></div>';
+        if(n.recoveryPending||n.recoveryCelebration){out+='<p>交渉結果：'+h(n.status)+'</p>'+(n.feedback?'<p>'+h(n.feedback)+'</p>':'')+'<p class="small">広告による交渉復活は報酬画面接続待ちです。</p>'+cmd('dismiss','結果を確認','data-id="'+n.id+'"');}
+        else if(n.question){out+='<h3>'+h(n.question.text)+'</h3>'+n.question.options.map(o=>cmd('reply',h(o.label),'data-id="'+n.id+'" data-answer="'+h(o.key)+'"')).join('');}
+        else if(n.status==='rights'){out+='<h3>入団条件を提示</h3><label>育成方針<select id="canonical-draft-role"><option value="develop">育成重視</option><option value="chance">出場機会重視</option></select></label>'+n.offers.map(o=>cmd('offer',['抑えめ','標準','好条件'][o.level]+' · 契約金 '+fmtMoney(o.fee)+' / 年俸 '+fmtSalary(o.salary),'data-id="'+n.id+'" data-level="'+o.level+'"',held||o.fee+o.salary>g.team.cash)).join('');}
+        if(!n.recoveryPending&&!n.recoveryCelebration&&n.status==='rights')out+=cmd('withdraw','交渉を打ち切る','data-id="'+n.id+'"')+cmd('delegate-contract','交渉を監督に任せる','data-id="'+n.id+'"');
+        out+='</section>';}
+    }else if(d.phase==='done'){out+='<h2>指名・交渉終了</h2>'+button('complete','戦力外通告へ進む','data-job="draft"',held);}
+    else if(['scout','first','later'].includes(d.phase)){
+      out+='<p>調査枠 '+d.researchUsed+' / '+d.researchBudget+'</p>'+(d.phase==='scout'?cmd('start','指名会議を開始する'):d.canNominate?cmd('pass','指名を見送る'):d.phase==='first'?cmd('cpu','他球団の指名へ'):'')+d.candidates.map(card).join('');
+    }
+    if(!d.announcement&&!d.rareIntro&&d.picks.length)out+='<section class="panel"><h3>確定済み指名結果</h3>'+d.picks.map(p=>'<p class="event">'+p.round+'位 · '+h(p.name)+' · '+h((g.club?.standings||[]).find(t=>t.id===p.teamId)?.name||String(p.teamId))+' · '+h(p.status)+'</p>').join('')+'</section>';
+    return out+'</section>';
+  }
+  function canonicalCutMarkup(g,a,held,button){
+    const r=a.roster;if(!r)return '<p class="warning">登録枠情報を取得できません。</p>';
+    const p=r.projection;
+    return '<section class="panel"><h2>戦力外通告</h2>'+normalDetailCard('contract','来季の支配下登録')+'<p>来季予定 '+p.projected+' / '+(g.club?.rosterLimit||50)+'名 · 超過 '+p.excess+'名</p><p>指名・合意済み '+p.signed+'名 · 引退予定 '+p.retiring+'名 · 不足補充 '+p.minimumFill+'名</p>'+r.eligible.map(x=>{const model=g.club?.roster.find(p=>p.id===x.id),selected=r.selected.includes(x.id);return '<article class="panel"><div class="recruit-player">'+(model?faceMini(canonicalPlayerModel(model,g),{overall:true}):'')+'<div><strong>'+(model?themedPlayerName(canonicalPlayerModel(model,g)):h(x.name))+'</strong><p>'+positionMarkup(x.pos)+' · 年俸 '+fmtSalary(x.salary)+'</p></div></div>'+(x.warnings||[]).map(w=>'<p class="small">'+h(w)+'</p>').join('')+button('cut',selected?'戦力外候補から外す':'戦力外候補にする','data-id="'+x.id+'"',held)+'</article>';}).join('')+button('complete','戦力外通告を確定する','data-job="roster-cut"',held||p.excess>0)+'</section>';
+  }
   function canonicalEventRender(){
     const app=$('#app'),g=canonicalSnapshot?.game;if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-events-back">‹ 本部</button></div>';
@@ -396,7 +434,9 @@ const pilotCode = `
       }else if(a.active==='movement-declarations'){
         const rows=a.requests||[],unresolved=rows.some(r=>['request','refused'].includes(r.status));
         body+='<section class="panel renewal-room"><h2>FA・海外挑戦の相談</h2>'+normalDetailCard('contract','去就相談・残留交渉')+rows.map(r=>{const p=g.club?.roster.find(p=>p.id===r.id),model=p?canonicalPlayerModel(p,g):null,open=['request','refused'].includes(r.status);return '<section class="panel">'+(model?playerUpperPortrait(model)+'<h3>'+themedPlayerName(model)+'</h3>':'')+'<p>'+h(movementRequestLabel(r.kind))+' · '+h(({request:'去就相談',refused:'残留交渉保留',retained:'残留合意',stayed:'挑戦見送り'})[r.status]||r.status)+'</p><p>希望年俸 '+fmtSalary(r.demand)+'</p>'+(open?[['retain','希望額で残留提示',1],['retain','希望額＋15％',1.15],['allow','本人の希望を受け入れる',0],...(r.kind==='posting'?[['deny','ポスティングを認めない',0]]:[])].map(([kind,label,mult])=>commandButton(kind,label,'data-id="'+r.id+'" data-mult="'+mult+'"',held)).join(''):'')+'</section>';}).join('')+(rows.length?'':'<p>対象選手はいません。</p>')+commandButton('complete','相談を終了する','data-job="movement-declarations"',held||unresolved)+'</section>';
-      }else if(a.active)body+='<p class="warning">現在のイベントの専用画面は未接続です。処理は保持します。</p>';
+      }else if(a.active==='draft')body+=canonicalDraftMarkup(g,a,held,commandButton);
+      else if(a.active==='roster-cut')body+=canonicalCutMarkup(g,a,held,commandButton);
+      else if(a.active)body+='<p class="warning">現在のイベントの専用画面は未接続です。処理は保持します。</p>';
     }else if(!a.canStart&&!inbox.review&&!inbox.monthly&&!inbox.milestoneCount&&!important)body+='<p class="empty">現在対応する年間業務はありません。</p>';
     app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(g.team)+'">'+top+'<main class="main">'+body+'</main></div>';
   }
@@ -422,11 +462,21 @@ const pilotCode = `
     else if(k==='start'&&a.canStart)cmd={annual:'start'};
     else if(k==='day'&&a.canAdvance)cmd={annual:'day'};
     else if(k==='open'&&canonicalAnnualJobs.includes(job)&&a.tasks?.some(j=>j.id===job&&j.status==='ready')&&!a.active)cmd={annual:'open',job};
-    else if(k==='complete'&&a.active===job&&canonicalAnnualJobs.includes(job))cmd={annual:'complete',job};
+    else if(k==='complete'&&a.active===job&&canonicalAnnualJobs.includes(job)&&(job!=='roster-cut'||window.confirm('戦力外通告を確定しますか？')))cmd={annual:'complete',job};
     else if(a.active==='movement-declarations'&&['retain','allow','deny'].includes(k)){
       const r=a.requests.find(r=>r.id===Number(b.dataset.id)&&['request','refused'].includes(r.status)),m=Number(b.dataset.mult);
       if(r&&(k!=='deny'||r.kind==='posting')&&(k!=='retain'||[1,1.15].includes(m))&&window.confirm('選手の去就について、この判断を確定しますか？'))cmd={annual:'movement',playerId:r.id,decision:k,...(k==='retain'?{multiplier:m}:{})};
     }
+    else if(a.active==='draft'&&k.startsWith('draft-')){
+      const decision=k.slice(6),id=Number(b.dataset.id),d=a.draft;
+      if(['start','intro','announcement','announcement-next','pass','cpu','delegate','reveal','next-draw','next-round','finish'].includes(decision))cmd={annual:'draft',decision};
+      else if(decision==='ticket')cmd={annual:'draft',decision,ticket:Number(b.dataset.ticket)};
+      else if(decision==='research'&&d?.candidates.some(c=>c.id===id&&c.canResearch&&!c.tasks.includes(b.dataset.key)))cmd={annual:'draft',decision,playerId:id,key:b.dataset.key};
+      else if(decision==='nominate'&&d?.canNominate&&d.candidates.some(c=>c.id===id)&&window.confirm('この選手を指名しますか？'))cmd={annual:'draft',decision,playerId:id};
+      else if(decision==='reply'&&d?.negotiation?.id===id)cmd={annual:'draft',decision,playerId:id,answer:b.dataset.answer};
+      else if(decision==='offer'&&d?.negotiation?.id===id){const role=$('#canonical-draft-role')?.value,level=Number(b.dataset.level);if(['chance','develop'].includes(role)&&[0,1,2].includes(level)&&window.confirm('この条件を正式に提示しますか？'))cmd={annual:'draft',decision,playerId:id,level,role};}
+      else if(['dismiss','withdraw','delegate-contract'].includes(decision)&&d?.negotiation?.id===id&&(decision==='dismiss'||window.confirm('交渉の判断を確定しますか？')))cmd={annual:'draft',decision,playerId:id};
+    }else if(a.active==='roster-cut'&&k==='cut'&&a.roster?.eligible.some(p=>p.id===Number(b.dataset.id)))cmd={annual:'cut',playerId:Number(b.dataset.id)};
     if(cmd)void canonicalEventRequest(cmd);
   }
   function canonicalHqOpen(){if(!canonicalSnapshot?.game?.headquarters||slotOpening||!accountCurrent())return;canonicalHqWorld=canonicalSnapshot.world;ui.page='canonical-hq';render();window.scrollTo(0,0);}
