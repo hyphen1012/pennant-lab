@@ -131,6 +131,7 @@ globalThis.__plAnnualEntryCheck=saved=>{
    else if(j.id==='broadcast'){commerce('delta',{value:1});}
    else if(j.id==='naming'){commerce('choice',{value:0});}
    else throw Error('unexpected '+j.id);
+   c=engine.view(w).annual.commerce;
    if(j.id==='sponsor'){a.equal(c.risk.burden,10);a.ok(c.annual>0);}
    if(j.id==='fanclub'){a.ok(Number.isSafeInteger(c.since)&&c.estimate.members>=0);}
    commerce('confirm');c=engine.view(w).annual.commerce;
