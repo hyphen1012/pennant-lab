@@ -16,7 +16,7 @@ const pilotCode = `
   let canonicalRoster=null;
   function canonicalTitleScreen(){
     const head='<div class="title-screen save-terminal multiverse-terminal"><header class="save-terminal-head"><span class="title-serial">VERSION 0.9.191 · STAGING</span><button class="ghost-btn" data-action="launch-back">‹ タイトル</button></header><div class="title-slot-title">セーブデータを選択</div>';
-    if(!canonicalSlots)return head+'<p role="status">サーバーのセーブ一覧を確認できません。データは変更されていません。</p><button class="btn primary full" data-action="canonical-retry">再取得する</button></div>';
+    if(!canonicalSlots)return head+'<p role="status">'+(slotOpening?'セーブ一覧を取得しています。':'サーバーのセーブ一覧を確認できません。データは変更されていません。')+'</p><button class="btn primary full" data-action="canonical-retry" '+(slotOpening?'disabled':'')+'>再取得する</button></div>';
     return head+'<div class="multiverse-map" aria-label="セーブデータを選択">'+cosmicAtlas()+'<div class="title-slots">'+[1,2,3].map(i=>{
       const row=canonicalSlots.find(x=>x.slot===i),d=row?.preview,t=d?.team;
       const orb=row&&!t?worldOrb(i,null,true).replace('<span class="world-new">＋</span>','<span class="world-new">●</span>'):worldOrb(i,t,!!row);
