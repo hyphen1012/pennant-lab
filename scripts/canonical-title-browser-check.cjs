@@ -236,7 +236,7 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   a.equal(reserves,1);a.equal(settles,1);
   await page.locator('[data-action="canonical-rewards-refresh"]').click();await page.locator('[data-action="canonical-achievements-open"]').waitFor();
   const afterReward=await post('read',{slot:3});a.equal(afterReward.revision,beforeReward.revision+1);a.equal(afterReward.wallet.tickets,0);a.equal(afterReward.game.club.roster.find(x=>x.id===injured.id).injuryDays,4);a.equal(afterReward.pending.length,0);a.equal(afterReward.actions.some(x=>x.operationId===target.operationId),false);a.equal(reserves,1);a.equal(settles,1);
-  const order=await post('order',{slot:3,operationId:target.operationId});a.equal(order.order.status,'committed');a.equal(order.order.result.before,8);a.equal(order.order.result.after,4);
+  const medicalOrder=await post('order',{slot:3,operationId:target.operationId});a.equal(medicalOrder.order.status,'committed');a.equal(medicalOrder.order.result.before,8);a.equal(medicalOrder.order.result.after,4);
   console.log('PASS real HTTP memorial claim, ticket exchange and treatment, lost committed response without duplicate charge');
   a.deepEqual(errors,[]);console.log('PASS packaged canonical title, actual HTTP create/reopen, lost commit recovery, offline and local save isolation');
  }finally{await browser?.close();await runtime.close();fs.rmSync(dir,{recursive:true,force:true});}
