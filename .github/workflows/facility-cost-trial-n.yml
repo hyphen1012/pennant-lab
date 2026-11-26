@@ -1,0 +1,43 @@
+name: Trial N mature facility cost audit
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/facility-trial-n*.cjs'
+      - 'scripts/year-cycle-trial-n.cjs'
+      - '.github/workflows/facility-cost-trial-n.yml'
+  push:
+    paths:
+      - 'scripts/facility-trial-n*.cjs'
+      - 'scripts/year-cycle-trial-n.cjs'
+      - '.github/workflows/facility-cost-trial-n.yml'
+jobs:
+  natural-investment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [1937, 4391, 8821]
+    env:
+      FACILITY_SEED: ${{ matrix.seed }}
+      FIXED_TEAM: -1
+      STOP_AFTER_FACILITY: '1'
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/facility-trial-n-check.cjs
+      - run: node scripts/cpu-economy-check.cjs
+      - run: |
+          mkdir -p test-results
+          set -o pipefail
+          node scripts/year-cycle-trial-n.cjs 55 "$FACILITY_SEED" | tee test-results/facility-cycle-n.log
+          node scripts/facility-endurance.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: facility-cost-trial-n-${{ matrix.seed }}
+          path: test-results/
