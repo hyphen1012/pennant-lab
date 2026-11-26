@@ -1,0 +1,36 @@
+name: Rival learning paired trial
+on:
+  pull_request:
+    paths:
+      - 'scripts/rival-learning-paired-trial.cjs'
+      - '.github/workflows/rival-learning-paired-trial.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - seed: 1937
+            target: 4
+          - seed: 4391
+            target: 6
+          - seed: 8821
+            target: 7
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/rival-learning-paired-trial.cjs ${{ matrix.seed }} ${{ matrix.target }} 20
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rival-learning-pair-${{ matrix.seed }}
+          path: test-results/
