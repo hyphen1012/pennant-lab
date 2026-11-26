@@ -1,0 +1,18 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const {applyTrialU}=require('./facility-trial-u.cjs');
+const html=applyTrialU(fs.readFileSync('index.html','utf8')),start=html.indexOf('<script>'),finish=html.indexOf('</script>',start),inline=html.slice(start+8,finish),end=inline.indexOf("  const appRoot=document.querySelector('#app');");assert(end>0);
+const tail=`save=()=>true;render=()=>{};showToast=()=>{};buildFresh();game.started=true;ensureGameExtras();
+const t=game.teams.find(t=>t.id!==game.selectedId),life=clubLifeData(t),x=stadiumState(t),rows=[];
+for(const k of Object.keys(INFRA_LABELS))infraSet(t,k,20);x.food=x.goods=20;x.park=19;
+const originalPlan=parkExpansionPlan;parkExpansionPlan=()=>({viable:true,required:160});
+t.cash=90;life.travel=3;const before=JSON.stringify(t);
+rows.push(trialUTravelTarget(t,50,10,life),trialUTravelTarget(t,50,16,life),trialUTravelTarget(t,50,-1,life));
+if(before!==JSON.stringify(t))throw Error('decision must not mutate team');
+life.trialUTravelYear=game.year;rows.push(trialUTravelTarget(t,50,10,life));delete life.trialUTravelYear;
+life.travel=2;rows.push(trialUTravelTarget(t,50,7,life),trialUTravelTarget(t,50,8,life));life.travel=1;rows.push(trialUTravelTarget(t,50,1,life));
+life.travel=3;t.cash=160;rows.push(trialUTravelTarget(t,50,1,life));t.cash=90;parkExpansionPlan=()=>({viable:false,required:160});rows.push(trialUTravelTarget(t,50,1,life));
+parkExpansionPlan=()=>({viable:true,required:160});x.park=14;rows.push(trialUTravelTarget(t,50,1,life));parkExpansionPlan=originalPlan;return rows;`;
+const code=inline.slice(0,end).replace('((Date.now()^0x53e719f1)>>>0)||1937','1937').replace('(() => {','return (() => {')+tail+'})();';
+const doc={querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){},body:{appendChild(){},insertAdjacentHTML(){}}},win={addEventListener(){},scrollTo(){}},ls={getItem:()=>null,setItem(){},removeItem(){}};
+const rows=new Function('document','window','localStorage','setTimeout','clearTimeout',code)(doc,win,ls,()=>0,()=>{});
+assert.deepEqual(rows,[2,3,3,3,1,2,1,3,3,3]);console.log('PASS U: targeted optional travel review, no state mutation, thresholds, reserve and project guard');
