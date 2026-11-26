@@ -189,7 +189,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @keyframes official-crowd{from{opacity:.04;transform:translateX(0)}to{opacity:.13;transform:translateX(2px)}}
 @keyframes official-particle{0%,100%{transform:translate3d(0,4px,0);opacity:.08}50%{transform:translate3d(3px,-8px,0);opacity:.55}}
 @media(prefers-reduced-motion:reduce){.official-title-metal,.official-stadium-lights,.official-crowd,.official-embedded-prompt,.official-title-particles i{animation:none;opacity:0}}
-.official-launch-hit{position:absolute;inset:0;border:0;background:transparent;width:100%;height:100%;padding:0;touch-action:manipulation;color:#f6e6bd}
+/* The full-screen title is one button: suppress mobile Chromium/WebKit's
+   default blue tap overlay locally, not keyboard focus or the intended exit. */
+[data-launch-screen],[data-launch-screen] *{-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+.official-launch-hit{position:absolute;inset:0;border:0;background:transparent;width:100%;height:100%;padding:0;touch-action:manipulation;color:#f6e6bd;appearance:none;-webkit-appearance:none;-webkit-tap-highlight-color:transparent}
+.official-launch-hit:active,.official-launch-hit:hover,.official-launch-hit:focus{background:transparent;box-shadow:none}
+.official-launch-hit:focus:not(:focus-visible){outline:none}
 .official-launch-hit:focus-visible{outline:2px solid #e7d2a1;outline-offset:-5px}
 .official-launch-prompt{position:absolute;bottom:max(5%,env(safe-area-inset-bottom));left:0;width:100%;text-align:center;text-shadow:0 2px 8px #080411;font-size:clamp(13px,3.8vw,20px);letter-spacing:.12em;animation:launch-glow 3.2s ease-in-out infinite}
 .official-launch-exit::after{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;background:radial-gradient(ellipse at center,#b797f057, #23113dbb 60%,#080510);animation:official-exit .42s ease-in both}
@@ -6343,10 +6348,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     startupAttempted=true;startupPlaying=true;document.body.classList?.add('official-startup-active');
     let video=null,watchdog=null,done=false;
     const finish=()=>{
-      if(done)return;done=true;clearTimeout(watchdog);startupPlaying=false;document.body.classList?.remove('official-startup-active');
+      if(done)return;done=true;clearTimeout(watchdog);
       document.removeEventListener?.('visibilitychange',visibility);
       window.removeEventListener?.('pl-native-suspend',finish);
-      if(video){video.pause?.();video.removeAttribute?.('src');video.load?.();video.remove();}
+      // The natural ended event fires after the entire original soundtrack.
+      // Silence and detach the decoder before unlocking the title.
+      const retiring=video;video=null;
+      if(retiring){
+        try{retiring.muted=true;retiring.volume=0;}catch{}
+        try{retiring.pause?.();}catch{}
+        try{retiring.removeAttribute?.('src');retiring.load?.();}catch{}
+        try{retiring.remove();}catch{}
+      }
+      startupPlaying=false;document.body.classList?.remove('official-startup-active');
     };
     const visibility=()=>{if(document.hidden)finish();};
     const arm=()=>{clearTimeout(watchdog);if(!done)watchdog=setTimeout(finish,12000);};
@@ -6361,31 +6375,22 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       video.playsInline=true;video.setAttribute('playsinline','');video.controls=false;video.disablePictureInPicture=true;
       video.preload='auto';video.muted=launchMuted();video.tabIndex=-1;video.disableRemotePlayback=true;
       video.addEventListener('ended',finish,{once:true});video.addEventListener('error',finish,{once:true});
-      let lastTime=-1;video.addEventListener('timeupdate',()=>{if(video.currentTime>lastTime){lastTime=video.currentTime;arm();}});
+      let lastTime=-1;video.addEventListener('timeupdate',()=>{if(!done&&video&&video.currentTime>lastTime){lastTime=video.currentTime;arm();}});
       video.src=STARTUP_MEDIA.video;document.body.appendChild(video);
       try{await video.play();}catch(e){
         if(done)return;
-        if(video.muted){finish();return;}
-        video.muted=true;try{await video.play();}catch{finish();}
+        if(video.muted||e?.name!=='NotAllowedError'){finish();return;}
+        // User preference: no extra choice screen; retry silently once.
+        video.muted=true;video.defaultMuted=true;video.volume=0;
+        try{await video.play();}catch{finish();}
       }
     }catch(e){finish();}
-  }
-  function launchTapSound(){
-    if(launchMuted())return;
-    try{
-      const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;
-      const ctx=new Audio();const play=()=>{const now=ctx.currentTime,osc=ctx.createOscillator(),gain=ctx.createGain();
-        osc.type='sine';osc.frequency.setValueAtTime(440,now);osc.frequency.exponentialRampToValueAtTime(660,now+.14);
-        gain.gain.setValueAtTime(.001,now);gain.gain.exponentialRampToValueAtTime(.035,now+.025);gain.gain.exponentialRampToValueAtTime(.001,now+.19);
-        osc.connect(gain);gain.connect(ctx.destination);osc.onended=()=>{void ctx.close().catch(()=>{});};osc.start(now);osc.stop(now+.2);
-      };if(ctx.state==='suspended')void ctx.resume().then(play,()=>ctx.close());else play();
-    }catch{}
   }
   function startOfficialTitleTransition(){
     if(startupPlaying||launchTransition||ui.page!=='title'||!ui.launchTitle||slotOpening||slotDeleteDialog)return;
     if(window.PennantNative&&!window.PennantNative.ready())return;
     if(!STARTUP_MEDIA.title||titleMediaFailed){ui.launchTitle=false;ui.rarePreview=null;render();window.scrollTo(0,0);return;}
-    launchTransition=true;launchTapSound();
+    launchTransition=true; // Silent transition: avoid transient Web Audio noise on mobile.
     const root=document.querySelector('[data-launch-screen]');root?.classList?.add('official-launch-exit');
     const complete=()=>{launchTransition=false;if(ui.page!=='title'||!ui.launchTitle||document.hidden||(window.PennantNative&&!window.PennantNative.ready())){root?.classList?.remove('official-launch-exit');return;}ui.launchTitle=false;ui.rarePreview=null;render();window.scrollTo(0,0);};
     if(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches)complete();else setTimeout(complete,420);
@@ -6459,7 +6464,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   document.addEventListener('click',e=>{
     const b=e.target.closest?.('.save-terminal .save-slot');
     if(b&&(slotClickBlock?.slot===b.dataset.slot&&Date.now()<slotClickBlock.until||b.closest('[data-slot-group]')?.getAttribute('data-reveal')==='true')){e.preventDefault();e.stopImmediatePropagation();if(slotClickBlock?.slot===b.dataset.slot&&Date.now()<slotClickBlock.until){slotClickBlock=null;}else revealSlot(null,false);}
-    else if(e.target.closest?.('[data-launch-screen]')&&!e.target.closest?.('button,video')){document.querySelector?.('[data-action="launch-start"]')?.click();}
+    else if(e.target.closest?.('[data-launch-screen]')){e.preventDefault();e.stopImmediatePropagation();startOfficialTitleTransition();}
   },true);
   function setupScreen(){
     const t=getTeam(ui.selectedTeam??2);
