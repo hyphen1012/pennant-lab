@@ -20,7 +20,9 @@ async function executeOfflineDeletion({dataDir,account,requestId,writersStopped,
   // Identity provider confirms token revocation/account treatment. False or
   // ambiguous outcomes leave the request in processing, never completed.
   if(await revokeIdentity(context)!==true)throw Error('identity deletion not verified');
-  remove('account',['DELETE FROM account_ledger WHERE id=?']);
+  // Old databases may predate canonical authority tables; create empty schema before purge.
+  {const db=new DatabaseSync(file('account'));try{require('./game-authority.cjs').installAuthorityTables(db);}finally{db.close();}}
+  remove('account',['DELETE FROM authority_actions WHERE account=?','DELETE FROM authority_worlds WHERE account=?','DELETE FROM account_ledger WHERE id=?']);
   remove('saves',['DELETE FROM transfer_history WHERE account=?','DELETE FROM transfers WHERE account=?']);
   remove('ad-proofs',['DELETE FROM ad_proofs WHERE account=?']);
   // Purchase evidence may have legally required retention. Adapter must
