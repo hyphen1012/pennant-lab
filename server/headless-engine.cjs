@@ -36,7 +36,7 @@ function createHeadlessEngine(){
    rare:rare?{eventKey:rare.id,year:rare.year,date:rare.date,category:rare.category}:null,
    career:career?{playerId:career.p.id,stage:career.e.type,options:['consult','plan'].includes(career.e.type)?farewellChoices(career.p).map(([key,label,cost])=>({key,label,cost})):[]}:null};
  };
- const annualSupported=['awards-all','settlement','movement-declarations','draft','roster-cut'];
+ const annualSupported=['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter'];
  const draftPending=d=>d.picks.find(x=>x.teamId===team.id&&(x.recoveryPending||x.recoveryCelebration));
  const draftOwnRow=d=>d.picks.find(x=>x.teamId===team.id&&x.status==='rights');
  const candidateView=c=>({id:c.id,name:secretProspect(c.player)?'????':c.player.name,pos:c.player.pos,type:c.type,category:playerTitleTheme(c.player)?.name||null});
@@ -49,11 +49,21 @@ function createHeadlessEngine(){
    negotiation:d.phase==='negotiate'&&c?{...candidateView(c),status:row.status,recoveryPending:!!row.recoveryPending,recoveryCelebration:!!row.recoveryCelebration,answers:row.conversation?.answers||[],question:row.status==='rights'&&questions?{options:questions.options.map(x=>({key:x[0],label:x[1]}))}:null}:null,
    picks:d.picks.map(x=>({round:x.round,teamId:x.teamId,candidateId:x.candidateId,status:x.status,pos:x.pos,name:secretProspect(draftCandidate(d,x.candidateId)?.player)?'????':x.name}))};
  };
+ const renewalView=()=>{
+  const d=renewalData(team);if(!d)return null;
+  return {round:d.round,confirmed:d.confirmed,waiting:!!d.waiting,rows:d.rows.map(r=>{const p=getPlayer(r.id);return {id:r.id,name:p?.name,pos:p?.pos,status:r.status,current:r.current,assessment:r.assessment,desired:r.desired,offer:r.offer,editable:renewalEditable(d,r),bonuses:r.bonuses,options:p?renewalBonusOptions(p).map(([key,target,amount,label])=>({key,target,amount,label})):[],history:r.history};})};
+ };
+ const trainingView=phase=>{
+  const report=annualReport(phase);
+  if(report)return {phase,report:{start:report.start,end:report.end,cost:report.cost,rows:(report.rows||[]).filter(r=>r.teamId===team.id),entries:(report.entries||[]).filter(r=>r.teamId===team.id),club:report.clubs?.find(c=>c.teamId===team.id)}};
+  if(phase==='winter')return {phase,assignments:winterPlan(team),eligible:winterEligible(team).map(p=>({id:p.id,name:p.name,pos:p.pos})),destinations:WINTER_DEST.map(([key,label,league,cost,effect])=>({key,label,league,cost,effect})),cost:winterCost(winterPlan(team))};
+  return {phase,players:annualPlayers(team,phase).map(p=>({id:p.id,name:p.name,pos:p.pos,injured:!!p.injury,focus:['balanced',...seasonSkillKeys(p)],menu:annualMenu(team,p,phase)}))};
+ };
  const annualView=()=>{
   const f=flowGet(),d=movementData();
   if(!f)return {mode:null,canStart:game.day===143&&game.calendarIndex===game.calendar.days.length&&!game.financeCrisis&&!flowInbox()&&!game.pendingMonth&&!game.pendingReview&&!pendingMilestoneNews().length&&!flowForeignResponse()};
   const tasks=Object.values(f.jobs).map(j=>({id:j.id,start:j.start,status:j.status,supported:annualSupported.includes(j.id)}));
-  return {mode:f.mode,date:f.date,active:f.active,tasks,canAdvance:!f.active&&!flowInbox()&&!game.financeCrisis&&!flowBlocking(f),draft:f.active==='draft'?draftView(game.draft):null,roster:f.active==='roster-cut'?{projection:draftRosterProjection(game.draft,team),selected:draftCutIds(game.draft,team),eligible:draftCutOptions(game.draft,team).map(p=>({id:p.id,name:p.name,pos:p.pos,salary:p.salary,warnings:draftCutReasons(p)}))}:null,requests:f.active==='movement-declarations'?(d?.requests||[]).filter(r=>r.from===team.id).map(r=>({id:r.id,kind:r.kind,status:r.status,demand:r.demand,offer:r.offer})):[]};
+  return {mode:f.mode,date:f.date,active:f.active,tasks,canAdvance:!f.active&&!flowInbox()&&!game.financeCrisis&&!flowBlocking(f),renewal:['renewal1','renewal2'].includes(f.active)?renewalView():null,training:['autumn','winter'].includes(f.active)?trainingView(f.active):null,draft:f.active==='draft'?draftView(game.draft):null,roster:f.active==='roster-cut'?{projection:draftRosterProjection(game.draft,team),selected:draftCutIds(game.draft,team),eligible:draftCutOptions(game.draft,team).map(p=>({id:p.id,name:p.name,pos:p.pos,salary:p.salary,warnings:draftCutReasons(p)}))}:null,requests:f.active==='movement-declarations'?(d?.requests||[]).filter(r=>r.from===team.id).map(r=>({id:r.id,kind:r.kind,status:r.status,demand:r.demand,offer:r.offer})):[]};
  };
  const medical=()=>own(team).filter(p=>rosterTreatmentEligible(p)&&p.injury&&typeof p.injury.date==='string').map(p=>({route:'medical',year:game.year,eventKey:String(p.id)+':'+p.injury.date,label:p.name+' 特別治療',playerId:p.id,date:p.injury.date}));
  // Same eligibility as the checked-in manager staff continuation handler:
@@ -191,6 +201,7 @@ function createHeadlessEngine(){
     const j=f.jobs[input.job];
     if(!annualSupported.includes(input.job)||!flowOpen(f,j))throw Error('annual event unavailable');
     if(j.id==='movement-declarations')movementInit();
+    if(['renewal1','renewal2'].includes(j.id))renewalData(team,true);
     game.pendingCeremonyIntro=null;
    }else if(input.choice==='complete'){
     const j=f.jobs[f.active];
@@ -201,7 +212,51 @@ function createHeadlessEngine(){
      const d=game.draft;if(d?.phase!=='done'||d.cutConfirmed||draftRosterProjection(d,team).excess||!draftPlanCPU(d)||game.teams.some(t=>draftRosterProjection(d,t).excess))throw Error('roster projection exceeds limit');
      d.cutConfirmed=true;
     }
+    if(['renewal1','renewal2'].includes(j.id)){
+     const d=renewalData(team);if(!d||d.confirmed||renewalUnresolved(d).length)throw Error('renewal unfinished');
+     if(!renewalFinish(team))throw Error('renewal confirmation failed');
+    }
+    if(['autumn','winter'].includes(j.id)&&!annualReport(j.id))throw Error('training report required');
     flowComplete(f,j);
+   }else if(input.choice==='renewal'){
+    if(!['renewal1','renewal2'].includes(f.active)||game.ceremonyStage!=='renewal')throw Error('renewal stage unavailable');
+    const d=renewalData(team,true),k=input.decision,row=d.rows.find(x=>x.id===input.playerId);
+    if(d.confirmed)throw Error('renewal already confirmed');
+    if(k==='bulk')renewalBulk(d,input.mode);
+    else if(k==='submit'){if(!d.rows.some(r=>renewalEditable(d,r)))throw Error('no editable renewal');if(input.bonus)reportRenewalBonuses(d);renewalSubmitAll(d);}
+    else if(k==='offer'){
+     if(!row||!renewalEditable(d,row))throw Error('renewal offer unavailable');
+     const allowed=renewalBonusOptions(getPlayer(row.id));
+     if(new Set(input.bonuses).size!==input.bonuses.length||input.bonuses.some(key=>!allowed.some(x=>x[0]===key)))throw Error('invalid renewal bonus');
+     row.bonuses=input.bonuses.slice();if(!renewalOffer(d,row,input.salary))throw Error('renewal offer rejected');
+    }else if(k==='release'){if(!renewalRelease(d,row))throw Error('renewal release rejected');}
+    else if(k==='restore'){if(row?.status!=='released')throw Error('renewal restore rejected');row.status=row.history.at(-1)?.status==='pending'?'pending':'unoffered';}
+    else if(k==='retire'){if(!renewalRetire(d,row))throw Error('renewal retirement rejected');}
+    else if(k==='next'){
+     if(f.active!=='renewal1'||d.rows.some(r=>r.status==='unoffered'||r.status==='retire-intent')||!renewalNextRound(d))throw Error('renewal second round unavailable');
+     flowComplete(f,f.jobs.renewal1);
+    }else if(k==='final-release'){
+     if(f.active!=='renewal2'||d.round!==2||d.rows.some(r=>r.status==='unoffered'||r.status==='retire-intent')||!renewalUnresolved(d).length)throw Error('final release unavailable');
+     for(const row of renewalUnresolved(d))if(!renewalRelease(d,row))throw Error('final release rejected');
+    }else throw Error('renewal operation unavailable');
+   }else if(input.choice==='training'){
+    const phase=f.active,j=f.jobs[phase],k=input.decision;
+    if(!['autumn','winter'].includes(phase)||game.ceremonyStage!==phase||annualReport(phase)||!j?.state?.open)throw Error('training operation unavailable');
+    if(k==='menu'&&phase==='autumn'){
+     const p=annualPlayers(team,phase).find(p=>p.id===input.playerId);
+     if(!p||!['balanced',...seasonSkillKeys(p)].includes(input.focus)||p.injury&&input.intensity!=='rest')throw Error('training menu unavailable');
+     annualPlan(team,phase,true).menus[p.id]={focus:input.focus,intensity:input.intensity};
+    }else if(k==='assign'&&phase==='winter'){
+     const p=winterEligible(team).find(p=>p.id===input.playerId),plan=winterPlan(team,true);
+     if(!p||input.destination!=='none'&&!winterDest(input.destination))throw Error('winter destination unavailable');
+     if(input.destination==='none')delete plan[p.id];else{if(!plan[p.id]&&Object.keys(plan).length>=4)throw Error('winter roster full');plan[p.id]=input.destination;}
+     if(winterCost(plan)>team.cash)throw Error('winter budget insufficient');
+     annualPlan(team,'winter',true).destinations=plan;
+    }else if(k==='run'){
+     if(!ensureSeasonFinanceClosed())throw Error('season finance not closed');
+     if(phase==='winter'){if(!annualRunPhase('winter'))throw Error('winter dispatch unavailable');}
+     else{const x=j.state;x.waiting=true;x.due=annualDate(phase,true);if(x.due<=f.date)x.due=calendarOffsetDate(f.date,1);flowPark(f,j,'waiting');}
+    }else throw Error('training operation unavailable');
    }else if(input.choice==='draft'){
     const d=game.draft,k=input.decision;
     if(f.active!=='draft'||game.ceremonyStage!=='draft'||d?.year!==game.year)throw Error('draft stage unavailable');
@@ -296,8 +351,25 @@ function createHeadlessEngine(){
   advance(state,command,rights){
    const verifiedVip=rights?.verified===true&&rights.vip===true;
    if(exact(command,['annual'])&&['start','day'].includes(command.annual))return run('annual',state,{choice:command.annual,verifiedVip});
-   if(exact(command,['annual','job'])&&['open','complete'].includes(command.annual)&&['awards-all','settlement','movement-declarations','draft','roster-cut'].includes(command.job))return run('annual',state,{choice:command.annual,job:command.job,verifiedVip});
+   if(exact(command,['annual','job'])&&['open','complete'].includes(command.annual)&&['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter'].includes(command.job))return run('annual',state,{choice:command.annual,job:command.job,verifiedVip});
    if(exact(command,['annual','playerId'])&&command.annual==='cut'&&Number.isSafeInteger(command.playerId))return run('annual',state,{choice:'cut',playerId:command.playerId,verifiedVip});
+   if(command?.annual==='renewal'){
+    const k=command.decision,base=['annual','decision'];
+    let valid=['next','final-release'].includes(k)&&exact(command,base)||['release','restore','retire'].includes(k)&&exact(command,[...base,'playerId'])&&Number.isSafeInteger(command.playerId);
+    if(k==='bulk')valid=exact(command,[...base,'mode'])&&['assessment','middle','desired'].includes(command.mode);
+    if(k==='submit')valid=exact(command,[...base,'bonus'])&&typeof command.bonus==='boolean';
+    if(k==='offer')valid=exact(command,[...base,'playerId','salary','bonuses'])&&Number.isSafeInteger(command.playerId)&&Number.isFinite(command.salary)&&command.salary>=.05&&command.salary<=15&&Array.isArray(command.bonuses)&&command.bonuses.length<=12&&command.bonuses.every(x=>typeof x==='string'&&x.length<=40);
+    if(!valid)throw Error('invalid renewal command');
+    return run('annual',state,{choice:'renewal',decision:k,playerId:command.playerId,salary:command.salary,bonuses:command.bonuses,mode:command.mode,bonus:command.bonus,verifiedVip});
+   }
+   if(command?.annual==='training'){
+    const k=command.decision,base=['annual','decision'];
+    let valid=k==='run'&&exact(command,base);
+    if(k==='menu')valid=exact(command,[...base,'playerId','focus','intensity'])&&Number.isSafeInteger(command.playerId)&&typeof command.focus==='string'&&command.focus.length<=20&&['rest','light','normal','hard'].includes(command.intensity);
+    if(k==='assign')valid=exact(command,[...base,'playerId','destination'])&&Number.isSafeInteger(command.playerId)&&['none','aus','south','taiwan','dubai'].includes(command.destination);
+    if(!valid)throw Error('invalid training command');
+    return run('annual',state,{choice:'training',decision:k,playerId:command.playerId,focus:command.focus,intensity:command.intensity,destination:command.destination,verifiedVip});
+   }
    if(command?.annual==='draft'){
     const k=command.decision,base=['annual','decision'];
     const simple=['start','intro','announcement','pass','cpu','delegate','reveal','next-draw','next-round','finish'];

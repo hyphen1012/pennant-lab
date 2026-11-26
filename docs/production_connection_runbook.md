@@ -142,3 +142,7 @@ The server uses the existing persisted calendar flow for post-143-game entry, da
 
 ## Canonical draft and roster cut increment
 Explicit annual draft commands for manual nominations/pass, CPU-only progression, sealed lottery reveal, dialogue, actual offer, delegated contract, recovery dismissal and finish. Existing draft functions and original roster projection/cut rules reused. Draft can exceed the future roster limit until cut confirmation; all 12 club projections must then fit. Hidden names and lottery winner remain masked until appropriate reveal (full special player portrait/scout/reveal UX not connected). Separate full-season fixture-driven integration test; no production rollout. Contract renewal and later annual events remain unsupported.
+
+
+## Canonical renewal and training increment
+First/second renewal rounds use the original calendar dates and renewal functions. Individual or bulk offers, optional performance bonuses, release/restore, first-round pending and explicit final release. No repeat offers in a round, no early second round. Autumn training accepts valid individual menus and parks until the real report date. Winter dispatch uses original eligibility (five pro years, max four), destinations, cost and report, with no duplicated charge. First-round and winter integration test uses actual regular season; second round and autumn completion await commerce integration because the fan festival is a real blocking event. No native screen integration or production merge.
