@@ -27,6 +27,41 @@ const a=require('node:assert/strict'),{createHeadlessEngine}=require('../server/
   a.equal(continued.state.teams.find(t=>t.id===staff.selectedId).manager.tenureContinuedYear,staff.year);
   a.throws(()=>engine.applyAction(continued.state,retention));
   continued.state.year++;a.ok(engine.actions(continued.state).some(x=>x.route==='manager'));
+  // Selection only; server owns all state and the seed.
+  for(const teamId of [0,11]){const w=engine.newWorld({team:teamId});a.equal(w.selectedId,teamId);a.equal(engine.view(w).team.id,teamId);a.notEqual(w.seed,w.clubLogoSeed,'generation must preserve consumed RNG cursor');}
+  for(const cmd of [{team:-1},{team:12},{team:'2'},{team:2,seed:1},{team:2,vip:true}])a.throws(()=>engine.newWorld(cmd));
+  const career=engine.newWorld({}),cp=career.players.find(p=>p.teamId===career.selectedId);
+  career.day=75;cp.retirePlan={year:career.year,teamId:career.selectedId,status:'consult',options:[],date:career.year+'-07-15'};
+  career.careerEventQueue=[{year:career.year,teamId:career.selectedId,id:cp.id,type:'consult',date:cp.retirePlan.date}];
+  const choice=engine.actions(career).find(x=>x.route==='retirement');a.ok(choice);
+  const retained=engine.applyAction(career,choice);a.equal(retained.result.playerId,cp.id);a.equal(retained.state.players.find(p=>p.id===cp.id).retirePlan.status,'continued');a.equal(retained.state.careerEventQueue.length,0);
+  a.equal(cp.retirePlan.status,'consult');a.throws(()=>engine.applyAction(retained.state,choice));
+  career.careerEventQueue[0].type='plan';a.ok(!engine.actions(career).some(x=>x.route==='retirement'));
+  a.throws(()=>engine.applyAction(career,choice));career.careerEventQueue[0].type='consult';cp.teamId=(career.selectedId+1)%12;a.ok(!engine.actions(career).some(x=>x.route==='retirement'));
+  // An identical persisted snapshot must replay the same transition.
+  const fresh=engine.newWorld({team:0});
+  a.deepEqual(engine.advance(fresh,{step:1}),engine.advance(JSON.parse(JSON.stringify(fresh)),{step:1}));
+  a.throws(()=>engine.advance(fresh,{step:1,vip:true}));
+  // Compare actual monthly game accounting from identical snapshots. Do not
+  // inject cash or mock the game economy. Retry fresh worlds if a rare event
+  // intentionally stops the limited pilot before a monthly settlement.
+  let checkedVip=false;
+  for(let attempt=0;attempt<5&&!checkedVip;attempt++){
+   let w=engine.newWorld({team:attempt});
+   for(let day=0;day<80;day++){
+    const v=engine.view(w);
+    if(v.acknowledgements.month){w=engine.advance(w,{acknowledge:'month'});continue;}
+    if(v.acknowledgements.milestones){w=engine.advance(w,{acknowledge:'milestones'});continue;}
+    if(v.blocked)break;
+    const normal=engine.advance(w,{step:1},{verified:true,vip:false});
+    const paid=engine.advance(w,{step:1},{verified:true,vip:true});
+    const earned=engine.view(paid).vipIncome;
+    a.equal(engine.view(normal).vipIncome,0);
+    if(earned>0){a.equal(engine.view(engine.advance(w,{step:1},{verified:false,vip:true})).vipIncome,0);for(const t of paid.teams.filter(t=>t.id!==w.selectedId))a.equal(t.cash,normal.teams.find(x=>x.id===t.id).cash);checkedVip=true;break;}
+    w=normal;
+   }
+  }
+  a.ok(checkedVip,'actual VIP settlement required');
   const archived=engine.newWorld({});archived.pendingMonth={year:archived.year,id:'fixture'};archived.monthlyArchive=[];
   a.throws(()=>engine.advance(archived,{acknowledge:'month'}),/not archived/);
   archived.monthlyArchive.push({...archived.pendingMonth});const ack=engine.advance(archived,{acknowledge:'month'});
