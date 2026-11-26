@@ -66,6 +66,8 @@ function createHeadlessEngine(){
    freeCount:free.length,free:free.slice(0,80).map(freeRow),
    managerCandidates:[1,2,3].map(slot=>{const m=makeManager(team.id,game.year,slot);return {slot,id:m.id,name:m.name,style:m.style,salary:m.salary,contractYears:m.contractYears,fee:r2(m.salary*.3),current:m.id===manager?.id};}),
    lineup:team.lineup.slice(),rotation:team.rotation.slice(),fieldingRoles:{...team.fieldingRoles},fieldingOptions:team.lineup.map(id=>({id,roles:FIELD_POSITIONS.filter(role=>canAssignFieldingRole(team,id,role))})),
+   lineupWarnings:{missing:Math.max(0,9-team.lineup.length),off:team.lineup.filter(id=>fieldingTier(getPlayer(id),team.fieldingRoles[id])==='off')},
+   lineupCandidates:firstHitters(team).filter(availableForGame).map(p=>({id:p.id,roles:FIELD_POSITIONS.filter(role=>!roster190Candidate(team,role,p))})),
    facilities:[...Object.entries(INFRA_LABELS),...Object.entries(STADIUM_KEYS)].map(([key,label])=>{const lv=Object.hasOwn(INFRA_LABELS,key)?infraLevel(team,key):stadium[key];return {key,label,level:lv,upkeep:facilityUpkeep(key,lv),nextCost:lv<20?facilityCost(key,lv):null,nextUpkeep:lv<20?facilityUpkeep(key,lv+1):null};}),
    prices:stadium.prices.slice(),canPrice:stadiumCanPrice(team),payroll:payroll(team),reserve:cpuReserve(team),forecast:cpuForecast(team),travel:clubLifeData(team).travel,travelCosts:CLUB_TRAVEL.slice(),
    manager:manager?{id:manager.id,name:manager.name,contractYears:manager.contractYears,tenure:managerTenure(team),salary:manager.salary,trust:manager.trust,discontent:manager.discontent,renewAvailable:managerTenure(team)<7&&manager.contractYears===1&&game.day>=98&&manager.renewedYear!==game.year,renewFee:r2(manager.salary*.2),orders:MANAGER_TACTICS.map(([key,label,attack,safe])=>({key,label,attack,safe,value:team.gmOrders?.[key]||'auto'}))}:null,
@@ -303,6 +305,15 @@ function createHeadlessEngine(){
    if(!p||p.teamId!==team.id||p.farmTier===2||!availableForGame(p)||(k==='lineup'?isPitch(p):p.pos!=='SP')||i>=arr.length||arr[i]===p.id)throw Error('invalid lineup selection');
    const old=arr[i],other=arr.indexOf(p.id);if(other>=0)arr[other]=old;arr[i]=p.id;
    if(k==='lineup')syncLineupFielding(team);
+  }else if(k==='lineup-recommend'||k==='lineup-move'||k==='lineup-replace'){
+   if(!freeVisible())throw Error('lineup unavailable before reveal');
+   if(k==='lineup-recommend'){
+    const recommended=managerRecommendedLineup(team);
+    if(roster190Fingerprint(team)===roster190Fingerprint(recommended))throw Error('lineup unchanged');
+    team.lineup=recommended.lineup;team.fieldingRoles=recommended.fieldingRoles;
+   }else if(k==='lineup-move'){
+    if(!roster190MoveOrder(team,input.slot,input.target))throw Error('invalid lineup move');
+   }else if(!roster190Replace(team,input.key,input.playerId))throw Error('invalid lineup replacement');
   }else if(k==='order'){
    const arr=input.kind==='lineup'?team.lineup:team.rotation;
    if(input.slot>=arr.length||input.target>=arr.length||input.slot===input.target)throw Error('invalid order exchange');
@@ -730,6 +741,9 @@ function createHeadlessEngine(){
     if(k==='identity')valid=exact(command,[...base,'identity','confirmed'])&&command.confirmed===true&&validIdentity(command.identity);
     if(k==='lineup'||k==='rotation')valid=pid&&slot(command.slot)&&exact(command,[...base,'playerId','slot']);
     if(k==='order')valid=exact(command,[...base,'kind','slot','target'])&&['lineup','rotation'].includes(command.kind)&&slot(command.slot)&&slot(command.target);
+    if(k==='lineup-recommend')valid=exact(command,[...base,'confirmed'])&&command.confirmed===true;
+    if(k==='lineup-move')valid=exact(command,[...base,'slot','target'])&&slot(command.slot)&&slot(command.target)&&command.slot!==command.target;
+    if(k==='lineup-replace')valid=pid&&exact(command,[...base,'playerId','key'])&&['C','1B','2B','3B','SS','LF','CF','RF','DH'].includes(command.key);
     if(k==='fielding')valid=pid&&exact(command,[...base,'playerId','key'])&&['C','1B','2B','3B','SS','LF','CF','RF','DH'].includes(command.key);
     if(k==='farm-move')valid=pid&&exact(command,[...base,'playerId']);
     if(k==='farm-mode')valid=exact(command,[...base,'value'])&&['auto','manual'].includes(command.value);

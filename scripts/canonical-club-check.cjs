@@ -31,3 +31,27 @@ const pending=JSON.parse(JSON.stringify(w));pending.pendingEvent={playerId:ownId
 const snapshot=JSON.stringify(w);engine.view(w);a.equal(JSON.stringify(w),snapshot);
 a.ok(Buffer.byteLength(JSON.stringify(engine.view(w)))<262144);
 console.log('PASS authoritative club roster, lineup/fielding, farm, facilities, price, support, manager policy, cash and event guards');
+
+// v190 manager recommendation and position-aware roster commands use the
+// actual UI engine helpers, not client-supplied assignments or RNG.
+w=engine.newWorld({team:0});v=view();
+a.throws(()=>engine.advance(w,{club:'lineup-recommend',confirmed:false}));
+a.throws(()=>engine.advance(w,{club:'lineup-recommend',confirmed:true,lineup:[]}));
+let initial=JSON.stringify(w),recommended;
+try{recommended=engine.advance(w,{club:'lineup-recommend',confirmed:true});}
+catch(e){a.match(String(e),/lineup unchanged/);w=engine.advance(w,{club:'lineup-move',slot:0,target:1});initial=JSON.stringify(w);recommended=engine.advance(w,{club:'lineup-recommend',confirmed:true});}
+a.equal(JSON.stringify(w),initial);
+a.deepEqual(engine.advance(w,{club:'lineup-recommend',confirmed:true}),recommended);
+w=recommended;v=view();a.equal(v.lineup.length,9);a.equal(new Set(v.lineup).size,9);a.equal(new Set(Object.values(v.fieldingRoles)).size,9);a.deepEqual(v.lineupWarnings,{missing:0,off:[]});
+a.throws(()=>engine.advance(w,{club:'lineup-recommend',confirmed:true}),/lineup unchanged/);
+let ids=v.lineup.slice(),assignments=v.fieldingRoles;
+v=go('lineup-move',{slot:0,target:3});a.deepEqual(v.lineup.slice(0,4),[ids[1],ids[2],ids[3],ids[0]]);a.deepEqual(v.fieldingRoles,assignments);
+a.throws(()=>engine.advance(w,{club:'lineup-move',slot:0,target:0}));
+a.throws(()=>engine.advance(w,{club:'lineup-replace',key:'C',playerId:other.id}));
+const eligible=v.lineupCandidates.find(x=>!v.lineup.includes(x.id)&&x.roles.length);
+a.ok(eligible);const role=eligible.roles[0],oldId=v.lineup.find(id=>v.fieldingRoles[id]===role),oldIndex=v.lineup.indexOf(oldId);
+v=go('lineup-replace',{key:role,playerId:eligible.id});a.equal(v.lineup[oldIndex],eligible.id);a.equal(v.fieldingRoles[eligible.id],role);a.equal(Object.hasOwn(v.fieldingRoles,oldId),false);
+a.throws(()=>engine.advance(w,{club:'lineup-replace',key:role,playerId:eligible.id}));
+const injured=JSON.parse(JSON.stringify(w));injured.players.find(p=>p.id===eligible.id).injury={daysLeft:5};a.throws(()=>engine.advance(injured,{club:'lineup-replace',key:role,playerId:eligible.id}));
+const blocked=JSON.parse(JSON.stringify(w));blocked.pendingDraftReveal={year:w.year,entries:[]};a.throws(()=>engine.advance(blocked,{club:'lineup-move',slot:0,target:1}));
+console.log('PASS server v190 recommendation, move, eligibility, role replacement and reveal boundary');
