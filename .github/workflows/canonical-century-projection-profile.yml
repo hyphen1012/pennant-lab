@@ -1,0 +1,30 @@
+name: Canonical century projection profile
+on:
+  pull_request:
+    paths:
+      - 'scripts/canonical-century-projection-profile.cjs'
+      - '.github/workflows/canonical-century-projection-profile.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-world-profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        years: [2, 100]
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/canonical-century-projection-profile.cjs run ${{ matrix.years }} 1937
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: canonical-century-projection-${{ matrix.years }}
+          path: test-results/century-worker-*.json
