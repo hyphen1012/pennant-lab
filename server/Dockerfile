@@ -3,6 +3,7 @@ WORKDIR /app
 COPY --chown=node:node server ./server
 RUN cd server && npm install --omit=dev --ignore-scripts && npm cache clean --force
 COPY --chown=node:node shared ./shared
+COPY --chown=node:node index.html ./index.html
 COPY --chown=node:node mobile/src/save-gzip-codec.cjs ./mobile/src/save-gzip-codec.cjs
 USER node
 ENV PL_ENV=staging PL_DATA_DIR=/data PL_PORT=8787
