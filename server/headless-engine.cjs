@@ -370,6 +370,7 @@ function createHeadlessEngine(){
       }else{
        if(!faCanApproach(d,row)||faUnread(o))throw Error('FA negotiation unavailable');
        if(k==='talk'||k==='salary'){
+        if(k==='salary'){const b=faSalaryBounds(d,row,faTalk(d,row,true));if(input.million<b.min||input.million>b.max)throw Error('FA salary exceeds available funds');}
         if(!faTalkCommand(d,row,k==='salary'?'million:'+input.million:input.key))throw Error('FA dialogue rejected');
        }else if(k==='years'){
         const v=faTalk(d,row,true);v.years=input.years;
@@ -504,9 +505,40 @@ function createHeadlessEngine(){
     if(m&&Number(m[2])===team.id)win(Number(m[1]),Number(m[3]));
     continue;
    }
-   if(!['award','facility','championship','league-championship','retirement'].includes(e.kind)&&!e.featKey&&!e.recordKey)continue;
+   // Preserve all previously exposed keys. New kinds are genuine own-club
+   // album events, not sharing actions or another club's headline.
+   if(!['award','facility','championship','league-championship','retirement','farewell','club-record'].includes(e.kind)&&!e.featKey&&!e.recordKey&&!e.anniversary&&!(e.id.startsWith('news:')&&memorialNewsEligible(e,team)))continue;
    const key='memorial:'+e.id;
    if(!entries.has(key))entries.set(key,{key,label:e.title.slice(0,160),eligible:true});
+  }
+  // Special news and the ordinary record edition sometimes describe the
+  // same achievement. Reuse the ordinary key rather than granting twice.
+  const careerNews=new Set((game.milestoneNews||[]).filter(e=>e.teamId===team.id&&e.careerKey).map(e=>e.playerId+':'+e.careerKey));
+  const addRare=(key,title)=>{key='memorial:'+key;if(!entries.has(key))entries.set(key,{key,label:title.slice(0,160),eligible:true});};
+  for(const e of game.rareNews||[]){
+   if(typeof e.id!=='string'||e.id.length>480||typeof e.title!=='string'||!e.title||!e.category||!Number.isSafeInteger(e.year)||!e.id.startsWith(e.year+':'))continue;
+   if(e.kind==='foreign-discovery'){
+    // Own scout discovery is a genuine server event; only its public title.
+    if(e.scoutTeamId===team.id&&e.id===e.year+':foreign-discovery:'+e.playerId)addRare('rare:'+e.id,e.title);
+    continue;
+   }
+   if(e.teamId!==team.id||!Number.isSafeInteger(e.playerId))continue;
+   const k=e.id.slice(String(e.year).length+1);
+   if(k.startsWith('awards:'))continue; // actual annual title entries already qualify
+   if(k.startsWith('feat:')){addRare('news:'+e.id,e.title);continue;}
+   if(k.startsWith('record:'))continue; // use original official record-update evidence only
+   if(k.startsWith('career:')){
+    const c=k.slice(('career:'+e.playerId+':').length);
+    if(careerNews.has(e.playerId+':'+c))continue;
+    addRare('news:'+e.id,e.title);continue;
+   }
+   const stat=k.match(/^stat:(\\d+):([a-z]+):(\\d+)$/);
+   if(stat&&Number(stat[1])===e.playerId){
+    const equivalent={'w:20':'season20w','k:200':'season200k','h:200':'season200h'}[stat[2]+':'+stat[3]];
+    if(equivalent){addRare('news:'+e.year+':season-feat:'+e.playerId+':'+equivalent,e.title);continue;}
+    addRare('rare:'+e.id,e.title);continue;
+   }
+   if(k==='debut:'+e.playerId||k==='awakening:'+e.playerId||k.startsWith('lineage:'+e.playerId+':'))addRare('rare:'+e.id,e.title);
   }
   return JSON.stringify([...entries.values()]);
  }
@@ -548,7 +580,7 @@ function createHeadlessEngine(){
     if(k==='open')valid=exact(command,[...base,'room'])&&['news','fa','return','other'].includes(command.room);
     if(['ack','submit','withdraw','exchange','special-result'].includes(k))valid=exact(command,[...base,'playerId'])&&id(command.playerId);
     if(k==='talk')valid=exact(command,[...base,'playerId','key'])&&id(command.playerId)&&['listen','winning','chance','trust','vision','legacy','salary:90','salary:100','salary:115','salary:130','salary:145'].includes(command.key);
-    if(k==='salary')valid=exact(command,[...base,'playerId','million'])&&id(command.playerId)&&Number.isSafeInteger(command.million)&&command.million>=5&&command.million<=500;
+    if(k==='salary')valid=exact(command,[...base,'playerId','million'])&&id(command.playerId)&&Number.isSafeInteger(command.million)&&command.million>=5;
     if(k==='years')valid=exact(command,[...base,'playerId','years'])&&id(command.playerId)&&Number.isSafeInteger(command.years)&&command.years>=1&&command.years<=10;
     if(k==='free')valid=exact(command,[...base,'playerId','salary'])&&id(command.playerId)&&Number.isFinite(command.salary)&&command.salary>=.05&&command.salary<=5;
     if(['trade','comp'].includes(k))valid=exact(command,[...base,'playerId','otherId'])&&id(command.playerId)&&id(command.otherId)&&command.playerId!==command.otherId;
