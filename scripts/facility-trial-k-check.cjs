@@ -1,7 +1,7 @@
 const fs=require('node:fs'),assert=require('node:assert/strict'),{applyTrialK}=require('./facility-trial-k.cjs');
 const html=fs.readFileSync('index.html','utf8');
 function evaluate(h){
- const inline=h.match(/<script>([\\s\\S]*?)<\\/script>/)[1],end=inline.indexOf("  const appRoot=document.querySelector('#app');");
+ const start=h.indexOf('<script>'),finish=h.indexOf('</script>',start);assert(start>=0&&finish>start);const inline=h.slice(start+8,finish),end=inline.indexOf("  const appRoot=document.querySelector('#app');");
  assert(end>0);
  const tail=`save=()=>true;render=()=>{};showToast=()=>{};buildFresh();game.started=true;ensureGameExtras();
  const t=myTeam(),result=[];t.fans=250000;
