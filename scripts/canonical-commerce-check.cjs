@@ -16,8 +16,10 @@ globalThis.__plAnnualEntryCheck=saved=>{
  a.equal(engine.view(routine).annual.routineClearable,true);a.equal(engine.view(routine).annual.canStart,true);
  const deferred=engine.advance(routine,{annual:'start'});a.equal(deferred.pendingReview,null);a.equal(deferred.pendingMonth,null);
  a.deepEqual(deferred.games,routine.games);a.deepEqual(deferred.monthlyArchive,routine.monthlyArchive);
- for(const invalid of [ {...routine,pendingReview:{...routine.pendingReview,explicit:true}}, {...routine,pendingMonth:{...routine.pendingMonth,explicit:true}}, {...routine,pendingReview:{...routine.pendingReview,gameId:'absent'}}, {...routine,pendingMonth:{...routine.pendingMonth,id:'absent'}}, {...routine,pendingMilestoneIds:['absent']} ]){
-  a.equal(engine.view(invalid).annual.canStart,false);a.throws(()=>engine.advance(invalid,{annual:'start'}),/inbox unresolved/);
+ // The existing save normalizer clears a dangling match pointer before annual logic; test an existing but wrong-club match instead.
+ const otherMatch=w.games.find(g=>g.home!==w.selectedId&&g.away!==w.selectedId);a.ok(otherMatch);
+ for(const [label,invalid] of [['explicit review',{...routine,pendingReview:{...routine.pendingReview,explicit:true}}],['explicit month',{...routine,pendingMonth:{...routine.pendingMonth,explicit:true}}],['wrong club review',{...routine,pendingReview:{year:otherMatch.year,gameId:otherMatch.id,explicit:false}}],['missing month',{...routine,pendingMonth:{...routine.pendingMonth,id:'absent'}}],['wrong club month',{...routine,monthlyArchive:routine.monthlyArchive.map(m=>m.id===month.id&&m.year===month.year?{...m,teamId:(w.selectedId+1)%12}:m)}],['missing milestone',{...routine,pendingMilestoneIds:['absent']}]]){
+  a.equal(engine.view(invalid).annual.canStart,false,label);a.throws(()=>engine.advance(invalid,{annual:'start'}),/inbox unresolved/,label);
  }
  const important={...routine,pendingDecade:year};a.equal(engine.view(important).annual.canStart,false);a.throws(()=>engine.advance(important,{annual:'start'}),/inbox unresolved/);
  const off={...deferred,pendingReview:{...routine.pendingReview},pendingMonth:{...routine.pendingMonth}};
