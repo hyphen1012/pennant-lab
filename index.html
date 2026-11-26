@@ -177,6 +177,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .official-launch-frame{position:relative;width:min(100%,56.25vh);width:min(100%,56.25dvh);aspect-ratio:9/16;overflow:hidden;isolation:isolate}
 .official-launch-frame>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;user-select:none}
 .official-ambient{position:absolute;inset:0;pointer-events:none;opacity:.16;background:radial-gradient(ellipse at 12% 20%,#9b4be93b,transparent 35%),radial-gradient(ellipse at 88% 65%,#bd83ff2b,transparent 32%);animation:official-ambient-drift 8s ease-in-out infinite alternate}
+.official-title-metal,.official-stadium-lights,.official-crowd,.official-embedded-prompt,.official-title-particles{position:absolute;inset:0;pointer-events:none}
+.official-title-metal{clip-path:polygon(20% 39%,32% 35%,52% 37%,83% 35%,86% 40%,79% 44%,68% 47%,50% 54%,23% 47%,16% 43%);background:linear-gradient(115deg,transparent 30%,#fff2b900 44%,#fff3c55c 50%,transparent 56%);background-size:250% 100%;mix-blend-mode:screen;animation:official-metal 10s ease-in-out infinite}
+.official-stadium-lights{background:radial-gradient(ellipse 10% 4% at 10% 60%,#e5caff38,transparent),radial-gradient(ellipse 10% 4% at 90% 60%,#e5caff38,transparent);mix-blend-mode:screen;animation:official-lights 7s ease-in-out infinite alternate}
+.official-crowd{clip-path:polygon(0 67%,39% 71%,61% 71%,100% 67%,100% 74%,0 74%);background:radial-gradient(ellipse 2px 1px at 40% 50%,#e0caff80,transparent);background-size:23px 13px;opacity:.08;animation:official-crowd 8s ease-in-out infinite alternate}
+.official-embedded-prompt{clip-path:inset(84% 17% 12% 17%);background:radial-gradient(ellipse 38% 3% at 50% 86%,#fff1c32c,transparent);mix-blend-mode:screen;animation:official-lights 3.8s ease-in-out infinite alternate}
+.official-title-particles i{position:absolute;left:var(--px);top:var(--py);width:2px;height:2px;background:#f0d5ff;border-radius:50%;box-shadow:0 0 5px #a96cff;animation:official-particle var(--pt) ease-in-out var(--pd) infinite;opacity:.15}
+@keyframes official-metal{0%,20%{background-position:100% 0;opacity:0}35%{opacity:.28}65%,100%{background-position:0 0;opacity:0}}
+@keyframes official-lights{from{opacity:.08}to{opacity:.38}}
+@keyframes official-crowd{from{opacity:.04;transform:translateX(0)}to{opacity:.13;transform:translateX(2px)}}
+@keyframes official-particle{0%,100%{transform:translate3d(0,4px,0);opacity:.08}50%{transform:translate3d(3px,-8px,0);opacity:.55}}
+@media(prefers-reduced-motion:reduce){.official-title-metal,.official-stadium-lights,.official-crowd,.official-embedded-prompt,.official-title-particles i{animation:none;opacity:0}}
 .official-launch-hit{position:absolute;inset:0;border:0;background:transparent;width:100%;height:100%;padding:0;touch-action:manipulation;color:#f6e6bd}
 .official-launch-hit:focus-visible{outline:2px solid #e7d2a1;outline-offset:-5px}
 .official-launch-prompt{position:absolute;bottom:max(5%,env(safe-area-inset-bottom));left:0;width:100%;text-align:center;text-shadow:0 2px 8px #080411;font-size:clamp(13px,3.8vw,20px);letter-spacing:.12em;animation:launch-glow 3.2s ease-in-out infinite}
@@ -6308,15 +6319,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   // The approved MP4 will be assigned here when the asset is delivered.
   // Official asset paths remain empty until the exact approved files are supplied.
   // No substitute media is generated. The title text flag must be verified on the original.
-  const STARTUP_MEDIA=Object.freeze({video:'',title:'',hasStartText:false});
+  const STARTUP_MEDIA=Object.freeze({video:'',title:'',hasStartText:true});
   let startupPlaying=false,startupAttempted=false,launchTransition=false,titleMediaFailed=false;
   function launchFallbackTitleScreen(){
     return '<main class="launch-screen" data-launch-screen><svg class="launch-field" viewBox="0 0 400 600" aria-hidden="true"><defs><radialGradient id="launch-light"><stop stop-color="#d5b879" stop-opacity=".3"/><stop offset="1" stop-color="#d5b879" stop-opacity="0"/></radialGradient></defs><ellipse cx="200" cy="350" rx="190" ry="225" fill="url(#launch-light)"/><g fill="none" stroke="#98bad3" stroke-width="1"><ellipse cx="200" cy="350" rx="180" ry="205"/><ellipse cx="200" cy="350" rx="160" ry="185"/><path d="M200 155L360 350 200 545 40 350Z M200 255L278 350 200 445 122 350Z M200 155V545M40 350H360"/></g></svg><div class="launch-brand"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.9.189 · CLUB LEGACY</span></div><button class="launch-start" data-action="launch-start"><span>画面をタップしてスタート</span><small>TAP TO START</small></button></main>';
   }
   function launchMuted(){try{return localStorage.getItem('pl_launch_muted')==='1';}catch{return false;}}
+  function officialTitleParticles(){
+    // Fixed art-relative positions, away from the central title and text.
+    const points=[[7,11],[17,7],[83,13],[92,26],[12,29],[6,39],[88,34],[94,44],[8,52],[91,50],[17,58],[81,57],[25,62],[76,62]];
+    return '<div class="official-title-particles" aria-hidden="true">'+points.map(([x,y],i)=>'<i style="--px:'+x+'%;--py:'+y+'%;--pd:'+(-i*.63)+'s;--pt:'+(6+i%5)+'s"></i>').join('')+'</div>';
+  }
   function launchTitleScreen(){
     if(!STARTUP_MEDIA.title||titleMediaFailed)return launchFallbackTitleScreen();
-    return '<main class="official-launch" data-launch-screen><div class="official-launch-frame"><img data-official-title-image src="'+h(STARTUP_MEDIA.title)+'" alt="" draggable="false"><div class="official-ambient" aria-hidden="true"></div><button class="official-launch-hit" data-action="launch-start" aria-label="画面をタップしてスタート">'+(STARTUP_MEDIA.hasStartText?'':'<span class="official-launch-prompt">画面をタップしてスタート</span>')+'</button></div></main>';
+    return '<main class="official-launch" data-launch-screen><div class="official-launch-frame"><img data-official-title-image src="'+h(STARTUP_MEDIA.title)+'" alt="" draggable="false"><div class="official-ambient" aria-hidden="true"></div><div class="official-title-metal" aria-hidden="true"></div><div class="official-stadium-lights" aria-hidden="true"></div><div class="official-crowd" aria-hidden="true"></div><div class="official-embedded-prompt" aria-hidden="true"></div>'+officialTitleParticles()+'<button class="official-launch-hit" data-action="launch-start" aria-label="画面をタップしてスタート">'+(STARTUP_MEDIA.hasStartText?'':'<span class="official-launch-prompt">画面をタップしてスタート</span>')+'</button></div></main>';
   }
   document.addEventListener('error',e=>{if(e.target?.hasAttribute?.('data-official-title-image')&&!titleMediaFailed){titleMediaFailed=true;if(ui.page==='title'&&ui.launchTitle)render();}},true);
   // Play the original multiplexed MP4 as a single media element. Never seek,
