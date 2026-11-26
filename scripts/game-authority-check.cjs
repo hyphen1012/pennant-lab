@@ -13,7 +13,7 @@ const assert=require('node:assert/strict'),{openLedger,createAccountService}=req
    if(a.route==='manager')result=retainManager(s,'mgr',s.year);
    if(!result)throw Error('ineligible');s.done.push(a.route);return {state:s,result};
   },
-  advance(s,cmd){if(Object.keys(cmd).join(',')!=='step'||cmd.step!==1)throw Error('bad command');s.tick++;return s;},
+  advance(s,cmd,rights){assert.deepEqual(rights,{verified:true,vip:paid,adSkip:false});if(Object.keys(cmd).join(',')!=='step'||cmd.step!==1)throw Error('bad command');s.tick++;return s;},
   view(s){return {done:s.done,tick:s.tick,days:s.players[0].injury.daysLeft,manager:s.teams[0].manager.tenureContinuedYear??null};}
  };
  const service=createGameAuthority({ledger,engine,authenticate:async t=>({authenticated:true,account:t==='owner'?owner:other}),verifyRights:async()=>({verified:true,vip:paid,adSkip:false}),hasAdProof:x=>proofs.has(x.operationId+':'+x.attempt),now:()=>now});

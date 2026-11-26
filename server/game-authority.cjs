@@ -66,13 +66,14 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
  }
  async function advance(token,slot,expectedRevision,command){
   const account=await identity(token);if(!n(expectedRevision))throw Error('invalid revision');
+  const entitlements=await rights(account);
   return ledger.transact(account,(s,db)=>{
    const r=world(db,account,slot);if(r.revision!==expectedRevision)throw Error('world revision conflict');
    // No advancement while an unresolved reward exists in this world. Recovery
    // or explicit cancel is required; lost connection is not a cancel.
    const pending=db.prepare('SELECT operation FROM authority_actions WHERE account=? AND world=? AND result IS NULL').all(account,r.world);
    if(pending.some(x=>s.orders[x.operation]?.status==='pending'))throw Error('reward reconciliation required');
-   const next=sync(engine.advance(r.state,JSON.parse(json(command,4096))));commitWorld(db,r,next);
+   const next=sync(engine.advance(r.state,JSON.parse(json(command,4096)),entitlements));commitWorld(db,r,next);
    return view({...r,state:next,revision:r.revision+1});
   });
  }

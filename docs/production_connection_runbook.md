@@ -117,3 +117,10 @@
 
 ## Headless manager and memorial pilot — 2026-11-26
 - Expanded real engine pilot with manager continuation (existing tenure >=7 and day >=98; one per season, unlimited future seasons), monthly report acknowledgement only if archived and milestone deferral via existing game function. No rare/injury notice deletion or crisis bypass; unsupported operations still blocked. Existing actual own-club win identities remain unchanged, historical wins from server-owned memorial album and own-club award/facility/championship/retirement/record entries are exposed with stable hashed IDs for non-win sources. Missing explicit team identity excluded. No SNS posting proof. Added actual-match regression and manager/archived-report fixtures. Remains staging-only and not wired into full UI/annual engine. Full reward catalog, VIP revenue, RNG reproducibility, event acknowledgement and concurrency tests remain open.
+
+
+## 2026-11-26: headless pilot increment
+- Actual retirement consultation continuation uses the current selected club player and existing careerEventDone transition; reward settlement remains canonical and atomic. No client snapshots accepted. Natural annual rollover and the complete career UI remain blocked.
+- Canonical advance receives a freshly verified entitlement from server authority. Only that trusted context activates the existing vipStatusProvider and actual eligible revenue accounting. No entitlement value is persisted in the game save or accepted in advance commands. Current limited calendar only; production receipts, expiration timing and full annual flow still require testing.
+- Optional exact `{team: 0..11}` setup selects a real server-generated club without admitting custom seed/state; legacy `{}` remains accepted. Preserve the PRNG cursor after initial roster generation, rather than resetting it to the initial seed. Add same-snapshot replay regression; comprehensive long-period deterministic audit remains open.
+- Staging only; no release/main integration or production activation. CI pending at submission.
