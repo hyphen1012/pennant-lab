@@ -36,11 +36,24 @@ function createHeadlessEngine(){
    rare:rare?{eventKey:rare.id,year:rare.year,date:rare.date,category:rare.category}:null,
    career:career?{playerId:career.p.id,stage:career.e.type,options:['consult','plan'].includes(career.e.type)?farewellChoices(career.p).map(([key,label,cost])=>({key,label,cost})):[]}:null};
  };
+ const annualSupported=['awards-all','settlement','movement-declarations','draft','roster-cut'];
+ const draftPending=d=>d.picks.find(x=>x.teamId===team.id&&(x.recoveryPending||x.recoveryCelebration));
+ const draftOwnRow=d=>d.picks.find(x=>x.teamId===team.id&&x.status==='rights');
+ const candidateView=c=>({id:c.id,name:secretProspect(c.player)?'????':c.player.name,pos:c.player.pos,type:c.type,category:playerTitleTheme(c.player)?.name||null});
+ const draftView=d=>{
+  if(!d||d.year!==game.year)return null;
+  const g=draftLotteryGroup(d),row=draftPending(d)||draftOwnRow(d),c=row&&draftCandidate(d,row.candidateId),questions=RECRUIT_QUESTIONS[row?.conversation?.answers?.length||0];
+  const options=['scout','first','later'].includes(d.phase)?draftOptions(d,team).filter(scoutVisible).map(candidateView):[];
+  return {phase:d.phase,round:d.round,rareIntro:!!d.rareIntro,announcement:!!d.announcement,canNominate:d.phase==='first'?d.active.includes(team.id):d.phase==='later'&&draftLaterOrder(d)[d.cursor]===team.id,
+   candidates:options,lottery:d.phase==='lottery'&&g?{stage:d.pendingLottery.stage,candidateId:g.cid,own:g.ids.includes(team.id),tickets:g.ids.length,...(d.pendingLottery.stage==='revealed'?{winner:g.winner}:{})}:null,
+   negotiation:d.phase==='negotiate'&&c?{...candidateView(c),status:row.status,recoveryPending:!!row.recoveryPending,recoveryCelebration:!!row.recoveryCelebration,answers:row.conversation?.answers||[],question:row.status==='rights'&&questions?{options:questions.options.map(x=>({key:x[0],label:x[1]}))}:null}:null,
+   picks:d.picks.map(x=>({round:x.round,teamId:x.teamId,candidateId:x.candidateId,status:x.status,pos:x.pos,name:secretProspect(draftCandidate(d,x.candidateId)?.player)?'????':x.name}))};
+ };
  const annualView=()=>{
   const f=flowGet(),d=movementData();
   if(!f)return {mode:null,canStart:game.day===143&&game.calendarIndex===game.calendar.days.length&&!game.financeCrisis&&!flowInbox()&&!game.pendingMonth&&!game.pendingReview&&!pendingMilestoneNews().length&&!flowForeignResponse()};
-  const tasks=Object.values(f.jobs).map(j=>({id:j.id,start:j.start,status:j.status,supported:['awards-all','settlement','movement-declarations'].includes(j.id)}));
-  return {mode:f.mode,date:f.date,active:f.active,tasks,canAdvance:!f.active&&!flowInbox()&&!game.financeCrisis&&!flowBlocking(f),requests:f.active==='movement-declarations'?(d?.requests||[]).filter(r=>r.from===team.id).map(r=>({id:r.id,kind:r.kind,status:r.status,demand:r.demand,offer:r.offer})):[]};
+  const tasks=Object.values(f.jobs).map(j=>({id:j.id,start:j.start,status:j.status,supported:annualSupported.includes(j.id)}));
+  return {mode:f.mode,date:f.date,active:f.active,tasks,canAdvance:!f.active&&!flowInbox()&&!game.financeCrisis&&!flowBlocking(f),draft:f.active==='draft'?draftView(game.draft):null,roster:f.active==='roster-cut'?{projection:draftRosterProjection(game.draft,team),selected:draftCutIds(game.draft,team),eligible:draftCutOptions(game.draft,team).map(p=>({id:p.id,name:p.name,pos:p.pos,salary:p.salary,warnings:draftCutReasons(p)}))}:null,requests:f.active==='movement-declarations'?(d?.requests||[]).filter(r=>r.from===team.id).map(r=>({id:r.id,kind:r.kind,status:r.status,demand:r.demand,offer:r.offer})):[]};
  };
  const medical=()=>own(team).filter(p=>rosterTreatmentEligible(p)&&p.injury&&typeof p.injury.date==='string').map(p=>({route:'medical',year:game.year,eventKey:String(p.id)+':'+p.injury.date,label:p.name+' 特別治療',playerId:p.id,date:p.injury.date}));
  // Same eligibility as the checked-in manager staff continuation handler:
@@ -176,14 +189,54 @@ function createHeadlessEngine(){
     if(f.date>=game.year+'-12-31'||!flowDay(f))throw Error('annual date blocked');
    }else if(input.choice==='open'){
     const j=f.jobs[input.job];
-    if(!['awards-all','settlement','movement-declarations'].includes(input.job)||!flowOpen(f,j))throw Error('annual event unavailable');
+    if(!annualSupported.includes(input.job)||!flowOpen(f,j))throw Error('annual event unavailable');
     if(j.id==='movement-declarations')movementInit();
     game.pendingCeremonyIntro=null;
    }else if(input.choice==='complete'){
     const j=f.jobs[f.active];
-    if(!j||j.id!==input.job||!['awards-all','settlement','movement-declarations'].includes(j.id))throw Error('annual event unavailable');
+    if(!j||j.id!==input.job||!annualSupported.includes(j.id))throw Error('annual event unavailable');
     if(j.id==='movement-declarations'&&movementData()?.requests.some(r=>r.from===team.id&&['request','refused'].includes(r.status)))throw Error('movement decision required');
+    if(j.id==='draft'&&(game.draft?.phase!=='done'||game.draft.announcement||game.draft.rareIntro))throw Error('draft unfinished');
+    if(j.id==='roster-cut'){
+     const d=game.draft;if(d?.phase!=='done'||d.cutConfirmed||draftRosterProjection(d,team).excess||!draftPlanCPU(d)||game.teams.some(t=>draftRosterProjection(d,t).excess))throw Error('roster projection exceeds limit');
+     d.cutConfirmed=true;
+    }
     flowComplete(f,j);
+   }else if(input.choice==='draft'){
+    const d=game.draft,k=input.decision;
+    if(f.active!=='draft'||game.ceremonyStage!=='draft'||d?.year!==game.year)throw Error('draft stage unavailable');
+    const pending=draftPending(d);
+    if(d.rareIntro){if(k!=='intro')throw Error('draft intro required');d.rareIntro=false;}
+    else if(d.announcement){if(k!=='announcement')throw Error('draft announcement required');d.announcement=null;}
+    else if(pending){if(k!=='dismiss'||input.playerId!==pending.candidateId)throw Error('draft recovery decision required');pending.recoveryPending=false;pending.recoveryCelebration=false;}
+    else if(k==='start'&&d.phase==='scout'){
+     draftStart(d);if(d.candidates.some(c=>playerTitleTheme(c.player))&&!d.rareIntroSeen){d.rareIntroSeen=true;d.rareIntro=true;}
+    }else if(k==='nominate'||k==='pass'||k==='cpu'){
+     const id=k==='nominate'?input.playerId:null,phase=d.phase,round=d.round,pickStart=d.picks.length,passStart=d.passed.length;
+     if(phase==='first'){
+      if(k==='cpu'?d.active.includes(team.id):!d.active.includes(team.id))throw Error('draft turn unavailable');
+      if(!draftFirst(d,id,k==='cpu'))throw Error('nomination rejected');
+     }else if(phase!=='later'||k==='cpu'||!draftLater(d,id))throw Error('nomination rejected');
+     draftQueueAnnouncements(d,phase,round,pickStart,passStart);
+    }else if(k==='ticket'||k==='delegate'){
+     if(!draftDraw(d,k==='ticket'?input.ticket:null,k==='ticket'?'manual':'delegate'))throw Error('lottery draw rejected');
+    }else if(k==='reveal'){
+     if(!draftOpenTicket(d))throw Error('lottery reveal rejected');
+    }else if(k==='next-draw'){
+     if(!draftNextDraw(d))throw Error('lottery next rejected');
+    }else if(k==='next-round'&&d.phase==='first-result'){
+     const pickStart=d.picks.length,passStart=d.passed.length;draftNextFirst(d);draftQueueAnnouncements(d,'later',d.round,pickStart,passStart);
+    }else if(k==='reply'||k==='offer'||k==='withdraw'||k==='delegate-contract'){
+     const row=draftOwnRow(d);
+     if(d.phase!=='negotiate'||!row||row.candidateId!==input.playerId)throw Error('draft negotiation unavailable');
+     if(k==='reply'){if(!draftReply(d,row,input.answer))throw Error('draft reply rejected');}
+     else if(k==='offer'){if(!draftOfferResponse(d,row,input.level,input.role))throw Error('draft offer rejected');if(row.status==='refused')row.recoveryPending=true;}
+     else if(k==='withdraw')draftWithdraw(d,row);
+     else draftAutoNegotiation(d,row);
+    }else if(k==='finish'){if(!draftFinalize(d))throw Error('draft unfinished');}
+    else throw Error('draft operation unavailable');
+   }else if(input.choice==='cut'){
+    if(f.active!=='roster-cut'||game.ceremonyStage!=='roster-cut'||!draftToggleCut(game.draft,team,input.playerId))throw Error('roster cut rejected');
    }else if(input.choice==='movement'){
     if(f.active!=='movement-declarations'||game.ceremonyStage!=='movement-declarations')throw Error('movement stage unavailable');
     const r=movementData()?.requests.find(x=>x.id===input.playerId&&x.from===team.id);
@@ -243,7 +296,19 @@ function createHeadlessEngine(){
   advance(state,command,rights){
    const verifiedVip=rights?.verified===true&&rights.vip===true;
    if(exact(command,['annual'])&&['start','day'].includes(command.annual))return run('annual',state,{choice:command.annual,verifiedVip});
-   if(exact(command,['annual','job'])&&['open','complete'].includes(command.annual)&&['awards-all','settlement','movement-declarations'].includes(command.job))return run('annual',state,{choice:command.annual,job:command.job,verifiedVip});
+   if(exact(command,['annual','job'])&&['open','complete'].includes(command.annual)&&['awards-all','settlement','movement-declarations','draft','roster-cut'].includes(command.job))return run('annual',state,{choice:command.annual,job:command.job,verifiedVip});
+   if(exact(command,['annual','playerId'])&&command.annual==='cut'&&Number.isSafeInteger(command.playerId))return run('annual',state,{choice:'cut',playerId:command.playerId,verifiedVip});
+   if(command?.annual==='draft'){
+    const k=command.decision,base=['annual','decision'];
+    const simple=['start','intro','announcement','pass','cpu','delegate','reveal','next-draw','next-round','finish'];
+    const player=['nominate','dismiss','withdraw','delegate-contract'];
+    let valid=simple.includes(k)&&exact(command,base)||player.includes(k)&&exact(command,[...base,'playerId'])&&Number.isSafeInteger(command.playerId);
+    if(k==='ticket')valid=exact(command,[...base,'ticket'])&&Number.isSafeInteger(command.ticket)&&command.ticket>=0&&command.ticket<12;
+    if(k==='reply')valid=exact(command,[...base,'playerId','answer'])&&Number.isSafeInteger(command.playerId)&&typeof command.answer==='string'&&command.answer.length<=40;
+    if(k==='offer')valid=exact(command,[...base,'playerId','level','role'])&&Number.isSafeInteger(command.playerId)&&[0,1,2].includes(command.level)&&['chance','develop'].includes(command.role);
+    if(!valid)throw Error('invalid draft command');
+    return run('annual',state,{choice:'draft',decision:k,playerId:command.playerId,ticket:command.ticket,answer:command.answer,level:command.level,role:command.role,verifiedVip});
+   }
    if(exact(command,['annual','playerId','decision'])&&command.annual==='movement'&&Number.isSafeInteger(command.playerId)&&['allow','deny'].includes(command.decision))return run('annual',state,{choice:'movement',playerId:command.playerId,decision:command.decision,verifiedVip});
    if(exact(command,['annual','playerId','decision','multiplier'])&&command.annual==='movement'&&Number.isSafeInteger(command.playerId)&&command.decision==='retain'&&[1,1.15].includes(command.multiplier))return run('annual',state,{choice:'movement',playerId:command.playerId,decision:command.decision,multiplier:command.multiplier,verifiedVip});
    if(exact(command,['acknowledge','eventKey'])&&['injury','rare'].includes(command.acknowledge)&&typeof command.eventKey==='string'&&command.eventKey.length<=512)return run('ack',state,{kind:command.acknowledge,eventKey:command.eventKey});
