@@ -122,17 +122,19 @@ function createHeadlessEngine(){
  };
  const foreignView=()=>{
   const m=game.foreignMarket?.year===game.year?foreignHydrate(game.foreignMarket):null;
-  if(!m)return {initialized:false,candidates:[],negotiation:null};
+  const canOperate=!(game.financeCrisis||flowInbox()||game.pendingMonth||game.pendingReview||pendingMilestoneNews().length||game.ceremonyStage||flowGet()?.active||game.pendingCeremonyIntro==='opening');
+  const responsePending=flowForeignResponse();
+  if(!m)return {initialized:false,candidates:[],negotiation:null,canOperate,responsePending};
   const conv=m.negotiations[team.id];
   const project=(c,stage=0)=>{
    const p=c.player,hidden=secretProspect(p)&&stage!==2,r=foreignReport(m,team,c),tasks=foreignTasks(m,team,c);
-   return {id:c.id,name:hidden?'????':p.name,pos:p.pos,age:p.age,country:c.country,category:playerTitleTheme(p)?.name||null,kind:c.kind,status:c.status,tasks,canBegin:c.status==='available'&&foreignRoom(team,c),confidence:r.confidence,estimate:hidden?null:{low:r.low,high:r.high},abilities:Object.fromEntries(Object.entries(r.values).map(([k,v],i)=>[k,stage===2||stage===1&&i<2?{value:p[k]}:hidden?null:{low:v.low,high:v.high,estimate:v.estimate}])),stats:hidden?null:foreignStats(m,c)};
+   return {id:c.id,name:hidden?'????':p.name,pos:p.pos,age:hidden?null:p.age,country:c.country,category:playerTitleTheme(p)?.name||null,specialCategory:p.specialCategory||null,originCategory:p.originCategory||null,hidden,appearanceSeed:hidden?null:p.appearanceSeed,kind:c.kind,status:c.status,tasks,canBegin:c.status==='available'&&foreignRoom(team,c),confidence:r.confidence,estimate:hidden?null:{low:r.low,high:r.high},abilities:Object.fromEntries(Object.entries(r.values).map(([k,v],i)=>[k,stage===2||stage===1&&i<2?{value:p[k]}:hidden?null:{low:v.low,high:v.high,estimate:v.estimate}])),stats:hidden?null:foreignStats(m,c)};
   };
   const c=conv&&m.candidates.find(x=>x.id===conv.candidateId),q=conv?.status==='talk'?FOREIGN_QUESTIONS[conv.answers?.length||0]:null;
   const opened=conv?.resultOpened===true,stage=opened&&conv.status==='signed'?conv.revealStage||0:0;
   const result=['signed','refused','rival','rival-pending','overseas'].includes(conv?.status);
   const status=result&&!opened?'response':conv?.status;
-  return {initialized:true,budget:foreignBudget(team),used:foreignUsed(m,team),research:Object.entries(FOREIGN_TASKS).map(([key,[label,cost]])=>({key,label,cost})),candidates:conv?[]:m.candidates.filter(c=>scoutVisible(c)&&c.status==='available').map(c=>project(c)),
+  return {initialized:true,canOperate,responsePending,budget:foreignBudget(team),used:foreignUsed(m,team),supportOptions:Object.entries(FOREIGN_SUPPORT).map(([key,x])=>({key,label:x.label,cost:x.cost})),research:Object.entries(FOREIGN_TASKS).map(([key,[label,cost]])=>({key,label,cost})),candidates:conv?[]:m.candidates.filter(c=>scoutVisible(c)&&c.status==='available').map(c=>project(c)),
    negotiation:c?{candidate:{...project(c,stage),status:result&&!opened?'pending':c.status,canBegin:false},status,opened,stage,interest:conv.interest,interpreter:!!conv.interpreter,interpreterCost:FOREIGN_INTERPRETER_COST,answerCount:conv.answers?.length||0,question:q?{text:conv.interpreter?q.q:q.gist,options:q.options.map(([key,label])=>({key,label}))}:null,support:conv.support,offerLevel:conv.offerLevel,offers:conv.status==='talk'&&conv.answers?.length===3?[0,1,2].map(level=>{const o=foreignOffer(m,c,level,conv.support);return {...o,affordable:foreignAffordable(team,o)};}):[],due:conv.dueDate,ready:conv.status==='waiting'&&!conv.waitDays,counter:conv.status==='counter'?{originalSalary:conv.counter.originalSalary,amount:conv.counter.amount,salary:conv.counter.revised.salary,affordable:foreignRoom(team,c)&&foreignAffordable(team,conv.counter.revised)}:null,result:opened&&result?{winner:conv.winner,offer:conv.offer,recovery:foreignRecoveryAllowed(m,team,c,conv)}:null}:null};
  };
  const commercialJobs=['fan-fest','tv','fanclub','sponsor','broadcast','naming','opening-promo'];

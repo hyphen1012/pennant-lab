@@ -5,6 +5,8 @@ const clone=v=>JSON.parse(JSON.stringify(v)),club=()=>w.teams.find(t=>t.id===w.s
 const go=(foreign,extra={})=>{w=engine.advance(w,{foreign,...extra});return engine.view(w).foreign;};
 let v=engine.view(w).foreign;
 if(!v.initialized)v=go('init');
+a.equal(v.canOperate,true);a.equal(v.responsePending,false);a.deepEqual(v.supportOptions.map(x=>x.key).sort(),['housing','interpreter']);
+for(const p of v.candidates.filter(p=>p.hidden)){a.equal(p.name,'????');a.equal(p.age,null);a.equal(p.appearanceSeed,null);a.equal(p.stats,null);a.ok(Object.values(p.abilities).every(x=>x===null));}
 a.throws(()=>engine.advance(w,{foreign:'init'}));
 a.throws(()=>engine.advance(w,{foreign:'begin',playerId:99999999}));
 a.throws(()=>engine.advance(w,{foreign:'begin',playerId:v.candidates[0].id,seed:1}));
@@ -30,12 +32,12 @@ if(conv.waitDays){a.throws(()=>engine.advance(w,{foreign:'open'}));for(let i=0;i
  else if(state.acknowledgements.milestones)w=engine.advance(w,{acknowledge:'milestones'});
  else w=engine.advance(w,{step:1});
 }}
-v=engine.view(w).foreign;a.ok(['response','waiting'].includes(v.negotiation.status));a.equal(v.negotiation.result,null);
+v=engine.view(w).foreign;a.ok(['response','waiting'].includes(v.negotiation.status));a.equal(v.negotiation.result,null);a.equal(v.responsePending,true);
 a.throws(()=>engine.advance(w,{foreign:'finish'}));a.throws(()=>engine.advance(w,{step:1}));
 v=go('open');a.equal(v.negotiation.status,'signed');a.equal(v.negotiation.result.winner,w.selectedId);
 a.equal(w.players.filter(p=>p.id===c.id).length,1);a.ok(w.players.find(p=>p.id===c.id).foreignContract);
 a.throws(()=>engine.advance(w,{foreign:'finish'}));a.throws(()=>engine.advance(w,{foreign:'open'}));
 v=go('reveal');a.equal(v.negotiation.stage,1);v=go('reveal');a.equal(v.negotiation.stage,2);a.ok(Object.values(v.negotiation.candidate.abilities).every(x=>Number.isFinite(x.value)));
-a.throws(()=>engine.advance(w,{foreign:'reveal'}));v=go('finish');a.equal(v.negotiation,null);
+a.throws(()=>engine.advance(w,{foreign:'reveal'}));v=go('finish');a.equal(v.negotiation,null);a.equal(v.responsePending,false);
 a.equal(w.players.filter(p=>p.id===c.id).length,1);
 a.ok(!v.candidates.some(x=>x.id===c.id));console.log('PASS actual foreign scouting, research and interpreter charges, dialogue, deferred response, one registration, reveal and duplicate guards');
