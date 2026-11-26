@@ -50,7 +50,7 @@ const fixture=buildSync({stdin:{contents:`
   assert.equal(await page.evaluate(async()=>await readFixtureRecord(JSON.stringify(['account-v1','a'.repeat(64),1]))),undefined,'no implicit guest migration');
   const dialog=page.locator('[data-cloud-save-dialog]');
   await page.locator('[data-cloud-save-open]').click();await dialog.getByText('最新の一覧を取得しました。').waitFor();
-  const section=n=>dialog.locator('section').filter({has:dialog.getByRole('heading',{name:'DATA 0'+n,exact:true})});
+  const section=n=>dialog.locator('section').filter({has:page.getByRole('heading',{name:'DATA 0'+n,exact:true})});
   async function stage(){await section(1).getByRole('button',{name:'端末へ取り込む'}).click();await dialog.getByLabel('端末の取込先').selectOption('3');await dialog.getByRole('button',{name:'内容を取得して確認'}).click();await dialog.getByRole('heading',{name:'端末のデータを置き換えますか？'}).waitFor();}
   await stage();await dialog.getByRole('button',{name:'キャンセル',exact:true}).click();await dialog.getByText('最新の一覧を取得しました。').waitFor();
   const key=JSON.stringify(['account-v1','a'.repeat(64),3]);assert.equal(await page.evaluate(k=>readFixtureRecord(k),key),undefined);
