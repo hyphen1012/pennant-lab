@@ -1,0 +1,20 @@
+name: Canonical offseason entry
+on:
+  push:
+    paths:
+      - 'scripts/canonical-offseason-entry-check.cjs'
+      - 'server/headless-engine.cjs'
+      - '.github/workflows/canonical-offseason-entry.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  annual-entry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/canonical-offseason-entry-check.cjs
