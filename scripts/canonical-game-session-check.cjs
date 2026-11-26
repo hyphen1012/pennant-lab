@@ -54,7 +54,13 @@ const {createAccountClient}=require('../mobile/src/account-client.cjs'),{createC
   a.equal(rosterRecovery.snapshot.game.club.lineupUndoAvailable,true);
   const undone=await one.advance({club:'lineup-undo'});a.equal(undone.status,'ready');a.equal(undone.snapshot.revision,rosterRecovery.snapshot.revision+1);a.deepEqual(undone.snapshot.game.club.lineup,moved.snapshot.game.club.lineup);a.equal(undone.snapshot.game.club.lineupUndoAvailable,false);
   one.suspend();a.equal(one.inspect().snapshot,null);a.throws(()=>one.advance({step:1}));a.equal((await one.refresh()).snapshot.world,b.snapshot.world);
-  console.log('PASS real engine HTTP session, explicit create, revision conflict, committed response loss, no replay, offline and identity isolation');
+  // Real HTTP bounded achievements: compare the existing complete projection.
+  const observer=createAccountClient({baseUrl:'https://fixture.invalid',fetcher});observer.setSession({account:other,token:'b'});
+  const complete=await observer.gameAchievements(1),observed=await one.achievementPage({offset:0,limit:30});a.equal(observed.status,'ready');a.equal(observed.page.total,complete.length);a.deepEqual(observed.page.items,complete.slice(0,30));
+  await a.rejects(observer.gameAchievementPage(1,b.snapshot.world,one.inspect().snapshot.revision,{offset:0,limit:41}));
+  await a.rejects(observer.gameAchievementPage(1,b.snapshot.world,one.inspect().snapshot.revision-1,{offset:0,limit:30}));
+  await a.rejects(one.claimAchievement('a'.repeat(64),'point',false));
+  console.log('PASS real engine HTTP session, explicit create, revision conflict, committed response loss, no replay, offline and identity isolation; bounded achievement page and confirmation guard');
  }finally{await runtime.close();fs.rmSync(dir,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});
 
