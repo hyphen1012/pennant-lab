@@ -34,7 +34,7 @@ const pilotCode = `
     }catch{return false;}
   }
   function canonicalReset(){
-    canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalHqError=false;
+    canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;
     canonicalPilot.suspend();ui.clubDraft=null;ui.portalSlot=null;ui.portalOrigin=null;slotOpening=false;
     ui.page='title';ui.launchTitle=false;
   }
@@ -153,7 +153,6 @@ const pilotCode = `
     if(act==='order190-role'&&s.role&&!s.swap)document.querySelector('.order190 .order-detail')?.scrollIntoView?.({block:'nearest',behavior:'instant'});
     if(act==='order190-exchange'&&s.swap)document.querySelector('.order190 .order-field')?.scrollIntoView?.({block:'nearest',behavior:'instant'});
   }
-  let canonicalHqError=false;
   function canonicalHqRender(){
     const app=$('#app'),g=canonicalSnapshot?.game,t=g?.team,v=g?.headquarters;if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-return">‹ データ選択</button></div>';
@@ -173,14 +172,14 @@ const pilotCode = `
       const result=await (step?canonicalPilot.advance({step:1}):canonicalPilot.refresh());
       if(epoch!==canonicalEpoch)return;
       if(result.status!=='ready'||result.snapshot.world!==previousWorld)throw Error('headquarters observation required');
-      canonicalSnapshot=result.snapshot;canonicalHqError=false;
+      canonicalSnapshot=result.snapshot;
     }catch{
       if(epoch!==canonicalEpoch)return;
-      canonicalSnapshot=null;canonicalHqError=true;
+      canonicalSnapshot=null;
     }finally{if(epoch===canonicalEpoch){slotOpening=false;render();draftJump(scroll);}}
   }
   let canonicalHqWorld=null;
-  function canonicalHqOpen(){if(!canonicalSnapshot?.game?.headquarters||slotOpening||!accountCurrent())return;canonicalHqWorld=canonicalSnapshot.world;canonicalHqError=false;ui.page='canonical-hq';render();window.scrollTo(0,0);}
+  function canonicalHqOpen(){if(!canonicalSnapshot?.game?.headquarters||slotOpening||!accountCurrent())return;canonicalHqWorld=canonicalSnapshot.world;ui.page='canonical-hq';render();window.scrollTo(0,0);}
   const canonicalOriginalRender=render;
   render=function(){
     if(ui.page==='canonical-hq'){canonicalHqRender();return;}
