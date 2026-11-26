@@ -20,4 +20,23 @@ a.equal(v().inbox.review.gameId,String(g.id));a.throws(()=>engine.advance(w,{ack
 const count=w.games.length;go({acknowledge:'review',eventKey:String(g.id)});a.equal(w.games.length,count);a.equal(w.pendingReview,null);
 w=engine.newWorld({team:0});club().cash=-1;const oldDay=w.calendarIndex;go({step:1});a.equal(w.calendarIndex,oldDay);a.equal(v().inbox.finance.status,'pending');a.equal(v().inbox.finance.loanAvailable,false);
 a.throws(()=>engine.advance(w,{finance:'gameover',confirmed:false}));go({finance:'gameover',confirmed:true});a.equal(v().inbox.finance.status,'gameover');a.throws(()=>engine.advance(w,{step:1}));a.throws(()=>engine.advance(w,{finance:'gameover',confirmed:true}));
+// Isolated large-market fixture: exercise the real projection with >80 candidates.
+w=engine.newWorld({team:0});
+const candidates=w.players.filter(p=>p.teamId!==w.selectedId&&!p.retired).slice(0,170);
+a.equal(candidates.length,170);
+for(const p of candidates)p.teamId=null;
+const before=JSON.stringify(w),firstPage=engine.freePage(w,{offset:0,limit:80,query:''});
+a.ok(firstPage.total>=170);a.equal(firstPage.items.length,80);a.equal(firstPage.nextOffset,80);
+a.deepEqual(firstPage.items,engine.view(w).club.free);
+const collected=[...firstPage.items];let offset=firstPage.nextOffset;
+while(offset!==null){const page=engine.freePage(w,{offset,limit:80,query:''});a.equal(page.total,firstPage.total);collected.push(...page.items);offset=page.nextOffset;}
+a.equal(collected.length,firstPage.total);a.equal(new Set(collected.map(p=>p.id)).size,collected.length);
+const target=collected[100],found=engine.freePage(w,{offset:0,limit:80,query:target.name});
+a.ok(found.items.some(p=>p.id===target.id));a.equal(JSON.stringify(w),before);
+a.throws(()=>engine.freePage(w,{offset:-1,limit:80,query:''}));
+a.throws(()=>engine.freePage(w,{offset:0,limit:81,query:''}));
+a.throws(()=>engine.freePage(w,{offset:firstPage.total+1,limit:80,query:''}));
+a.throws(()=>engine.freePage(w,{offset:0,limit:80,query:'',state:w}));
+w.pendingDraftReveal={year:w.year,entries:[]};a.throws(()=>engine.freePage(w,{offset:0,limit:80,query:''}));
+console.log('PASS bounded free market pagination/search, read-only projection and reveal guard');
 console.log('PASS manager hiring/renewal, ordinary free-agent and release, archived match acknowledgement, terminal finance and guard');

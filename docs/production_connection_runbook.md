@@ -172,3 +172,7 @@ Run 45785036741 passed both 2- and 100-season storage tests. 50-year JSON 84,559
 
 ## Canonical staging metadata and storage boundary
 PR73 dedicated and aggregate CI passed (45817579618 / 45817579627). Staging game authority may now be enabled explicitly with PL_CANONICAL_GAME_ENABLED=1; default off, production release gate unchanged. Container bundles exact checked-in index.html. Authenticated game/slots returns slot/world/revision metadata only, no stored world or client import. Metadata-first lazy state read avoids decompressing long histories for rejected revision, order observation, committed replay or proof-pending response. Read-only ledger snapshot no longer rewrites wallet for canonical reads; no history deletion. Resource tests use deliberately corrupted isolated state to prove metadata-only reads and guard failures avoid decode; do not infer memory SLA or production readiness. Real auth, load and full native UI remain external or unfinished.
+
+
+## Canonical free market browsing (staging only)
+Authenticated `/v1/game/free-page` reads a bounded page (1–80) or normalized name search from the existing free-agent list. Requires matching slot world ID and revision before decode; no mutation or save change. Same projection and hidden-arrival guard as club view. Native client/session exposes the read, invalidates on mismatch and never retries; existing UI not yet connected. Isolated >80 candidate fixture and actual HTTP session regression added; CI pending. No production or main changes.
