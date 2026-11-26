@@ -128,3 +128,9 @@
 
 ## Recruitment reward adapters (staging only)
 Connect draft/foreign revival and first-round lottery through existing applyDraftRecovery, applyForeignRecovery, applyLotteryReward. FA/posting/overseas retention uses current own refused request with existing cash requirement. FA signing uses movementPool and movementCanSign, preserves offered years via movementSign; cannot displace a completed rival deal or expired market. No reward for unsupported state; recheck inside atomic settlement. Legacy local reward provider not enabled. Tests use actual generated candidates with isolated fixture negotiation states. Calendar/year rollover, full modern FA UI reward integration and native SSV remain open; do not classify as production ready.
+
+
+## Canonical calendar inbox increment
+- Server view exposes limited injury/rare/current-career event descriptors, never hidden prospect names or abilities. Advance requires explicit acknowledgement of the matching injury or first rare notice; preserves history and injury duration. Career decisions use existing farewell options, contribution, budget and news logic, and explicitly dismiss thanks/farewell notices. No advertisement required to accept retirement.
+- Day advancement stops for unresolved career, review and foreign-counter events as well as existing crises/reports. Last-day retirement consultation may still be continued if valid. No auto-accept or skipped rare report.
+- This remains regular-season staging. Native inbox views, full off-season flow, postseason, foreign-counter commands and year rollover are not yet connected. Tests use isolated server fixtures; CI required before integration.
