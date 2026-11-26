@@ -13,7 +13,7 @@ const {createAdSsvService}=require('./ad-ssv-service.cjs');
 const {openDeletionRequests,createDeletionService}=require('./deletion-requests.cjs');
 const {createAccountHttp}=require('./account-http.cjs'),{createSaveHttp}=require('./save-http.cjs');
 const {createRateLimiter}=require('./rate-limit.cjs'),{createServiceRouter}=require('./service-router.cjs');
-function createServiceRuntime({environment='staging',dataDir,authenticate,verifyRecentReauth,verifyReceipt,verifyCurrent,verifyNotification,verifyEvent,verifyAction,verifyCompletion,storeConfig=null,canonicalEngine=null,units,origins=[],maxBytes=64*1024*1024,maxDecodedBytes=256*1024*1024,resolveKey=createAdMobKeyResolver(),now=Date.now,gameLimits={}}={}){
+function createServiceRuntime({environment='staging',dataDir,authenticate,verifyRecentReauth,verifyReceipt,verifyCurrent,verifyNotification,verifyEvent,verifyAction,verifyCompletion,storeConfig=null,canonicalEngine=null,units,origins=[],maxBytes=64*1024*1024,maxDecodedBytes=256*1024*1024,resolveKey=createAdMobKeyResolver(),now=Date.now,gameLimits={},projectionWorker=null}={}){
  if(environment!=='staging'||typeof dataDir!=='string'||!path.isAbsolute(dataDir)||[authenticate,verifyRecentReauth,verifyReceipt,verifyCurrent,verifyNotification,verifyEvent,verifyAction,verifyCompletion].some(x=>typeof x!=='function'))throw Error('staging and trusted adapters required');
  if(!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>256*1024*1024)throw Error('invalid storage limit');
  fs.mkdirSync(dataDir,{recursive:true,mode:0o700});const root=fs.realpathSync(dataDir);
@@ -32,7 +32,7 @@ function createServiceRuntime({environment='staging',dataDir,authenticate,verify
   const gameAuthority=canonicalEngine?require('./game-authority.cjs').createGameAuthority({
    ledger,engine:canonicalEngine,authenticate:auth,
    verifyRights:async a=>{const r=require('./purchase-rights.cjs').normalizeRights(a,await purchases.verifyEntitlements(a),now());return {verified:true,vip:r.entitlements.vip.active,adSkip:r.entitlements.adSkip.active};},
-   hasAdProof:x=>proofs.hasProof(x),now
+   hasAdProof:x=>proofs.hasProof(x),now,projectionWorker
   }):null;
   // Once canonical authority is active, reference game mutations must not
   // run alongside it; wallet snapshots/exchange and verified purchases remain.
