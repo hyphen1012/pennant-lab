@@ -22,7 +22,7 @@ function createHeadlessEngine(){
  if(op==='new'){
   buildFresh();game.started=true;game.clubLogoSeed=SERVER_SEED;
   // buildFresh consumes the PRNG; preserve the post-generation cursor.
-  if(input.team!==undefined){game.selectedId=input.team;game.fans=clubFanCount(myTeam());}
+  if(input.team!==undefined){const former=myTeam(),target=getTeam(input.team),nextFans=clubFanCount(target);former.fans=clubFanCount(former);game.selectedId=input.team;game.fans=nextFans;}
   ensureGameExtras();game.ceremonyStage=null;game.calendarFlow=null;game.pendingCeremonyIntro=null;
   return JSON.stringify(game);
  }
