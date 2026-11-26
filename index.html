@@ -203,7 +203,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .world-orb{display:grid;place-items:center;position:relative;flex:0 0 clamp(80px,25vw,114px);width:clamp(80px,25vw,114px);aspect-ratio:1;isolation:isolate}
 .world-halo{position:absolute;inset:-9%;border-radius:50%;background:radial-gradient(circle,transparent 33%,color-mix(in srgb,var(--world-tone) 25%,transparent) 49%,transparent 69%);animation:world-breathe 4s ease-in-out infinite}
 .world-sphere{width:75%;height:75%;border-radius:50%;position:relative;overflow:hidden;display:grid;place-items:center;background:radial-gradient(circle at 34% 24%,#eff9ff 0%,var(--world-tone) 13%,#324568 34%,#182239 61%,#050813 87%);border:1px solid var(--world-tone);box-shadow:0 0 15px var(--world-tone),inset -12px -8px 20px #000b}
-.world-land{position:absolute;inset:0;opacity:.62;background:repeating-radial-gradient(ellipse at 30% 35%,transparent 0 8px,#080e284d 9px 14px,transparent 16px 24px);transform:rotate(-23deg)}
+.world-land{position:absolute;inset:0;opacity:.75;background:radial-gradient(ellipse at 30% 32%,color-mix(in srgb,var(--world-tone) 43%,transparent),transparent 45%),radial-gradient(ellipse at 74% 75%,#7755c78c,transparent 43%);transform:rotate(-23deg)}
+.world-sphere{background:radial-gradient(circle at 50% 45%,#273052,#0c1329 54%,#02040d 90%);border:1px solid var(--world-tone);box-shadow:0 0 13px var(--world-tone),inset 0 0 13px var(--world-tone)}
+.world-galaxy{position:absolute;inset:0;width:100%;height:100%;opacity:.86;transform:rotate(-19deg);animation:galaxy-turn 38s linear infinite}
+@keyframes galaxy-turn{to{transform:rotate(341deg)}}
+@media(prefers-reduced-motion:reduce){.world-galaxy{animation:none!important}}
 .world-core{position:relative;z-index:1;display:grid;place-items:center;filter:drop-shadow(0 2px 6px #000)}
 .world-core .slot-emblem{width:36px!important;height:36px!important;flex-basis:36px!important}
 .world-new{font-size:29px;color:#e5fff9;text-shadow:0 0 10px var(--world-tone)}
@@ -225,6 +229,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .portal-tunnel b{position:absolute;inset:44%;border-radius:50%;background:#f0ffff;box-shadow:0 0 28px 12px var(--world-tone)}
 .portal-destination{position:absolute;top:15%;font-size:12px;letter-spacing:.35em;color:#d9e7ff}.portal-loading{position:absolute;bottom:15%;letter-spacing:.22em;font-size:11px;color:#d9e7ff}
 @keyframes portal-zoom{0%{transform:scale(.4) rotate(-35deg);opacity:.4}42%{transform:scale(1) rotate(0deg);opacity:1}100%{transform:scale(6) rotate(29deg);opacity:.25}}
+.portal-transit::after{content:"";position:absolute;inset:-50%;z-index:-1;background:repeating-conic-gradient(from 16deg at 50% 50%,transparent 0deg 13deg,color-mix(in srgb,var(--world-tone) 35%,transparent) 14deg,transparent 15deg 24deg);mask-image:radial-gradient(circle,transparent 10%,#000 45%,transparent 70%);animation:portal-zoom 1.25s ease-in both;pointer-events:none}
+@media(prefers-reduced-motion:reduce){.portal-transit::after{animation:none!important}}
 @media(prefers-reduced-motion:reduce){.world-halo,.world-satellite,.portal-tunnel{animation:none!important}}
 .slot-delete-dialog{box-sizing:border-box;width:min(92vw,420px);max-height:85vh;overflow:auto;padding:22px;border-radius:16px;border:1px solid #8f4e55;background:#152137;color:#f4f7ff;box-shadow:0 20px 60px #0008}
 .slot-delete-dialog::backdrop{background:#030913cc}
@@ -6282,7 +6288,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
   function worldOrb(i,t,started){
     const color=WORLD_TONES[i-1];
-    return '<span class="world-orb" style="--world-tone:'+color+'"><span class="world-halo"></span><span class="world-orbit"></span><span class="world-orbit second"></span><span class="world-sphere"><span class="world-land"></span><span class="world-core">'+(started&&t?teamBadge(t,'slot-emblem'):'<span class="world-new">＋</span>')+'</span></span><span class="world-satellite"></span></span>';
+    const starfield=Array.from({length:36},(_,j)=>'<circle cx="'+((j*41+i*17)%100)+'" cy="'+((j*j*13+j*7+i*29)%100)+'" r="'+(j%9===0?1.2:.46)+'" fill="#e3f6ff" opacity="'+(.28+(j%6)*.12)+'"/>').join('');
+    const arms=Array.from({length:4},(_,j)=>'<path d="M50 50 C35 31 67 18 83 40 S76 77 38 86" transform="rotate('+(j*90+i*13)+' 50 50)" stroke="'+color+'" stroke-width="'+(j%2?1.2:2.2)+'" opacity="'+(j%2?.55:.85)+'" fill="none"/>').join('');
+    const galaxy='<svg class="world-galaxy" viewBox="0 0 100 100" aria-hidden="true">'+starfield+'<g transform="translate(50 50) scale(1 .66) translate(-50 -50)">'+arms+'</g><circle cx="50" cy="50" r="3" fill="#fff"/></svg>';
+    return '<span class="world-orb" style="--world-tone:'+color+'"><span class="world-halo"></span><span class="world-orbit"></span><span class="world-orbit second"></span><span class="world-sphere"><span class="world-land"></span>'+galaxy+'<span class="world-core">'+(started&&t?teamBadge(t,'slot-emblem'):'<span class="world-new">＋</span>')+'</span></span><span class="world-satellite"></span></span>';
   }
   function portalTransitScreen(i){
     return '<div class="title-screen portal-transit" role="status" aria-live="polite" style="--world-tone:'+WORLD_TONES[i-1]+'">'+cosmicAtlas()+'<div class="portal-tunnel"><i></i><i></i><i></i><i></i><i></i><b></b></div><span class="portal-destination">DATA 0'+i+'</span><span class="portal-loading">LOADING…</span></div>';
