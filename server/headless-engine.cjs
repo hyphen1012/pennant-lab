@@ -513,7 +513,7 @@ function createHeadlessEngine(){
   }
   // Special news and the ordinary record edition sometimes describe the
   // same achievement. Reuse the ordinary key rather than granting twice.
-  const news=(game.milestoneNews||[]).filter(e=>e.teamId===team.id);
+  const careerNews=new Set((game.milestoneNews||[]).filter(e=>e.teamId===team.id&&e.careerKey).map(e=>e.playerId+':'+e.careerKey));
   const addRare=(key,title)=>{key='memorial:'+key;if(!entries.has(key))entries.set(key,{key,label:title.slice(0,160),eligible:true});};
   for(const e of game.rareNews||[]){
    if(typeof e.id!=='string'||e.id.length>480||typeof e.title!=='string'||!e.title||!e.category||!Number.isSafeInteger(e.year)||!e.id.startsWith(e.year+':'))continue;
@@ -526,15 +526,10 @@ function createHeadlessEngine(){
    const k=e.id.slice(String(e.year).length+1);
    if(k.startsWith('awards:'))continue; // actual annual title entries already qualify
    if(k.startsWith('feat:')){addRare('news:'+e.id,e.title);continue;}
-   if(k.startsWith('record:')){
-    // Existing record update keys include the official day; use that evidence.
-    const recordKey=k.slice(('record:'+e.playerId+':').length);
-    if(news.some(n=>n.year===e.year&&n.playerId===e.playerId&&n.recordKey===recordKey))continue;
-    continue; // do not create an unverified historical record identity
-   }
+   if(k.startsWith('record:'))continue; // use original official record-update evidence only
    if(k.startsWith('career:')){
     const c=k.slice(('career:'+e.playerId+':').length);
-    if(news.some(n=>n.playerId===e.playerId&&n.careerKey===c))continue;
+    if(careerNews.has(e.playerId+':'+c))continue;
     addRare('news:'+e.id,e.title);continue;
    }
    const stat=k.match(/^stat:(\\d+):([a-z]+):(\\d+)$/);
