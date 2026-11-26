@@ -45,8 +45,8 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
   // No client-supplied state or seed can be installed.
   return ledger.transact(account,(s,db)=>{
    if(db.prepare('SELECT 1 FROM authority_worlds WHERE account=? AND slot=?').get(account,slot))throw Error('canonical slot exists');
-   const state=sync(engine.newWorld(JSON.parse(json(command,4096)),{account,worldId:randomUUID()}));
-   const worldId=randomUUID();db.prepare('INSERT INTO authority_worlds VALUES(?,?,?,?,?)').run(account,slot,worldId,1,json(state));
+   const worldId=randomUUID(),state=sync(engine.newWorld(JSON.parse(json(command,4096)),{account,worldId}));
+   db.prepare('INSERT INTO authority_worlds VALUES(?,?,?,?,?)').run(account,slot,worldId,1,json(state));
    return view({world:worldId,revision:1,state});
   });
  }

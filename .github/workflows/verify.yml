@@ -143,3 +143,6 @@ jobs:
 
       - run: node scripts/store-provider-check.cjs
         if: always()
+
+      - run: node scripts/game-authority-check.cjs
+        if: always()
