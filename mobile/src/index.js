@@ -8,6 +8,7 @@ import {createCommerceLifecycle} from './commerce-lifecycle.cjs';
 import {openNativeBillingDialog} from './native-billing-dialog.cjs';
 import {openDeletionDialog} from './deletion-dialog.cjs';
 import {createAccountClient} from './account-client.cjs';
+import {createCanonicalGameSession} from './canonical-game-session.cjs';
 import {createSsvAdAdapter} from './ssv-adapter.cjs';
 import {Filesystem,Directory,Encoding} from '@capacitor/filesystem';
 import {Share} from '@capacitor/share';
@@ -20,7 +21,7 @@ if(native){
   const accountEnabled=!!(config.accountApi&&config.oauth);
   let accountAccess=!accountEnabled,accountInitialized=false,authStarted=false,accountEpoch=0,checkingIdentity=null,identityAt=-Infinity;
   let appActive=true,visible=!document.hidden;
-  let bootstrap=null,provider=null,life=null,bridge=null,billingDialog=null,deletionBusy=false,reauthProvider=null,evidenceClient=null,ssv=null;
+  let bootstrap=null,provider=null,life=null,bridge=null,billingDialog=null,deletionBusy=false,reauthProvider=null,evidenceClient=null,ssv=null,canonicalGame=null;
   const billingPlugin=registerPlugin('PennantBilling');
   function usable(){return gate.ready()&&accountAccess;}
   // Prior to title tap, only the startup movie and title may be shown.
@@ -50,7 +51,7 @@ if(native){
   }
   function suspendAccount(){
     if(!accountEnabled)return;
-    accountEpoch++;accountAccess=false;identityAt=-Infinity;bootstrap?.suspend();billingDialog?.abort();ssv?.invalidate();life?.invalidate();
+    accountEpoch++;accountAccess=false;identityAt=-Infinity;bootstrap?.suspend();canonicalGame?.suspend();billingDialog?.abort();ssv?.invalidate();life?.invalidate();
   }
   async function verifyIdentity(){
     if(!accountEnabled)return true;
@@ -85,10 +86,11 @@ if(native){
     provider=createNativeOAuth({config:config.oauth,openExternal:url=>Browser.open({url}),closeExternal:()=>Browser.close()});
     bridge=createEntitlementBridge({baseUrl:config.accountApi});
     evidenceClient=createAccountClient({baseUrl:config.accountApi});
+    if(config.canonicalUiPilot&&!config.production)canonicalGame=createCanonicalGameSession({client:createAccountClient({baseUrl:config.accountApi}),online:async()=>usable()&&await gate.check(true)&&usable()});
     if(config.production)ssv=createSsvAdAdapter({client:evidenceClient,sdk:AdMob,platform:Capacitor.getPlatform(),adId:config.units[Capacitor.getPlatform()],online:async()=>await gate.check(true)&&usable(),consent:rewardConsent});
     life=createCommerceLifecycle({bridge,online:async()=>usable()});
     life.setVisible(visible);life.setActive(appActive);
-    bootstrap=createAccountBootstrap({baseUrl:config.accountApi,provider,online:usable,onSession:s=>{billingDialog?.abort();ssv?.invalidate();evidenceClient.setSession(s);life.setSession(s);}});
+    bootstrap=createAccountBootstrap({baseUrl:config.accountApi,provider,online:usable,onSession:s=>{billingDialog?.abort();ssv?.invalidate();evidenceClient.setSession(s);life.setSession(s);if(canonicalGame){canonicalGame.setSession(s);window.dispatchEvent(new Event('pl-canonical-identity-changed'));}}});
   }
   let accountReadyTask=null;
   async function accountReady(){
@@ -131,7 +133,7 @@ if(native){
       if(info.isConsentFormAvailable&&info.status===AdmobConsentStatus.REQUIRED)info=await AdMob.showConsentForm();
       consentInfo=info;return info.canRequestAds===true;
   }
-  const reward=createReward({
+  const reward=config.canonicalUiPilot?null:createReward({
     online:async()=>await gate.check(true)&&usable(),consent:rewardConsent,
     initialize:()=>AdMob.initialize(),
     prepare:()=>AdMob.prepareRewardVideoAd({adId:config.units[Capacitor.getPlatform()],npa:true}),
@@ -139,7 +141,7 @@ if(native){
   });
   window.PennantNative={
     ready:interfaceReady,check:async force=>await gate.check(force)&&interfaceReady(),accountRequired:accountEnabled,reward:config.production?null:reward,
-    get accountContext(){return bootstrap?.context()??null;},accountReady,
+    get accountContext(){return bootstrap?.context()??null;},accountReady,canonicalGame,
     deletionAvailable:config.deletionEnabled===true,
     // Evidence-only. No production reward application is connected here.
     requestAdProof:config.production&&ssv?o=>ssv.requestAdProof(o):null,
