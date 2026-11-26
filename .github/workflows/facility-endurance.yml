@@ -24,6 +24,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verify capital allocation regression
+        run: node scripts/cpu-economy-check.cjs
       - run: |
           mkdir -p test-results
           set -o pipefail
@@ -42,3 +44,5 @@ jobs:
 # v0.9.169: preserve the 50-season target; audit actual cash and balanced capital allocation.
 
 # Trial B: reserve sensitivity only; identical 3 seeds and 50+5 season pass criteria.
+
+# Trial C: protect viable park capital from competing elite investments; same seeds and 50+5 gate.
