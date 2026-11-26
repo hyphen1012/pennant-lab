@@ -1,4 +1,4 @@
-const assert=require('node:assert/strict'),{openLedger}=require('../server/account-ledger.cjs'),{createGameAuthority}=require('../server/game-authority.cjs'),{rosterTreatment,retainManager}=require('../server/canonical-care.cjs');
+const assert=require('node:assert/strict'),{openLedger,createAccountService}=require('../server/account-ledger.cjs'),{createGameAuthority}=require('../server/game-authority.cjs'),{rosterTreatment,retainManager}=require('../server/canonical-care.cjs');
 (async()=>{
  const ledger=openLedger(':memory:'),owner='a'.repeat(64),other='b'.repeat(64);let now=1700000000000,paid=false,proofs=new Set(),fail=false;
  const routeKeys=['draft-revival','foreign-revival','lottery','fa-retention','fa-sign','retirement','manager','medical'];
@@ -31,6 +31,8 @@ const assert=require('node:assert/strict'),{openLedger}=require('../server/accou
   const opts=(await service.read('owner',1)).actions,med=opts.find(x=>x.route==='medical').operationId,mgr=opts.find(x=>x.route==='manager').operationId;
   await assert.rejects(service.reserve('other',1,med,'ticket'));
   const before=await service.read('owner',1),r=await service.reserve('owner',1,med,'ticket');assert.equal(r.mode,'ticket');
+  const legacy=createAccountService({ledger,authenticate:async()=>({authenticated:true,account:owner}),verifyEntitlements:async()=>null,verifyEvent:async()=>null,verifyAction:async()=>({verified:true,eligible:true,account:owner,id:med}),verifyCompletion:async()=>({verified:true,account:owner,id:med,mode:'ticket',attempt:r.attempt,applied:true})});
+  await assert.rejects(legacy.finish('owner','fixture'),/canonical action/);
   await assert.rejects(service.advance('owner',1,before.revision,{step:1}));await assert.rejects(service.reserve('owner',1,mgr,'ticket'));
   fail=true;await assert.rejects(service.settle('owner',1,med,r.attempt));assert.equal((await service.read('owner',1)).wallet.tickets,4);assert.equal((await service.read('owner',1)).game.days,9);
   fail=false;const treatment=await service.settle('owner',1,med,r.attempt);assert.equal(treatment.result.after,5);assert.equal(treatment.wallet.tickets,3);

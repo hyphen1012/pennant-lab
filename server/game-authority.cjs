@@ -69,6 +69,7 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
   return ledger.transact(account,(s,db)=>{
    const r=world(db,account,slot),previous=lookup(db,account,operation),o=s.orders[operation];
    if(previous&&previous.world!==r.world)throw Error('world mismatch');
+   if(o&&!previous)throw Error('operation already owned by another settlement path');
    if(previous&&o&&o.status!=='cancelled')return {operationId:operation,...o,replay:true,wallet:publicWallet(s)};
    const a=actions(r).get(operation);if(!a)throw Error('action no longer eligible');
    const reserved=rules.reserve(s,operation,entitlements,choice);

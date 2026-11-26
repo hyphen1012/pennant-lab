@@ -3,6 +3,7 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs');
 const {createOfflineBackup,verifyBackup,restoreToNewDirectory}=require('../server/backup.cjs');
 const {createAdMobKeyResolver}=require('../server/admob-key-resolver.cjs');
 const {openLedger}=require('../server/account-ledger.cjs');
+const {openDeletionRequests}=require('../server/deletion-requests.cjs');
 (async()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'pl-services-')),data=path.join(root,'data'),archive=path.join(root,'backups'),restored=path.join(root,'restored');
  const {privateKey,publicKey}=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
@@ -40,9 +41,20 @@ const {openLedger}=require('../server/account-ledger.cjs');
   await runtime.close();runtime=null;
   await assert.rejects(createOfflineBackup({dataDir:data,backupDir:archive}));
   const dir=await createOfflineBackup({dataDir:data,backupDir:archive,quiesced:true});assert.equal((await verifyBackup(dir)).files.length,5);
-  await restoreToNewDirectory({backupDir:dir,targetDir:restored});await assert.rejects(restoreToNewDirectory({backupDir:dir,targetDir:restored}));
+  const latestDeletionFile=path.join(data,'deletion.sqlite');
+  // Account B is deleted after the historical snapshot. Recovery must not
+  // expose B and must not claim its restored data is already erased.
+  const latest=openDeletionRequests(latestDeletionFile,{now:()=>now+1000});
+  try{latest.request(other);latest.advance(other,'requested','processing');latest.advance(other,'processing','completed');}finally{latest.close();}
+  const opts={backupDir:dir,targetDir:restored,latestDeletionFile,quiesced:true};
+  await assert.rejects(restoreToNewDirectory({backupDir:dir,targetDir:restored}));
+  await assert.rejects(restoreToNewDirectory({...opts,latestDeletionFile:path.join(dir,'deletion.sqlite')}));
+  await restoreToNewDirectory(opts);await assert.rejects(restoreToNewDirectory(opts));
+  const recovered=openDeletionRequests(path.join(restored,'deletion.sqlite'));
+  try{assert.equal(recovered.status(other).status,'processing');assert.equal(recovered.status(owner).status,'requested');}finally{recovered.close();}
   runtime=createServiceRuntime({...config,dataDir:restored});await new Promise(ok=>runtime.server.listen(0,'127.0.0.1',ok));
   const r=await fetch('http://127.0.0.1:'+runtime.server.address().port+'/v1/identity',{method:'POST',headers:{Authorization:'Bearer a','Content-Type':'application/json'},body:'{}'});assert.equal(r.status,403);
+  const blocked=await fetch('http://127.0.0.1:'+runtime.server.address().port+'/v1/identity',{method:'POST',headers:{Authorization:'Bearer b','Content-Type':'application/json'},body:'{}'});assert.equal(blocked.status,403);
   await runtime.close();runtime=null;fs.appendFileSync(path.join(dir,'account.sqlite'),'corrupt');await assert.rejects(verifyBackup(dir));
   console.log('PASS unified service, signed ad proof without grant, deletion quarantine, CORS and independent-target offline backup/restore');
  }finally{await runtime?.close();fs.rmSync(root,{recursive:true,force:true});}
