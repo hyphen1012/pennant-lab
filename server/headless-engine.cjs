@@ -167,11 +167,11 @@ function createHeadlessEngine(){
  };
  const commercialView=(f,j)=>{
   const s=j.state;if(!s)return null;
-  if(j.id==='sponsor')return {job:j.id,stage:s.stage,year:s.year,candidates:s.candidates.map(c=>({id:c.id,name:c.name,industry:c.industry,annual:c.annual})),selected:s.selected,contract:s.stage==='result'?sponsorContract(team,s.year):null};
-  return {job:j.id,stage:s.stage,year:s.year,due:s.due,plan:s.plan,players:s.players,name:s.name,fee:s.fee,perk:s.perk,color:s.color,font:s.font,delta:s.delta,choice:s.choice,report:s.report,result:s.result,
-   ...(['fan-fest','opening-promo'].includes(j.id)?{plans:(j.id==='fan-fest'?FAN_FEST_PLANS:OPENING_PROMO_PLANS).map((p,index)=>({index,name:p.name,cost:p.cost}))}:{}),
+  if(j.id==='sponsor')return {job:j.id,stage:s.stage,year:s.year,candidates:s.candidates.map(c=>({id:c.id,name:c.name,industry:c.industry,annual:c.annual})),selected:s.selected,risk:sponsorRisk(s.selected.length),annual:sponsorAnnual(s.candidates.filter(c=>s.selected.includes(c.id))),contract:s.stage==='result'?sponsorContract(team,s.year):null};
+  return {job:j.id,stage:s.stage,year:s.year,due:s.due,plan:s.plan,players:s.players,name:s.name,fee:s.fee,perk:s.perk,color:s.color,font:s.font,since:s.since,delta:s.delta,choice:s.choice,report:s.report,result:s.result,
+   ...(['fan-fest','opening-promo'].includes(j.id)?{plans:(j.id==='fan-fest'?FAN_FEST_PLANS:OPENING_PROMO_PLANS).map((p,index)=>({index,name:p.name,cost:p.cost,desc:p.desc,title:p.title||p.name,photo:p.photo??null,gain:p.gain??null}))}:{}),
    ...(j.id==='tv'?{eligible:own(team).filter(p=>!retirementScheduled(p)).map(p=>({id:p.id,name:p.name,pos:p.pos}))}:{}),
-   ...(j.id==='fanclub'?{perks:FAN_PERKS.map(([key,label,cost])=>({key,label,cost})),estimate:fanEstimate(team,s)}:{}),
+   ...(j.id==='fanclub'?{perks:FAN_PERKS.map(([key,label,cost])=>({key,label,cost})),estimate:fanEstimate(team,s),contract:s.stage==='result'?commerceData(team).clubs[s.year]||null:null}:{}),
    ...(j.id==='broadcast'?{base:commerceBase(team),chance:broadcastChance(s.delta),contract:commerceData(team).broadcasts[s.year]||null}:{}),
    ...(j.id==='naming'?{options:NAMING_OPTIONS,contract:commerceNaming(team,s.year)}:{})};
  };
