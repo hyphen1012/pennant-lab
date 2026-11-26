@@ -37,7 +37,7 @@ function createHeadlessEngine(){
    career:career?{playerId:career.p.id,stage:career.e.type,options:['consult','plan'].includes(career.e.type)?farewellChoices(career.p).map(([key,label,cost])=>({key,label,cost})):[]}:null};
  };
  const commercialJobs=['fan-fest','tv','fanclub','sponsor','broadcast','naming'];
- const annualSupported=['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter',...commercialJobs];
+ const annualSupported=['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter',...commercialJobs,'movement-market'];
  const draftPending=d=>d.picks.find(x=>x.teamId===team.id&&(x.recoveryPending||x.recoveryCelebration));
  const draftOwnRow=d=>d.picks.find(x=>x.teamId===team.id&&x.status==='rights');
  const candidateView=c=>({id:c.id,name:secretProspect(c.player)?'????':c.player.name,pos:c.player.pos,type:c.type,category:playerTitleTheme(c.player)?.name||null});
@@ -70,11 +70,24 @@ function createHeadlessEngine(){
    ...(j.id==='broadcast'?{base:commerceBase(team),chance:broadcastChance(s.delta),contract:commerceData(team).broadcasts[s.year]||null}:{}),
    ...(j.id==='naming'?{options:NAMING_OPTIONS,contract:commerceNaming(team,s.year)}:{})};
  };
+ const marketView=f=>{
+  const j=f.jobs['movement-market'],d=movementData(),x=j?.state;
+  if(!j||!['active','ready'].includes(j.status))return null;
+  const active=f.active===j.id;
+  const rows=active&&!x.news&&['fa','return'].includes(x.view)?offdeskMarketRows(d,x.view).map(r=>{
+   const p=getPlayer(r.id),o=d.offers[r.id],v=faTalk(d,r);
+   return {id:r.id,name:p.name,pos:p.pos,kind:r.kind,demand:r.demand,category:playerTitleTheme(p)?.name||null,outcome:faOutcome(d,r),canApproach:faCanApproach(d,r),offer:o?{status:o.status,salary:o.salary,years:o.years,due:o.due,counter:o.counter,replyUntil:o.replyUntil,seen:!!o.seen}:null,talk:v?{round:v.round,turn:v.turn,max:v.max,salary:v.salary,years:v.years,role:v.role,speech:v.speech,trust:v.trust,satisfaction:v.satisfaction,caution:v.caution}:null};
+  }):[];
+  return {active,news:x?x.news:'eve',room:active?x.view:null,cpuDone:!!d?.cpuDone,deadline:d?.faClock?.deadline,rows,
+   unread:d?faUnreadRows(d).length:0,waiting:d?Object.values(d.offers).filter(o=>o.status==='waiting').length:0,counter:d?Object.values(d.offers).filter(o=>o.status==='counter').length:0,
+   deals:active&&d?(d.deals||[]).filter(a=>a.from===team.id||a.to===team.id).map(a=>({id:a.id,kind:a.kind,from:a.from,to:a.to,salary:a.salary,years:a.years,rank:a.rank,comp:a.comp,compMode:a.compMode,compOptions:d.cpuDone?movementCompOptions(d,a).map(p=>({id:p.id,name:p.name,pos:p.pos})):[]})):[],
+   free:active&&x.view==='other'&&!x.news&&!d.cpuDone?movementPool(d).filter(r=>r.kind==='free').map(r=>({id:r.id,name:getPlayer(r.id).name,demand:r.demand})):[]};
+ };
  const annualView=()=>{
   const f=flowGet(),d=movementData();
   if(!f)return {mode:null,canStart:game.day===143&&game.calendarIndex===game.calendar.days.length&&!game.financeCrisis&&!flowInbox()&&!game.pendingMonth&&!game.pendingReview&&!pendingMilestoneNews().length&&!flowForeignResponse()};
   const tasks=Object.values(f.jobs).map(j=>({id:j.id,start:j.start,status:j.status,supported:annualSupported.includes(j.id)}));
-  return {mode:f.mode,date:f.date,active:f.active,tasks,commerce:commercialJobs.includes(f.active)?commercialView(f,f.jobs[f.active]):null,canAdvance:!f.active&&!flowInbox()&&!game.financeCrisis&&!flowBlocking(f),renewal:['renewal1','renewal2'].includes(f.active)?renewalView():null,training:['autumn','winter'].includes(f.active)?trainingView(f.active):null,draft:f.active==='draft'?draftView(game.draft):null,roster:f.active==='roster-cut'?{projection:draftRosterProjection(game.draft,team),selected:draftCutIds(game.draft,team),eligible:draftCutOptions(game.draft,team).map(p=>({id:p.id,name:p.name,pos:p.pos,salary:p.salary,warnings:draftCutReasons(p)}))}:null,requests:f.active==='movement-declarations'?(d?.requests||[]).filter(r=>r.from===team.id).map(r=>({id:r.id,kind:r.kind,status:r.status,demand:r.demand,offer:r.offer})):[]};
+  return {mode:f.mode,date:f.date,active:f.active,tasks,market:marketView(f),commerce:commercialJobs.includes(f.active)?commercialView(f,f.jobs[f.active]):null,canAdvance:!f.active&&!flowInbox()&&!game.financeCrisis&&!flowBlocking(f),renewal:['renewal1','renewal2'].includes(f.active)?renewalView():null,training:['autumn','winter'].includes(f.active)?trainingView(f.active):null,draft:f.active==='draft'?draftView(game.draft):null,roster:f.active==='roster-cut'?{projection:draftRosterProjection(game.draft,team),selected:draftCutIds(game.draft,team),eligible:draftCutOptions(game.draft,team).map(p=>({id:p.id,name:p.name,pos:p.pos,salary:p.salary,warnings:draftCutReasons(p)}))}:null,requests:f.active==='movement-declarations'?(d?.requests||[]).filter(r=>r.from===team.id).map(r=>({id:r.id,kind:r.kind,status:r.status,demand:r.demand,offer:r.offer})):[]};
  };
  const medical=()=>own(team).filter(p=>rosterTreatmentEligible(p)&&p.injury&&typeof p.injury.date==='string').map(p=>({route:'medical',year:game.year,eventKey:String(p.id)+':'+p.injury.date,label:p.name+' 特別治療',playerId:p.id,date:p.injury.date}));
  // Same eligibility as the checked-in manager staff continuation handler:
@@ -207,10 +220,13 @@ function createHeadlessEngine(){
    if(!f||f.mode!=='off')throw Error('annual flow unavailable');
    if(input.choice==='day'){
     // Never bypass a ready event, and never cross into an unsupported rollover.
-    if(f.date>=game.year+'-12-31'||!flowDay(f))throw Error('annual date blocked');
+    const m=f.jobs['movement-market'];
+    if(m?.status==='ready'&&(!m.state||['eve','opening','results'].includes(m.state.news)))throw Error('market news acknowledgement required');
+    if(f.date>=game.year+'-12-31'&&(!m||m.status==='done'||f.date>=String(game.year+1)+'-01-31'))throw Error('annual rollover not connected');
+    if(!flowDay(f))throw Error('annual date blocked');
    }else if(input.choice==='open'){
     const j=f.jobs[input.job];
-    if(!annualSupported.includes(input.job))throw Error('annual event unavailable');
+    if(!annualSupported.includes(input.job)||input.job==='movement-market')throw Error('annual event unavailable');
     const opened=commercialJobs.includes(input.job)?(input.job==='sponsor'?sponsorAction('sponsor-open',{dataset:{}}):commerceAction('commerce-open',{dataset:{value:input.job}})):flowOpen(f,j);
     if(!opened)throw Error('annual event unavailable');
     if(j.id==='movement-declarations')movementInit();
@@ -219,7 +235,7 @@ function createHeadlessEngine(){
    }else if(input.choice==='complete'){
     const j=f.jobs[f.active];
     if(!j||j.id!==input.job||!annualSupported.includes(j.id))throw Error('annual event unavailable');
-    if(commercialJobs.includes(j.id))throw Error('commerce requires explicit result confirmation');
+    if(commercialJobs.includes(j.id)||j.id==='movement-market')throw Error('explicit result confirmation required');
     if(j.id==='movement-declarations'&&movementData()?.requests.some(r=>r.from===team.id&&['request','refused'].includes(r.status)))throw Error('movement decision required');
     if(j.id==='draft'&&(game.draft?.phase!=='done'||game.draft.announcement||game.draft.rareIntro))throw Error('draft unfinished');
     if(j.id==='roster-cut'){
@@ -232,6 +248,67 @@ function createHeadlessEngine(){
     }
     if(['autumn','winter'].includes(j.id)&&!annualReport(j.id))throw Error('training report required');
     flowComplete(f,j);
+   }else if(input.choice==='market'){
+    const j=f.jobs['movement-market'],k=input.decision;
+    if(!j)throw Error('market unavailable');
+    if(k==='open'){
+     if(!flowOpen(f,j,input.room))throw Error('market room unavailable');
+     game.pendingCeremonyIntro=null;
+    }else{
+     const x=j.state,d=movementData();
+     if(f.active!==j.id||j.status!=='active'||!x?.open||!d||d.closed)throw Error('market room unavailable');
+     if(k==='news'){
+      if(x.view!=='news'||!['eve','opening','results'].includes(x.news))throw Error('market news unavailable');
+      const before=x.news;
+      offdeskAction({'eve':'offdesk-news-eve','opening':'offdesk-news-open','results':'offdesk-news-results'}[before],{dataset:{}});
+      if(x.news===before||x.open)throw Error('market news rejected');
+      flowSync(f);
+     }else if(k==='home'){
+      if(x.news)throw Error('market news acknowledgement required');
+      flowPark(f,j,'ready');
+     }else if(k==='close'){
+      if(x.news||x.view!=='other'||d.cpuDone||faUnreadRows(d).length||Object.values(d.offers).some(o=>['waiting','counter'].includes(o.status)))throw Error('market negotiations unfinished');
+      if(!offdeskCloseMarket(d))throw Error('market close rejected');
+      flowSync(f);
+     }else if(k==='finish'){
+      if(x.news||x.view!=='other'||!d.cpuDone||faUnreadRows(d).length)throw Error('market results unfinished');
+      movementAction('movement-market-finish',{dataset:{}});
+      if(!d.closed)throw Error('market finish rejected');
+      flowComplete(f,j);
+     }else if(k==='comp'){
+      if(x.news||x.view!=='other'||!d.cpuDone)throw Error('compensation unavailable');
+      const deal=d.deals.find(a=>a.id===input.playerId);
+      if(!deal||!movementChooseComp(d,deal,input.otherId))throw Error('compensation rejected');
+     }else if(k==='free'){
+      if(x.news||x.view!=='other'||d.cpuDone)throw Error('free agent unavailable');
+      const row=movementPool(d).find(r=>r.kind==='free'&&r.id===input.playerId);
+      if(!row||!movementBid(d,row,input.salary))throw Error('free agent offer rejected');
+     }else if(k==='trade'){
+      if(x.news||x.view!=='other'||d.cpuDone)throw Error('trade unavailable');
+      const a=getPlayer(input.playerId),b=getPlayer(input.otherId),u=getTeam(b?.teamId);
+      if(!u||!movementTrade(d,team,u,a,b))throw Error('trade rejected');
+     }else if(k==='exchange'){
+      if(x.news||x.view!=='other'||d.cpuDone||!movementExchange(d,team,input.playerId))throw Error('exchange rejected');
+     }else{
+      if(x.news||!['fa','return'].includes(x.view)||d.cpuDone)throw Error('FA negotiation unavailable');
+      const row=offdeskMarketRows(d,x.view).find(r=>r.id===input.playerId),o=row&&d.offers[row.id];
+      if(!row)throw Error('FA player unavailable');
+      if(k==='ack'){
+       if(!faUnread(o))throw Error('FA reply unavailable');o.seen=true;
+      }else{
+       if(!faCanApproach(d,row)||faUnread(o))throw Error('FA negotiation unavailable');
+       if(k==='talk'){
+        if(!faTalkCommand(d,row,input.key))throw Error('FA dialogue rejected');
+       }else if(k==='years'){
+        const v=faTalk(d,row,true);v.years=input.years;
+       }else if(k==='submit'){
+        if(!faSubmitTalk(d,row,x))throw Error('FA offer rejected');
+       }else if(k==='withdraw'){
+        if(o?.status!=='counter')throw Error('FA counter unavailable');o.status='refused';o.seen=true;o.resolved=x.date;
+       }else throw Error('FA operation unavailable');
+      }
+     }
+    }
    }else if(input.choice==='commerce'){
     const job=f.active,j=f.jobs[job],s=j?.state,k=input.decision;
     if(!commercialJobs.includes(job)||j.status!=='active'||!s)throw Error('commerce stage unavailable');
@@ -383,6 +460,18 @@ function createHeadlessEngine(){
    if(exact(command,['annual'])&&['start','day'].includes(command.annual))return run('annual',state,{choice:command.annual,verifiedVip});
    if(exact(command,['annual','job'])&&['open','complete'].includes(command.annual)&&['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter','fan-fest','tv','fanclub','sponsor','broadcast','naming'].includes(command.job))return run('annual',state,{choice:command.annual,job:command.job,verifiedVip});
    if(exact(command,['annual','playerId'])&&command.annual==='cut'&&Number.isSafeInteger(command.playerId))return run('annual',state,{choice:'cut',playerId:command.playerId,verifiedVip});
+   if(command?.annual==='market'){
+    const k=command.decision,base=['annual','decision'],id=n=>Number.isSafeInteger(n)&&n>0;
+    let valid=['news','home','close','finish'].includes(k)&&exact(command,base);
+    if(k==='open')valid=exact(command,[...base,'room'])&&['news','fa','return','other'].includes(command.room);
+    if(['ack','submit','withdraw','exchange'].includes(k))valid=exact(command,[...base,'playerId'])&&id(command.playerId);
+    if(k==='talk')valid=exact(command,[...base,'playerId','key'])&&id(command.playerId)&&['listen','winning','chance','trust','vision','legacy','salary:90','salary:100','salary:115','salary:130','salary:145'].includes(command.key);
+    if(k==='years')valid=exact(command,[...base,'playerId','years'])&&id(command.playerId)&&Number.isSafeInteger(command.years)&&command.years>=1&&command.years<=10;
+    if(k==='free')valid=exact(command,[...base,'playerId','salary'])&&id(command.playerId)&&Number.isFinite(command.salary)&&command.salary>=.05&&command.salary<=5;
+    if(['trade','comp'].includes(k))valid=exact(command,[...base,'playerId','otherId'])&&id(command.playerId)&&id(command.otherId)&&command.playerId!==command.otherId;
+    if(!valid)throw Error('invalid market command');
+    return run('annual',state,{choice:'market',decision:k,room:command.room,playerId:command.playerId,otherId:command.otherId,key:command.key,years:command.years,salary:command.salary,verifiedVip});
+   }
    if(command?.annual==='commerce'){
     const k=command.decision,base=['annual','decision'],v=command.value;
     let valid=['start','back','finish','confirm','decline','park','live','tv'].includes(k)&&exact(command,base);
