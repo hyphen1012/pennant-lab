@@ -79,6 +79,7 @@ const a=require('node:assert/strict'),{createHeadlessEngine}=require('../server/
   const draw=clone(),cid=draw.draft.candidates[0].id;draw.ceremonyStage='draft';Object.assign(draw.draft,{phase:'lottery',round:1,autoRequested:false,lotteryRewardUsed:false,pendingLottery:{stage:'choose',attempt:1,cursor:0,groups:[{cid,ids:[draw.selectedId,(draw.selectedId+1)%12]}]}});
   const drawn=verify(draw,'lottery');a.equal(drawn.result.winner,draw.selectedId);a.equal(drawn.result.stage,'sealed');a.equal(drawn.state.draft.lotteryRewardUsed,true);
   const f=clone(),fc=f.foreignMarket.candidates.find(c=>c.status==='available');fc.status='refused';
+  f.foreignMarket.negotiations??={};
   f.foreignMarket.negotiations[f.selectedId]={candidateId:fc.id,resultOpened:true,status:'refused',offer:{fee:.1,salary:.2,level:1,supportCost:0,benefits:{interpreter:false,housing:false}}};
   const noRoom=JSON.parse(JSON.stringify(f));club(noRoom).cash=0;a.ok(!action(noRoom,'foreign-revival'));
   const signed=verify(f,'foreign-revival');a.equal(signed.state.players.find(p=>p.id===fc.id).teamId,f.selectedId);a.ok(Math.abs(club(f).cash-club(signed.state).cash-.1)<1e-7);
