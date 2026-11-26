@@ -98,6 +98,22 @@ function createHeadlessEngine(){
  };
  const latestPaper=()=>{const p=(game.dailyBulletins||[]).at(-1);return p?.year===game.year?paperReport(p):null;};
  const archiveAvailable=()=>!game.pendingDraftReveal&&!flowForeignResponse()&&!pendingRareNews().length&&!flowGet();
+ const decadeAvailable=()=>!game.pendingDraftReveal&&!flowForeignResponse()&&!pendingRareNews().length&&(!flowGet()||game.pendingDecade!=null);
+ const decadeProjection=period=>{
+  const r=decadeReport(period.end);if(!r)throw Error('missing decade report');
+  const name=(id,teamId)=>({playerId:id,name:getPlayer(id)?.name||'記録なし',teamId:teamId??null,club:getTeam(teamId)?.name||null});
+  const events=rows=>rows.slice(0,12).map(e=>({year:e.year,title:String(e.title||e.label||'保存済み記録').slice(0,160)}));
+  const club=x=>x?{id:x.id,name:String(x.name).slice(0,80)}:null;
+  const leaders=side=>r.leaders[side].map(x=>({metric:x.metric,label:x.label,value:String(x.value),count:x.leaders.length,leaders:x.leaders.slice(0,20).map(p=>name(p.playerId,p.teamId))}));
+  return {start:r.start,end:r.end,count:r.count,complete:r.complete,teams:r.teams.slice(0,12).map(t=>({id:t.id,name:t.name,league:t.league,seasons:t.seasons,wins:t.wins,losses:t.losses,ties:t.ties,leagueTitles:t.leagueTitles,championships:t.championships,best:t.best,pct:t.pct})),own:r.seasons.map(s=>{const t=[...(s.standings?.E||[]),...(s.standings?.W||[])].find(t=>t.id===team.id);return t?{year:s.year,name:t.name,rank:t.rank,wins:t.wins,losses:t.losses,ties:t.ties,champion:s.postseason?.championId===t.id}:null;}).filter(Boolean),timeline:r.timeline.map(t=>({year:t.year,east:club(t.east),west:club(t.west),champion:club(t.champion)})),leaders:{bat:leaders('bat'),pitch:leaders('pitch')},awards:r.awards.slice(0,20).map(p=>({...name(p.playerId,p.teamId),count:p.count,mvp:p.mvp})),hall:r.hall.slice(0,20).map(p=>({...name(p.id,p.retirement?.teamId),year:p.legacyHall.year,score:p.legacyHall.score})),records:events(r.records),feats:events(r.feats),counts:{awards:r.awards.length,hall:r.hall.length,records:r.records.length,feats:r.feats.length}};
+ };
+ if(op==='report-page'&&input.kind==='decades'){
+  if(!decadeAvailable())throw Error('decade archive unavailable');
+  const periods=decadePeriods(game.seasonArchive).filter(p=>!input.year||p.end===input.year);
+  if(input.offset>periods.length)throw Error('archive offset out of range');
+  const items=periods.slice(input.offset,input.offset+input.limit).map(decadeProjection),end=input.offset+items.length;
+  return JSON.stringify({kind:input.kind,year:input.year,offset:input.offset,total:periods.length,nextOffset:end<periods.length?end:null,items});
+ }
  if(op==='report-page'){
   if(!archiveAvailable())throw Error('archive unavailable during confidential event');
   const source=input.kind==='matches'?game.games:(game.dailyBulletins||[]);
@@ -1026,7 +1042,7 @@ function createHeadlessEngine(){
    return run('trade-page',state,command);
   },
   reportPage(state,command){
-   if(!exact(command,['kind','year','offset','limit'])||!['matches','papers'].includes(command.kind)||!Number.isSafeInteger(command.year)||command.year!==0&&(command.year<2027||command.year>state.year)||!Number.isSafeInteger(command.offset)||command.offset<0||!Number.isSafeInteger(command.limit)||command.limit<1||command.limit>(command.kind==='matches'?1:3))throw Error('invalid report page');
+   if(!exact(command,['kind','year','offset','limit'])||!['matches','papers','decades'].includes(command.kind)||!Number.isSafeInteger(command.year)||command.year!==0&&(command.year<2027||command.year>state.year+(command.kind==='decades'?9:0))||!Number.isSafeInteger(command.offset)||command.offset<0||!Number.isSafeInteger(command.limit)||command.limit<1||command.limit>(command.kind==='papers'?3:1))throw Error('invalid report page');
    return run('report-page',state,command);
   },
   playerPage(state,command){
