@@ -196,22 +196,24 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   assert(app.innerHTML.includes('タイトル獲得歴'));
   assert(app.innerHTML.includes('記録達成履歴'));
 
-  // Both starting lineup and starting rotation show the same player overall badge
-  // on top of the five-stat ring; the swap list must use it too.
+  // New field-first lineup, candidate list and two-tap batting-order editor.
   dispatch('click',{action:'tab',tab:'roster'});
   assert.match(app.innerHTML,/スターティングメンバー/);
-  assert.match(app.innerHTML,/class="player-pick-btn roster-pick-btn"/);
+  assert.match(app.innerHTML,/監督におまかせ/);
+  assert.equal((app.innerHTML.match(/class="order-node"/g)||[]).length,9);
+  dispatch('click',{action:'order190-role',role:'DH'});
+  assert.match(app.innerHTML,/class="order-candidate"/);
+  assert.match(app.innerHTML,/class="face-mini [^"]*has-overall"/);
   assert.match(app.innerHTML,/class="portrait-overall"/);
-  assert.match(app.innerHTML,/has-overall/);
-  assert.match(app.innerHTML,/data-kind="lineup"/);
-  dispatch('click',{action:'swap-open',kind:'lineup',slot:'0'});
-  assert(overlays.some(markup=>markup.includes('class="swap-candidate"')),
-    'The swap modal must show replacement player candidates');
-  const modal=overlays.at(-1);
-  assert.match(modal,/class="face-mini [^"]*has-overall"/);
-  assert.match(modal,/class="portrait-overall"/);
-  assert.match(modal,/--avatar-color:#/);
-  dispatch('click',{action:'swap-close'});
+  assert.match(app.innerHTML,/--avatar-color:#/);
+  dispatch('click',{action:'order190-mode',mode:'order'});
+  const rosterBefore=window.PennantLab.getSnapshot().teams.find(t=>t.id===window.PennantLab.getSnapshot().selectedId).lineup.slice();
+  assert.match(app.innerHTML,/class="order-row"/);
+  assert.match(app.innerHTML,/class="portrait-overall"/);
+  dispatch('click',{action:'order190-order',index:'0'});
+  dispatch('click',{action:'order190-order',index:'1'});
+  const rosterAfter=window.PennantLab.getSnapshot().teams.find(t=>t.id===window.PennantLab.getSnapshot().selectedId).lineup;
+  assert.equal(rosterAfter[0],rosterBefore[1]);assert.equal(rosterAfter[1],rosterBefore[0]);
   dispatch('click',{action:'roster-mode',mode:'rotation'});
   assert.match(app.innerHTML,/data-kind="rotation"/);
   assert.match(app.innerHTML,/class="portrait-overall"/);
