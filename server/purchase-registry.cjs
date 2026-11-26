@@ -4,9 +4,10 @@ const {DatabaseSync}=require('node:sqlite');
 const {MAX_AGE_MS}=require('./purchase-rights.cjs');
 const id=v=>typeof v==='string'&&v.length>0&&v.length<=200&&!/[\x00-\x1f]/.test(v);
 const int=v=>Number.isSafeInteger(v)&&v>=0;
-function openPurchaseRegistry(filename){
+function openPurchaseRegistry(filename,{tokenKey=null}={}){
  const db=new DatabaseSync(filename);
  db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS purchases (store TEXT NOT NULL, chain TEXT NOT NULL, account TEXT NOT NULL, product TEXT NOT NULL, revision INTEGER NOT NULL, status TEXT NOT NULL, expires INTEGER, PRIMARY KEY(store,chain)); CREATE INDEX IF NOT EXISTS purchase_account ON purchases(account)');
+ const vault=tokenKey?require('./store-token-vault.cjs').createTokenVault({db,key:tokenKey}):null;
  const find=db.prepare('SELECT * FROM purchases WHERE store=? AND chain=?');
  const byAccount=db.prepare('SELECT * FROM purchases WHERE account=? ORDER BY store,chain');
  const write=db.prepare('INSERT INTO purchases(store,chain,account,product,revision,status,expires) VALUES(?,?,?,?,?,?,?) ON CONFLICT(store,chain) DO UPDATE SET revision=excluded.revision,status=excluded.status,expires=excluded.expires');
@@ -25,7 +26,7 @@ function openPurchaseRegistry(filename){
   }
   write.run(v.store,v.chain,account,v.product,v.revision,v.status,v.expiresAt);return true;
  }
- return {record:(v,account)=>atomic(()=>put(v,account)),find:(store,chain)=>find.get(store,chain),list:account=>byAccount.all(account),reconcile:(account,expected,values)=>atomic(()=>{
+ return {vault,record:(v,account)=>atomic(()=>put(v,account)),find:(store,chain)=>find.get(store,chain),list:account=>byAccount.all(account),reconcile:(account,expected,values)=>atomic(()=>{
   const current=byAccount.all(account);
   if(JSON.stringify(current)!==JSON.stringify(expected))throw Error('purchase registry changed; refresh required');
   if(values.length!==current.length)throw Error('incomplete purchase verification');
@@ -67,7 +68,7 @@ function createPurchaseService({registry,authenticate,verifyReceipt,verifyCurren
   if(!id(account))throw Error('invalid account');
   const start=now();if(!int(start))throw Error('invalid server time');
   const rows=registry.list(account);
-  const values=await Promise.all(rows.map(async x=>fresh(await verifyCurrent({account,store:x.store,chain:x.chain,product:x.product}))));
+  const values=await Promise.all(rows.map(async x=>fresh(await verifyCurrent({account,store:x.store,chain:x.chain,product:x.product,expiresAt:x.expires,status:x.status}))));
   const t=now(),verifiedAt=values.reduce((at,v)=>Math.min(at,v.verifiedAt),start);
   if(!int(t)||t<start||t-verifiedAt>=MAX_AGE_MS)throw Error('stale purchase reconciliation');
   const current=registry.reconcile(account,rows,values);
