@@ -5,10 +5,10 @@ const {chromium}=require('playwright'),esbuild=require('esbuild');
 const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHeadlessEngine}=require('../server/headless-engine.cjs');
 (async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pl-title-browser-')),owner='a'.repeat(64),deny=async()=>null;
- let clockOffset=0,fixtureRookie=false;
+ let clockOffset=0,fixtureRookie=false,fixtureDecade=false;
  const engine=createHeadlessEngine();
  // Isolated third-slot fixture, persisted through the real HTTP authority.
- const fixtureEngine={...engine,newWorld(command){const w=engine.newWorld(command);if(fixtureRookie){const p=w.players.find(p=>p.teamId===w.selectedId&&!p.retired);a.ok(p);w.pendingDraftReveal={year:w.year-1,entries:[{id:p.id,revealStage:0}]};const injured=w.players.find(q=>q.id!==p.id&&q.teamId===w.selectedId&&!q.retired);a.ok(injured);injured.injury={date:w.year+'-03-01',daysLeft:8,label:'試験用負傷'};w.memorialHistory={...(w.memorialHistory||{}),'fixture:facility':{id:'fixture:facility',year:w.year,teamId:w.selectedId,kind:'facility',title:'試験用施設実績',body:'隔離試験用'}};}return w;}};
+ const fixtureEngine={...engine,newWorld(command){const w=engine.newWorld(command);if(fixtureDecade)return require('./decade-fixture.cjs').decadeFixture(w);if(fixtureRookie){const p=w.players.find(p=>p.teamId===w.selectedId&&!p.retired);a.ok(p);w.pendingDraftReveal={year:w.year-1,entries:[{id:p.id,revealStage:0}]};const injured=w.players.find(q=>q.id!==p.id&&q.teamId===w.selectedId&&!q.retired);a.ok(injured);injured.injury={date:w.year+'-03-01',daysLeft:8,label:'試験用負傷'};w.memorialHistory={...(w.memorialHistory||{}),'fixture:facility':{id:'fixture:facility',year:w.year,teamId:w.selectedId,kind:'facility',title:'試験用施設実績',body:'隔離試験用'}};}return w;}};
  const runtime=createServiceRuntime({now:()=>Date.now()+clockOffset,dataDir:dir,authenticate:async t=>t==='a'?{authenticated:true,account:owner}:{authenticated:false},verifyRecentReauth:deny,verifyReceipt:deny,verifyCurrent:deny,verifyNotification:deny,verifyEvent:deny,verifyAction:deny,verifyCompletion:deny,canonicalEngine:fixtureEngine,units:{android:{unit:'123',item:'ticket',amount:1}},origins:[]});
  let browser;
  try{
@@ -304,6 +304,22 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   page.once('dialog',d=>d.accept());await delete3.click();await page.locator('button[data-slot="3"][data-action="new-slot"]').waitFor();
   a.equal(await slot(1).getAttribute('data-action'),'continue-slot');a.equal(await slot(2).getAttribute('data-action'),'continue-slot');a.equal(await delete3.count(),0);
   console.log('PASS long press, cancellation and confirmed server world deletion');
+  // Separate recreated third world with ten synthetic historical seasons.
+  clockOffset+=61000;fixtureDecade=true;
+  await slot(3).click();await finish.waitFor();await finish.click();await page.getByText('サーバー保存の確認画面（開発試験）').waitFor();fixtureDecade=false;
+  const beforeDecade=await post('read',{slot:3});a.equal(beforeDecade.game.inbox.decade,2036);
+  await page.locator('[data-action="canonical-hq-open"]').click();await page.locator('[data-action="canonical-events-open"]').click();
+  await page.locator('[data-action="canonical-decade-read"]').click();const book=page.locator('[data-canonical-decade]');await book.waitFor();
+  await book.getByText('自球団の10年史',{exact:true}).click();await book.getByText('10回',{exact:true}).first().waitFor();
+  a.equal((await post('read',{slot:3})).revision,beforeDecade.revision);
+  await page.getByRole('button',{name:'節目の報告を確認する'}).click();
+  await page.locator('[data-action="canonical-decade-read"]').waitFor({state:'detached'});
+  const afterDecade=await post('read',{slot:3});a.equal(afterDecade.game.inbox.decade,null);a.equal(afterDecade.revision,beforeDecade.revision+1);
+  await page.locator('[data-action="canonical-events-back"]').click();await page.locator('[data-action="canonical-reports-open"]').click();
+  await page.locator('[data-action="canonical-archive-kind"][data-kind="decades"]').click();await book.waitFor();
+  await book.getByText('年度別の優勝球団',{exact:true}).click();await book.getByText('2027年 · 日本一：',{exact:false}).waitFor();
+  a.equal((await post('read',{slot:3})).revision,afterDecade.revision);
+  console.log('PASS actual browser decade event, optional reading and later archive reread');
   a.deepEqual(errors,[]);console.log('PASS packaged canonical title, actual HTTP create/reopen, lost commit recovery, offline and local save isolation');
  }finally{await browser?.close();await runtime.close();fs.rmSync(dir,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});
