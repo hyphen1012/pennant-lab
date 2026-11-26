@@ -26,6 +26,7 @@ function createServiceRouter({accountHttp,saveHttp,adService,deletionService,sto
   ['/v1/game/reserve',['reserve',['slot','operationId','choice']]],
   ['/v1/game/settle',['settle',['slot','operationId','attempt']]],
   ['/v1/game/cancel',['cancel',['slot','operationId','attempt','confirmed']]],
+  ['/v1/game/achievement-page',['achievementPage',['slot','world','revision','command']]],
   ['/v1/game/achievements',['achievements',['slot']]],
   ['/v1/game/claim',['claim',['slot','eventId','choice']]]
  ]);
