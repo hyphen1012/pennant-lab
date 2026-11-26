@@ -19,7 +19,7 @@ function canonicalTitlePilot(html){
  return html;
 }
 const pilotCode = `
-  let canonicalRoster=null;
+  let canonicalRoster=null,canonicalDeletePress=null,canonicalDeleteSuppressed=null;
   function canonicalTitleScreen(){
     const head='<div class="title-screen save-terminal multiverse-terminal"><header class="save-terminal-head"><span class="title-serial">VERSION 0.9.191 · STAGING</span><button class="ghost-btn" data-action="launch-back">‹ タイトル</button></header><div class="title-slot-title">セーブデータを選択</div>';
     if(!canonicalSlots)return head+'<p role="status">'+(slotOpening?'セーブ一覧を取得しています。':'サーバーのセーブ一覧を確認できません。データは変更されていません。')+'</p><button class="btn primary full" data-action="canonical-retry" '+(slotOpening?'disabled':'')+'>再取得する</button></div>';
@@ -27,8 +27,47 @@ const pilotCode = `
       const row=canonicalSlots.find(x=>x.slot===i),d=row?.preview,t=d?.team;
       const orb=row&&!t?worldOrb(i,null,true).replace('<span class="world-new">＋</span>','<span class="world-new">●</span>'):worldOrb(i,t,!!row);
       const label=t?'<strong>'+h(t.name)+'</strong><small>'+leagueTag(t.league)+'　'+d.year+'年</small><small>'+d.day+'/143試合 · '+h(d.gmName)+'</small><small>'+t.wins+'勝　'+fmtMoney(t.cash)+'</small>':row?'<strong>保存済みデータ</strong><small>詳細は開いて確認</small>':'<strong>新しい球団で始める</strong><small>空きデータ '+i+'</small>';
-      return '<div class="save-slot-group" data-slot-group="'+i+'" style="--world-tone:'+WORLD_TONES[i-1]+'"><button class="save-slot world-node '+(row?'has-game':'empty-slot')+' '+(t?leagueClass(t.league):'')+'" data-action="'+(row?'continue-slot':'new-slot')+'" data-slot="'+i+'">'+orb+'<span class="slot-label world-label"><span class="world-number">DATA 0'+i+' <i></i></span>'+label+'</span></button></div>';
+      return '<div class="save-slot-group" data-slot-group="'+i+'" style="--world-tone:'+WORLD_TONES[i-1]+'"><button class="save-slot world-node '+(row?'has-game':'empty-slot')+' '+(t?leagueClass(t.league):'')+'" data-action="'+(row?'continue-slot':'new-slot')+'" data-slot="'+i+'">'+orb+'<span class="slot-label world-label"><span class="world-number">DATA 0'+i+' <i></i></span>'+label+'</span></button>'+(row?'<button class="btn outline full canonical-world-delete" style="display:none" data-action="canonical-world-delete" data-slot="'+i+'">このセーブデータを削除</button>':'')+'</div>';
     }).join('')+'</div></div><p class="save-terminal-hint">試験環境 · サーバー保存データ</p><button class="btn outline full" data-action="canonical-retry">一覧を更新</button><button class="btn outline full" data-action="canonical-logout">ログアウト</button></div>';
+  }
+  function canonicalDeleteClear(){if(canonicalDeletePress)clearTimeout(canonicalDeletePress.timer);canonicalDeletePress=null;}
+  function canonicalDeleteReveal(slot){
+    if(ui.page!=='title'||ui.launchTitle||slotOpening||!accountCurrent()||!canonicalSlots?.some(x=>x.slot===slot))return;
+    document.querySelectorAll('.canonical-world-delete').forEach(b=>{b.style.display=Number(b.dataset.slot)===slot?'':'none';});
+    canonicalDeleteSuppressed={slot,until:Date.now()+1100};
+  }
+  window.addEventListener('pointerdown',e=>{
+    if(ui.page!=='title'||ui.launchTitle||slotOpening||!accountCurrent())return;
+    const b=e.target.closest?.('button.save-slot.has-game');if(!b||e.button!==0||e.isPrimary===false)return;
+    canonicalDeleteClear();canonicalDeleteSuppressed=null;
+    const p={slot:Number(b.dataset.slot),id:e.pointerId,x:e.clientX,y:e.clientY,epoch:canonicalEpoch};
+    canonicalDeletePress=p;p.timer=setTimeout(()=>{if(canonicalDeletePress===p&&p.epoch===canonicalEpoch){canonicalDeleteReveal(p.slot);p.revealed=true;}},1800);
+  },true);
+  window.addEventListener('pointermove',e=>{
+    const p=canonicalDeletePress;if(!p||p.id!==e.pointerId)return;
+    const dx=e.clientX-p.x,dy=e.clientY-p.y;
+    if(Math.abs(dy)>18&&Math.abs(dy)>Math.abs(dx)){canonicalDeleteClear();return;}
+    if(Math.abs(dx)>12||Math.abs(dy)>12)clearTimeout(p.timer);
+    if(dx<=-55&&Math.abs(dy)<35&&!p.revealed){canonicalDeleteReveal(p.slot);p.revealed=true;}
+  },true);
+  window.addEventListener('pointerup',e=>{const p=canonicalDeletePress;if(p?.id===e.pointerId){if(p.revealed)canonicalDeleteSuppressed={slot:p.slot,until:Date.now()+1100};canonicalDeleteClear();}},true);
+  for(const name of ['pointercancel','scroll'])window.addEventListener(name,canonicalDeleteClear,true);
+  window.addEventListener('contextmenu',e=>{const b=e.target.closest?.('button.save-slot.has-game');if(ui.page==='title'&&!ui.launchTitle&&b&&accountCurrent()){e.preventDefault();canonicalDeleteReveal(Number(b.dataset.slot));}},true);
+  window.addEventListener('keydown',e=>{const b=e.target.closest?.('button.save-slot.has-game');if(ui.page==='title'&&!ui.launchTitle&&b&&(e.key==='ContextMenu'||e.shiftKey&&e.key==='F10')){e.preventDefault();canonicalDeleteReveal(Number(b.dataset.slot));}},true);
+  async function canonicalDeleteWorld(b){
+    const slot=Number(b.dataset.slot),row=canonicalSlots?.find(x=>x.slot===slot);
+    if(slotOpening||!accountCurrent()||!row||b.style.display==='none'||ui.page!=='title'||ui.launchTitle)return;
+    if(!window.confirm('DATA 0'+slot+'「'+(row.preview?.team?.name||'保存済みデータ')+'」を削除しますか？ この世界線のプレイ記録は元に戻せません。'))return;
+    canonicalDeleteClear();canonicalDeleteSuppressed=null;const epoch=canonicalEpoch;
+    slotOpening=true;canonicalSlots=null;render();
+    let deleted=false;
+    try{const x=await canonicalPilot.deleteWorld(row,true);if(epoch!==canonicalEpoch)return;deleted=x.status==='deleted';}catch{}
+    finally{
+      if(epoch===canonicalEpoch){
+        canonicalSnapshot=null;canonicalSlot=null;await refreshCanonicalSlots();
+        if(epoch===canonicalEpoch){slotOpening=false;render();showToast(deleted?'セーブデータを削除しました。':'削除結果を確認してください。別端末の更新や未確定報酬がある場合は削除できません。自動再送は行いません。',!deleted);}
+      }
+    }
   }
   async function refreshCanonicalSlots(){
     const epoch=canonicalEpoch;canonicalSlots=null;
@@ -40,7 +79,7 @@ const pilotCode = `
     }catch{return false;}
   }
   function canonicalReset(){
-    canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalForeignOpen=false;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';canonicalReplay=null;canonicalReplaySkip=false;canonicalArchive=null;canonicalManagerEntry=true;canonicalTrade=null;canonicalTradeQuote=null;canonicalTradeClub=null;canonicalAchievementPage=null;canonicalAchievementNote='';canonicalRewardNote='';
+    canonicalDeleteClear();canonicalDeleteSuppressed=null;canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalForeignOpen=false;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';canonicalReplay=null;canonicalReplaySkip=false;canonicalArchive=null;canonicalManagerEntry=true;canonicalTrade=null;canonicalTradeQuote=null;canonicalTradeClub=null;canonicalAchievementPage=null;canonicalAchievementNote='';canonicalRewardNote='';
     canonicalPilot.suspend();ui.clubDraft=null;ui.portalSlot=null;ui.portalOrigin=null;slotOpening=false;
     ui.page='title';ui.launchTitle=false;
   }
@@ -960,7 +999,11 @@ const pilotCode = `
     if(slotOpening){e.preventDefault();e.stopImmediatePropagation();if(ui.page==='canonical-hq'&&act==='canonical-hq-pause'&&canonicalRunning){canonicalStop=true;render();}else if(ui.page==='canonical-hq'&&act==='canonical-replay-skip'&&canonicalReplay){canonicalReplaySkip=true;}return;}
     if(ui.page==='title'&&ui.launchTitle&&['launch-start','launch-back'].includes(act)||ui.page==='title'&&!ui.launchTitle&&act==='launch-back'||ui.page==='setup'&&['setup-league','pick-setup-team','team-color','club-design'].includes(act))return;
     e.preventDefault();e.stopImmediatePropagation();
-    if(ui.page==='title'&&!ui.launchTitle&&['new-slot','continue-slot'].includes(act))void openCanonicalSlot(b,act==='new-slot');
+    if(ui.page==='title'&&!ui.launchTitle&&['new-slot','continue-slot'].includes(act)){
+      if(canonicalDeleteSuppressed?.slot===Number(b.dataset.slot)&&Date.now()<canonicalDeleteSuppressed.until){canonicalDeleteSuppressed=null;return;}
+      void openCanonicalSlot(b,act==='new-slot');
+    }
+    else if(ui.page==='title'&&!ui.launchTitle&&act==='canonical-world-delete')void canonicalDeleteWorld(b);
     else if(ui.page==='title'&&act==='canonical-retry'||act==='canonical-return'||ui.page==='setup'&&act==='title')void canonicalReturn();
     else if(ui.page==='canonical-ready'&&act==='canonical-hq-open')canonicalHqOpen();
     else if(ui.page==='canonical-hq'&&act==='canonical-hq-step')void canonicalRun('date');
