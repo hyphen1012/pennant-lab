@@ -28,6 +28,8 @@ function createHeadlessEngine(){
  }
  game=input.state;ensureGameExtras();
  const team=myTeam();
+ // JSON persistence loses the browser's shared job/desk object reference.
+ const restoredFlow=flowGet();if(restoredFlow?.active&&restoredFlow.jobs[restoredFlow.active]?.state)game.offseasonDesk=restoredFlow.jobs[restoredFlow.active].state;
  const injuryNotice=()=>{const e=game.pendingEvent;return e?.type==='injury'&&e.teamId===team.id&&Number.isSafeInteger(e.playerId)&&typeof e.date==='string'?e:null;};
  const careerNotice=()=>{const e=careerCurrentEvent(),p=e&&getPlayer(e.id),q=p?.retirePlan;return e&&p&&q?.year===game.year&&q.teamId===team.id?{e,p,q}:null;};
  const inbox=()=>{
@@ -259,21 +261,21 @@ function createHeadlessEngine(){
      if(f.active!==j.id||j.status!=='active'||!x?.open||!d||d.closed)throw Error('market room unavailable');
      if(k==='news'){
       if(x.view!=='news'||!['eve','opening','results'].includes(x.news))throw Error('market news unavailable');
-      const before=x.news;
-      offdeskAction({'eve':'offdesk-news-eve','opening':'offdesk-news-open','results':'offdesk-news-results'}[before],{dataset:{}});
-      if(x.news===before||x.open)throw Error('market news rejected');
-      flowSync(f);
+      // Same persisted transitions as offdesk-news-eve/open/results, without DOM event guards.
+      if(x.news==='eve')x.news='opening-wait';
+      else if(x.news==='opening'){x.marketOpened??=f.date;faClock(d,x);faOpeningDraw(f.date);x.news=null;}
+      else x.news=null;
+      x.open=false;flowPark(f,j,'ready');
      }else if(k==='home'){
       if(x.news)throw Error('market news acknowledgement required');
       flowPark(f,j,'ready');
      }else if(k==='close'){
       if(x.news||x.view!=='other'||d.cpuDone||faUnreadRows(d).length||Object.values(d.offers).some(o=>['waiting','counter'].includes(o.status)))throw Error('market negotiations unfinished');
-      if(!offdeskCloseMarket(d))throw Error('market close rejected');
-      flowSync(f);
+      movementCPU(d);if(!d.cpuDone)throw Error('market close rejected');
+      x.news='results';x.view=null;x.faFocus=null;x.faStage=0;game.offseasonMarketEnd={year:game.year,date:f.date};flowPark(f,j,'ready');
      }else if(k==='finish'){
       if(x.news||x.view!=='other'||!d.cpuDone||faUnreadRows(d).length)throw Error('market results unfinished');
-      movementAction('movement-market-finish',{dataset:{}});
-      if(!d.closed)throw Error('market finish rejected');
+      d.closed=true; // existing movement-market-finish final compensation transition
       flowComplete(f,j);
      }else if(k==='comp'){
       if(x.news||x.view!=='other'||!d.cpuDone)throw Error('compensation unavailable');
