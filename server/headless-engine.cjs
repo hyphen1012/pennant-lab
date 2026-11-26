@@ -27,8 +27,17 @@ function createHeadlessEngine(){
  game=input.state;ensureGameExtras();
  const team=myTeam();
  const medical=()=>own(team).filter(p=>rosterTreatmentEligible(p)&&p.injury&&typeof p.injury.date==='string').map(p=>({route:'medical',year:game.year,eventKey:String(p.id)+':'+p.injury.date,label:p.name+' 特別治療',playerId:p.id,date:p.injury.date}));
- if(op==='actions')return JSON.stringify(medical());
+ // Same eligibility as the checked-in manager staff continuation handler:
+ // seven years, late season, one continuation per year, own club only.
+ const manager=()=>{const m=team.manager;if(!m||managerTenure(team)<7||game.day<98||m.tenureContinuedYear===game.year||game.financeCrisis)return [];return [{route:'manager',year:game.year,eventKey:String(m.id),label:m.name+' 監督慰留'}];};
+ if(op==='actions')return JSON.stringify([...medical(),...manager()]);
  if(op==='apply'){
+  if(input.action.route==='manager'){
+   const a=manager().find(x=>x.eventKey===input.action.eventKey);
+   if(!a)throw Error('manager continuation unavailable');
+   team.manager.tenureContinuedYear=game.year;
+   return JSON.stringify({state:game,result:{managerId:team.manager.id,continuedThrough:game.year+1}});
+  }
   const a=medical().find(x=>x.eventKey===input.action.eventKey&&input.action.route==='medical');
   if(!a)throw Error('medical action unavailable');
   const p=getPlayer(a.playerId),before=p.injury.daysLeft;
@@ -36,6 +45,20 @@ function createHeadlessEngine(){
   // applySpecialTreatment additionally requires the actual pending popup.
   if(!applyRosterTreatment(p)||p.injury.daysLeft!==Math.ceil(before/2))throw Error('real medical mutation failed');
   return JSON.stringify({state:game,result:{before,after:p.injury.daysLeft,date:a.date}});
+ }
+ if(op==='ack'){
+  const kind=input.kind;
+  // Only acknowledge archived monthly reports or defer already-recorded
+  // milestone news. Never discard injury/rare notices or resolve a crisis.
+  if(kind==='month'){
+   if(!game.pendingMonth||!game.monthlyArchive?.some(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id))throw Error('monthly report not archived');
+   game.pendingMonth=null;
+  }else if(kind==='milestones'){
+   if(!game.pendingMilestoneIds?.length)throw Error('no milestone notices');
+   deferSeasonMilestones(game.pendingMilestoneIds);
+   game.pendingMilestoneIds=[];game.milestoneResume=false;game.milestoneEdition=null;game.milestonePage=0;
+  }else throw Error('unsupported acknowledgement');
+  return JSON.stringify(game);
  }
  if(op==='advance'){
   if(game.day>=143||game.financeCrisis)throw Error('pilot season boundary');
@@ -45,10 +68,25 @@ function createHeadlessEngine(){
   return JSON.stringify(game);
  }
  if(op==='achievements'){
-  // Narrow initial scope: only completed, actually won own-club games.
-  return JSON.stringify(game.games.filter(g=>(g.home===team.id&&g.homeScore>g.awayScore)||(g.away===team.id&&g.awayScore>g.homeScore)).map(g=>({key:'win:'+g.year+':'+g.day,label:'試合勝利 '+g.year+' / '+g.day,eligible:true})));
+  const entries=new Map();
+  const win=(year,day)=>{if(Number.isSafeInteger(year)&&year>=2027&&Number.isSafeInteger(day)&&day>=1&&day<=143){const key='win:'+year+':'+day;entries.set(key,{key,label:'試合勝利 '+year+' / '+day,eligible:true});}};
+  for(const g of game.games)if((g.home===team.id&&g.homeScore>g.awayScore)||(g.away===team.id&&g.awayScore>g.homeScore))win(g.year,g.day);
+  // Existing memorial album is generated from actual game records. Only
+  // own-club entries with a supported source and explicit team ID qualify.
+  for(const e of memorialEntries()){
+   if(e.teamId!==team.id||typeof e.id!=='string'||typeof e.title!=='string'||e.id.length>512||!e.title)continue;
+   if(e.kind==='win'){
+    const m=/^win:(\\d{4,}):(\\d+):(\\d+)$/.exec(e.id);
+    if(m&&Number(m[2])===team.id)win(Number(m[1]),Number(m[3]));
+    continue;
+   }
+   if(!['award','facility','championship','league-championship','retirement'].includes(e.kind)&&!e.featKey&&!e.recordKey)continue;
+   const key='memorial:'+e.id;
+   if(!entries.has(key))entries.set(key,{key,label:e.title.slice(0,160),eligible:true});
+  }
+  return JSON.stringify([...entries.values()]);
  }
- if(op==='view')return JSON.stringify({year:game.year,day:game.day,calendarIndex:game.calendarIndex,team:{id:team.id,name:team.name,wins:team.wins,losses:team.losses,ties:team.ties,cash:team.cash},games:game.games.length,medical:medical().length,blocked:!!(game.financeCrisis||game.pendingRareIds?.length||game.pendingMilestoneIds?.length||game.pendingEvent||game.pendingMonth||game.day>=143)});
+ if(op==='view')return JSON.stringify({year:game.year,day:game.day,calendarIndex:game.calendarIndex,team:{id:team.id,name:team.name,wins:team.wins,losses:team.losses,ties:team.ties,cash:team.cash},games:game.games.length,medical:medical().length,managerEligible:manager().length===1,acknowledgements:{month:!!(game.pendingMonth&&game.monthlyArchive?.some(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id)),milestones:!!game.pendingMilestoneIds?.length},blocked:!!(game.financeCrisis||game.pendingRareIds?.length||game.pendingMilestoneIds?.length||game.pendingEvent||game.pendingMonth||game.day>=143)});
  throw Error('unsupported pilot operation');
  `;
  const compiled=new vm.Script(pre+source.replace('(() => {','(() => {')+tail+'})();',{filename:'pennant-lab-headless-pilot.js'});
@@ -65,9 +103,9 @@ function createHeadlessEngine(){
  return Object.freeze({
   sourceHash:hash,
   newWorld(command){if(!exact(command,[]))throw Error('pilot setup accepts no options');return run('new',null);},
-  advance(state,command){if(!exact(command,['step'])||command.step!==1)throw Error('pilot accepts one calendar day');return run('advance',state);},
-  actions:state=>run('actions',state),achievements:state=>run('achievements',state),view:state=>run('view',state),
-  applyAction(state,action){if(action?.route!=='medical')throw Error('pilot route unavailable');return run('apply',state,{action:{route:action.route,eventKey:action.eventKey}});}
+  advance(state,command){if(exact(command,['acknowledge'])&&['month','milestones'].includes(command.acknowledge))return run('ack',state,{kind:command.acknowledge});if(!exact(command,['step'])||command.step!==1)throw Error('pilot accepts one calendar day or explicit report acknowledgement');return run('advance',state);},
+  actions:state=>run('actions',state),achievements:state=>run('achievements',state).map(e=>e.key.startsWith('memorial:')?{...e,key:'memorial:'+createHash('sha256').update(e.key).digest('hex')}:e),view:state=>run('view',state),
+  applyAction(state,action){if(!['medical','manager'].includes(action?.route))throw Error('pilot route unavailable');return run('apply',state,{action:{route:action.route,eventKey:action.eventKey}});}
  });
 }
 module.exports={createHeadlessEngine};
