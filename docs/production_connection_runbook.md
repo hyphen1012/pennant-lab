@@ -283,3 +283,6 @@ PR116: expose only the existing 1-point ticket exchange, with confirmation, serv
 
 ## Regular season trade (staging)
 PR117: explicit rival selection, eligible roster and original gmTradeQuote read via revision-checked endpoint. Confirmed execution uses original gmTradeExecute (max 3 per side, signed fee, July 31, protected players, roster and both budgets). Revalidate quote at commit. No client mutation. Actual engine fixture tests cash conservation, duplicate and confirmation guards. Browser walk-through pending. No production enablement.
+
+## Manager meeting and scouting profile (staging)
+PR118: original office entry and portrait/grade helpers, actual manager profile, tendencies versus effective tactics, trust/discontent risk and last 15 games of actual manager moves (latest six). Existing authoritative hire/renew/orders only; meeting entry is read-only and cannot change relationship. Engine regression checks actual stored move count and rating fields. Browser visual parity remains open.
