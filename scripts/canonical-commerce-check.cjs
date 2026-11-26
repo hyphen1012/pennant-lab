@@ -173,7 +173,7 @@ globalThis.__plAnnualEntryCheck=saved=>{
   const base=engine.achievements(w).map(e=>e.key);
   const feat=year+':fixture-feat:'+p.id,ordinary=year+':fixture-ordinary:'+p.id,rare=year+':awakening:'+p.id,rival=year+':awakening:'+other.id,scout=year+':foreign-discovery:987654321';
   fixture.milestoneNews=[...(fixture.milestoneNews||[]),{id:ordinary,year,teamId,playerId:p.id,type:'player',title:'Fixture ordinary milestone'},{id:feat,year,teamId,playerId:p.id,type:'player',featKey:'fixture',title:'Fixture special feat'}];
-  fixture.rareNews=[...(fixture.rareNews||[]),{id:rare,year,teamId,playerId:p.id,category:'awakening',title:'Fixture awakening'},{id:rival,year,teamId:other.teamId,playerId:other.id,category:'awakening',title:'Fixture rival'},{id:scout,year,scoutTeamId:teamId,kind:'foreign-discovery',category:'foreign',title:'Fixture public discovery'}];
+  fixture.rareNews=[...(fixture.rareNews||[]),{id:rare,year,teamId,playerId:p.id,category:'awakening',title:'Fixture awakening'},{id:rival,year,teamId:other.teamId,playerId:other.id,category:'awakening',title:'Fixture rival'},{id:scout,year,playerId:987654321,scoutTeamId:teamId,kind:'foreign-discovery',category:'foreign',title:'Fixture public discovery'}];
   const snapshot=JSON.stringify(fixture),entries=engine.achievements(fixture),keys=new Set(entries.map(e=>e.key));
   for(const k of base)a.ok(keys.has(k),'prior achievement identity retained');
   for(const id of ['news:'+ordinary,'news:'+feat,'rare:'+rare,'rare:'+scout])a.ok(keys.has(key(id)),'missing '+id);
