@@ -176,3 +176,7 @@ PR73 dedicated and aggregate CI passed (45817579618 / 45817579627). Staging game
 
 ## Canonical free market browsing (staging only)
 Authenticated `/v1/game/free-page` reads a bounded page (1–80) or normalized name search from the existing free-agent list. Requires matching slot world ID and revision before decode; no mutation or save change. Same projection and hidden-arrival guard as club view. Native client/session exposes the read, invalidates on mismatch and never retries; existing UI not yet connected. Isolated >80 candidate fixture and actual HTTP session regression added; CI pending. No production or main changes.
+
+
+## Canonical club identity and slot selection increment
+Original club/GM identity editor fields are accepted on canonical creation or explicit confirmed identity update; enum/length/hex validation rejects additional fields, image/CSS payloads and arbitrary state. Actual applyIdentity is used, with safe public team identity in the projection. Session offers authenticated metadata-only slot listing and checks confirmed empty occupancy before issuing creation; server still rejects racing duplicate creation. Dedicated original-engine and HTTP integration checks expanded. Existing game title/setup UI integration still open. No production flag or public release change.
