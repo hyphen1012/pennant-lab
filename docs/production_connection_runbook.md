@@ -146,3 +146,10 @@ Explicit annual draft commands for manual nominations/pass, CPU-only progression
 
 ## Canonical renewal and training increment
 First/second renewal rounds use the original calendar dates and renewal functions. Individual or bulk offers, optional performance bonuses, release/restore, first-round pending and explicit final release. No repeat offers in a round, no early second round. Autumn training accepts valid individual menus and parks until the real report date. Winter dispatch uses original eligibility (five pro years, max four), destinations, cost and report, with no duplicated charge. First-round and winter integration test uses actual regular season; second round and autumn completion await commerce integration because the fan festival is a real blocking event. No native screen integration or production merge.
+
+
+## Canonical annual commerce increment
+Connect existing fan festival scheduling and completion, TV guest selection and live report, fanclub design/fee/perks, sponsor selection, broadcast negotiation and naming rights. Strict typed commands and original calendar/finance handlers; no generic job completion bypass. Actual season integration test extends through second renewal. Remaining: movement market, booking/rollover/preseason, screen integration. CI pending.
+
+## 100-season actual checkpoint results
+Run 45785036741 passed both 2- and 100-season storage tests. 50-year JSON 84,559,947 bytes, encoded 14,596,401, RSS 1,808,056,320 bytes; 100-year JSON 167,281,128 bytes, encoded 28,978,862, RSS 3,254,300,672 bytes; complete SHA256 match, closed backup restore, rollback and isolation. 100-year restore 3476.61 ms, view 2333.26 ms, achievements 2425.1 ms (6919). Reserve-isolated, not economy pass or concurrent server SLA. High RSS and latency require separate production resource/concurrency audit; no history deletion.

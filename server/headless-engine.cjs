@@ -36,7 +36,8 @@ function createHeadlessEngine(){
    rare:rare?{eventKey:rare.id,year:rare.year,date:rare.date,category:rare.category}:null,
    career:career?{playerId:career.p.id,stage:career.e.type,options:['consult','plan'].includes(career.e.type)?farewellChoices(career.p).map(([key,label,cost])=>({key,label,cost})):[]}:null};
  };
- const annualSupported=['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter'];
+ const commercialJobs=['fan-fest','tv','fanclub','sponsor','broadcast','naming'];
+ const annualSupported=['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter',...commercialJobs];
  const draftPending=d=>d.picks.find(x=>x.teamId===team.id&&(x.recoveryPending||x.recoveryCelebration));
  const draftOwnRow=d=>d.picks.find(x=>x.teamId===team.id&&x.status==='rights');
  const candidateView=c=>({id:c.id,name:secretProspect(c.player)?'????':c.player.name,pos:c.player.pos,type:c.type,category:playerTitleTheme(c.player)?.name||null});
@@ -59,11 +60,21 @@ function createHeadlessEngine(){
   if(phase==='winter')return {phase,assignments:winterPlan(team),eligible:winterEligible(team).map(p=>({id:p.id,name:p.name,pos:p.pos})),destinations:WINTER_DEST.map(([key,label,league,cost,effect])=>({key,label,league,cost,effect})),cost:winterCost(winterPlan(team))};
   return {phase,players:annualPlayers(team,phase).map(p=>({id:p.id,name:p.name,pos:p.pos,injured:!!p.injury,focus:['balanced',...seasonSkillKeys(p)],menu:annualMenu(team,p,phase)}))};
  };
+ const commercialView=(f,j)=>{
+  const s=j.state;if(!s)return null;
+  if(j.id==='sponsor')return {job:j.id,stage:s.stage,year:s.year,candidates:s.candidates.map(c=>({id:c.id,name:c.name,industry:c.industry,annual:c.annual})),selected:s.selected,contract:s.stage==='result'?sponsorContract(team,s.year):null};
+  return {job:j.id,stage:s.stage,year:s.year,due:s.due,plan:s.plan,players:s.players,name:s.name,fee:s.fee,perk:s.perk,color:s.color,font:s.font,delta:s.delta,choice:s.choice,report:s.report,result:s.result,
+   ...(j.id==='fan-fest'?{plans:FAN_FEST_PLANS.map((p,index)=>({index,name:p.name,cost:p.cost}))}:{}),
+   ...(j.id==='tv'?{eligible:own(team).filter(p=>!retirementScheduled(p)).map(p=>({id:p.id,name:p.name,pos:p.pos}))}:{}),
+   ...(j.id==='fanclub'?{perks:FAN_PERKS.map(([key,label,cost])=>({key,label,cost})),estimate:fanEstimate(team,s)}:{}),
+   ...(j.id==='broadcast'?{base:commerceBase(team),chance:broadcastChance(s.delta),contract:commerceData(team).broadcasts[s.year]||null}:{}),
+   ...(j.id==='naming'?{options:NAMING_OPTIONS,contract:commerceNaming(team,s.year)}:{})};
+ };
  const annualView=()=>{
   const f=flowGet(),d=movementData();
   if(!f)return {mode:null,canStart:game.day===143&&game.calendarIndex===game.calendar.days.length&&!game.financeCrisis&&!flowInbox()&&!game.pendingMonth&&!game.pendingReview&&!pendingMilestoneNews().length&&!flowForeignResponse()};
   const tasks=Object.values(f.jobs).map(j=>({id:j.id,start:j.start,status:j.status,supported:annualSupported.includes(j.id)}));
-  return {mode:f.mode,date:f.date,active:f.active,tasks,canAdvance:!f.active&&!flowInbox()&&!game.financeCrisis&&!flowBlocking(f),renewal:['renewal1','renewal2'].includes(f.active)?renewalView():null,training:['autumn','winter'].includes(f.active)?trainingView(f.active):null,draft:f.active==='draft'?draftView(game.draft):null,roster:f.active==='roster-cut'?{projection:draftRosterProjection(game.draft,team),selected:draftCutIds(game.draft,team),eligible:draftCutOptions(game.draft,team).map(p=>({id:p.id,name:p.name,pos:p.pos,salary:p.salary,warnings:draftCutReasons(p)}))}:null,requests:f.active==='movement-declarations'?(d?.requests||[]).filter(r=>r.from===team.id).map(r=>({id:r.id,kind:r.kind,status:r.status,demand:r.demand,offer:r.offer})):[]};
+  return {mode:f.mode,date:f.date,active:f.active,tasks,commerce:commercialJobs.includes(f.active)?commercialView(f,f.jobs[f.active]):null,canAdvance:!f.active&&!flowInbox()&&!game.financeCrisis&&!flowBlocking(f),renewal:['renewal1','renewal2'].includes(f.active)?renewalView():null,training:['autumn','winter'].includes(f.active)?trainingView(f.active):null,draft:f.active==='draft'?draftView(game.draft):null,roster:f.active==='roster-cut'?{projection:draftRosterProjection(game.draft,team),selected:draftCutIds(game.draft,team),eligible:draftCutOptions(game.draft,team).map(p=>({id:p.id,name:p.name,pos:p.pos,salary:p.salary,warnings:draftCutReasons(p)}))}:null,requests:f.active==='movement-declarations'?(d?.requests||[]).filter(r=>r.from===team.id).map(r=>({id:r.id,kind:r.kind,status:r.status,demand:r.demand,offer:r.offer})):[]};
  };
  const medical=()=>own(team).filter(p=>rosterTreatmentEligible(p)&&p.injury&&typeof p.injury.date==='string').map(p=>({route:'medical',year:game.year,eventKey:String(p.id)+':'+p.injury.date,label:p.name+' 特別治療',playerId:p.id,date:p.injury.date}));
  // Same eligibility as the checked-in manager staff continuation handler:
@@ -199,13 +210,16 @@ function createHeadlessEngine(){
     if(f.date>=game.year+'-12-31'||!flowDay(f))throw Error('annual date blocked');
    }else if(input.choice==='open'){
     const j=f.jobs[input.job];
-    if(!annualSupported.includes(input.job)||!flowOpen(f,j))throw Error('annual event unavailable');
+    if(!annualSupported.includes(input.job))throw Error('annual event unavailable');
+    const opened=commercialJobs.includes(input.job)?(input.job==='sponsor'?sponsorAction('sponsor-open',{dataset:{}}):commerceAction('commerce-open',{dataset:{value:input.job}})):flowOpen(f,j);
+    if(!opened)throw Error('annual event unavailable');
     if(j.id==='movement-declarations')movementInit();
     if(['renewal1','renewal2'].includes(j.id))renewalData(team,true);
     game.pendingCeremonyIntro=null;
    }else if(input.choice==='complete'){
     const j=f.jobs[f.active];
     if(!j||j.id!==input.job||!annualSupported.includes(j.id))throw Error('annual event unavailable');
+    if(commercialJobs.includes(j.id))throw Error('commerce requires explicit result confirmation');
     if(j.id==='movement-declarations'&&movementData()?.requests.some(r=>r.from===team.id&&['request','refused'].includes(r.status)))throw Error('movement decision required');
     if(j.id==='draft'&&(game.draft?.phase!=='done'||game.draft.announcement||game.draft.rareIntro))throw Error('draft unfinished');
     if(j.id==='roster-cut'){
@@ -218,6 +232,22 @@ function createHeadlessEngine(){
     }
     if(['autumn','winter'].includes(j.id)&&!annualReport(j.id))throw Error('training report required');
     flowComplete(f,j);
+   }else if(input.choice==='commerce'){
+    const job=f.active,j=f.jobs[job],s=j?.state,k=input.decision;
+    if(!commercialJobs.includes(job)||j.status!=='active'||!s)throw Error('commerce stage unavailable');
+    if(job==='sponsor'){
+     const action={start:'sponsor-start',toggle:'sponsor-toggle',confirm:'sponsor-confirm',finish:'sponsor-finish',back:'sponsor-back'}[k];
+     if(!action||!sponsorAction(action,{dataset:{value:input.value}}))throw Error('sponsor decision rejected');
+    }else if(k==='name'){
+     if(job!=='fanclub'||s.stage!=='selection')throw Error('fanclub name unavailable');
+     s.name=input.value;
+    }else{
+     const action={start:'commerce-start',back:'commerce-back',finish:'commerce-finish',confirm:'commerce-confirm',decline:'commerce-decline',park:'commerce-schedule-finish',plan:'commerce-plan',player:'commerce-player',fee:'commerce-fee',perk:'commerce-perk',color:'commerce-color',font:'commerce-font',delta:'commerce-delta',choice:'commerce-choice',live:'commerce-live-finish',tv:'commerce-tv-finish'}[k];
+     const allowed={plan:['fan-fest'],player:['tv'],fee:['fanclub'],perk:['fanclub'],color:['fanclub'],font:['fanclub'],delta:['broadcast'],choice:['naming'],live:['fan-fest'],tv:['tv'],park:['fan-fest','tv'],decline:['fan-fest','tv']};
+     if(!action||allowed[k]&&!allowed[k].includes(job))throw Error('commerce decision unavailable');
+     if(k==='player'&&!s.players.includes(input.value)&&s.players.length>=5)throw Error('TV roster full');
+     if(!commerceAction(action,{dataset:{value:String(input.value??'')}}))throw Error('commerce decision rejected');
+    }
    }else if(input.choice==='renewal'){
     if(!['renewal1','renewal2'].includes(f.active)||game.ceremonyStage!=='renewal')throw Error('renewal stage unavailable');
     const d=renewalData(team,true),k=input.decision,row=d.rows.find(x=>x.id===input.playerId);
@@ -351,8 +381,25 @@ function createHeadlessEngine(){
   advance(state,command,rights){
    const verifiedVip=rights?.verified===true&&rights.vip===true;
    if(exact(command,['annual'])&&['start','day'].includes(command.annual))return run('annual',state,{choice:command.annual,verifiedVip});
-   if(exact(command,['annual','job'])&&['open','complete'].includes(command.annual)&&['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter'].includes(command.job))return run('annual',state,{choice:command.annual,job:command.job,verifiedVip});
+   if(exact(command,['annual','job'])&&['open','complete'].includes(command.annual)&&['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter','fan-fest','tv','fanclub','sponsor','broadcast','naming'].includes(command.job))return run('annual',state,{choice:command.annual,job:command.job,verifiedVip});
    if(exact(command,['annual','playerId'])&&command.annual==='cut'&&Number.isSafeInteger(command.playerId))return run('annual',state,{choice:'cut',playerId:command.playerId,verifiedVip});
+   if(command?.annual==='commerce'){
+    const k=command.decision,base=['annual','decision'],v=command.value;
+    let valid=['start','back','finish','confirm','decline','park','live','tv'].includes(k)&&exact(command,base);
+    if(exact(command,[...base,'value'])){
+     if(k==='name')valid=typeof v==='string'&&v.trim().length>0&&v.length<=30&&!/[\u0000-\u001f]/.test(v);
+     else if(k==='toggle')valid=typeof v==='string'&&v.length<=100;
+     else if(k==='perk')valid=['pin','towel','uniform','none'].includes(v);
+     else if(k==='fee')valid=[-500,500].includes(v);
+     else if(k==='player')valid=Number.isSafeInteger(v)&&v>0;
+     else if(k==='plan')valid=[0,1,2].includes(v);
+     else if(k==='delta'||k==='font')valid=[0,1,2,3].includes(v);
+     else if(k==='color')valid=[0,1,2,3,4,5].includes(v);
+     else if(k==='choice')valid=[-1,0,1,2].includes(v);
+    }
+    if(!valid)throw Error('invalid commerce command');
+    return run('annual',state,{choice:'commerce',decision:k,value:v,verifiedVip});
+   }
    if(command?.annual==='renewal'){
     const k=command.decision,base=['annual','decision'];
     let valid=['next','final-release'].includes(k)&&exact(command,base)||['release','restore','retire'].includes(k)&&exact(command,[...base,'playerId'])&&Number.isSafeInteger(command.playerId);
