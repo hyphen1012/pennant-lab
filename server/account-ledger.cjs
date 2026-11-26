@@ -1,6 +1,7 @@
 // Local/reference account service. NOT a public API or a deployed authority.
 const {DatabaseSync}=require('node:sqlite');
 const rules=require('../shared/monetization.cjs');
+const {normalizeRights}=require('./purchase-rights.cjs');
 function openLedger(filename){
   const db=new DatabaseSync(filename);
   db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS account_ledger (id TEXT PRIMARY KEY, payload TEXT NOT NULL)');
@@ -18,18 +19,23 @@ function openLedger(filename){
   }
   return {transact,close:()=>db.close()};
 }
-function createAccountService({ledger,authenticate,verifyEvent,verifyEntitlements,verifyAction,verifyCompletion,now=Date.now}){
+function createAccountService({ledger,authenticate,verifyEvent,verifyEntitlements,verifyAction,verifyCompletion,purchaseService=null,now=Date.now}){
   if(!ledger?.transact||[authenticate,verifyEvent,verifyEntitlements,verifyAction,verifyCompletion].some(f=>typeof f!=='function'))throw Error('trusted adapters required');
   async function identity(token){
     const auth=await authenticate(token);
     if(auth?.authenticated!==true||typeof auth.account!=='string'||!auth.account)throw Error('unauthorized');
     return auth.account;
   }
-  async function rights(account){
+  async function verifiedRights(account){
     const result=await verifyEntitlements(account);
-    if(result?.verified!==true||result.account!==account)throw Error('entitlements unavailable');
-    return {verified:true,vip:result.vip===true,adSkip:result.adSkip===true};
+    return normalizeRights(account,result,now());
   }
+  async function rights(account){
+    const result=await verifiedRights(account);
+    return {verified:true,vip:result.entitlements.vip.active,adSkip:result.entitlements.adSkip.active};
+  }
+  async function entitlementSnapshot(token){return verifiedRights(await identity(token));}
+  async function restorePurchase(token,store,proof){await identity(token);if(typeof purchaseService?.restore!=='function')throw Error('purchase restoration unavailable');return purchaseService.restore(token,store,proof);}
   const publicState=s=>({tickets:s.tickets,points:s.points,owned:Object.keys(s.owned).filter(k=>s.owned[k]===true),claimCount:s.claimCount,nextAt:s.claimCount>=3?s.lastClaim+rules.HOUR:null});
   async function snapshot(token){const account=await identity(token);return ledger.transact(account,publicState);}
   async function claim(token,eventProof,choice='ticket'){
@@ -67,6 +73,6 @@ function createAccountService({ledger,authenticate,verifyEvent,verifyEntitlement
       return {order:o?{operationId:id,mode:o.mode,status:o.status,attempt:o.attempt??1}:null,wallet:publicState(s)};
     });
   }
-  return {snapshot,claim,exchange,reserve,finish,orderStatus};
+  return {snapshot,entitlementSnapshot,restorePurchase,claim,exchange,reserve,finish,orderStatus};
 }
 module.exports={openLedger,createAccountService};

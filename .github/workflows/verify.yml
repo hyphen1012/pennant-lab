@@ -95,3 +95,15 @@ jobs:
 
       - run: node scripts/startup-asset-check.cjs
         if: always()
+
+      - run: node scripts/purchase-rights-check.cjs
+        if: always()
+
+      - run: node scripts/commerce-transfer-check.cjs
+        if: always()
+
+      - run: node scripts/commerce-client-recovery-check.cjs
+        if: always()
+
+      - run: node scripts/save-http-check.cjs
+        if: always()

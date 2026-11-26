@@ -5,7 +5,7 @@ let now=1000,vip=false,permanent=false,ledger=openLedger(filename);
 const adapters={
  authenticate:async token=>['a','b'].includes(token)?{authenticated:true,account:token}:null,
  verifyEvent:async(account,proof)=>proof?.startsWith('event-')?{verified:true,account,eligible:true,id:proof}:null,
- verifyEntitlements:async account=>({verified:true,account,vip,adSkip:permanent}),
+ verifyEntitlements:async account=>({verified:true,account,verifiedAt:now,entitlements:{adSkip:{active:permanent,expiresAt:null},vip:{active:vip,expiresAt:vip?now+3600000:null}}}),
  verifyAction:async(account,proof)=>proof?.startsWith('action-')?{verified:true,account,eligible:true,id:proof}:null,
  verifyCompletion:async(account,proof)=>proof?.id?.startsWith('action-')?{verified:true,account,id:proof.id,attempt:proof.attempt,mode:proof.mode,applied:proof.applied}:null,
  now:()=>now
