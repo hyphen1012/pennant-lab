@@ -18,7 +18,13 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{rosterTre
  const req=async(p,body,token='a')=>{const r=await fetch(base+p,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Origin:'https://fixture.invalid'},body:JSON.stringify(body)});return [r.status,await r.json()];};
  try{
   await start(cfg);assert.equal((await req('/v1/game/read',{slot:1}))[0],503);await runtime.close();runtime=null;
+  const fixtureLedger=require('../server/account-ledger.cjs').openLedger(path.join(dir,'account.sqlite'));
+  try{fixtureLedger.transact(a,s=>{s.points=10;});}finally{fixtureLedger.close();}
   await start({...cfg,canonicalEngine:engine});
+  const beforeCatalog=(await req('/v1/wallet',{}))[1];assert.equal(beforeCatalog.points,10);
+  for(const key of ['frame','profile','uniform']){const x=(await req('/v1/exchange',{key}))[1];assert.equal(x.ok,false);assert.deepEqual(x.wallet,beforeCatalog);}
+  const exchanged=(await req('/v1/exchange',{key:'ticket'}))[1];assert.equal(exchanged.ok,true);assert.equal(exchanged.wallet.points,9);assert.equal(exchanged.wallet.tickets,1);
+  const rights=(await req('/v1/entitlements',{}))[1];assert.equal(rights.verified,true);assert.equal(rights.account,a);assert.equal(rights.entitlements.vip.active,false);assert.equal(rights.entitlements.adSkip.active,false);
   const pre=await fetch(base+'/v1/purchase-finish',{method:'OPTIONS',headers:{Origin:'https://fixture.invalid','Access-Control-Request-Method':'POST'}});assert.equal(pre.status,204);
   assert.equal((await req('/v1/game/create',{slot:1,command:{team:0,state:{}}}))[0],403);
   assert.equal((await req('/v1/game/create',{slot:1,command:{team:0},seed:42}))[0],400);
@@ -49,7 +55,7 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{rosterTre
   const sig=sign('sha256',Buffer.from(raw),privateKey).toString('base64url');
   assert.equal((await fetch(base+'/v1/admob/ssv?'+raw+'&signature='+sig+'&key_id=7')).status,200);
   assert.equal((await req('/v1/game/read',{slot:1}))[1].game.days,9);
-  const done=(await req('/v1/game/settle',{slot:1,operationId:op,attempt}))[1];assert.equal(done.result.after,5);assert.equal(done.wallet.tickets,1);
+  const done=(await req('/v1/game/settle',{slot:1,operationId:op,attempt}))[1];assert.equal(done.result.after,5);assert.equal(done.wallet.tickets,2);
   const recovered=(await req('/v1/game/order',{slot:1,operationId:op}))[1];assert.equal(recovered.order.status,'committed');assert.equal(recovered.order.result.after,5);
   assert.equal((await req('/v1/game/read',{slot:1}))[1].pending.length,0);
   assert.equal((await req('/v1/game/settle',{slot:1,operationId:op,attempt}))[1].replay,true);

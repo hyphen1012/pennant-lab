@@ -58,6 +58,7 @@ const {createAccountClient}=require('../mobile/src/account-client.cjs'),{createC
   one.suspend();a.equal(one.inspect().snapshot,null);a.throws(()=>one.advance({step:1}));a.equal((await one.refresh()).snapshot.world,b.snapshot.world);
   // Real HTTP bounded achievements: compare the existing complete projection.
   const observer=createAccountClient({baseUrl:'https://fixture.invalid',fetcher});observer.setSession({account:other,token:'b'});
+  const verified=await one.readEntitlements();a.equal(verified.status,'ready');a.equal(verified.rights.vip.active,false);a.equal(verified.rights.adSkip.active,false);a.ok(Number.isSafeInteger(verified.rights.serverNow));
   const complete=await observer.gameAchievements(1),observed=await one.achievementPage({offset:0,limit:30});a.equal(observed.status,'ready');a.equal(observed.page.total,complete.length);a.deepEqual(observed.page.items,complete.slice(0,30));
   await a.rejects(observer.gameAchievementPage(1,b.snapshot.world,one.inspect().snapshot.revision,{offset:0,limit:41}));
   await a.rejects(observer.gameAchievementPage(1,b.snapshot.world,one.inspect().snapshot.revision-1,{offset:0,limit:30}));

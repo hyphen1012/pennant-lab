@@ -79,7 +79,7 @@ const pilotCode = `
     }catch{return false;}
   }
   function canonicalReset(){
-    canonicalDeleteClear();canonicalDeleteSuppressed=null;canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalForeignOpen=false;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';canonicalReplay=null;canonicalReplaySkip=false;canonicalArchive=null;canonicalManagerEntry=true;canonicalTrade=null;canonicalTradeQuote=null;canonicalTradeClub=null;canonicalAchievementPage=null;canonicalAchievementNote='';canonicalMemorial=null;canonicalMemorialBusy=false;canonicalRewardNote='';
+    canonicalDeleteClear();canonicalDeleteSuppressed=null;canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalForeignOpen=false;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';canonicalReplay=null;canonicalReplaySkip=false;canonicalArchive=null;canonicalManagerEntry=true;canonicalTrade=null;canonicalTradeQuote=null;canonicalTradeClub=null;canonicalAchievementPage=null;canonicalAchievementNote='';canonicalMemorial=null;canonicalMemorialBusy=false;canonicalRewardNote='';canonicalRights=null;canonicalRightsBusy=false;
     canonicalPilot.suspend();ui.clubDraft=null;ui.portalSlot=null;ui.portalOrigin=null;slotOpening=false;
     ui.page='title';ui.launchTitle=false;
   }
@@ -417,7 +417,7 @@ const pilotCode = `
   }
   let canonicalPlayback='normal',canonicalTarget=null,canonicalRunning=false,canonicalStop=false;
   const canonicalCanRun=g=>!!g?.headquarters?.canCalendar&&!canonicalSnapshot?.pending?.length&&accountCurrent();
-  let canonicalRewardReturn='canonical-hq',canonicalRewardNote='';
+  let canonicalRewardReturn='canonical-hq',canonicalRewardNote='',canonicalRights=null,canonicalRightsBusy=false;
   let canonicalAchievementPage=null,canonicalAchievementNote='',canonicalMemorial=null,canonicalMemorialBusy=false;
   function canonicalAchievementRender(){
     const app=$('#app'),snap=canonicalSnapshot,g=snap?.game,p=canonicalAchievementPage;if(!app)return;
@@ -458,24 +458,39 @@ const pilotCode = `
     finally{if(epoch===canonicalEpoch){canonicalMemorialBusy=false;if(ui.page==='canonical-achievements')render();}}
   }
   function canonicalRewardLink(){return '<button class="btn outline full" data-action="canonical-rewards-open">広告券・報酬・慰留</button>';}
+  function canonicalRightsMarkup(snap){
+    const r=canonicalRights,owned=new Set(snap.wallet.owned||[]),labels={ticket:'広告券',frame:'カード枠',profile:'GMプロフィール',uniform:'ユニフォーム',hq:'本部テーマ',museum:'博物館',emblem:'エンブレム',deluxeCard:'最高級カード',anniversary:'創設記念演出'};
+    const rights=r?'<p>永久広告スキップ：'+(r.adSkip.active?'確認済み・有効':'未保有または無効')+'</p><p>VIP：'+(r.vip.active?'確認済み・有効':'未保有または無効')+'</p>'+(r.vip.active?'<p>有効期限：'+h(new Date(r.vip.expiresAt).toLocaleString('ja-JP'))+'</p>':'')+'<p class="small">確認時刻：'+h(new Date(r.serverNow).toLocaleString('ja-JP'))+'（この時点の状態。利用時にはサーバーで再確認します）</p>':'<p class="small">購入権利は未確認です。下のボタンで確認してください。</p>';
+    const rows=Object.entries(window.PennantExchangeCatalog||{}).filter(([k])=>k!=='ticket'&&Object.hasOwn(labels,k)).map(([k,cost])=>'<article class="event"><strong>'+h(labels[k])+' · '+cost+'ポイント</strong><p class="small">'+(owned.has(k)?'取得済み（利用画面は準備中）':'提供準備中・ポイントは消費しません')+'</p></article>').join('');
+    return '<section class="panel"><h3>購入権利の確認</h3>'+rights+'<button class="btn outline full" data-action="canonical-rights-refresh" '+(slotOpening||canonicalRightsBusy?'disabled':'')+'>'+(canonicalRightsBusy?'確認中…':'サーバーの購入権利を確認')+'</button><p class="small">試験環境のため購入は受け付けません。</p></section><section class="panel"><h3>ポイント交換品</h3><p class="small">必要ポイントは暫定仕様です。未提供の交換品は取得できません。</p>'+rows+'</section>';
+  }
+  async function canonicalRightsRefresh(){
+    if(slotOpening||canonicalRightsBusy||!accountCurrent()||!canonicalSnapshot)return;
+    const epoch=canonicalEpoch;canonicalRights=null;canonicalRightsBusy=true;render();
+    try{const r=await canonicalPilot.readEntitlements();if(epoch!==canonicalEpoch||ui.page!=='canonical-rewards'||!accountCurrent())return;if(r.status==='ready')canonicalRights=r.rights;else canonicalRewardNote='購入権利を確認できませんでした。';}
+    catch{if(epoch===canonicalEpoch&&ui.page==='canonical-rewards')canonicalRewardNote='購入権利を確認できませんでした。';}
+    finally{if(epoch===canonicalEpoch){canonicalRightsBusy=false;if(ui.page==='canonical-rewards')render();}}
+  }
   function canonicalRewardRender(){
     const app=$('#app'),snap=canonicalSnapshot,g=snap?.game;if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-rewards-back">‹ 戻る</button></div>';
     if(!g||!snap.wallet||!Array.isArray(snap.actions)||!Array.isArray(snap.pending)){app.innerHTML='<div class="setup-screen">'+top+'<p role="status">報酬の確定状態を取得してください。自動再送は行いません。</p><button class="btn primary full" data-action="canonical-rewards-refresh" '+(slotOpening?'disabled':'')+'>最新状態を取得</button></div>';return;}
     const pending=snap.pending,dis=slotOpening?'disabled':'',btn=(kind,id,label,disabled=false)=>'<button class="btn outline full" data-action="canonical-rewards-command" data-kind="'+kind+'" data-id="'+h(id)+'" '+(disabled||slotOpening?'disabled':'')+'>'+label+'</button>';
-    const body='<h2 class="page-title">広告券・報酬</h2><section class="panel"><p>広告券 <b>'+snap.wallet.tickets+' / 30</b>　ポイント <b>'+snap.wallet.points+'</b></p><p class="small">試験環境：広告券、サーバーで確認済みの広告スキップ権利のみ利用できます。実広告は未接続です。</p><button class="btn outline full" data-action="canonical-achievements-open">記念実績・報酬を受け取る</button><button class="btn outline full" data-action="canonical-ticket-exchange" '+(slotOpening||pending.length||snap.wallet.points<1||snap.wallet.tickets>=30?'disabled':'')+'>1ポイントを広告券1枚に交換</button><p class="small">その他の交換品は利用画面の接続後に提供します。</p></section>'+(canonicalRewardNote?'<p role="status">'+h(canonicalRewardNote)+'</p>':'')+pending.map(p=>'<section class="panel warning"><h3>未確定の報酬</h3><p>結果を確認するまで日程進行は停止します。</p>'+btn('reconcile',p.operationId,'確定結果を照合する')+btn('cancel',p.operationId,'予約の取り消しを申請する')+'</section>').join('')+'<section class="panel"><h3>現在利用可能な報酬</h3>'+snap.actions.filter(a=>['available','cancelled'].includes(a.status)).map(a=>'<article class="event"><strong>'+h(a.label)+'</strong>'+btn('ticket',a.operationId,'広告券・確認済み権利で実行',pending.length>0)+'</article>').join('')+(!snap.actions.some(a=>['available','cancelled'].includes(a.status))?'<p>現在利用できる報酬はありません。</p>':'')+'</section><button class="btn outline full" data-action="canonical-rewards-refresh" '+dis+'>最新状態を取得</button>';
+    const body='<h2 class="page-title">広告券・報酬</h2><section class="panel"><p>広告券 <b>'+snap.wallet.tickets+' / 30</b>　ポイント <b>'+snap.wallet.points+'</b></p><p class="small">試験環境：広告券、サーバーで確認済みの広告スキップ権利のみ利用できます。実広告は未接続です。</p><button class="btn outline full" data-action="canonical-achievements-open">記念実績・報酬を受け取る</button><button class="btn outline full" data-action="canonical-ticket-exchange" '+(slotOpening||pending.length||snap.wallet.points<1||snap.wallet.tickets>=30?'disabled':'')+'>1ポイントを広告券1枚に交換</button><p class="small">その他の交換品は利用画面の接続後に提供します。</p></section>'+canonicalRightsMarkup(snap)+(canonicalRewardNote?'<p role="status">'+h(canonicalRewardNote)+'</p>':'')+pending.map(p=>'<section class="panel warning"><h3>未確定の報酬</h3><p>結果を確認するまで日程進行は停止します。</p>'+btn('reconcile',p.operationId,'確定結果を照合する')+btn('cancel',p.operationId,'予約の取り消しを申請する')+'</section>').join('')+'<section class="panel"><h3>現在利用可能な報酬</h3>'+snap.actions.filter(a=>['available','cancelled'].includes(a.status)).map(a=>'<article class="event"><strong>'+h(a.label)+'</strong>'+btn('ticket',a.operationId,'広告券・確認済み権利で実行',pending.length>0)+'</article>').join('')+(!snap.actions.some(a=>['available','cancelled'].includes(a.status))?'<p>現在利用できる報酬はありません。</p>':'')+'</section><button class="btn outline full" data-action="canonical-rewards-refresh" '+dis+'>最新状態を取得</button>';
     app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(g.team)+'">'+top+'<main class="main">'+body+'</main></div>';
   }
   async function canonicalRewardRequest(kind,id){
     if(slotOpening||!accountCurrent()||!canonicalSlot)return;
-    const epoch=canonicalEpoch,world=canonicalSnapshot?.world||canonicalHqWorld;slotOpening=true;canonicalRewardNote='';render();
+    const epoch=canonicalEpoch,world=canonicalSnapshot?.world||canonicalHqWorld;slotOpening=true;canonicalRewardNote='';canonicalRights=null;render();
     try{const r=await(kind==='exchange'?canonicalPilot.exchangeTicket(true):kind?canonicalPilot.reward(kind,id,true):canonicalPilot.refresh());if(epoch!==canonicalEpoch)return;if(r.status!=='ready'||r.snapshot.world!==world)throw Error('reward observation required');canonicalSnapshot=r.snapshot;canonicalRewardNote=kind==='exchange'?(r.exchangeOk?'広告券への交換を確認しました。':'交換できませんでした。最新残高を確認してください。'):({committed:'報酬の適用をサーバーで確認しました。',cancelled:'予約の取り消しを確認しました。',unavailable:'広告券または有効な権利がありません。',awaiting_proof:'広告完了証明がまだ確認できません。',pending:'報酬は未確定です。',settlement_required:'完了証明が確認されました。確定結果を照合してください。',entitlement_expired:'権利の有効期限を確認してください。'})[r.rewardStatus]||'';}
     catch{if(epoch===canonicalEpoch)canonicalSnapshot=null;}
     finally{if(epoch===canonicalEpoch){slotOpening=false;render();}}
   }
   function canonicalRewardClick(b){
     const act=b.dataset.action;
-    if(act==='canonical-rewards-back'){ui.page=canonicalRewardReturn;render();draftJump(0);return;}
+    if(canonicalRightsBusy)return;
+    if(act==='canonical-rights-refresh'){void canonicalRightsRefresh();return;}
+    if(act==='canonical-rewards-back'){canonicalRights=null;ui.page=canonicalRewardReturn;render();draftJump(0);return;}
     if(act==='canonical-rewards-refresh'){void canonicalRewardRequest(null);return;}
     if(act==='canonical-ticket-exchange'){const w=canonicalSnapshot?.wallet;if(w&&w.points>=1&&w.tickets<30&&!canonicalSnapshot.pending?.length&&window.confirm('1ポイントを広告券1枚に交換しますか？'))void canonicalRewardRequest('exchange');return;}
     if(act!=='canonical-rewards-command'||!canonicalSnapshot?.wallet)return;
