@@ -89,3 +89,6 @@ jobs:
         if: always()
       - run: node scripts/rate-limit-check.cjs
         if: always()
+
+      - run: node scripts/purchase-rights-check.cjs
+        if: always()

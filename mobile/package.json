@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "prepareWeb": "node prepare.cjs",
-    "test": "node gate-check.cjs && node entitlement-check.cjs && node release-surface-check.cjs && node account-client-check.cjs",
+    "test": "node gate-check.cjs && node entitlement-check.cjs && node release-surface-check.cjs && node account-client-check.cjs && node ../scripts/purchase-rights-check.cjs",
     "android": "npm run prepareWeb && npx cap sync android",
     "ios": "npm run prepareWeb && npx cap sync ios"
   },

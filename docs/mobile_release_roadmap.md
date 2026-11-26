@@ -54,3 +54,9 @@ See [development handoff](development_handoff_2026-11-25.md) for exact commits, 
 
 ## v0.9.151–152 priority revision
 User confirmed that 500/1000-year play is only a smoke/reference test and previous saves are development test data. Do not block release on 500/1000 full runs or complete old-development-save compatibility. Keep the actual 100-year endurance, preservation of histories and normal save reliability. Added 1000 calendar years and anniversary fixture smoke, not 1000 actual seasons. Production-only native packaging disables scenario start, rare preview actions/menu, achievement preview and the development window.PennantLab surface. Debug native and web remain available for user checks. This is presentation/build separation, not a tamper-proof anti-cheat boundary. See [handoff](development_handoff_2026-11-25.md).
+
+
+## 工程8：購入権限・認証接続の準備（2026-11-26）
+- 認証付き /v1/entitlements を追加。信頼済みストア検証アダプタの明示的な永久権・VIP状態、有効期限、検証時刻、アカウント一致を必須化。5分以上古い検証・未来時刻・不正形式・他アカウントは拒否。期限切れVIPは無効化し、報酬請求・利用予約も同一の判定を使用。従来の真偽値だけの検証アダプタは意図的に非互換とし、テストfixtureを更新。
+- モバイルの読み取り専用接続モジュールを追加。HTTPS認証、サーバー時刻を基準に単調時計で権限の短期有効性を計算（通信遅延を保守的に差し引く）。同一アカウントのトークン再発行・切替・ログアウトで旧権限と進行中の応答を無効化する。端末時刻変更で権限を延長しない。
+- 本番のStoreKit/Google Play Billingの購入・復元・返金/通知検証、認証サービス、実機ライフサイクルとの接続、サーバー上の達成/適用証明は未実装。ゲームのVIP・広告スキップ・報酬は有効化していない。既存の無料プレイ・1.2倍の対象・価格・セーブデータは変更しない。単調時計がOS休止中に進まない環境では復帰時に無効化・再検証が必要（本番接続条件）。独立開発ブランチ、公開未実施。
