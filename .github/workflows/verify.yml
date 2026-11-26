@@ -92,3 +92,6 @@ jobs:
 
       - run: node scripts/startup-media-check.cjs
         if: always()
+
+      - run: node scripts/startup-asset-check.cjs --allow-missing
+        if: always()

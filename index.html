@@ -172,6 +172,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .launch-start{position:relative;display:grid;gap:8px;justify-items:center;min-height:66px;width:100%;color:#f7dda2;background:#101a2a99;border:1px solid #cfaa6a80;border-radius:9px;padding:12px;font-weight:700;letter-spacing:.12em}
 .launch-start small{font-size:11px;letter-spacing:.22em;color:#d0d8e4}.launch-start span{animation:launch-glow 2.2s ease-in-out infinite}
 @keyframes launch-glow{50%{opacity:.55;text-shadow:0 0 18px #ffe6a5}}
+.official-startup-active::after{content:"";position:fixed;inset:0;background:#000;z-index:2147482999;pointer-events:auto}
 .official-startup-video{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;background:#000;z-index:2147483000;pointer-events:auto}
 .official-launch{position:relative;isolation:isolate;display:grid;place-items:center;width:100%;height:100vh;height:100dvh;overflow:hidden;background:#090510}
 .official-launch-frame{position:relative;width:min(100%,56.25vh);width:min(100%,56.25dvh);aspect-ratio:9/16;overflow:hidden;isolation:isolate}
@@ -6317,9 +6318,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function appLogo(){return `<div class="app-brand"><span class="brand-mark">⚾</span><span><b>PENNANT<span class="brand-gold"> LAB</span></b><small>BASEBALL GENERAL MANAGER</small></span></div>`}
   function slotData(i){if(deletedSlotPreviews.has(i))return null;try{const raw=localStorage.getItem(SLOT_PREFIX+i);if(!raw)return null;const d=JSON.parse(raw);return d&&Array.isArray(d.teams)&&d.teams.length===12?d:null}catch(e){return null}}
   // The approved MP4 will be assigned here when the asset is delivered.
-  // Official asset paths remain empty until the exact approved files are supplied.
+  // Official asset paths are fixed; missing media falls back in development.
   // No substitute media is generated. The title text flag must be verified on the original.
-  const STARTUP_MEDIA=Object.freeze({video:'',title:'',hasStartText:true});
+  const STARTUP_MEDIA=Object.freeze({video:'assets/startup/PARALAB_GAMES_startup_v8_SFX_reverb.mp4',title:'assets/startup/PENNANT_LAB_title.webp',hasStartText:true});
   let startupPlaying=false,startupAttempted=false,launchTransition=false,titleMediaFailed=false;
   function launchFallbackTitleScreen(){
     return '<main class="launch-screen" data-launch-screen><svg class="launch-field" viewBox="0 0 400 600" aria-hidden="true"><defs><radialGradient id="launch-light"><stop stop-color="#d5b879" stop-opacity=".3"/><stop offset="1" stop-color="#d5b879" stop-opacity="0"/></radialGradient></defs><ellipse cx="200" cy="350" rx="190" ry="225" fill="url(#launch-light)"/><g fill="none" stroke="#98bad3" stroke-width="1"><ellipse cx="200" cy="350" rx="180" ry="205"/><ellipse cx="200" cy="350" rx="160" ry="185"/><path d="M200 155L360 350 200 545 40 350Z M200 255L278 350 200 445 122 350Z M200 155V545M40 350H360"/></g></svg><div class="launch-brand"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.9.189 · CLUB LEGACY</span></div><button class="launch-start" data-action="launch-start"><span>画面をタップしてスタート</span><small>TAP TO START</small></button></main>';
@@ -6339,10 +6340,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   // speed up, crossfade the audio, or replace its encoded soundtrack.
   async function showStartupVideo(){
     if(startupAttempted||!STARTUP_MEDIA.video)return;
-    startupAttempted=true;startupPlaying=true;
+    startupAttempted=true;startupPlaying=true;document.body.classList?.add('official-startup-active');
     let video=null,watchdog=null,done=false;
     const finish=()=>{
-      if(done)return;done=true;clearTimeout(watchdog);startupPlaying=false;
+      if(done)return;done=true;clearTimeout(watchdog);startupPlaying=false;document.body.classList?.remove('official-startup-active');
       document.removeEventListener('visibilitychange',visibility);
       window.removeEventListener?.('pl-native-suspend',finish);
       if(video){video.pause();video.removeAttribute('src');video.load();video.remove();}

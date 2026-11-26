@@ -13,6 +13,7 @@ fs.rmSync(out,{recursive:true,force:true});fs.mkdirSync(out,{recursive:true});fs
 let html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 // Release packaging must not silently ship the temporary title or an absent video.
 if(production){
+ require('../scripts/startup-asset-check.cjs').verifyStartupAssets(out);
  const media=html.match(/const STARTUP_MEDIA=Object\.freeze\(\{video:'([^']*)',title:'([^']*)',hasStartText:(?:true|false)\}\);/);
  if(!media||!media[1]||!media[2])throw Error('Official startup video and title image are required for production');
  for(const name of media.slice(1,3)){
