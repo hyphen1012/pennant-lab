@@ -172,7 +172,30 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .launch-start{position:relative;display:grid;gap:8px;justify-items:center;min-height:66px;width:100%;color:#f7dda2;background:#101a2a99;border:1px solid #cfaa6a80;border-radius:9px;padding:12px;font-weight:700;letter-spacing:.12em}
 .launch-start small{font-size:11px;letter-spacing:.22em;color:#d0d8e4}.launch-start span{animation:launch-glow 2.2s ease-in-out infinite}
 @keyframes launch-glow{50%{opacity:.55;text-shadow:0 0 18px #ffe6a5}}
-.launch-video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#05080d;z-index:2}.launch-video-skip{position:absolute;right:16px;bottom:max(24px,env(safe-area-inset-bottom));z-index:3}
+.official-startup-active::after{content:"";position:fixed;inset:0;background:#000;z-index:2147482999;pointer-events:auto}
+.official-startup-video{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;background:#000;z-index:2147483000;pointer-events:auto}
+.official-launch{position:relative;isolation:isolate;display:grid;place-items:center;width:100%;height:100vh;height:100dvh;overflow:hidden;background:#090510}
+.official-launch-frame{position:relative;width:min(100%,56.25vh);width:min(100%,56.25dvh);aspect-ratio:9/16;overflow:hidden;isolation:isolate}
+.official-launch-frame>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;user-select:none;-webkit-user-drag:none}
+.official-ambient{position:absolute;inset:0;pointer-events:none;opacity:.16;background:radial-gradient(ellipse at 12% 20%,#9b4be93b,transparent 35%),radial-gradient(ellipse at 88% 65%,#bd83ff2b,transparent 32%);animation:official-ambient-drift 8s ease-in-out infinite alternate}
+.official-title-metal,.official-stadium-lights,.official-crowd,.official-embedded-prompt,.official-title-particles{position:absolute;inset:0;pointer-events:none}
+.official-title-metal{clip-path:polygon(20% 39%,32% 35%,52% 37%,83% 35%,86% 40%,79% 44%,68% 47%,50% 54%,23% 47%,16% 43%);background:linear-gradient(115deg,transparent 30%,#fff2b900 44%,#fff3c55c 50%,transparent 56%);background-size:250% 100%;mix-blend-mode:screen;animation:official-metal 10s ease-in-out infinite}
+.official-stadium-lights{background:radial-gradient(ellipse 10% 4% at 10% 60%,#e5caff38,transparent),radial-gradient(ellipse 10% 4% at 90% 60%,#e5caff38,transparent);mix-blend-mode:screen;animation:official-lights 7s ease-in-out infinite alternate}
+.official-crowd{clip-path:polygon(0 67%,39% 71%,61% 71%,100% 67%,100% 74%,0 74%);background:radial-gradient(ellipse 2px 1px at 40% 50%,#e0caff80,transparent);background-size:23px 13px;opacity:.08;animation:official-crowd 8s ease-in-out infinite alternate}
+.official-embedded-prompt{clip-path:inset(84% 17% 12% 17%);background:radial-gradient(ellipse 38% 3% at 50% 86%,#fff1c32c,transparent);mix-blend-mode:screen;animation:official-lights 3.8s ease-in-out infinite alternate}
+.official-title-particles i{position:absolute;left:var(--px);top:var(--py);width:2px;height:2px;background:#f0d5ff;border-radius:50%;box-shadow:0 0 5px #a96cff;animation:official-particle var(--pt) ease-in-out var(--pd) infinite;opacity:.15}
+@keyframes official-metal{0%,20%{background-position:100% 0;opacity:0}35%{opacity:.28}65%,100%{background-position:0 0;opacity:0}}
+@keyframes official-lights{from{opacity:.08}to{opacity:.38}}
+@keyframes official-crowd{from{opacity:.04;transform:translateX(0)}to{opacity:.13;transform:translateX(2px)}}
+@keyframes official-particle{0%,100%{transform:translate3d(0,4px,0);opacity:.08}50%{transform:translate3d(3px,-8px,0);opacity:.55}}
+@media(prefers-reduced-motion:reduce){.official-title-metal,.official-stadium-lights,.official-crowd,.official-embedded-prompt,.official-title-particles i{animation:none;opacity:0}}
+.official-launch-hit{position:absolute;inset:0;border:0;background:transparent;width:100%;height:100%;padding:0;touch-action:manipulation;color:#f6e6bd}
+.official-launch-hit:focus-visible{outline:2px solid #e7d2a1;outline-offset:-5px}
+.official-launch-prompt{position:absolute;bottom:max(5%,env(safe-area-inset-bottom));left:0;width:100%;text-align:center;text-shadow:0 2px 8px #080411;font-size:clamp(13px,3.8vw,20px);letter-spacing:.12em;animation:launch-glow 3.2s ease-in-out infinite}
+.official-launch-exit::after{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;background:radial-gradient(ellipse at center,#b797f057, #23113dbb 60%,#080510);animation:official-exit .42s ease-in both}
+@keyframes official-ambient-drift{from{transform:translate3d(-2%,0,0);opacity:.10}to{transform:translate3d(2%,1%,0);opacity:.22}}
+@keyframes official-exit{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.official-ambient,.official-launch-prompt,.official-launch-exit::after{animation:none}.official-launch-exit::after{display:none}}
 .save-terminal{position:relative;isolation:isolate;padding:18px 15px max(20px,env(safe-area-inset-bottom));gap:12px;background:radial-gradient(ellipse at 50% 0,#213d56,#0b1628 47%,#071020)}
 .save-terminal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid #a4c1dc35;padding-bottom:10px}
 .save-terminal-head .ghost-btn{min-height:44px;color:#cbd9ed}.save-terminal-head .title-serial{font-size:10px;letter-spacing:.06em}
@@ -6295,19 +6318,77 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function appLogo(){return `<div class="app-brand"><span class="brand-mark">⚾</span><span><b>PENNANT<span class="brand-gold"> LAB</span></b><small>BASEBALL GENERAL MANAGER</small></span></div>`}
   function slotData(i){if(deletedSlotPreviews.has(i))return null;try{const raw=localStorage.getItem(SLOT_PREFIX+i);if(!raw)return null;const d=JSON.parse(raw);return d&&Array.isArray(d.teams)&&d.teams.length===12?d:null}catch(e){return null}}
   // The approved MP4 will be assigned here when the asset is delivered.
-  const STARTUP_VIDEO_URL='';
-  function launchTitleScreen(){
+  // Official asset paths are fixed; missing media falls back in development.
+  // No substitute media is generated. The title text flag must be verified on the original.
+  const STARTUP_MEDIA=Object.freeze({video:'assets/startup/PARALAB_GAMES_startup_v8_SFX_reverb.mp4',title:'assets/startup/PENNANT_LAB_title.webp',hasStartText:true});
+  let startupPlaying=false,startupAttempted=false,launchTransition=false,titleMediaFailed=false;
+  function launchFallbackTitleScreen(){
     return '<main class="launch-screen" data-launch-screen><svg class="launch-field" viewBox="0 0 400 600" aria-hidden="true"><defs><radialGradient id="launch-light"><stop stop-color="#d5b879" stop-opacity=".3"/><stop offset="1" stop-color="#d5b879" stop-opacity="0"/></radialGradient></defs><ellipse cx="200" cy="350" rx="190" ry="225" fill="url(#launch-light)"/><g fill="none" stroke="#98bad3" stroke-width="1"><ellipse cx="200" cy="350" rx="180" ry="205"/><ellipse cx="200" cy="350" rx="160" ry="185"/><path d="M200 155L360 350 200 545 40 350Z M200 255L278 350 200 445 122 350Z M200 155V545M40 350H360"/></g></svg><div class="launch-brand"><span class="title-kicker">BASEBALL GENERAL MANAGER</span><div class="title-ball">⚾</div><div class="hero-name">PENNANT <em>LAB</em></div><p>選手を見極め、球団の未来をつくる。</p><span class="title-serial">VERSION 0.9.189 · CLUB LEGACY</span></div><button class="launch-start" data-action="launch-start"><span>画面をタップしてスタート</span><small>TAP TO START</small></button></main>';
   }
-  function showStartupVideo(){
-    if(!STARTUP_VIDEO_URL)return;
-    const root=document.querySelector?.('[data-launch-screen]');if(!root)return;
-    const video=document.createElement('video'),skip=document.createElement('button');
-    video.className='launch-video';video.src=STARTUP_VIDEO_URL;video.muted=true;video.playsInline=true;video.preload='auto';
-    skip.className='btn outline launch-video-skip';skip.textContent='スキップ ›';let done=false;
-    const finish=()=>{if(done)return;done=true;clearTimeout(timeout);video.pause();video.remove();skip.remove();};
-    const timeout=setTimeout(finish,15000);video.addEventListener('ended',finish,{once:true});video.addEventListener('error',finish,{once:true});skip.onclick=finish;
-    root.append(video,skip);Promise.resolve(video.play()).catch(finish);
+  function launchMuted(){try{return localStorage.getItem('pl_launch_muted')==='1';}catch{return false;}}
+  function officialTitleParticles(){
+    // Fixed art-relative positions, away from the central title and text.
+    const points=[[7,11],[17,7],[83,13],[92,26],[12,29],[6,39],[88,34],[94,44],[8,52],[91,50],[17,58],[81,57],[25,62],[76,62]];
+    return '<div class="official-title-particles" aria-hidden="true">'+points.map(([x,y],i)=>'<i style="--px:'+x+'%;--py:'+y+'%;--pd:'+(-i*.63)+'s;--pt:'+(6+i%5)+'s"></i>').join('')+'</div>';
+  }
+  function launchTitleScreen(){
+    if(!STARTUP_MEDIA.title||titleMediaFailed)return launchFallbackTitleScreen();
+    return '<main class="official-launch" data-launch-screen><div class="official-launch-frame"><img data-official-title-image src="'+h(STARTUP_MEDIA.title)+'" alt="" draggable="false"><div class="official-ambient" aria-hidden="true"></div><div class="official-title-metal" aria-hidden="true"></div><div class="official-stadium-lights" aria-hidden="true"></div><div class="official-crowd" aria-hidden="true"></div><div class="official-embedded-prompt" aria-hidden="true"></div>'+officialTitleParticles()+'<button class="official-launch-hit" data-action="launch-start" aria-label="画面をタップしてスタート">'+(STARTUP_MEDIA.hasStartText?'':'<span class="official-launch-prompt">画面をタップしてスタート</span>')+'</button></div></main>';
+  }
+  document.addEventListener('error',e=>{if(e.target?.hasAttribute?.('data-official-title-image')&&!titleMediaFailed){titleMediaFailed=true;if(ui.page==='title'&&ui.launchTitle)render();}},true);
+  // Play the original multiplexed MP4 as a single media element. Never seek,
+  // speed up, crossfade the audio, or replace its encoded soundtrack.
+  async function showStartupVideo(){
+    if(startupAttempted||!STARTUP_MEDIA.video)return;
+    startupAttempted=true;startupPlaying=true;document.body.classList?.add('official-startup-active');
+    let video=null,watchdog=null,done=false;
+    const finish=()=>{
+      if(done)return;done=true;clearTimeout(watchdog);startupPlaying=false;document.body.classList?.remove('official-startup-active');
+      document.removeEventListener?.('visibilitychange',visibility);
+      window.removeEventListener?.('pl-native-suspend',finish);
+      if(video){video.pause?.();video.removeAttribute?.('src');video.load?.();video.remove();}
+    };
+    const visibility=()=>{if(document.hidden)finish();};
+    const arm=()=>{clearTimeout(watchdog);if(!done)watchdog=setTimeout(finish,12000);};
+    arm();
+    try{
+      if(document.hidden||(window.PennantNative&&!await window.PennantNative.check())){finish();return;}
+      if(done||ui.page!=='title'||!ui.launchTitle){finish();return;}
+      document.addEventListener('visibilitychange',visibility);
+      window.addEventListener?.('pl-native-suspend',finish);
+      video=document.createElement('video');
+      video.className='official-startup-video';video.setAttribute('aria-label','PARALAB GAMES 起動映像');
+      video.playsInline=true;video.setAttribute('playsinline','');video.controls=false;video.disablePictureInPicture=true;
+      video.preload='auto';video.muted=launchMuted();video.tabIndex=-1;video.disableRemotePlayback=true;
+      video.addEventListener('ended',finish,{once:true});video.addEventListener('error',finish,{once:true});
+      let lastTime=-1;video.addEventListener('timeupdate',()=>{if(video.currentTime>lastTime){lastTime=video.currentTime;arm();}});
+      video.src=STARTUP_MEDIA.video;document.body.appendChild(video);
+      try{await video.play();}catch(e){
+        if(done)return;
+        if(video.muted){finish();return;}
+        video.muted=true;try{await video.play();}catch{finish();}
+      }
+    }catch(e){finish();}
+  }
+  function launchTapSound(){
+    if(launchMuted())return;
+    try{
+      const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;
+      const ctx=new Audio();const play=()=>{const now=ctx.currentTime,osc=ctx.createOscillator(),gain=ctx.createGain();
+        osc.type='sine';osc.frequency.setValueAtTime(440,now);osc.frequency.exponentialRampToValueAtTime(660,now+.14);
+        gain.gain.setValueAtTime(.001,now);gain.gain.exponentialRampToValueAtTime(.035,now+.025);gain.gain.exponentialRampToValueAtTime(.001,now+.19);
+        osc.connect(gain);gain.connect(ctx.destination);osc.onended=()=>{void ctx.close().catch(()=>{});};osc.start(now);osc.stop(now+.2);
+      };if(ctx.state==='suspended')void ctx.resume().then(play,()=>ctx.close());else play();
+    }catch{}
+  }
+  function startOfficialTitleTransition(){
+    if(startupPlaying||launchTransition||ui.page!=='title'||!ui.launchTitle||slotOpening||slotDeleteDialog)return;
+    if(window.PennantNative&&!window.PennantNative.ready())return;
+    if(!STARTUP_MEDIA.title||titleMediaFailed){ui.launchTitle=false;ui.rarePreview=null;render();window.scrollTo(0,0);return;}
+    launchTransition=true;launchTapSound();
+    const root=document.querySelector('[data-launch-screen]');root?.classList?.add('official-launch-exit');
+    const complete=()=>{launchTransition=false;if(ui.page!=='title'||!ui.launchTitle||document.hidden||(window.PennantNative&&!window.PennantNative.ready())){root?.classList?.remove('official-launch-exit');return;}ui.launchTitle=false;ui.rarePreview=null;render();window.scrollTo(0,0);};
+    if(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches)complete();else setTimeout(complete,420);
   }
   const WORLD_TONES=['#88bffa','#c7a4ff','#7be4d1'];
   function cosmicAtlas(){
@@ -7426,7 +7507,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       return;
     }
     if(act==='back-to-hq'){ui.tab='hq';ui.playerDetail=null;render();window.scrollTo({top:0,behavior:'instant'});return}
-    if(act==='launch-start'||act==='launch-back'){if(ui.page==='title'&&!slotOpening&&!slotDeleteDialog){ui.launchTitle=act==='launch-back';ui.rarePreview=null;render();window.scrollTo(0,0);}return}
+    if(act==='launch-start'){startOfficialTitleTransition();return}
+    if(act==='launch-back'){if(ui.page==='title'&&!slotOpening&&!slotDeleteDialog&&!startupPlaying&&!launchTransition){ui.launchTitle=true;ui.rarePreview=null;render();window.scrollTo(0,0);}return}
     if(act==='slot-delete'){void requestSlotDelete(b.dataset.slot);return}
     if(act==='new-slot'||act==='continue-slot'){const group=b.closest?.('[data-slot-group]'),orb=group?.querySelector?.('.world-orb'),rect=orb?.getBoundingClientRect?.();const origin=rect?{x:Math.max(0,Math.min(100,(rect.left+rect.width/2)/(window.innerWidth||1)*100)),y:Math.max(0,Math.min(100,(rect.top+rect.height/2)/(window.innerHeight||1)*100))}:null;openSlot(b.dataset.slot,act==='new-slot',!!rect,origin);return}
     if(act==='title'){ui.clubDraft=null;save();ui.launchTitle=false;ui.page='title';ui.playerDetail=null;ui.detail=null;ui.confirm=null;render();window.scrollTo(0,0);return}
