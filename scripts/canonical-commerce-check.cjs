@@ -131,6 +131,39 @@ globalThis.__plAnnualEntryCheck=saved=>{
  a.ok(secondRound);for(const id of ['fan-fest','tv','fanclub','sponsor','broadcast','naming','autumn'])a.ok(completed.has(id),'missing '+id);
  a.equal(w.calendarFlow.jobs['movement-market'].status,'ready');
  console.log('PASS commercial jobs and actual second renewal round',JSON.stringify([...completed]));
+ // Separate generated-world fixture: exercise rare negotiation outcomes
+ // that did not occur in the actual first-season market. Never alter w.
+ {
+  let fixture=JSON.parse(JSON.stringify(w));
+  const teamId=fixture.selectedId,club=fixture.teams.find(t=>t.id===teamId);
+  const p=fixture.players.find(p=>p.teamId>=0&&p.teamId!==teamId&&p.age<34&&p.pos==='OF');
+  a.ok(p);club.cash=100;
+  // Remove competition only for deterministic branch coverage, not economics.
+  for(const t of fixture.teams)if(t.id!==teamId)t.cash=0;
+  const owned=fixture.players.filter(p=>p.teamId===teamId&&p.pos==='OF');
+  for(const q of owned.slice(4))q.teamId=null;
+  fixture.movement.requests=[{id:p.id,from:p.teamId,kind:'fa',status:'declared',demand:.2,offer:.2,minimum:.2,year}];
+  fixture.movement.deals=[];fixture.movement.offers={};fixture.movement.declared=true;delete fixture.movement.eventRows;delete fixture.movement.faClock;
+  const m=(decision,extra={})=>{fixture=engine.advance(fixture,{annual:'market',decision,...extra});};
+  const day=()=>{fixture=engine.advance(fixture,{annual:'day'});};
+  m('open',{room:'news'});m('news');day();m('open',{room:'news'});m('news');m('open',{room:'fa'});
+  a.throws(()=>engine.advance(fixture,{annual:'market',decision:'submit',playerId:p.id}));
+  m('years',{playerId:p.id,years:3});m('talk',{playerId:p.id,key:'listen'});m('salary',{playerId:p.id,million:5});m('submit',{playerId:p.id});m('home');
+  a.equal(fixture.movement.offers[p.id].status,'waiting');
+  for(let n=0;n<5&&fixture.movement.offers[p.id].status==='waiting';n++)day();
+  a.equal(fixture.movement.offers[p.id].status,'counter');a.throws(()=>engine.advance(fixture,{annual:'day'}));
+  m('open',{room:'fa'});a.throws(()=>engine.advance(fixture,{annual:'market',decision:'talk',playerId:p.id,key:'listen'}));m('ack',{playerId:p.id});
+  a.throws(()=>engine.advance(fixture,{annual:'market',decision:'ack',playerId:p.id}));
+  m('years',{playerId:p.id,years:3});m('talk',{playerId:p.id,key:'listen'});
+  a.throws(()=>engine.advance(fixture,{annual:'market',decision:'salary',playerId:p.id,million:999999}));
+  m('salary',{playerId:p.id,million:600});m('submit',{playerId:p.id});m('home');
+  for(let n=0;n<5&&fixture.movement.offers[p.id].status==='waiting';n++)day();
+  a.equal(fixture.movement.offers[p.id].status,'signed');
+  const deal=fixture.movement.deals.find(d=>d.id===p.id);a.ok(deal);a.equal(deal.to,teamId);a.equal(deal.years,3);a.equal(deal.salary,6);
+  m('open',{room:'fa'});m('ack',{playerId:p.id});a.throws(()=>engine.advance(fixture,{annual:'market',decision:'submit',playerId:p.id}));m('home');
+  a.equal(fixture.movement.deals.filter(d=>d.id===p.id).length,1);
+  console.log('PASS isolated actual FA negotiation: delayed counter, required acknowledgement, exact high salary, three-year agreement');
+ }
  const market=(decision,extra={})=>step({annual:'market',decision,...extra});
  a.throws(()=>engine.advance(w,{annual:'open',job:'movement-market'}));
  a.throws(()=>engine.advance(w,{annual:'day'}));
