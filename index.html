@@ -12233,15 +12233,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(!(q.stadium?stadiumResize(t,q.k,1):infraUpgrade(t,q.k)))return false;
     a.spent=r2(a.spent+q.cost);a.investments++;cpuLog(t,date,'invest',q.label+' Lv.'+(q.lv+1),q.cost);return true;
   }
+  // Trial E: estimate mature-park ticket demand over a weekday/weekend mix.
+  // No change to prices allowed, satisfaction, attendance limits or accounting.
+  function cpuPriceDemand(t,date){
+    const day=Math.max(1,game.day);
+    if(stadiumState(t).park<15)return stadiumDemand(t,null,date,day);
+    const weekday=stadiumDemand(t,null,'2027-06-04',day),weekend=stadiumDemand(t,null,'2027-06-06',day);
+    const out={satisfaction:Math.min(weekday.satisfaction,weekend.satisfaction)};
+    for(const key of ['attendance','ticket','food','goods','operating'])out[key]=(weekday[key]*5+weekend[key]*2)/7;
+    return out;
+  }
   function cpuPricePlan(t,date){
     if(t.id===game.selectedId)return false;const a=cpuEconomy(t),x=stadiumState(t);
     if(a.priceYear===game.year||!stadiumCanPrice(t))return false;a.priceYear=game.year;
-    const old=x.prices.slice(),baseline=stadiumDemand(t,null,date,Math.max(1,game.day)),net=v=>v.ticket+v.food+v.goods-v.operating;
+    const old=x.prices.slice(),baseline=cpuPriceDemand(t,date),net=v=>v.ticket+v.food+v.goods-v.operating;
     let best=old,bestScore=net(baseline)+(a.style===2?baseline.attendance*180:0);
     // A bounded uniform adjustment, using actual demand rather than invented income.
     for(const ratio of [.9,.95,1,1.05,1.1]){
       const vals=old.map((v,i)=>clamp(Math.round(v*ratio/100)*100,Math.round(STADIUM_DEFAULT[i]*.7/100)*100,Math.round(STADIUM_DEFAULT[i]*1.3/100)*100));
-      x.prices=vals;const v=stadiumDemand(t,null,date,Math.max(1,game.day));const score=net(v)+(a.style===2?v.attendance*180:0);
+      x.prices=vals;const v=cpuPriceDemand(t,date);const score=net(v)+(a.style===2?v.attendance*180:0);
       if(v.satisfaction>=65&&v.attendance>=baseline.attendance*.85&&score>bestScore){bestScore=score;best=vals;}
     }
     // Mature parks may price premium sections separately, while cheap seats
@@ -12250,7 +12260,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       for(let i=0;i<5;i++)for(const ratio of [.9,.95,1,1.05,1.1]){
         const vals=best.slice(),ceiling=i===0?1.65:i===1?1.5:1.3;
         vals[i]=clamp(Math.round(old[i]*ratio/100)*100,Math.round(STADIUM_DEFAULT[i]*.7/100)*100,Math.round(STADIUM_DEFAULT[i]*ceiling/100)*100);
-        x.prices=vals;const v=stadiumDemand(t,null,date,Math.max(1,game.day)),score=net(v)+(a.style===2?v.attendance*180:0);
+        x.prices=vals;const v=cpuPriceDemand(t,date),score=net(v)+(a.style===2?v.attendance*180:0);
         if(v.satisfaction>=65&&v.attendance>=baseline.attendance*.85&&score>bestScore){bestScore=score;best=vals;}
       }
     }
