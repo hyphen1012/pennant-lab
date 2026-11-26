@@ -252,6 +252,7 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   await claim.waitFor();
   const artButton=page.locator('article.panel').filter({has:page.getByRole('heading',{name:'試験用施設実績'})}).locator('[data-action="canonical-achievements-art"]');
   await artButton.click();const art=page.locator('[data-canonical-memorial] img');
+  a.equal(await page.locator('[data-action="canonical-achievements-frame"]').count(),0);
   await art.waitFor();await page.waitForFunction(()=>{const img=document.querySelector('[data-canonical-memorial] img');return img?.complete&&img.naturalWidth===1080&&img.naturalHeight===1350;});
   a.equal(await page.evaluate(()=>window.fixtureShares.length),0);
   await page.locator('[data-action="canonical-achievements-share"]').click();
@@ -273,6 +274,22 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   const afterReward=await post('read',{slot:3});a.equal(afterReward.revision,beforeReward.revision+1);a.equal(afterReward.wallet.tickets,0);a.equal(afterReward.game.club.roster.find(x=>x.id===injured.id).injuryDays,4);a.equal(afterReward.pending.length,0);a.equal(afterReward.actions.some(x=>x.operationId===target.operationId),false);a.equal(reserves,1);a.equal(settles,1);
   const medicalOrder=await post('order',{slot:3,operationId:target.operationId});a.equal(medicalOrder.order.status,'committed');a.equal(medicalOrder.order.result.before,8);a.equal(medicalOrder.order.result.after,4);
   console.log('PASS real HTTP memorial claim, ticket exchange and treatment, lost committed response without duplicate charge');
+  // Isolated test-only point fixture, not a production grant route.
+  const fixtureLedger=require('../server/account-ledger.cjs').openLedger(path.join(dir,'account.sqlite'));
+  try{fixtureLedger.transact(owner,s=>{s.points=3;});}finally{fixtureLedger.close();}
+  clockOffset+=61000;
+  await page.locator('[data-action="canonical-rewards-refresh"]').click();
+  const buyFrame=page.locator('[data-action="canonical-frame-exchange"]:enabled');await buyFrame.waitFor();
+  page.once('dialog',d=>d.dismiss());await buyFrame.click();a.equal((await post('read',{slot:3})).wallet.points,3);
+  page.once('dialog',d=>d.accept());await buyFrame.click();await page.getByText('記念カード枠への交換を確認しました。').waitFor();
+  const ownedFrame=await post('read',{slot:3});a.equal(ownedFrame.wallet.points,0);a.ok(ownedFrame.wallet.owned.includes('frame'));a.equal(ownedFrame.revision,afterReward.revision);
+  await page.locator('[data-action="canonical-achievements-open"]').click();await artButton.waitFor();await artButton.click();await art.waitFor();
+  const plain=await art.getAttribute('src');await page.locator('[data-action="canonical-achievements-frame"][data-frame="foil"]').click();
+  const foil=await art.getAttribute('src');a.notEqual(foil,plain);await page.locator('[data-action="canonical-achievements-share"]').click();await page.waitForFunction(()=>window.fixtureShares.length===2);
+  a.equal((await page.evaluate(()=>window.fixtureShares[1].data)),foil.slice('data:image/png;base64,'.length));
+  await page.locator('[data-action="canonical-achievements-frame"][data-frame="standard"]').click();a.equal(await art.getAttribute('src'),plain);
+  await page.locator('[data-action="canonical-achievements-back"]').click();await page.locator('[data-action="canonical-rewards-back"]').waitFor();
+  a.deepEqual((await post('read',{slot:3})).wallet,ownedFrame.wallet);
   // Return to the multiverse; deletion is hidden until an intentional gesture.
   await page.locator('[data-action="canonical-rewards-back"]').click();
   await page.locator('[data-action="canonical-events-back"]').click();
