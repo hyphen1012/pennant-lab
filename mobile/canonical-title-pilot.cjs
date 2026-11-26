@@ -584,6 +584,20 @@ const pilotCode = `
     else {out+='<p>交渉結果を確認してください。</p>'+(n.result?.recovery?'<p class="small">広告・チケットによる復活交渉は報酬画面の接続待ちです。</p>':'')+cmd('finish','この交渉を終了する');}
     return out+'</article></section>';
   }
+  // Important notices are rendered from server projections only; the local
+  // engine's original artwork helpers are read-only, never its event handlers.
+  function canonicalImportantMarkup(g,i,blocked,cmd){
+    const portrait=p=>p&&!p.hidden?faceMini(canonicalDraftModel(p)):'';
+    const name=p=>p&&!p.hidden?themedPlayerName(canonicalDraftModel(p)):'非公開選手';
+    const eventArt=(p,kind)=>p&&(p.specialCategory||p.originCategory)?rarePanel(canonicalDraftModel(p),kind)+rareCinemaArt(canonicalDraftModel(p),kind,!p.hidden):'';
+    if(i.finance){const f=i.finance;return '<section class="panel warning"><h2>球団資金不足</h2><p>'+h(f.date)+' · 不足額 '+fmtMoney(f.shortfall)+'</p><p>銀行融資は現在未接続です。保存データは維持します。</p>'+(f.status==='pending'?cmd('finance-end','経営終了を確定する','',blocked):'<p>経営終了済み</p>')+'</section>';}
+    if(i.injury){const e=i.injury;return '<section class="panel"><h2>負傷報告</h2>'+portrait(e.player)+'<h3>'+name(e.player)+'</h3><p>'+h(e.date)+' · 離脱見込み '+h(String(e.days))+'日</p>'+normalDetailCard('medical','負傷・治療報告')+eventArt(e.player,'injury')+'<p>特別治療の広告接続は未完了です。</p>'+cmd('injury','報告を確認する','',blocked)+'</section>';}
+    if(i.rare){const e=i.rare,p=e.player;return '<section class="rare-news-screen"><header class="edition-heading"><small>'+h(String(e.year))+' · SPECIAL NEWS</small><h2>'+h(e.category||'特別速報')+'</h2></header>'+eventArt(p,'join')+'<h3>'+h(e.title||'特別な選手に関する速報')+'</h3>'+portrait(p)+'<p>'+h(e.date||'')+'</p>'+cmd('rare','特別速報を確認する','',blocked)+'</section>';}
+    if(i.career){const e=i.career,select=['consult','plan'].includes(e.stage);return '<section class="panel renewal-room"><h2>'+(select?'引退・去就相談':e.stage==='farewell'?'引退セレモニー':'引退のご報告')+'</h2>'+portrait(e.player)+'<h3>'+name(e.player)+'</h3>'+normalDetailCard('contract','選手の去就')+eventArt(e.player,'contract')+(select?'<p>選手が引退を希望しています。球団が用意する内容を選択してください。</p><fieldset '+(blocked?'disabled':'')+'><legend>引退記念行事</legend>'+e.options.map(o=>'<label class="event"><input type="checkbox" class="canonical-farewell-option" value="'+h(o.key)+'"> '+h(o.label)+' · '+fmtMoney(o.cost)+'</label>').join('')+'</fieldset><p>広告による慰留は未接続です。</p>'+cmd('career-accept','引退を受け入れる','',blocked):cmd('career-dismiss','報告を確認する','',blocked))+'</section>';}
+    if(i.rookie){const r=i.rookie;return '<section class="draft-room draft-event"><header class="draft-stage-head"><small>'+h(String(r.year))+' · ROOKIE REPORT</small><h2>新人入団報告</h2></header>'+r.entries.map(p=>'<article class="panel">'+portrait(p)+'<h3>'+name(p)+'</h3>'+eventArt(p,'join')+'<p>能力公開 '+p.stage+'/2</p>'+(p.stage===2&&p.abilities?annualAbilityStrip({...canonicalDraftModel(p),...p.abilities}):cmd('rookie-reveal','次の段階へ','data-id="'+p.id+'"',blocked))+'</article>').join('')+cmd('rookie-finish','入団報告を終了する','',blocked||r.entries.some(p=>p.stage<2))+'</section>';}
+    if(i.decade!=null)return '<section class="panel"><h2>10年の球団史</h2><p>'+h(String(i.decade))+' · 節目の報告</p>'+normalDetailCard('awards','球団の歩み')+'<p>詳細な年代別記録の演出は追加調整が必要です。</p>'+cmd('decade','報告を確認する','',blocked)+'</section>';
+    return '';
+  }
   function canonicalEventRender(){
     const app=$('#app'),g=canonicalSnapshot?.game;if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-events-back">‹ 本部</button></div>';
@@ -595,9 +609,9 @@ const pilotCode = `
     if(inbox.review){const r=inbox.review;body+='<section class="panel"><h3>試合結果の確認</h3><p>'+h(r.date)+'</p><div class="score-big">'+r.homeScore+' - '+r.awayScore+'</div><p class="small">ホーム球団 '+h((g.club?.standings||[]).find(t=>t.id===r.home)?.name||String(r.home))+' / ビジター '+h((g.club?.standings||[]).find(t=>t.id===r.away)?.name||String(r.away))+'</p>'+commandButton('review','保存済みの試合結果を確認', '',blocked||important)+'</section>';}
     if(inbox.monthly){const m=inbox.monthly;body+='<section class="panel"><h3>月次報告</h3>'+normalDetailCard('finance','月例会議')+'<p>'+h(m.month)+' · '+m.wins+'勝 '+m.losses+'敗 '+m.ties+'分</p>'+(m.finance?'<p>収入 '+fmtMoney(m.finance.revenue)+' / 報告差額 '+fmtMoney(m.finance.net)+'</p>':'<p class="small">会計内訳の記録なし</p>')+'<p>報告時の保有資金 '+fmtMoney(m.cash)+'</p>'+(m.matches||[]).map(x=>'<div class="event">'+h(x.date)+' · '+h(x.opponent)+' '+x.rs+' - '+x.ra+'</div>').join('')+commandButton('month','保存済み月次報告を確認','',blocked||important||!!inbox.review)+'</section>';}
     if(inbox.milestoneCount){body+='<section class="panel"><h3>記録・ニュース</h3>'+inbox.milestones.map(e=>'<p class="event">'+h(e.date)+' '+h(e.title)+'</p>').join('')+(inbox.milestoneCount>inbox.milestones.length?'<p class="small">ほか '+(inbox.milestoneCount-inbox.milestones.length)+'件は記録に保存されています。</p>':'')+commandButton('milestones','保存済み報告を確認','',blocked||important||!!inbox.review)+'</section>';}
-    if(important)body+='<section class="panel warning"><h3>重要イベントの対応が必要です</h3><p>特殊選手・去就・負傷・入団報告・資金不足など、専用の演出と判断が必要な処理は未接続のまま保持します。</p></section>';
+    if(important)body+=canonicalImportantMarkup(g,inbox,blocked,commandButton);
     const held=blocked||important||!!g.foreign?.responsePending||!!inbox.review||!!inbox.monthly||!!inbox.milestoneCount;
-    body+=canonicalForeignMarkup(g,blocked,commandButton);
+    body+=canonicalForeignMarkup(g,blocked||important,commandButton);
     if(inbox.opening)body+='<section class="panel"><h2>新シーズン開幕</h2>'+normalDetailCard('opening','新たなシーズン')+commandButton('opening-ack','新シーズンを始める','',held)+'</section>';
     if(a.canStart)body+='<section class="panel"><h3>シーズン全日程終了</h3>'+normalDetailCard('awards','年間表彰・決算')+commandButton('start','オフシーズン業務を開始','',held)+'</section>';
     if(a.mode){
@@ -642,6 +656,8 @@ const pilotCode = `
     if(act==='canonical-digest-next'&&a.active==='exhibition'&&a.preseason?.report&&!a.preseason.digestSeen){canonicalDigestCut=Math.min(REPORT_DIGEST_CUTS.length-1,canonicalDigestCut+1);render();return;}
     if(act!=='canonical-event-command'||canonicalSnapshot.pending?.length)return;
     const k=b.dataset.kind,job=b.dataset.job;
+    const important=!!(i.finance||i.injury||i.rare||i.career||i.rookie||i.decade!=null);
+    if(important&&!['finance-end','injury','rare','career-accept','career-dismiss','rookie-reveal','rookie-finish','decade'].includes(k))return;
     let cmd=null;
     if(k.startsWith('foreign-')&&g.foreign?.canOperate){
       const decision=k.slice(8),f=g.foreign,n=f.negotiation,id=Number(b.dataset.id),key=b.dataset.key,level=Number(b.dataset.level);canonicalForeignOpen=true;
@@ -658,6 +674,17 @@ const pilotCode = `
       else if(decision==='reveal'&&n?.status==='signed'&&n.opened&&n.stage<2)cmd={foreign:decision};
       else if(decision==='finish'&&n?.opened&&(n.status!=='signed'||n.stage===2)&&window.confirm('交渉結果を確定して終了しますか？'))cmd={foreign:decision};
     }
+    else if(k==='finance-end'&&i.finance?.status==='pending'&&window.confirm('球団経営を終了しますか？ この世界の進行は終了します。'))cmd={finance:'gameover',confirmed:true};
+    else if(k==='injury'&&!i.finance&&i.injury)cmd={acknowledge:'injury',eventKey:i.injury.eventKey};
+    else if(k==='rare'&&!i.finance&&!i.injury&&i.rare)cmd={acknowledge:'rare',eventKey:i.rare.eventKey};
+    else if(k==='career-accept'&&!i.finance&&!i.injury&&!i.rare&&['consult','plan'].includes(i.career?.stage)){
+      const options=[...document.querySelectorAll('.canonical-farewell-option:checked')].map(x=>x.value);
+      if(options.every(x=>i.career.options.some(o=>o.key===x))&&window.confirm('引退と選択した記念行事を確定しますか？'))cmd={career:'accept',playerId:i.career.playerId,options};
+    }
+    else if(k==='career-dismiss'&&!i.finance&&!i.injury&&!i.rare&&['thanks','farewell'].includes(i.career?.stage))cmd={career:'dismiss',playerId:i.career.playerId};
+    else if(k==='rookie-reveal'&&!i.finance&&!i.injury&&!i.rare&&!i.career&&i.rookie?.entries.some(p=>p.id===Number(b.dataset.id)&&p.stage<2))cmd={acknowledge:'rookie-reveal',playerId:Number(b.dataset.id)};
+    else if(k==='rookie-finish'&&!i.finance&&!i.injury&&!i.rare&&!i.career&&i.rookie?.entries.every(p=>p.stage===2))cmd={acknowledge:'rookie-finish'};
+    else if(k==='decade'&&!i.finance&&!i.injury&&!i.rare&&!i.career&&!i.rookie&&i.decade!=null)cmd={acknowledge:'decade',eventKey:String(i.decade)};
     else if(k==='opening-ack'&&i.opening)cmd={acknowledge:'opening'};
     else if(k==='review'&&i.review)cmd={acknowledge:'review',eventKey:i.review.gameId};
     else if(k==='month'&&i.monthly)cmd={acknowledge:'month'};
