@@ -1,7 +1,7 @@
 // Reference orchestration for explicit, optional reward use. The server must
 // verify the action and perform idempotent application; this module never grants
 // a local reward from a reservation, SDK callback, or replay response.
-function createRewardCoordinator({client,requestAdProof,applyVerified,online}={}){
+function createRewardCoordinator({client,requestAdProof,applyVerified,online,reconcileVerified=null}={}){
  if(!client||[client.reserve,client.finish,client.orderStatus,requestAdProof,applyVerified,online].some(f=>typeof f!=='function'))throw Error('trusted reward adapters required');
  let generation=0,busy=false;
  function invalidate(){generation++;} // keep busy until outstanding provider call settles
@@ -44,6 +44,30 @@ function createRewardCoordinator({client,requestAdProof,applyVerified,online}={}
   if(gen!==generation)throw Error('session changed');
   return result; // read only; no application or automatic mutation retry
  }
- return {run,recover,invalidate};
+ // Explicit user-initiated reconciliation. No proof of application is inferred
+ // from elapsed time, ad dismissal, local save or a lost connection.
+ async function reconcile(operationId){
+  if(busy)return {status:'busy'};
+  if(typeof reconcileVerified!=='function')return {status:'reconcile_required',operationId};
+  if(typeof operationId!=='string'||!operationId)throw Error('invalid operation');
+  busy=true;const gen=generation;
+  try{
+   if(!await online()||gen!==generation)return {status:'reconcile_required',operationId};
+   const before=await client.orderStatus(operationId);
+   if(gen!==generation)return {status:'reconcile_required',operationId};
+   const o=before?.order;
+   if(!valid(o)||o.operationId!==operationId)return {status:'reconcile_required',operationId};
+   if(o.status==='committed'||o.status==='cancelled')return {status:o.status,operationId,wallet:before.wallet};
+   if(o.status!=='pending')return {status:'reconcile_required',operationId};
+   const proof=await reconcileVerified({operationId,attempt:o.attempt,mode:o.mode});
+   if(gen!==generation||typeof proof!=='string'||!proof)return {status:'reconcile_required',operationId};
+   await client.finish(proof); // verified cancellation returns ok=false by existing rules
+   if(gen!==generation)return {status:'reconcile_required',operationId};
+   const after=await client.orderStatus(operationId);
+   if(gen!==generation||after?.order?.operationId!==operationId||after.order.attempt!==o.attempt||after.order.mode!==o.mode||!['committed','cancelled'].includes(after.order.status))return {status:'reconcile_required',operationId};
+   return {status:after.order.status,operationId,wallet:after.wallet};
+  }catch{return {status:'reconcile_required',operationId};}finally{busy=false;}
+ }
+ return {run,recover,reconcile,invalidate};
 }
 module.exports={createRewardCoordinator};

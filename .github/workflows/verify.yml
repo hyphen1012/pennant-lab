@@ -95,3 +95,6 @@ jobs:
 
       - run: node scripts/commerce-transfer-check.cjs
         if: always()
+
+      - run: node scripts/commerce-client-recovery-check.cjs
+        if: always()
