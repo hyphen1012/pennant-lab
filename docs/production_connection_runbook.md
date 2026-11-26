@@ -138,3 +138,7 @@ Connect draft/foreign revival and first-round lottery through existing applyDraf
 
 ## Canonical offseason entry increment
 The server uses the existing persisted calendar flow for post-143-game entry, daily offseason clock, award and settlement acknowledgement, and own FA/posting/overseas declaration decisions. No calendar bypass: unsupported ready events block progression. Actual season simulation already computes awards and postseason; no duplicate calculation or rollover. Add missing careerDecisionTick to real daily advancement. Actual one-season entry test uses reserve-isolated existing simulation and requires CI. Draft, cuts, renewals, training, market, commerce, opening and year rollover still require explicit commands and native views.
+
+
+## Canonical draft and roster cut increment
+Explicit annual draft commands for manual nominations/pass, CPU-only progression, sealed lottery reveal, dialogue, actual offer, delegated contract, recovery dismissal and finish. Existing draft functions and original roster projection/cut rules reused. Draft can exceed the future roster limit until cut confirmation; all 12 club projections must then fit. Hidden names and lottery winner remain masked until appropriate reveal (full special player portrait/scout/reveal UX not connected). Separate full-season fixture-driven integration test; no production rollout. Contract renewal and later annual events remain unsupported.
