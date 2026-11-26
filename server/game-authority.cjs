@@ -15,8 +15,10 @@ function installAuthorityTables(db){
 }
 // Nullable migration: older worlds remain occupied but have no preview until
 // a successful canonical write. Never decompress them merely to list slots.
-function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof,now=Date.now}={}){
+function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof,now=Date.now,projectionWorker=null}={}){
  if(!ledger?.transact||[engine?.newWorld,engine?.actions,engine?.achievements,engine?.applyAction,engine?.advance,engine?.view,authenticate,verifyRights,hasAdProof].some(x=>typeof x!=='function'))throw Error('trusted canonical game engine required');
+ if(projectionWorker!==null&&typeof projectionWorker.project!=='function')throw Error('invalid projection worker');
+ let projectionBusy=false;
  const stateCodec=createCanonicalStateCodec();
  function sync(v){if(v&&typeof v.then==='function')throw Error('engine transaction must be synchronous');return v;}
  const json=(v,max=32*1024*1024)=>{const s=JSON.stringify(v);if(typeof s!=='string'||Buffer.byteLength(s)>max)throw Error('canonical state exceeds limit');return s;};
@@ -80,7 +82,30 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
    return {deleted:true,slot,world:r.world,revision:r.revision};
   });
  }
- async function read(token,slot){const account=await identity(token);return inspect(account,(s,db)=>{const r=world(db,account,slot),p=typeof engine.readProjection==='function'?sync(engine.readProjection(r.state)):null;if(p&&(!p.game||!Array.isArray(p.actions)))throw Error('invalid read projection');return {...(p?{world:r.world,revision:r.revision,game:JSON.parse(json(p.game,262144))}:view(r)),actions:options(db,r,s,p?.actions),pending:db.prepare('SELECT operation,attempt FROM authority_actions WHERE account=? AND world=? AND result IS NULL').all(account,r.world).filter(x=>s.orders[x.operation]?.status==='pending').map(x=>({operationId:x.operation,attempt:x.attempt,mode:s.orders[x.operation].mode})),wallet:publicWallet(s)};});}
+ function readResult(db,r,s,p){
+  if(p&&(!p.game||!Array.isArray(p.actions)))throw Error('invalid read projection');
+  return {...(p?{world:r.world,revision:r.revision,game:JSON.parse(json(p.game,262144))}:view(r)),actions:options(db,r,s,p?.actions),pending:db.prepare('SELECT operation,attempt FROM authority_actions WHERE account=? AND world=? AND result IS NULL').all(r.account,r.world).filter(x=>s.orders[x.operation]?.status==='pending').map(x=>({operationId:x.operation,attempt:x.attempt,mode:s.orders[x.operation].mode})),wallet:publicWallet(s)};
+ }
+ async function read(token,slot){
+  const account=await identity(token);
+  if(!projectionWorker)return inspect(account,(s,db)=>{const r=world(db,account,slot),p=typeof engine.readProjection==='function'?sync(engine.readProjection(r.state)):null;return readResult(db,r,s,p);});
+  // Bound admission before decompressing a world. Never hold SQLite across await.
+  if(projectionBusy)throw Error('projection worker busy');
+  projectionBusy=true;
+  try{
+   const snapshot=inspect(account,(s,db)=>{const r=world(db,account,slot);return {world:r.world,revision:r.revision,state:r.state};});
+   const p=await projectionWorker.project(snapshot.state);
+   if(!p?.game||!Array.isArray(p.actions))throw Error('invalid read projection');
+   // Authentication/deletion state can change while CPU work is in flight.
+   if(await identity(token)!==account)throw Error('unauthorized');
+   return inspect(account,(s,db)=>{
+    const r=world(db,account,slot);
+    if(r.world!==snapshot.world||r.revision!==snapshot.revision)throw Error('canonical revision conflict');
+    // Current wallet and pending orders, not the earlier snapshot.
+    return readResult(db,r,s,p);
+   });
+  }finally{projectionBusy=false;}
+ }
  // Recover from a lost reserve/settle response without consulting the store
  // or reapplying a game effect. A pending order may no longer be in actions().
  async function freePage(token,slot,worldId,revision,command){
