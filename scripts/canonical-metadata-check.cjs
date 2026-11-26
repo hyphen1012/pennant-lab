@@ -27,6 +27,24 @@ const a=require('node:assert/strict'),{openLedger}=require('../server/account-le
   a.equal((await service.orderStatus('a',1,op)).wallet.tickets,0);
   a.equal((await service.read('b',2)).revision,1);
   await service.advance('b',2,otherWorld.world,1,{step:1});a.deepEqual((await service.slots('b'))[0].preview,{tick:1});
+  // Deletion is a metadata-only CAS; pending rewards must be settled/cancelled first.
+  const fresh=await service.create('a',2,{}),action=(await service.read('a',2)).actions[0].operationId;
+  const held=await service.reserve('a',2,action,'ad');a.equal(held.status,'pending');
+  await a.rejects(service.deleteWorld('a',2,fresh.world,1,true),/reward reconciliation/);
+  await a.rejects(service.deleteWorld('a',2,fresh.world,1,false),/explicit/);
+  await a.rejects(service.deleteWorld('b',2,fresh.world,1,true),/revision conflict/);
+  await service.cancel('a',2,action,held.attempt,true);
+  await service.advance('a',2,fresh.world,1,{step:1});
+  await a.rejects(service.deleteWorld('a',2,fresh.world,1,true),/revision conflict/);
+  const dropped=await service.deleteWorld('a',2,fresh.world,2,true);a.deepEqual(dropped,{deleted:true,slot:2,world:fresh.world,revision:2});
+  a.equal(ledger.readOrder(owner,action).status,'cancelled');
+  const replacement=await service.create('a',2,{});a.notEqual(replacement.world,fresh.world);
+  await a.rejects(service.deleteWorld('a',2,fresh.world,1,true),/revision conflict/);
+  a.equal((await service.read('a',2)).world,replacement.world);
+  // Corrupted state can be explicitly removed without decoding it.
+  await service.deleteWorld('a',1,w.world,1,true);a.deepEqual((await service.slots('a')).map(x=>x.slot),[2,3]);
+  a.equal((await service.read('b',2)).world,otherWorld.world);
+  console.log('PASS deletion CAS, pending reward, old world isolation, corrupted state removal and journal retention');
   console.log('PASS metadata-only slots, order recovery, stale revision and pending guards; read-only rollback and isolation');
  }finally{ledger.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
