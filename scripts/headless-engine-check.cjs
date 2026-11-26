@@ -64,6 +64,7 @@ const a=require('node:assert/strict'),{createHeadlessEngine}=require('../server/
   a.ok(checkedVip,'actual VIP settlement required');
   // Use actual generated candidates; only event/offer states are fixtures.
   // No public command or endpoint accepts these test snapshots.
+  {
   const base=engine.advance(engine.newWorld({}),{step:1});
   const clone=()=>JSON.parse(JSON.stringify(base));
   const action=(w,route)=>engine.actions(w).find(x=>x.route===route);
@@ -89,6 +90,7 @@ const a=require('node:assert/strict'),{createHeadlessEngine}=require('../server/
   fa.ceremonyStage='movement-market';fa.movement={year:fa.year,requests:[{id:p.id,from:p.teamId,year:fa.year,kind:'fa',status:'declared',demand:.2}],deals:[],offers:{[p.id]:{status:'refused',salary:.2,years:3}},history:[],declared:true,closed:false};
   const rival=JSON.parse(JSON.stringify(fa));rival.movement.deals.push({id:p.id,from:p.teamId,to:(fa.selectedId+1)%12,kind:'fa',salary:.2,years:1});a.ok(!action(rival,'fa-sign'));
   const deal=verify(fa,'fa-sign');a.equal(deal.state.movement.deals[0].to,fa.selectedId);a.equal(deal.state.movement.deals[0].years,3);
+  }
   const archived=engine.newWorld({});archived.pendingMonth={year:archived.year,id:'fixture'};archived.monthlyArchive=[];
   a.throws(()=>engine.advance(archived,{acknowledge:'month'}),/not archived/);
   archived.monthlyArchive.push({...archived.pendingMonth});const ack=engine.advance(archived,{acknowledge:'month'});
