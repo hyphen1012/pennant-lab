@@ -47,13 +47,20 @@ const indexedDB={open:()=>{
   queueMicrotask(()=>req.onsuccess?.());return req;
 }};
 const domElement=()=>({innerHTML:'',textContent:'',className:'',style:{},remove(){},
-  appendChild(){},click(){},setAttribute(){}});
+  appendChild(){},click(){},setAttribute(){},removeAttribute(){}});
+// The engine VM cannot decode MP4; emit a synthetic ended event rather than
+// disabling the shipping startup or conflating this with actual playback QA.
+const mockVideo=()=>{const events=new Map();return {...domElement(),currentTime:7,
+  addEventListener:(k,fn)=>events.set(k,fn),pause(){},load(){},
+  async play(){queueMicrotask(()=>events.get('ended')?.());}
+};};
 const document={
   hidden:false,
   body:{appendChild() {},insertAdjacentHTML(where,markup){overlays.push(markup)}},
   querySelector:sel=>sel==='#app'?app:null,
   querySelectorAll:()=>[],
-  createElement:()=>domElement(),
+  createElement:tag=>tag==='video'?mockVideo():domElement(),
+  removeEventListener:(type,callback)=>{const i=listeners.findIndex(x=>x.type===type&&x.callback===callback);if(i>=0)listeners.splice(i,1);},
   addEventListener:(type,callback,capture)=>listeners.push({type,callback,capture:!!capture})
 };
 const window={
@@ -108,7 +115,10 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
 (async()=>{
   await flush();
   assert(window.PennantLab,'Game API must bootstrap');
-  assert(app.innerHTML.includes('VERSION '+html.match(/<title>PENNANT LAB v(\d+\.\d+\.\d+)/)[1]+' · '),'Current release title');
+  assert(app.innerHTML.includes('data-official-title-image'),'Official title markup');
+  assert(!app.innerHTML.includes('data-slot-group='),'Title must precede saves');
+  dispatch('click',{action:'launch-start'});await flush();
+  assert(app.innerHTML.includes('VERSION '+html.match(/<title>PENNANT LAB v(\d+\.\d+\.\d+)/)[1]+' · '),'Current release save terminal');
   const previewBefore=JSON.stringify(window.PennantLab.getSnapshot()),saveBefore=store.size;
   dispatch('click',{action:'rare-preview-open'});assert(app.innerHTML.includes('演出確認'));assert(app.innerHTML.includes('特殊選手の顔デザイン'));assert(app.innerHTML.includes('data-permanent-mask="true"'));assert(app.innerHTML.includes('data-portrait-inherited="異界転生"'));
   dispatch('click',{action:'rare-preview-start'});assert(app.innerHTML.includes('観測記録に異常を検出'));

@@ -5,11 +5,15 @@ on:
     paths:
       - 'index.html'
       - 'scripts/browser-audit.cjs'
+      - 'scripts/startup-browser-check.cjs'
+      - 'assets/startup/**'
       - '.github/workflows/browser-audit.yml'
   pull_request:
     paths:
       - 'index.html'
       - 'scripts/browser-audit.cjs'
+      - 'scripts/startup-browser-check.cjs'
+      - 'assets/startup/**'
       - '.github/workflows/browser-audit.yml'
 
 concurrency:
@@ -29,6 +33,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: |
           python3 -m http.server 8765 > /tmp/pl-http.log 2>&1 &
+          node scripts/startup-browser-check.cjs
           node scripts/browser-audit.cjs
       - uses: actions/upload-artifact@v4
         if: always()
