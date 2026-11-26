@@ -1048,5 +1048,43 @@ const pilotCode = `
   function canonicalInterrupted(){if(!accountContext)return;canonicalReset();render();}
   window.addEventListener('pl-native-suspend',canonicalInterrupted);
   window.addEventListener('pl-canonical-identity-changed',canonicalInterrupted);
+  // Audio is a presentation-only observer of the current authoritative view.
+  // Never use a hidden player's category for an audio cue.
+  const sceneAudio=window.PennantAudio;
+  if(sceneAudio){
+    let audioScene=null;
+    const refreshSceneAudio=()=>{
+      const g=canonicalSnapshot?.game;
+      const next=sceneAudio.sceneFor({page:ui.page,launchTitle:ui.launchTitle,annual:g?.annual?.active,inbox:g?.inbox,foreign:canonicalForeignOpen||g?.foreign?.responsePending,replay:canonicalReplay?.phase,skip:canonicalRunning&&canonicalPlayback==='skip',portal:!!ui.portalSlot,startup:startupPlaying||document.body.classList?.contains('official-startup-active'),available:ui.page==='title'||ui.page==='setup'||!!g});
+      if(next!==audioScene){
+        audioScene=next;sceneAudio.setScene(next);
+        const cue=({mystery:'alert',legend:'rare',immortal:'immortal',rebirth:'rebirth',transcendent:'transcendent',awards:'awards',crisis:'alert'})[next];
+        if(cue)sceneAudio.cue(cue);
+      }
+    };
+    function audioPanel(){
+      if(!['title','canonical-hq'].includes(ui.page)||startupPlaying||ui.portalSlot)return;
+      const app=$('#app');if(!app||app.querySelector('[data-pl-audio]'))return;
+      const p=sceneAudio.inspect().prefs,details=document.createElement('details');
+      details.className='panel';details.dataset.plAudio='1';
+      details.innerHTML='<summary>サウンド設定（試聴版）</summary><label class="row"><input type="checkbox" data-pl-audio-enabled '+(p.enabled?'checked':'')+'> ゲーム内サウンド</label><label> BGM音量 <input type="range" min="0" max="100" step="5" value="'+Math.round(p.bgm*100)+'" data-pl-bgm aria-label="BGM音量"></label><label> 効果音音量 <input type="range" min="0" max="100" step="5" value="'+Math.round(p.sfx*100)+'" data-pl-sfx aria-label="効果音音量"></label><button type="button" class="btn outline full" data-pl-audio-test>効果音を試聴</button><p class="small">端末に保存されます。起動動画の音声には影響しません。</p>';
+      details.addEventListener('input',e=>{const b=e.target;if(b.hasAttribute('data-pl-audio-enabled')){sceneAudio.settings({enabled:b.checked});if(b.checked)void sceneAudio.unlock();}else if(b.hasAttribute('data-pl-bgm'))sceneAudio.settings({bgm:Number(b.value)/100});else if(b.hasAttribute('data-pl-sfx'))sceneAudio.settings({sfx:Number(b.value)/100});});
+      details.addEventListener('click',e=>{if(e.target.closest('[data-pl-audio-test]'))void sceneAudio.unlock().then(ok=>{if(ok)sceneAudio.cue('open');});});
+      (app.firstElementChild||app).appendChild(details);
+    }
+    const beforeAudioRender=render;
+    render=function(){const result=beforeAudioRender();try{refreshSceneAudio();audioPanel();}catch{}return result;};
+    window.addEventListener('click',e=>{
+      if(!e.isTrusted||startupPlaying||document.hidden||!audioScene)return;
+      const b=e.target.closest?.('button[data-action]');
+      if(b?.disabled)return;
+      void sceneAudio.unlock().then(ok=>{if(ok&&b&&!slotOpening&&audioScene)sceneAudio.cue('tap');});
+    },true);
+    document.addEventListener('visibilitychange',()=>sceneAudio.visibility(!document.hidden));
+    window.addEventListener('pl-native-suspend',()=>sceneAudio.visibility(false));
+    window.addEventListener('focus',()=>{if(!document.hidden)sceneAudio.visibility(true);});
+    window.addEventListener('pagehide',()=>sceneAudio.visibility(false));
+    window.addEventListener('pageshow',()=>sceneAudio.visibility(!document.hidden));
+  }
 `;
 module.exports={canonicalTitlePilot};

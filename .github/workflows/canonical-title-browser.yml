@@ -6,6 +6,7 @@ on:
       - 'mobile/**'
       - 'server/**'
       - 'scripts/canonical-title-browser-check.cjs'
+      - 'scripts/scene-audio-check.cjs'
       - '.github/workflows/canonical-title-browser.yml'
 jobs:
   browser:
@@ -16,6 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: node scripts/scene-audio-check.cjs
       - run: npm install --no-save playwright esbuild
       - run: npx playwright install --with-deps chromium
       - run: npm --prefix mobile install

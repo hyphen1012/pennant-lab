@@ -49,9 +49,18 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   await page.goto('http://127.0.0.1:8765/mobile/www/');
   const start=page.locator('[data-action="launch-start"]');await start.waitFor();
   await page.waitForFunction(()=>!document.body.classList.contains('official-startup-active'));
+  a.equal(await page.evaluate(()=>window.PennantAudio.inspect().active),false);
   await start.click();
   const slot=n=>page.locator('button.save-slot[data-slot="'+n+'"]');
   await slot(2).waitFor();a.equal(await page.locator('button.save-slot').count(),3);
+  a.equal(await page.evaluate(()=>window.PennantAudio.inspect().scene),'worlds');
+  const soundPanel=page.locator('[data-pl-audio]');await soundPanel.locator('summary').click();
+  await soundPanel.locator('[data-pl-audio-enabled]').uncheck();
+  a.equal(await page.evaluate(()=>window.PennantAudio.inspect().prefs.enabled),false);
+  a.equal(await page.evaluate(()=>window.PennantAudio.inspect().active),false);
+  await soundPanel.locator('[data-pl-bgm]').fill('25');await soundPanel.locator('[data-pl-sfx]').fill('60');
+  a.deepEqual(await page.evaluate(()=>window.PennantAudio.inspect().prefs),{enabled:false,bgm:.25,sfx:.6});
+  await soundPanel.locator('summary').click();
   a.equal(await slot(1).getAttribute('data-action'),'new-slot');
   a.equal(await slot(2).getAttribute('data-action'),'continue-slot');
   await slot(1).click();await page.locator('.portal-transit').waitFor();
@@ -69,6 +78,8 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   await page.locator('[data-action="canonical-roster-refresh"]').click();await page.getByText('最新の編成を取得しました。').waitFor();roster=await post('read',{slot:1});a.equal(roster.revision,3);a.deepEqual(roster.game.club.lineup,one.game.club.lineup);a.equal(advances,2);
   await page.locator('[data-action="canonical-roster-back"]').click();await page.getByText('サーバー保存の確認画面（開発試験）').waitFor();
   await page.locator('[data-action="canonical-hq-open"]').click();await page.locator('.hero-stadium').waitFor();a.equal(await page.locator('.hero-team h2').textContent(),'試験球団');
+  a.equal(await page.evaluate(()=>window.PennantAudio.inspect().scene),'hq');
+  a.deepEqual(await page.evaluate(()=>window.PennantAudio.inspect().prefs),{enabled:false,bgm:.25,sfx:.6});
   const beforeDay=await post('read',{slot:1});a.equal(beforeDay.game.headquarters.canStep,true);
   await page.locator('[data-action="canonical-events-open"]').click();await page.getByText('現在対応する年間業務はありません。').waitFor();a.equal(await page.locator('[data-action="canonical-event-command"]').count(),0);await page.locator('[data-action="canonical-events-back"]').click();a.equal((await post('read',{slot:1})).revision,beforeDay.revision);
   await page.locator('[data-action="canonical-players"]').click();a.equal(await page.locator('.player-card').count(),beforeDay.game.club.roster.length);
