@@ -197,7 +197,7 @@ const pilotCode = `
       if(act==='canonical-farm-move'&&row&&c.farmMode==='manual'&&window.confirm(row.name+'選手を'+(row.tier===1?'二軍へ降格':'一軍へ昇格')+'しますか？'))void canonicalOpsRequest({club:'farm-move',playerId:id});
     }else if(ui.page==='canonical-free'&&act==='canonical-free-sign'){
       const r=canonicalFreePage?.items.find(p=>p.id===id);
-      if(r&&c.roster.length<c.rosterLimit&&window.confirm(r.name+'選手を獲得しますか？ 獲得費 '+fmtMoney(r.cost)+' / 年俸 '+fmtSalary(r.salary)))void canonicalOpsRequest({club:'sign',playerId:id});
+      if(r&&c.roster.length<c.rosterLimit&&window.confirm(r.name+'選手を獲得しますか？ 獲得費 '+fmtMoney(r.cost)+' / 年俸 '+fmtSalary(r.salary)))void canonicalOpsRequest({club:'sign',playerId:id,confirmed:true});
     }
   }
   function canonicalRosterRender(){
