@@ -10,6 +10,7 @@ public class PennantBillingPlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = ["product", "purchase", "restore", "finish"].map {
         CAPPluginMethod(name: $0, returnType: CAPPluginReturnPromise)
     }
+    private let transactionsEnabled = false // remove only after verified provider integration
     private var active = false
     private var seen: [String: StoreKit.Transaction] = [:]
     private func run(_ call: CAPPluginCall, _ operation: @escaping () async throws -> [String: Any]) {
@@ -40,6 +41,7 @@ public class PennantBillingPlugin: CAPPlugin, CAPBridgedPlugin {
         run(call) { let p = try await self.getProduct(call); return ["id":p.id,"formattedPrice":p.displayPrice] }
     }
     @objc func purchase(_ call: CAPPluginCall) {
+        guard transactionsEnabled else { call.reject("billing_not_enabled"); return }
         run(call) {
             let p = try await self.getProduct(call)
             guard call.getBool("confirmed") == true, call.getString("confirmedPrice") == p.displayPrice,
@@ -71,6 +73,7 @@ public class PennantBillingPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
     @objc func finish(_ call: CAPPluginCall) {
+        guard transactionsEnabled else { call.reject("billing_not_enabled"); return }
         run(call) {
             guard let proof = call.getString("proof"), let tx = await self.seen[proof] else { throw BillingError.invalid }
             await tx.finish()

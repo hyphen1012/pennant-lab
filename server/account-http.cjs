@@ -1,7 +1,7 @@
 // Reference HTTP transport. NOT deployed. Requires trusted service/limiter and TLS ingress.
 const http=require('node:http');
 const ROUTES=new Map([
- ['/v1/identity',['identitySnapshot',[]]],['/v1/wallet',['snapshot',[]]],['/v1/entitlements',['entitlementSnapshot',[]]],['/v1/restore',['restorePurchase',['store','proof']]],['/v1/claim',['claim',['eventProof','choice']]],
+ ['/v1/identity',['identitySnapshot',[]]],['/v1/wallet',['snapshot',[]]],['/v1/entitlements',['entitlementSnapshot',[]]],['/v1/restore',['restorePurchase',['store','proof']]],['/v1/purchase-finish',['authorizePurchaseFinish',['store','proof']]],['/v1/claim',['claim',['eventProof','choice']]],
  ['/v1/exchange',['exchange',['key']]],['/v1/reserve',['reserve',['actionProof','choice']]],
  ['/v1/finish',['finish',['completionProof']]],['/v1/order',['orderStatus',['id']]]
 ]);
@@ -17,7 +17,7 @@ function createAccountHttp({service,allowRequest,maxBody=65536}={}){
   req.on('end',()=>{if(done)return;try{const x=JSON.parse(Buffer.concat(parts).toString('utf8'));if(!x||Object.getPrototypeOf(x)!==Object.prototype)throw Error();done=true;resolve(x);}catch{fail(400);}});
  });}
  const proof=v=>typeof v==='string'&&v.length>0&&v.length<=maxBody;
- const handlers={identitySnapshot:()=>[],snapshot:()=>[],entitlementSnapshot:()=>[],restorePurchase:b=>['apple','google'].includes(b.store)&&proof(b.proof)?[b.store,b.proof]:null,claim:b=>proof(b.eventProof)&&['ticket','point'].includes(b.choice)?[b.eventProof,b.choice]:null,exchange:b=>typeof b.key==='string'&&b.key.length<=64?[b.key]:null,reserve:b=>proof(b.actionProof)&&['ad','ticket'].includes(b.choice)?[b.actionProof,b.choice]:null,finish:b=>proof(b.completionProof)?[b.completionProof]:null,orderStatus:b=>typeof b.id==='string'&&/^[A-Za-z0-9:_-]{1,200}$/.test(b.id)?[b.id]:null};
+ const handlers={identitySnapshot:()=>[],snapshot:()=>[],entitlementSnapshot:()=>[],restorePurchase:b=>['apple','google'].includes(b.store)&&proof(b.proof)?[b.store,b.proof]:null,authorizePurchaseFinish:b=>['apple','google'].includes(b.store)&&proof(b.proof)?[b.store,b.proof]:null,claim:b=>proof(b.eventProof)&&['ticket','point'].includes(b.choice)?[b.eventProof,b.choice]:null,exchange:b=>typeof b.key==='string'&&b.key.length<=64?[b.key]:null,reserve:b=>proof(b.actionProof)&&['ad','ticket'].includes(b.choice)?[b.actionProof,b.choice]:null,finish:b=>proof(b.completionProof)?[b.completionProof]:null,orderStatus:b=>typeof b.id==='string'&&/^[A-Za-z0-9:_-]{1,200}$/.test(b.id)?[b.id]:null};
  return http.createServer({requestTimeout:15000,headersTimeout:10000,maxHeaderSize:8192},async(req,res)=>{
   try{
    const route=ROUTES.get(req.url);

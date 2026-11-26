@@ -11,6 +11,8 @@ import org.json.JSONObject;
 // Real Play Billing SDK boundary. Never grants game rights. No consume path.
 @CapacitorPlugin(name="PennantBilling")
 public class PennantBillingPlugin extends Plugin implements PurchasesUpdatedListener {
+    // Keep real transactions disabled until provider end-to-end tests pass.
+    private static final boolean TRANSACTIONS_ENABLED=false;
     private BillingClient client;
     private final Handler main = new Handler(Looper.getMainLooper());
     private PluginCall active;
@@ -84,7 +86,7 @@ public class PennantBillingPlugin extends Plugin implements PurchasesUpdatedList
     @PluginMethod public void product(PluginCall call){begin(call,()->findOffer(call,o->{
         JSObject r=new JSObject();r.put("id",o.product.getProductId());r.put("formattedPrice",o.price);done(call,r);
     }));}
-    @PluginMethod public void purchase(PluginCall call){begin(call,()->findOffer(call,o->{
+    @PluginMethod public void purchase(PluginCall call){if(!TRANSACTIONS_ENABLED){call.reject("billing_not_enabled");return;}begin(call,()->findOffer(call,o->{
         String account=call.getString("account"),price=call.getString("confirmedPrice");
         if(account==null||!account.matches("[a-f0-9]{64}")||!o.price.equals(price)||!Boolean.TRUE.equals(call.getBoolean("confirmed"))){fail(call,"confirmation_required");return;}
         BillingFlowParams.ProductDetailsParams.Builder b=BillingFlowParams.ProductDetailsParams.newBuilder().setProductDetails(o.product);
@@ -123,7 +125,7 @@ public class PennantBillingPlugin extends Plugin implements PurchasesUpdatedList
     });}
     // Invoke only after server verifies this specific purchase. Native ack is
     // not entitlement authority; the server remains the source of paid rights.
-    @PluginMethod public void finish(PluginCall call){begin(call,()->{
+    @PluginMethod public void finish(PluginCall call){if(!TRANSACTIONS_ENABLED){call.reject("billing_not_enabled");return;}begin(call,()->{
         String proof=call.getString("proof");Purchase p=seen.get(proof);
         if(p==null||p.getPurchaseState()!=Purchase.PurchaseState.PURCHASED){fail(call,"unknown_purchase");return;}
         if(p.isAcknowledged()){done(call,new JSObject());return;}
