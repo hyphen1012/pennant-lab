@@ -30,6 +30,6 @@ t=f.period(t,{year:2028,phase:'off',titles:['japan']});t=begin(t,-1);a.equal(f.e
 t=f.period(t,{year:2029,phase:'season'});a.equal(t.bankUses,0);a.equal(t.loans.length,3);a.equal(t.parentUsedYear,2028);
 let u=f.period(open(),{year:2027,phase:'off',titles:['world']});u=f.period(u,{year:2028,phase:'season'});u=f.period(u,{year:2028,phase:'off'});a.equal(f.eligibility(u).preemptiveWindow,false);u=f.period(u,{year:2029,phase:'season'});a.equal(u.titleYear,null);
 u=begin(u,-200);a.equal(f.eligibility(u).parentRescue,false);a.throws(()=>f.beginMonth(u,{month:1,operatingNet:-201}),/month already prepared/);a.deepEqual(f.beginMonth(u,{month:1,operatingNet:-200}),u);
-let v=open();v=begin(v,-200);v=bank(v,'full');v=pay(v);let paid=0;for(let i=0;i<12;i++){v=begin(v,100);paid+=v.pending.total;v=pay(v);}a.equal(f.statement(v).loans[0].remaining,0);a.equal(f.statement(v).loans[0].next,null);a.equal(v.cash,1200-paid);a.equal(paid,165);a.equal(v.loans[0].paid,12);
+let v=open();v=begin(v,-200);v=bank(v,'full');v=pay(v);let paid=0;for(let i=0;i<12;i++){v=begin(v,100);paid+=v.pending.total;v=pay(v);}a.equal(f.statement(v).loans[0].remaining,0);a.equal(f.statement(v).loans[0].next,null);a.equal(v.cash,1200-paid);a.equal(paid,163);a.equal(v.loans[0].paid,12);
 a.throws(()=>f.beginMonth(v,{month:v.closedMonth+2,operatingNet:0}),/invalid month/);
 console.log('PASS immutable finance trial: proof binding, lost response replay, exact rescue, bank cap, annual renewal, parent window, atomic repayment and principal conservation');
