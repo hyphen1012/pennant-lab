@@ -19,6 +19,7 @@ function createAccountClient({baseUrl,fetcher=globalThis.fetch,timeoutMs=10000}=
  const order=v=>v&&id(v.operationId)&&modes.includes(v.mode)&&['pending','committed','cancelled'].includes(v.status)&&integer(v.attempt)&&v.attempt>0;
  const checks={
   wallet:wallet,
+  restore:v=>v&&typeof v.recorded==='boolean',
   entitlements:v=>v?.verified===true&&typeof v.account==='string'&&integer(v.serverNow)&&integer(v.verifiedAt)&&v.verifiedAt<=v.serverNow&&v.serverNow-v.verifiedAt<300000&&typeof v.entitlements?.adSkip?.active==='boolean'&&v.entitlements.adSkip.expiresAt===null&&typeof v.entitlements?.vip?.active==='boolean'&&(v.entitlements.vip.active?integer(v.entitlements.vip.expiresAt)&&v.entitlements.vip.expiresAt>v.serverNow:v.entitlements.vip.expiresAt===null),
   order:v=>wallet(v?.wallet)&&(v.order===null||order(v.order)),
   claim:v=>wallet(v?.wallet)&&typeof v.result?.ok==='boolean'&&(v.result.ok?['ticket','point'].includes(v.result.kind)&&[1,2].includes(v.result.amount):typeof v.result.reason==='string'),
@@ -51,6 +52,6 @@ function createAccountClient({baseUrl,fetcher=globalThis.fetch,timeoutMs=10000}=
    throw e?.code&&typeof e.uncertain==='boolean'?e:fail('network_error',mutation);
   }finally{clearTimeout(timer);active.delete(ctl);if(mutation&&gen===generation)busy=false;}
  }
- return {setSession,snapshot:()=>request('wallet',{}),entitlements:()=>request('entitlements',{}),claim:(eventProof,choice='ticket')=>request('claim',{eventProof,choice},true),exchange:key=>request('exchange',{key},true),reserve:(actionProof,choice)=>request('reserve',{actionProof,choice},true),finish:completionProof=>request('finish',{completionProof},true),orderStatus:id=>request('order',{id})};
+ return {setSession,snapshot:()=>request('wallet',{}),entitlements:()=>request('entitlements',{}),restorePurchase:(store,proof)=>request('restore',{store,proof},true),claim:(eventProof,choice='ticket')=>request('claim',{eventProof,choice},true),exchange:key=>request('exchange',{key},true),reserve:(actionProof,choice)=>request('reserve',{actionProof,choice},true),finish:completionProof=>request('finish',{completionProof},true),orderStatus:id=>request('order',{id})};
 }
 module.exports={createAccountClient};

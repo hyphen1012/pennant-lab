@@ -59,11 +59,12 @@ function createPurchaseService({registry,authenticate,verifyReceipt,verifyCurren
   const start=now();if(!int(start))throw Error('invalid server time');
   const rows=registry.list(account);
   const values=await Promise.all(rows.map(async x=>fresh(await verifyCurrent({account,store:x.store,chain:x.chain,product:x.product}))));
+  const t=now(),verifiedAt=values.reduce((at,v)=>Math.min(at,v.verifiedAt),start);
+  if(!int(t)||t<start||t-verifiedAt>=MAX_AGE_MS)throw Error('stale purchase reconciliation');
   const current=registry.reconcile(account,rows,values);
-  const t=now();if(!int(t)||t<start||t-start>=MAX_AGE_MS)throw Error('stale purchase reconciliation');
   const active=current.filter(x=>x.status==='active');
   const expiry=Math.max(0,...active.filter(x=>x.product==='vip'&&x.expires>t).map(x=>x.expires));
-  return {verified:true,account,verifiedAt:start,entitlements:{adSkip:{active:active.some(x=>x.product==='permanent'),expiresAt:null},vip:{active:expiry>0,expiresAt:expiry||null}}};
+  return {verified:true,account,verifiedAt,entitlements:{adSkip:{active:active.some(x=>x.product==='permanent'),expiresAt:null},vip:{active:expiry>0,expiresAt:expiry||null}}};
  }
  return {restore,notification,verifyEntitlements};
 }
