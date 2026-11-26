@@ -1,7 +1,7 @@
 // Store-neutral UI state machine; native StoreKit/Play adapters are not included.
 // Only independently verified backend rights may activate a paid entitlement.
-function createStorePurchaseFlow({sdk,bridge,catalog,onChange=()=>{}}={}){
- if(!sdk||[sdk.products,sdk.purchase,sdk.restore,sdk.finish,bridge?.restorePurchase,bridge?.status,onChange].some(f=>typeof f!=='function')||!Array.isArray(catalog)||!catalog.length||catalog.some(x=>typeof x!=='string'||!x)||new Set(catalog).size!==catalog.length)throw Error('purchase adapters required');
+function createStorePurchaseFlow({sdk,bridge,catalog,authorizeFinish,onChange=()=>{}}={}){
+ if(!sdk||[sdk.products,sdk.purchase,sdk.restore,sdk.finish,bridge?.restorePurchase,bridge?.status,authorizeFinish,onChange].some(f=>typeof f!=='function')||!Array.isArray(catalog)||!catalog.length||catalog.some(x=>typeof x!=='string'||!x)||new Set(catalog).size!==catalog.length)throw Error('purchase adapters required');
  let generation=0,busy=false,session=false,products=new Map();
  const allowed=new Set(catalog);
  function invalidate(){generation++;session=false;products.clear();bridge.invalidate?.();}
@@ -15,7 +15,8 @@ function createStorePurchaseFlow({sdk,bridge,catalog,onChange=()=>{}}={}){
   if(rights?.verified!==true)return {phase:'verification_required'};
   // Backend restore can be idempotent. Store-specific acknowledgement/finish
   // is allowed only after verified reconciliation; no local benefit here.
-  await sdk.finish(receipt);current();
+  if(await authorizeFinish(receipt)!==true)return {phase:'verification_required'};
+  current();await sdk.finish(receipt);current();
   return {phase:'verified',rights:bridge.status()};
  }
  function purchase(id,confirmed){return task(async current=>{
