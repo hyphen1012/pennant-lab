@@ -77,6 +77,7 @@ function createCanonicalGameSession({client,online=()=>true}={}){
   const r=await run('exchange',async(t,old)=>{const x=await client.exchange('ticket');if(!current(t))throw Error('session changed');exchanged=x.ok===true;return client.gameRead(t.slot);});
   return {...r,exchangeOk:r.status==='ready'?exchanged:null};
  }
+ async function tradePage(command){return readPage('gameTradePage',command);}
  async function reportPage(command){return readPage('gameReportPage',command);}
  async function achievementPage(command){return readPage('gameAchievementPage',command);}
  async function claimAchievement(id,choice,confirmed){
@@ -101,6 +102,6 @@ function createCanonicalGameSession({client,online=()=>true}={}){
    snapshot=null;status='refresh-required';return {status};
   }finally{if(current(t))active=null;}
  }
- return Object.freeze({setSession,suspend,select,refresh,create,advance,inspect,freePage,playerPage,listSlots,reward,achievementPage,claimAchievement,reportPage,exchangeTicket});
+ return Object.freeze({setSession,suspend,select,refresh,create,advance,inspect,freePage,playerPage,listSlots,reward,achievementPage,claimAchievement,reportPage,exchangeTicket,tradePage});
 }
 module.exports={createCanonicalGameSession};
