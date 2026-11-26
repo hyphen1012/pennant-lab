@@ -2481,38 +2481,53 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const raw=await new Response(data.bytes.stream().pipeThrough(new DecompressionStream('gzip'))).text();
     return JSON.parse(raw);
   }
+  // Persist revisions with the real slot record, including deletion tombstones.
+  // Old object/gzip records have revision 0; no schema upgrade or migration
+  // deletes their content. A stale tab must stop rather than overwrite it.
+  const slotRevisions=new Map();
+  function databaseRevision(record){
+    const rev=record?.revision??0;
+    if(!Number.isSafeInteger(rev)||rev<0)throw Error('Invalid stored save revision');
+    return rev;
+  }
   async function readDatabaseRecord(slot){
+    slot=Number(slot);if(![1,2,3].includes(slot))throw Error('Invalid save slot');
     const db=await openDatabase();
-    const data=await new Promise((resolve,reject)=>{
-      const tx=db.transaction(DB_STORE,'readonly'),req=tx.objectStore(DB_STORE).get(Number(slot));
-      req.onsuccess=()=>resolve(req.result?.data??null);
-      req.onerror=()=>reject(req.error||new Error('Failed to read save'));
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction(DB_STORE,'readonly'),req=tx.objectStore(DB_STORE).get(slot);let record;
+      req.onsuccess=()=>{record=req.result;};
+      tx.oncomplete=()=>{try{slotRevisions.set(slot,databaseRevision(record));resolve(record?.data??null);}catch(e){reject(e);}};
       tx.onabort=()=>reject(tx.error||new Error('Read transaction aborted'));
     });
-    return data;
   }
   async function readDatabaseSlot(slot){return decodeSaveRecord(await readDatabaseRecord(slot));}
-  async function deleteDatabaseSlot(slot){
-    if(![1,2,3].includes(slot))throw Error('Invalid save slot');
+  async function mutateDatabaseSlot(slot,data){
+    slot=Number(slot);
+    if(![1,2,3].includes(slot)||!slotRevisions.has(slot))throw Error('Save slot was not read');
+    const expected=slotRevisions.get(slot);
+    if(expected>=Number.MAX_SAFE_INTEGER)throw Error('Save revision exhausted');
     const db=await openDatabase();
     return new Promise((resolve,reject)=>{
-      const tx=db.transaction(DB_STORE,'readwrite');
-      tx.objectStore(DB_STORE).delete(slot);
-      tx.oncomplete=()=>resolve();
-      tx.onerror=()=>reject(tx.error||Error('Delete failed'));
-      tx.onabort=()=>reject(tx.error||Error('Delete aborted'));
+      const tx=db.transaction(DB_STORE,'readwrite'),store=tx.objectStore(DB_STORE),req=store.get(slot);
+      let failure=null,written=false;
+      req.onsuccess=()=>{
+        try{
+          if(databaseRevision(req.result)!==expected)throw Object.assign(Error('Save revision conflict'),{code:'save_conflict'});
+          store.put({slot,revision:expected+1,data});written=true;
+        }catch(e){failure=e;tx.abort();}
+      };
+      tx.oncomplete=()=>{if(!written){reject(Error('Save not written'));return;}slotRevisions.set(slot,expected+1);resolve();};
+      tx.onabort=()=>reject(failure||tx.error||Error('Save transaction aborted'));
     });
   }
+  async function deleteDatabaseSlot(slot){
+    // Explicit deletion leaves only the revision, not the deleted game data.
+    return mutateDatabaseSlot(slot,null);
+  }
   async function writeDatabaseSlot(slot,snapshot){
-    // Complete compression before creating the transaction: no async IDB auto-close.
-    const data=await encodeSaveSnapshot(snapshot),db=await openDatabase();
-    return new Promise((resolve,reject)=>{
-      const tx=db.transaction(DB_STORE,'readwrite');
-      tx.objectStore(DB_STORE).put({slot:Number(slot),data});
-      tx.oncomplete=()=>resolve();
-      tx.onerror=()=>reject(tx.error||new Error('Failed to save'));
-      tx.onabort=()=>reject(tx.error||new Error('Save transaction aborted'));
-    });
+    // Compression finishes before opening a read/write transaction.
+    const data=await encodeSaveSnapshot(snapshot);
+    return mutateDatabaseSlot(slot,data);
   }
   function validateSave(data){
     return !!(data&&data.v===VERSION&&Array.isArray(data.teams)&&data.teams.length===12
@@ -3715,7 +3730,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
               writeSlotPreview(slot,next.preview);
             }catch(e){
               failedSaveRevision=Math.max(failedSaveRevision,next.revision);storageFailure=true;console.warn('Save failed:',e);
-              showToast('自動保存に失敗しました。進行を止め、JSONバックアップを書き出してください。',true);
+              showToast(e?.code==='save_conflict'?'別の画面でセーブが更新されました。上書きせず進行を停止しました。JSONバックアップを保存して再読み込みしてください。':'自動保存に失敗しました。進行を止め、JSONバックアップを書き出してください。',true);
             }
           }
         }finally{saveDraining=false;if(ui.page==='title'&&!ui.rarePreview&&!slotOpening&&!scenarioLab)render();}
