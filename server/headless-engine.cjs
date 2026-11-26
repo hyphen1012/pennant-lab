@@ -62,10 +62,11 @@ function createHeadlessEngine(){
  };
  const canManage=()=>team.cash>=0&&!game.financeCrisis&&!flowInbox()&&!game.pendingMonth&&!game.pendingReview&&!pendingMilestoneNews().length&&!flowForeignResponse()&&!game.ceremonyStage&&!flowGet()?.active&&game.pendingCeremonyIntro!=='opening';
  const canStep=()=>!!calendarNextDay()&&game.day<143&&!game.financeCrisis&&!flowGet()&&game.pendingCeremonyIntro!=='opening'&&!game.pendingDraftReveal&&game.pendingDecade==null&&!pendingRareNews().length&&!game.pendingMilestoneIds?.length&&!game.pendingEvent&&!game.pendingMonth&&!game.pendingReview&&!careerEventPending()&&!flowForeignResponse();
- const archivedMonth=()=>!!(game.pendingMonth&&game.monthlyArchive?.some(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id));
+ const archivedMonth=()=>!!(game.pendingMonth&&game.monthlyArchive?.some(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id&&m.teamId===team.id));
  const archivedMilestones=()=>!!game.pendingMilestoneIds?.length&&game.pendingMilestoneIds.every(id=>(game.milestoneNews||[]).some(m=>m.id===id));
  const archivedReview=()=>!!(game.pendingReview&&game.games.some(g=>g.id===game.pendingReview.gameId&&g.year===game.pendingReview.year&&(g.home===team.id||g.away===team.id)));
- const canCalendar=()=>!!calendarNextDay()&&game.day<143&&!game.financeCrisis&&!flowGet()&&game.pendingCeremonyIntro!=='opening'&&!game.pendingDraftReveal&&game.pendingDecade==null&&!pendingRareNews().length&&!game.pendingEvent&&!careerEventPending()&&!flowForeignResponse()&&(!game.pendingMonth||!game.pendingMonth.explicit&&archivedMonth())&&(!game.pendingReview||!game.pendingReview.explicit&&archivedReview())&&(!game.pendingMilestoneIds?.length||archivedMilestones());
+ const routineClearable=()=>(!game.pendingMonth||!game.pendingMonth.explicit&&archivedMonth())&&(!game.pendingReview||!game.pendingReview.explicit&&archivedReview())&&(!game.pendingMilestoneIds?.length||archivedMilestones());
+ const canCalendar=()=>!!calendarNextDay()&&game.day<143&&!game.financeCrisis&&!flowGet()&&game.pendingCeremonyIntro!=='opening'&&!game.pendingDraftReveal&&game.pendingDecade==null&&!pendingRareNews().length&&!game.pendingEvent&&!careerEventPending()&&!flowForeignResponse()&&routineClearable();
  const deferRoutine=()=>{
   if(game.pendingMonth&&!game.pendingMonth.explicit&&archivedMonth())game.pendingMonth=null;
   if(game.pendingReview&&!game.pendingReview.explicit&&archivedReview())game.pendingReview=null;
@@ -290,9 +291,9 @@ function createHeadlessEngine(){
  const annualAwardsView=()=>({awards:(game.awards||[]).filter(a=>a.year===game.year).map(a=>{const p=getPlayer(a.playerId),t=getTeam(a.teamId);return {title:a.title,league:a.league,teamId:a.teamId,team:t?.name||'球団',stat:awardStatLabel(a),player:p?{id:p.id,name:p.name,pos:p.pos,age:p.age,teamId:p.teamId,talent:p.talent,...Object.fromEntries(seasonSkillKeys(p).map(k=>[k,p[k]])),appearanceSeed:p.appearanceSeed,specialCategory:p.specialCategory||null,originCategory:p.originCategory||null,pastLifeAppearance:p.pastLifeAppearance?{seed:p.pastLifeAppearance.seed,baseCategory:p.pastLifeAppearance.baseCategory}:null}:null};}),milestones:(game.milestoneNews||[]).filter(e=>e.year===game.year).slice(-80).map(e=>({title:e.title,date:e.date,teamId:e.teamId??null}))});
  const annualView=()=>{
   const f=flowGet(),d=movementData();
-  if(!f)return {mode:null,canStart:game.day===143&&game.calendarIndex===game.calendar.days.length&&!game.financeCrisis&&!flowInbox()&&!game.pendingMonth&&!game.pendingReview&&!pendingMilestoneNews().length&&!flowForeignResponse()};
+  if(!f)return {mode:null,routineClearable:routineClearable(),canStart:game.day===143&&game.calendarIndex===game.calendar.days.length&&!game.financeCrisis&&!flowInbox()&&routineClearable()&&!flowForeignResponse()};
   const tasks=Object.values(f.jobs).map(j=>({id:j.id,start:j.start,status:j.status,supported:annualSupported.includes(j.id)}));
-  return {mode:f.mode,date:f.date,active:f.active,tasks,awardReport:f.active==='awards-all'?annualAwardsView():null,financeReport:f.active==='settlement'?annualFinanceView():null,preseason:preView(f),market:marketView(f),commerce:commercialJobs.includes(f.active)?commercialView(f,f.jobs[f.active]):null,canAdvance:!f.active&&!flowInbox()&&!game.financeCrisis&&!flowBlocking(f),renewal:['renewal1','renewal2'].includes(f.active)?renewalView():null,training:['autumn','winter'].includes(f.active)?trainingView(f.active):null,draft:f.active==='draft'?draftView(game.draft):null,roster:f.active==='roster-cut'?{projection:draftRosterProjection(game.draft,team),selected:draftCutIds(game.draft,team),eligible:draftCutOptions(game.draft,team).map(p=>({id:p.id,name:p.name,pos:p.pos,salary:p.salary,warnings:draftCutReasons(p)}))}:null,requests:f.active==='movement-declarations'?(d?.requests||[]).filter(r=>r.from===team.id).map(r=>({id:r.id,kind:r.kind,status:r.status,demand:r.demand,offer:r.offer})):[]};
+  return {mode:f.mode,date:f.date,active:f.active,tasks,routineClearable:routineClearable(),awardReport:f.active==='awards-all'?annualAwardsView():null,financeReport:f.active==='settlement'?annualFinanceView():null,preseason:preView(f),market:marketView(f),commerce:commercialJobs.includes(f.active)?commercialView(f,f.jobs[f.active]):null,canAdvance:!f.active&&!flowInbox()&&!game.financeCrisis&&!flowForeignResponse()&&routineClearable()&&!flowBlocking(f),renewal:['renewal1','renewal2'].includes(f.active)?renewalView():null,training:['autumn','winter'].includes(f.active)?trainingView(f.active):null,draft:f.active==='draft'?draftView(game.draft):null,roster:f.active==='roster-cut'?{projection:draftRosterProjection(game.draft,team),selected:draftCutIds(game.draft,team),eligible:draftCutOptions(game.draft,team).map(p=>({id:p.id,name:p.name,pos:p.pos,salary:p.salary,warnings:draftCutReasons(p)}))}:null,requests:f.active==='movement-declarations'?(d?.requests||[]).filter(r=>r.from===team.id).map(r=>({id:r.id,kind:r.kind,status:r.status,demand:r.demand,offer:r.offer})):[]};
  };
  const medical=()=>own(team).filter(p=>rosterTreatmentEligible(p)&&p.injury&&typeof p.injury.date==='string').map(p=>({route:'medical',year:game.year,eventKey:String(p.id)+':'+p.injury.date,label:p.name+' 特別治療',playerId:p.id,date:p.injury.date}));
  // Same eligibility as the checked-in manager staff continuation handler:
@@ -379,7 +380,7 @@ function createHeadlessEngine(){
   // Only acknowledge archived monthly reports or defer already-recorded
   // milestone news. Never discard injury/rare notices or resolve a crisis.
   if(kind==='month'){
-   if(!game.pendingMonth||!game.monthlyArchive?.some(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id))throw Error('monthly report not archived');
+   if(!game.pendingMonth||!game.monthlyArchive?.some(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id&&m.teamId===team.id))throw Error('monthly report not archived');
    game.pendingMonth=null;
   }else if(kind==='milestones'){
    if(!game.pendingMilestoneIds?.length)throw Error('no milestone notices');
@@ -543,7 +544,9 @@ function createHeadlessEngine(){
  }
  if(op==='annual'){
   vipStatusProvider=()=>({verified:true,vip:input.verifiedVip===true});
-  if(game.financeCrisis||flowInbox()||game.pendingMonth||game.pendingReview||pendingMilestoneNews().length||flowForeignResponse())throw Error('annual inbox unresolved');
+  if(game.financeCrisis||flowInbox()||!routineClearable()||flowForeignResponse())throw Error('annual inbox unresolved');
+  // Only already archived ordinary notices may be deferred; important and explicitly requested reports remain blocking.
+  deferRoutine();
   let f=flowGet();
   if(input.choice==='start'){
    if(f||game.day!==143||game.calendarIndex!==game.calendar.days.length||!game.postseason||!Array.isArray(game.awards))throw Error('annual start unavailable');
@@ -866,7 +869,7 @@ function createHeadlessEngine(){
   }
   return JSON.stringify([...entries.values()]);
  }
- if(op==='view')return JSON.stringify({year:game.year,day:game.day,calendarIndex:game.calendarIndex,team:{id:team.id,name:team.name,short:team.short,league:team.league,color:team.color,letter:team.letter,emblem:team.emblem||null,wins:team.wins,losses:team.losses,ties:team.ties,cash:team.cash},gmName:game.gmName||'GM',games:game.games.length,headquarters:headquartersView(),inbox:inbox(),club:clubView(),foreign:foreignView(),annual:annualView(),vipIncome:r2((game.financeLedger?.clubs?.[team.id]?.vipIncome||0)+vipOffTotal(team,game.year)),retirementEligible:retirement().length===1,medical:medical().length,managerEligible:manager().length===1,acknowledgements:{month:!!(game.pendingMonth&&game.monthlyArchive?.some(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id)),milestones:!!game.pendingMilestoneIds?.length},blocked:!!(game.financeCrisis||pendingRareNews().length||game.pendingMilestoneIds?.length||game.pendingEvent||game.pendingMonth||game.pendingReview||careerEventPending()||flowForeignResponse()||game.day>=143)});
+ if(op==='view')return JSON.stringify({year:game.year,day:game.day,calendarIndex:game.calendarIndex,team:{id:team.id,name:team.name,short:team.short,league:team.league,color:team.color,letter:team.letter,emblem:team.emblem||null,wins:team.wins,losses:team.losses,ties:team.ties,cash:team.cash},gmName:game.gmName||'GM',games:game.games.length,headquarters:headquartersView(),inbox:inbox(),club:clubView(),foreign:foreignView(),annual:annualView(),vipIncome:r2((game.financeLedger?.clubs?.[team.id]?.vipIncome||0)+vipOffTotal(team,game.year)),retirementEligible:retirement().length===1,medical:medical().length,managerEligible:manager().length===1,acknowledgements:{month:!!(game.pendingMonth&&game.monthlyArchive?.some(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id&&m.teamId===team.id)),milestones:!!game.pendingMilestoneIds?.length},blocked:!!(game.financeCrisis||pendingRareNews().length||game.pendingMilestoneIds?.length||game.pendingEvent||game.pendingMonth||game.pendingReview||careerEventPending()||flowForeignResponse()||game.day>=143)});
  throw Error('unsupported pilot operation');
  `;
  const compiled=new vm.Script(pre+source.replace('(() => {','(() => {')+tail+'})();',{filename:'pennant-lab-headless-pilot.js'});

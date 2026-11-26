@@ -118,7 +118,7 @@ const a=require('node:assert/strict'),{createHeadlessEngine}=require('../server/
   }
   const archived=engine.newWorld({});archived.pendingMonth={year:archived.year,id:'fixture'};archived.monthlyArchive=[];
   a.throws(()=>engine.advance(archived,{acknowledge:'month'}),/not archived/);
-  archived.monthlyArchive.push({...archived.pendingMonth});const ack=engine.advance(archived,{acknowledge:'month'});
+  archived.monthlyArchive.push({...archived.pendingMonth,teamId:(archived.selectedId+1)%12});a.throws(()=>engine.advance(archived,{acknowledge:'month'}),/not archived/);archived.monthlyArchive[0].teamId=archived.selectedId;const ack=engine.advance(archived,{acknowledge:'month'});
   a.equal(ack.pendingMonth,null);a.equal(ack.monthlyArchive.length,1);a.equal(ack.day,archived.day);
   a.throws(()=>engine.advance(ack,{acknowledge:'rare'}));a.throws(()=>engine.advance(ack,{acknowledge:'month'}));
   // Actual server-origin results, not client-provided scores: compare the
