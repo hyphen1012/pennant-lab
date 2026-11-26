@@ -55,3 +55,14 @@ a.throws(()=>engine.advance(w,{club:'lineup-replace',key:role,playerId:eligible.
 const injured=JSON.parse(JSON.stringify(w));injured.players.find(p=>p.id===eligible.id).injury={daysLeft:5};a.throws(()=>engine.advance(injured,{club:'lineup-replace',key:role,playerId:eligible.id}));
 const blocked=JSON.parse(JSON.stringify(w));blocked.pendingDraftReveal={year:w.year,entries:[]};a.throws(()=>engine.advance(blocked,{club:'lineup-move',slot:0,target:1}));
 console.log('PASS server v190 recommendation, move, eligibility, role replacement and reveal boundary');
+
+a.equal(v.lineupUndoAvailable,true);
+const replaced=JSON.stringify(w);a.throws(()=>engine.advance(w,{club:'lineup-undo',lineup:[]}));a.equal(JSON.stringify(w),replaced);
+v=go('lineup-undo');a.equal(v.lineup[oldIndex],oldId);a.equal(v.fieldingRoles[oldId],role);a.equal(v.lineupUndoAvailable,false);
+a.throws(()=>engine.advance(w,{club:'lineup-undo'}));
+v=go('lineup-move',{slot:0,target:2});a.equal(v.lineupUndoAvailable,true);
+const saved=JSON.parse(JSON.stringify(w));a.equal(engine.view(saved).club.lineupUndoAvailable,true);
+const tampered=JSON.parse(JSON.stringify(w));const t=tampered.teams.find(t=>t.id===tampered.selectedId);[t.lineup[0],t.lineup[1]]=[t.lineup[1],t.lineup[0]];a.equal(engine.view(tampered).club.lineupUndoAvailable,false);a.throws(()=>engine.advance(tampered,{club:'lineup-undo'}));
+const hurt=JSON.parse(JSON.stringify(w));hurt.players.find(p=>p.id===hurt.canonicalRosterUndo.before.lineup[0]).injury={daysLeft:5};a.equal(engine.view(hurt).club.lineupUndoAvailable,false);a.throws(()=>engine.advance(hurt,{club:'lineup-undo'}));
+v=go('travel',{value:2});a.equal(v.lineupUndoAvailable,false);a.throws(()=>engine.advance(w,{club:'lineup-undo'}));
+console.log('PASS trusted one-step lineup undo, restart, tamper, injury and unrelated-operation invalidation');

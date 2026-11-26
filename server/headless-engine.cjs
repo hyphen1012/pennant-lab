@@ -30,6 +30,15 @@ function createHeadlessEngine(){
  }
  game=input.state;ensureGameExtras();
  const team=myTeam();
+ // A single trusted undo entry, never populated from a client command.
+ // Any successful unrelated mutation (including reward application) invalidates it.
+ const rosterEdit=op==='club'&&(['lineup','fielding','lineup-recommend','lineup-move','lineup-replace'].includes(input.choice)||input.choice==='order'&&input.kind==='lineup');
+ const rosterUndo=op==='club'&&input.choice==='lineup-undo';
+ if(!['view','actions','achievements','free-page'].includes(op)&&!rosterUndo)delete game.canonicalRosterUndo;
+ const undoAvailable=()=>{
+  const u=game.canonicalRosterUndo,b=u?.before;
+  return !!(u&&u.team===team.id&&u.year===game.year&&u.day===game.day&&u.after===roster190Fingerprint(team)&&b&&Array.isArray(b.lineup)&&b.lineup.length<=9&&b.fieldingRoles&&new Set(b.lineup).size===b.lineup.length&&Object.keys(b.fieldingRoles).length===b.lineup.length&&new Set(Object.values(b.fieldingRoles)).size===b.lineup.length&&b.lineup.every(id=>FIELD_POSITIONS.includes(b.fieldingRoles[id])&&firstHitters(team).some(p=>p.id===id&&availableForGame(p))));
+ };
  // JSON persistence loses the browser's shared job/desk object reference.
  const restoredFlow=flowGet();if(restoredFlow?.active&&restoredFlow.jobs[restoredFlow.active]?.state)game.offseasonDesk=restoredFlow.jobs[restoredFlow.active].state;
  const injuryNotice=()=>{const e=game.pendingEvent;return e?.type==='injury'&&e.teamId===team.id&&Number.isSafeInteger(e.playerId)&&typeof e.date==='string'?e:null;};
@@ -66,6 +75,7 @@ function createHeadlessEngine(){
    freeCount:free.length,free:free.slice(0,80).map(freeRow),
    managerCandidates:[1,2,3].map(slot=>{const m=makeManager(team.id,game.year,slot);return {slot,id:m.id,name:m.name,style:m.style,salary:m.salary,contractYears:m.contractYears,fee:r2(m.salary*.3),current:m.id===manager?.id};}),
    lineup:team.lineup.slice(),rotation:team.rotation.slice(),fieldingRoles:{...team.fieldingRoles},fieldingOptions:team.lineup.map(id=>({id,roles:FIELD_POSITIONS.filter(role=>canAssignFieldingRole(team,id,role))})),
+   lineupUndoAvailable:canManage()&&undoAvailable(),
    lineupWarnings:{missing:Math.max(0,9-team.lineup.length),off:team.lineup.filter(id=>fieldingTier(getPlayer(id),team.fieldingRoles[id])==='off')},
    lineupCandidates:firstHitters(team).filter(availableForGame).map(p=>({id:p.id,roles:FIELD_POSITIONS.filter(role=>!roster190Candidate(team,role,p))})),
    facilities:[...Object.entries(INFRA_LABELS),...Object.entries(STADIUM_KEYS)].map(([key,label])=>{const lv=Object.hasOwn(INFRA_LABELS,key)?infraLevel(team,key):stadium[key];return {key,label,level:lv,upkeep:facilityUpkeep(key,lv),nextCost:lv<20?facilityCost(key,lv):null,nextUpkeep:lv<20?facilityUpkeep(key,lv+1):null};}),
@@ -298,7 +308,13 @@ function createHeadlessEngine(){
  if(op==='club'){
   if(!canManage())throw Error('club operation blocked by required event');
   const k=input.choice,p=input.playerId===undefined?null:getPlayer(input.playerId);
-  if(k==='identity'){
+  if((rosterEdit||rosterUndo)&&!freeVisible())throw Error('lineup unavailable before reveal');
+  const beforeRoster=rosterEdit?roster190Capture(team):null;
+  const beforeFingerprint=rosterEdit?roster190Fingerprint(team):null;
+  if(k==='lineup-undo'){
+   if(!undoAvailable()||!roster190Restore(team,game.canonicalRosterUndo.before))throw Error('lineup undo unavailable');
+   delete game.canonicalRosterUndo;
+  }else if(k==='identity'){
    ui.clubDraft={...input.identity,slot:activeSlot,id:team.id};applyIdentity(team);
   }else if(k==='lineup'||k==='rotation'){
    const arr=k==='lineup'?team.lineup:team.rotation,i=input.slot;
@@ -360,6 +376,7 @@ function createHeadlessEngine(){
   }else if(k==='manager-order'){
    if(!team.manager||!MANAGER_TACTICS.some(t=>t[0]===input.key))throw Error('manager order unavailable');(team.gmOrders??={})[input.key]=input.value;
   }else throw Error('invalid club operation');
+  if(rosterEdit&&beforeFingerprint!==roster190Fingerprint(team))game.canonicalRosterUndo={team:team.id,year:game.year,day:game.day,before:beforeRoster,after:roster190Fingerprint(team)};
   return JSON.stringify(game);
  }
  if(op==='foreign'){
@@ -741,6 +758,7 @@ function createHeadlessEngine(){
     if(k==='identity')valid=exact(command,[...base,'identity','confirmed'])&&command.confirmed===true&&validIdentity(command.identity);
     if(k==='lineup'||k==='rotation')valid=pid&&slot(command.slot)&&exact(command,[...base,'playerId','slot']);
     if(k==='order')valid=exact(command,[...base,'kind','slot','target'])&&['lineup','rotation'].includes(command.kind)&&slot(command.slot)&&slot(command.target);
+    if(k==='lineup-undo')valid=exact(command,base);
     if(k==='lineup-recommend')valid=exact(command,[...base,'confirmed'])&&command.confirmed===true;
     if(k==='lineup-move')valid=exact(command,[...base,'slot','target'])&&slot(command.slot)&&slot(command.target)&&command.slot!==command.target;
     if(k==='lineup-replace')valid=pid&&exact(command,[...base,'playerId','key'])&&['C','1B','2B','3B','SS','LF','CF','RF','DH'].includes(command.key);

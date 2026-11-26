@@ -51,6 +51,8 @@ const {createAccountClient}=require('../mobile/src/account-client.cjs'),{createC
   const beforeRoster=one.inspect().snapshot,ids=beforeRoster.game.club.lineup;
   const moved=await one.advance({club:'lineup-move',slot:0,target:3});a.equal(moved.status,'ready');a.equal(moved.snapshot.revision,beforeRoster.revision+1);a.deepEqual(moved.snapshot.game.club.lineup.slice(0,4),[ids[1],ids[2],ids[3],ids[0]]);
   const beforeLost=advances;lost=true;const lostRoster=await one.advance({club:'lineup-move',slot:3,target:0});a.equal(lostRoster.status,'refresh-required');a.equal(lostRoster.uncertain,true);a.throws(()=>one.advance({club:'lineup-move',slot:3,target:0}));const rosterRecovery=await one.refresh();a.equal(rosterRecovery.snapshot.revision,moved.snapshot.revision+1);a.deepEqual(rosterRecovery.snapshot.game.club.lineup,ids);a.equal(advances,beforeLost+1);
+  a.equal(rosterRecovery.snapshot.game.club.lineupUndoAvailable,true);
+  const undone=await one.advance({club:'lineup-undo'});a.equal(undone.status,'ready');a.equal(undone.snapshot.revision,rosterRecovery.snapshot.revision+1);a.deepEqual(undone.snapshot.game.club.lineup,moved.snapshot.game.club.lineup);a.equal(undone.snapshot.game.club.lineupUndoAvailable,false);
   one.suspend();a.equal(one.inspect().snapshot,null);a.throws(()=>one.advance({step:1}));a.equal((await one.refresh()).snapshot.world,b.snapshot.world);
   console.log('PASS real engine HTTP session, explicit create, revision conflict, committed response loss, no replay, offline and identity isolation');
  }finally{await runtime.close();fs.rmSync(dir,{recursive:true,force:true});}
