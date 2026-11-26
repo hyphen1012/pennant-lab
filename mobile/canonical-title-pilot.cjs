@@ -650,6 +650,8 @@ const pilotCode = `
     if(act==='canonical-digest-next'&&a.active==='exhibition'&&a.preseason?.report&&!a.preseason.digestSeen){canonicalDigestCut=Math.min(REPORT_DIGEST_CUTS.length-1,canonicalDigestCut+1);render();return;}
     if(act!=='canonical-event-command'||canonicalSnapshot.pending?.length)return;
     const k=b.dataset.kind,job=b.dataset.job;
+    const important=!!(i.finance||i.rare||i.injury||i.career||i.rookie||i.decade!=null);
+    if(important&&!['finance-end','rare-ack','injury-ack','career-accept','career-dismiss','rookie-reveal','rookie-finish','decade-ack'].includes(k))return;
     let cmd=null;
     if(k.startsWith('foreign-')&&g.foreign?.canOperate&&!i.finance&&!i.rare&&!i.injury&&!i.career&&!i.rookie&&i.decade==null){
       const decision=k.slice(8),f=g.foreign,n=f.negotiation,id=Number(b.dataset.id),key=b.dataset.key,level=Number(b.dataset.level);canonicalForeignOpen=true;
