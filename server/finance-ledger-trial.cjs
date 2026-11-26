@@ -60,7 +60,7 @@ function createFinanceLedgerTrial({verifyBankProof=()=>false}={}){
   for(const row of next.pending.rows){const l=next.loans.find(l=>l.id===row.id);a(l&&l.rows[l.paid]?.month===row.month,'installment mismatch');l.paid++;}
   next.closedMonth=month;next.pending=null;return {state:next,status:'paid'};
  }
- function statement(s){return {cash:s.cash,...eligibility(s),pending:s.pending?clone(s.pending):null,loans:s.loans.map(l=>({id:l.id,kind:l.kind,principal:l.principal,remaining:l.paid?l.rows[l.paid-1].remaining:l.principal,paid:l.paid,next:l.rows[l.paid]?{month:l.openedMonth+l.rows[l.paid].month,...l.rows[l.paid],dueMonth:l.openedMonth+l.rows[l.paid].month}:null}))};}
+ function statement(s){return {cash:s.cash,...eligibility(s),pending:s.pending?clone(s.pending):null,loans:s.loans.map(l=>({id:l.id,kind:l.kind,principal:l.principal,remaining:l.paid?l.rows[l.paid-1].remaining:l.principal,paid:l.paid,next:l.rows[l.paid]?{...l.rows[l.paid],dueMonth:l.openedMonth+l.rows[l.paid].month}:null}))};}
  return {create,period,beginMonth,borrow,settleMonth,statement,eligibility};
 }
 module.exports={createFinanceLedgerTrial};
