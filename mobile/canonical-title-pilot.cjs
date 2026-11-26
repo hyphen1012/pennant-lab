@@ -100,7 +100,7 @@ const pilotCode = `
     const app=$('#app'),g=canonicalSnapshot?.game,c=g?.club;
     if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-info-back">‹ '+(ui.page==='canonical-player'?'全選手':'本部')+'</button></div>';
-    if(!g||!accountCurrent()){app.innerHTML='<div class="setup-screen">'+top+'<p>確定状態を取得してください。</p></div>';return;}
+    if(!g||!accountCurrent()){app.innerHTML='<div class="setup-screen">'+top+'<p>確定状態を取得してください。自動再送は行いません。</p><button class="btn primary full" data-action="canonical-info-refresh" '+(slotOpening?'disabled':'')+'>最新状態を取得</button></div>';return;}
     let body='';
     if(ui.page==='canonical-standings'){
       const league=canonicalLeague||g.team.league,rows=g.headquarters.standings[league];
@@ -109,14 +109,15 @@ const pilotCode = `
     else if(ui.page==='canonical-player'){
       const row=c.roster.find(p=>p.id===canonicalPlayerId);
       if(!row)body='<p>選手情報を取得できません。</p>';
-      else{const p=canonicalPlayerModel(row,g);
-        body='<div class="player-profile"><div class="player-club">'+h(g.team.name)+' · '+positionMarkup(p.pos)+'</div><div class="profile-row profile-upper-row">'+playerUpperPortrait(p)+'<div><h2>'+themedPlayerName(p)+' <small>('+p.age+')</small></h2><div class="profile-meta">'+throwBat(p)+' · '+fmtSalary(p.salary)+'</div><div class="profile-meta">総合 '+rating(p)+' · 愛着 ♥'+p.affinity+'</div></div></div></div><div class="player-detail-condition">'+conditionBar(p)+'</div><section class="panel"><h3>能力・適性</h3>'+annualAbilityStrip(p)+'<p>'+positionMarkup(p.pos)+(p.subPos?' / '+positionMarkup(p.subPos):'')+'</p></section><section class="panel"><h3>今季の公式戦成績</h3>'+statDisplayGrid(p)+'</section><p class="small">試験接続：能力・今季成績。通算成績、育成設定、メモ等は未接続。</p>';
+      else{const p=canonicalPlayerModel(row,g),blocked=slotOpening||!c.canManage||!!canonicalSnapshot.pending?.length;
+        const focus='<section class="panel"><h3>シーズン育成方針</h3><p class="small">重点育成する能力を選択します。</p><div class="chips">'+['balanced',...Object.keys(row.abilities)].map(k=>'<button class="chip '+(row.focus===k?'active':'')+'" data-action="canonical-focus" data-key="'+h(k)+'" '+(blocked||row.focus===k?'disabled':'')+'>'+h(k==='balanced'?'バランス':DRAFT_LABELS[k]||k)+'</button>').join('')+'</div></section>';
+        body='<div class="player-profile"><div class="player-club">'+h(g.team.name)+' · '+positionMarkup(p.pos)+'</div><div class="profile-row profile-upper-row">'+playerUpperPortrait(p)+'<div><h2>'+themedPlayerName(p)+' <small>('+p.age+')</small></h2><div class="profile-meta">'+throwBat(p)+' · '+fmtSalary(p.salary)+'</div><div class="profile-meta">総合 '+rating(p)+' · 愛着 ♥'+p.affinity+'</div></div></div></div><div class="player-detail-condition">'+conditionBar(p)+'</div><section class="panel"><h3>能力・適性</h3>'+annualAbilityStrip(p)+'<p>'+positionMarkup(p.pos)+(p.subPos?' / '+positionMarkup(p.subPos):'')+'</p></section><section class="panel"><h3>今季の公式戦成績</h3>'+statDisplayGrid(p)+'</section>'+focus+'<p class="small">試験接続：能力・今季成績・育成方針。通算成績、メモ等は未接続。</p>';
       }
     }else{
       const rows=c.roster.map(p=>canonicalPlayerModel(p,g)).sort((a,b)=>rating(b)-rating(a)||a.id-b.id);
       body='<h2 class="page-title">全選手</h2><p class="page-sub">所属 '+rows.length+' / '+c.rosterLimit+'人</p>'+[false,true].map(pitch=>{const group=rows.filter(p=>isPitch(p)===pitch);return '<div class="section-label">'+(pitch?positionMarkup('P','投手'):'野手')+'（'+group.length+'人）</div>'+group.map(p=>playerCardMarkup(p,false,true)).join('');}).join('');
     }
-    app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(g.team)+'">'+top+'<main class="main">'+body+'</main></div>';
+    app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(g.team)+'">'+top+'<main class="main">'+(canonicalOpsNote?'<p role="status">'+h(canonicalOpsNote)+'</p>':'')+body+'</main></div>';
   }
   let canonicalFreePage=null,canonicalFreeQuery='',canonicalRotationSlot=null,canonicalOpsNote='';
   const canonicalOpsPages=['canonical-rotation','canonical-farm','canonical-free','canonical-facilities','canonical-manager'];
@@ -384,7 +385,9 @@ const pilotCode = `
     else if(ui.page==='canonical-hq'&&act==='canonical-standings'&&canonicalSnapshot?.game?.headquarters&&accountCurrent()){canonicalLeague=canonicalSnapshot.game.team.league;ui.page='canonical-standings';render();draftJump(0);}
     else if(ui.page==='canonical-standings'&&act==='canonical-league'&&['E','W'].includes(b.dataset.league)){canonicalLeague=b.dataset.league;render();}
     else if(ui.page==='canonical-players'&&act==='player-detail'&&canonicalSnapshot?.game?.club?.roster.some(p=>p.id===Number(b.dataset.id))&&accountCurrent()){canonicalPlayerId=Number(b.dataset.id);ui.page='canonical-player';render();draftJump(0);}
-    else if(['canonical-players','canonical-player','canonical-standings'].includes(ui.page)&&act==='canonical-info-back'){ui.page=ui.page==='canonical-player'?'canonical-players':'canonical-hq';canonicalPlayerId=null;render();draftJump(0);}
+    else if(ui.page==='canonical-player'&&act==='canonical-focus'){const c=canonicalSnapshot?.game?.club,p=c?.roster.find(p=>p.id===canonicalPlayerId),k=b.dataset.key;if(p&&c.canManage&&!canonicalSnapshot.pending?.length&&['balanced',...Object.keys(p.abilities)].includes(k)&&p.focus!==k)void canonicalOpsRequest({club:'focus',playerId:p.id,key:k});}
+    else if(['canonical-players','canonical-player','canonical-standings'].includes(ui.page)&&act==='canonical-info-refresh')void canonicalOpsRequest(null);
+    else if(['canonical-players','canonical-player','canonical-standings'].includes(ui.page)&&act==='canonical-info-back'){ui.page=ui.page==='canonical-player'?'canonical-players':'canonical-hq';canonicalPlayerId=null;canonicalOpsNote='';render();draftJump(0);}
     else if(['canonical-ready','canonical-hq'].includes(ui.page)&&act==='canonical-roster-open')canonicalRosterOpen();
     else if(ui.page==='canonical-roster'&&act==='canonical-roster-refresh')void canonicalRosterRequest(null);
     else if(ui.page==='canonical-roster'&&act==='canonical-roster-back'){if(!canonicalSnapshot)void canonicalReturn();else{const dest=canonicalRoster?.returnPage||'canonical-ready';canonicalRoster=null;ui.page=dest;render();window.scrollTo(0,0);}}
