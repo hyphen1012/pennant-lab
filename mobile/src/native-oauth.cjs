@@ -48,6 +48,7 @@ function createNativeOAuth({config,openExternal,closeExternal=async()=>{},fetche
   try{
    if(q.has('error')||q.getAll('code').length!==1||!q.get('code')||q.get('code').length>4096||q.getAll('iss').length>1||(q.has('iss')&&q.get('iss')!==issuer&&q.get('iss')!==config.issuer))throw Error('authorization failed');
    await closeExternal().catch(()=>{});
+   if(a.gen!==generation)throw Error('sign-in cancelled');
    const t=await exchange({grant_type:'authorization_code',code:q.get('code'),redirect_uri:redirectUri,code_verifier:a.verifier},a.gen);a.resolve(t);
   }catch(e){if(a.gen===generation)session=null;a.reject(e);}
   return true;
