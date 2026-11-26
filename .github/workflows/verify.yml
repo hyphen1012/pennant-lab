@@ -110,3 +110,12 @@ jobs:
 
       - run: node scripts/save-client-check.cjs
         if: always()
+
+      - run: node scripts/commerce-lifecycle-check.cjs
+        if: always()
+
+      - run: node scripts/admob-ssv-check.cjs
+        if: always()
+
+      - run: node scripts/release-blocker-check.cjs
+        if: always()
