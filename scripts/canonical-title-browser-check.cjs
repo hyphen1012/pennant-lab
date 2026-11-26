@@ -60,6 +60,11 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   lostAdvance=true;await page.locator('[data-action="order190-undo"]').click();await page.getByText('編成の確定状態を取得してください。自動再送は行いません。').waitFor();a.equal(await page.locator('.order190').count(),0);a.equal(advances,2);
   await page.locator('[data-action="canonical-roster-refresh"]').click();await page.getByText('最新の編成を取得しました。').waitFor();roster=await post('read',{slot:1});a.equal(roster.revision,3);a.deepEqual(roster.game.club.lineup,one.game.club.lineup);a.equal(advances,2);
   await page.locator('[data-action="canonical-roster-back"]').click();await page.getByText('サーバー保存の確認画面（開発試験）').waitFor();
+  await page.locator('[data-action="canonical-hq-open"]').click();await page.locator('.hero-stadium').waitFor();a.equal(await page.locator('.hero-team h2').textContent(),'試験球団');
+  const beforeDay=await post('read',{slot:1});a.equal(beforeDay.game.headquarters.canStep,true);
+  lostAdvance=true;await page.locator('[data-action="canonical-hq-step"]').click();await page.getByText('確定した日程を取得してください。自動再送は行いません。').waitFor();a.equal(await page.locator('.hero-stadium').count(),0);a.equal(advances,3);
+  await page.locator('[data-action="canonical-hq-refresh"]').click();await page.locator('.hero-stadium').waitFor();
+  const afterDay=await post('read',{slot:1});a.equal(afterDay.revision,beforeDay.revision+1);a.equal(afterDay.game.calendarIndex,beforeDay.game.calendarIndex+1);a.equal(advances,3);
   await page.locator('[data-action="canonical-return"]').first().click();await slot(1).waitFor();
   a.equal(await slot(1).getAttribute('data-action'),'continue-slot');
   await slot(2).click();await page.getByText('サーバー保存の確認画面（開発試験）').waitFor();

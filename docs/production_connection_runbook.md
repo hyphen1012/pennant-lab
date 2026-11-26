@@ -200,3 +200,7 @@ Trusted world stores one bounded previous batting order/fielding assignment and 
 
 ## Canonical roster screen pilot
 Extract the original v190 field/order markup into a shared renderer. Staging pilot supplies bounded visible roster fields and server candidate reasons; no local world assignment, save, or simulation. All changes use the authenticated session commands and show only returned canonical state. A lost response removes the editor until explicit observation of the same world; no automatic replay. Startup/slot and roster UI are connected for staging; full HQ and gameplay remain deliberately held. Browser fixture now exercises original field screen, actual HTTP order and lost undo response, and local-save isolation. Portrait projection contains only visible roster appearance fields. Physical device and full UI remain open; no production activation.
+
+
+## Canonical world CAS and headquarters first slice (staging)
+Advance requires the exact world UUID and revision before decoding state. The two remaining direct regression callers were updated. Headquarters pilot reuses the original hero, displays bounded date/rank/payroll/fans/opponent and last score, and sends one calendar-day command. All unsupported event boundaries remain blocked, never acknowledged silently. Lost replies clear the screen until a same-world read; no replay. Full duty navigation, event screens, speed and skip remain open. Public PR81 is independent; no production authority activation.
