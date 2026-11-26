@@ -48,6 +48,9 @@ const {createAccountClient}=require('../mobile/src/account-client.cjs'),{createC
   a.deepEqual((await one.listSlots()).slots,[]);
   const b=await one.create({team:1,identity:{gmName:'B',name:'新球団',short:'NEW',letter:'N',color:'#123456',accent:'#ffffff',shape:'circle',pattern:'solid',font:'bold',motif:'letter'}},true);a.equal(b.status,'ready');a.notEqual(b.snapshot.world,first.snapshot.world);a.equal(b.snapshot.game.team.name,'新球団');a.equal(b.snapshot.game.gmName,'B');const bPreview=(await one.listSlots()).slots[0].preview;a.equal(bPreview.team.name,'新球団');a.equal(bPreview.gmName,'B');
   a.equal((await two.refresh()).snapshot.game.club.travel,2);
+  const beforeRoster=one.inspect().snapshot,ids=beforeRoster.game.club.lineup;
+  const moved=await one.advance({club:'lineup-move',slot:0,target:3});a.equal(moved.status,'ready');a.equal(moved.snapshot.revision,beforeRoster.revision+1);a.deepEqual(moved.snapshot.game.club.lineup.slice(0,4),[ids[1],ids[2],ids[3],ids[0]]);
+  const beforeLost=advances;lost=true;const lostRoster=await one.advance({club:'lineup-move',slot:3,target:0});a.equal(lostRoster.status,'refresh-required');a.equal(lostRoster.uncertain,true);a.throws(()=>one.advance({club:'lineup-move',slot:3,target:0}));const rosterRecovery=await one.refresh();a.equal(rosterRecovery.snapshot.revision,moved.snapshot.revision+1);a.deepEqual(rosterRecovery.snapshot.game.club.lineup,ids);a.equal(advances,beforeLost+1);
   one.suspend();a.equal(one.inspect().snapshot,null);a.throws(()=>one.advance({step:1}));a.equal((await one.refresh()).snapshot.world,b.snapshot.world);
   console.log('PASS real engine HTTP session, explicit create, revision conflict, committed response loss, no replay, offline and identity isolation');
  }finally{await runtime.close();fs.rmSync(dir,{recursive:true,force:true});}
