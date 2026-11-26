@@ -40,7 +40,7 @@ const pilotCode = `
     }catch{return false;}
   }
   function canonicalReset(){
-    canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalForeignOpen=false;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';canonicalReplay=null;canonicalReplaySkip=false;canonicalArchive=null;canonicalManagerEntry=true;canonicalTrade=null;canonicalTradeQuote=null;canonicalAchievementPage=null;canonicalAchievementNote='';canonicalRewardNote='';
+    canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalForeignOpen=false;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';canonicalReplay=null;canonicalReplaySkip=false;canonicalArchive=null;canonicalManagerEntry=true;canonicalTrade=null;canonicalTradeQuote=null;canonicalTradeClub=null;canonicalAchievementPage=null;canonicalAchievementNote='';canonicalRewardNote='';
     canonicalPilot.suspend();ui.clubDraft=null;ui.portalSlot=null;ui.portalOrigin=null;slotOpening=false;
     ui.page='title';ui.launchTitle=false;
   }
@@ -147,10 +147,10 @@ const pilotCode = `
   }
   let canonicalFreePage=null,canonicalFreeQuery='',canonicalRotationSlot=null,canonicalOpsNote='';
   let canonicalManagerEntry=true;
-  let canonicalTrade=null,canonicalTradeQuote=null;
+  let canonicalTrade=null,canonicalTradeQuote=null,canonicalTradeClub=null;
   async function canonicalTradeRead(command){
     if(slotOpening||!accountCurrent()||!canonicalSnapshot?.game?.club?.tradeAvailable||canonicalSnapshot.pending?.length)return;
-    const epoch=canonicalEpoch;slotOpening=true;canonicalTradeQuote=null;if(command.mode==='list')canonicalTrade=null;render();
+    const epoch=canonicalEpoch;slotOpening=true;canonicalTradeQuote=null;if(command.mode==='list'){canonicalTrade=null;canonicalTradeClub=command.clubId;}render();
     try{const r=await canonicalPilot.tradePage(command);if(epoch!==canonicalEpoch)return;if(r.status!=='ready')throw Error('trade observation required');if(command.mode==='list')canonicalTrade=r.page;else canonicalTradeQuote=r.page;}
     catch{if(epoch===canonicalEpoch){canonicalSnapshot=null;canonicalTrade=null;canonicalTradeQuote=null;}}
     finally{if(epoch===canonicalEpoch){slotOpening=false;render();}}
@@ -158,9 +158,9 @@ const pilotCode = `
   function canonicalTradeMarkup(g,blocked){
     const c=g.club,p=canonicalTrade,q=canonicalTradeQuote,dis=blocked?'disabled':'';
     if(!c.tradeAvailable)return '<section class="panel"><h2>シーズン中トレード</h2><p>開幕後から7月31日まで。重要イベント・報酬の確定後に利用してください。</p></section>';
-    const clubs=c.standings.filter(x=>x.id!==g.team.id),options=clubs.map(x=>'<option value="'+x.id+'" '+(p?.clubId===x.id?'selected':'')+'>'+h(x.name)+'</option>').join('');
+    const clubs=c.standings.filter(x=>x.id!==g.team.id),options=clubs.map(x=>'<option value="'+x.id+'" '+((canonicalTradeClub??p?.clubId)===x.id?'selected':'')+'>'+h(x.name)+'</option>').join('');
     const select=(side,rows,ids)=>Array.from({length:3},(_,i)=>'<label class="small">'+(i+1)+'人目<select class="canonical-trade-pick" data-side="'+side+'" '+dis+'><option value="">選手なし</option>'+rows.map(x=>'<option value="'+x.id+'" '+(ids?.[i]===x.id?'selected':'')+'>'+h(x.name)+' '+h(namePos(x.pos))+' '+x.overall+' · '+fmtSalary(x.salary)+'</option>').join('')+'</select></label>').join('');
-    return '<section class="panel"><div class="eyebrow">TRADE MARKET · 7/31 DEADLINE</div><h2>シーズン中トレード</h2><p>各球団最大3名・金銭の組み合わせ。特殊選手、負傷者、保護契約等は対象外。</p><label>交渉球団<select id="canonical-trade-club" '+dis+'>'+options+'</select></label><button class="btn outline full" data-action="canonical-trade-load" '+dis+'>候補を取得する</button>'+(p?'<h3>自球団から提示</h3>'+select('out',p.out,q?.outIds)+'<h3>相手球団から獲得</h3>'+select('in',p.in,q?.inIds)+'<label>移籍金（億円、正：支払い／負：受取）<input id="canonical-trade-fee" type="number" min="-30" max="30" step="0.01" value="'+(q?.fee??0)+'" '+dis+'></label><button class="btn outline full" data-action="canonical-trade-review" '+dis+'>条件を確認する</button>':'')+(q?'<div class="panel"><h3>'+(q.ok?'合意可能な条件':'交渉不成立')+'</h3><p>'+h(q.ok?'移籍金 '+fmtMoney(q.fee)+' · 年俸増減 '+fmtMoney(q.delta):q.reason)+'</p>'+(q.ok?'<button class="btn primary full" data-action="canonical-trade-commit" '+dis+'>この条件で契約する</button>':'')+'</div>':'')+'</section>';
+    return '<section class="panel"><div class="eyebrow">TRADE MARKET · 7/31 DEADLINE</div><h2>シーズン中トレード</h2><p>各球団最大3名・金銭の組み合わせ。特殊選手、負傷者、保護契約等は対象外。</p><label>交渉球団<select id="canonical-trade-club" '+dis+'>'+options+'</select></label><button class="btn outline full" data-action="canonical-trade-load" '+dis+'>候補を取得する</button>'+(p?'<h3>自球団から提示</h3>'+select('out',p.out,q?.outIds)+'<h3>相手球団から獲得</h3>'+select('in',p.in,q?.inIds)+'<label>移籍金（億円、正：支払い／負：受取）<input id="canonical-trade-fee" type="number" min="-30" max="30" step="0.01" value="'+(q?.fee??0)+'" '+dis+'></label><button class="btn outline full" data-action="canonical-trade-review" '+dis+'>条件を確認する</button>':'')+(q?'<div class="panel canonical-trade-result" role="status"><h3>'+(q.ok?'合意可能な条件':'交渉不成立')+'</h3><p>'+h(q.ok?'移籍金 '+fmtMoney(q.fee)+' · 年俸増減 '+fmtMoney(q.delta):q.reason)+'</p>'+(q.ok?'<button class="btn primary full" data-action="canonical-trade-commit" '+dis+'>この条件で契約する</button>':'')+'</div>':'')+'</section>';
   }
   function canonicalTradeForm(){
     const p=canonicalTrade,fee=$('#canonical-trade-fee'),club=Number($('#canonical-trade-club')?.value);
@@ -169,6 +169,24 @@ const pilotCode = `
     const out=ids('out'),inc=ids('in'),amount=Number(fee.value);if(!out.length&&!inc.length||new Set([...out,...inc]).size!==out.length+inc.length||!out.every(id=>p.out.some(x=>x.id===id))||!inc.every(id=>p.in.some(x=>x.id===id))||!Number.isFinite(amount)||Math.abs(amount)>30||Math.round(amount*100)/100!==amount)return null;
     return {clubId:club,out,in:inc,fee:amount};
   }
+  function canonicalTradeEdited(e){
+    if(ui.page!=='canonical-trade'||slotOpening||!accountCurrent())return;
+    const target=e.target;
+    if(target?.id==='canonical-trade-club'){
+      const club=Number(target.value);
+      if(!canonicalSnapshot?.game?.club?.standings.some(x=>x.id===club&&x.id!==canonicalSnapshot.game.team.id))return;
+      if(canonicalTradeClub===club)return;
+      canonicalTradeClub=club;canonicalTrade=null;canonicalTradeQuote=null;render();return;
+    }
+    if(target?.id==='canonical-trade-fee'||target?.classList?.contains('canonical-trade-pick')){
+      if(!canonicalTradeQuote)return;
+      canonicalTradeQuote=null;
+      const result=$('.canonical-trade-result');
+      if(result)result.textContent='条件を変更しました。もう一度条件を確認してください。';
+    }
+  }
+  document.addEventListener('input',canonicalTradeEdited,true);
+  document.addEventListener('change',canonicalTradeEdited,true);
   const canonicalOpsPages=['canonical-rotation','canonical-farm','canonical-free','canonical-facilities','canonical-manager','canonical-trade'];
   function canonicalOpsRender(){
     const app=$('#app'),g=canonicalSnapshot?.game,c=g?.club;if(!app)return;
@@ -961,7 +979,7 @@ const pilotCode = `
     else if(ui.page==='canonical-achievements')canonicalAchievementClick(b);
     else if(ui.page==='canonical-rewards')canonicalRewardClick(b);
     else if(ui.page==='canonical-events')canonicalEventClick(b);
-    else if(ui.page==='canonical-hq'&&act==='canonical-ops-open'&&['rotation','farm','free','facilities','manager','trade'].includes(b.dataset.kind)&&canonicalSnapshot?.game?.club&&accountCurrent()){canonicalOpsNote='';canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalTrade=null;canonicalTradeQuote=null;canonicalManagerEntry=true;ui.page='canonical-'+b.dataset.kind;render();draftJump(0);if(b.dataset.kind==='free')void canonicalLoadFree(0,'');}
+    else if(ui.page==='canonical-hq'&&act==='canonical-ops-open'&&['rotation','farm','free','facilities','manager','trade'].includes(b.dataset.kind)&&canonicalSnapshot?.game?.club&&accountCurrent()){canonicalOpsNote='';canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalTrade=null;canonicalTradeQuote=null;canonicalTradeClub=null;canonicalManagerEntry=true;ui.page='canonical-'+b.dataset.kind;render();draftJump(0);if(b.dataset.kind==='free')void canonicalLoadFree(0,'');}
     else if(canonicalOpsPages.includes(ui.page))canonicalOpsClick(b);
     else if(ui.page==='canonical-hq'&&act==='canonical-players'&&canonicalSnapshot?.game?.club&&accountCurrent()){ui.page='canonical-players';render();draftJump(0);}
     else if(ui.page==='canonical-hq'&&act==='canonical-standings'&&canonicalSnapshot?.game?.headquarters&&accountCurrent()){canonicalLeague=canonicalSnapshot.game.team.league;ui.page='canonical-standings';render();draftJump(0);}
