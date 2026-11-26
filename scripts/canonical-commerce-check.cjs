@@ -258,6 +258,7 @@ globalThis.__plAnnualEntryCheck=saved=>{
  const trainee2=engine.view(w).annual.preseason.players.find(p=>!p.injured);a.ok(trainee2);
  w=engine.advance(w,{annual:'training',decision:'menu',playerId:trainee2.id,focus:'balanced',intensity:'rest'});
  pre('run');a.equal(engine.view(w).annual.preseason.support,true);
+ pre('self-back');a.equal(engine.view(w).annual.preseason.support,false);a.throws(()=>engine.advance(w,{annual:'preseason',decision:'self-back'}));pre('run');
  if(engine.view(w).annual.preseason.supportOptions.find(o=>o.key==='drinks').eligible){pre('support',{value:'drinks'});a.throws(()=>engine.advance(w,{annual:'preseason',decision:'support',value:'drinks'}));}
  pre('run');until('self');a.ok(engine.view(w).annual.preseason.report);pre('finish');
  if(w.calendarFlow.jobs['winter-return'].status!=='done'){until('winter-return');a.ok(engine.view(w).annual.preseason.report);pre('finish');}
@@ -266,7 +267,7 @@ globalThis.__plAnnualEntryCheck=saved=>{
  a.equal(engine.view(w).annual.preseason.step,2);pre('visit',{value:'rest'});a.throws(()=>engine.advance(w,{annual:'preseason',decision:'visit',value:'rest'}));pre('visit-finish');until('camp');
  a.equal(engine.view(w).annual.preseason.step,3);pre('run');until('camp');a.ok(engine.view(w).annual.preseason.report);pre('finish');
  until('exhibition');pre('policy',{value:'youth'});pre('run');a.equal(engine.view(w).annual.preseason.meeting,true);pre('run');until('exhibition');
- const exhibition=engine.view(w).annual.preseason.report;a.equal(exhibition.leagueGames,36);a.equal(exhibition.games.length,6);a.equal(w.games.length,0);a.ok(w.teams.every(t=>t.wins===0&&t.losses===0&&t.ties===0));pre('finish');
+ const exhibition=engine.view(w).annual.preseason.report;a.equal(exhibition.leagueGames,36);a.equal(exhibition.games.length,6);a.equal(w.games.length,0);a.ok(w.teams.every(t=>t.wins===0&&t.losses===0&&t.ties===0));a.equal(exhibition.clubs.length,12);a.ok(exhibition.rows.every(r=>r.teamId===w.selectedId));a.throws(()=>engine.advance(w,{annual:'preseason',decision:'finish'}));pre('digest');a.equal(engine.view(w).annual.preseason.digestSeen,true);a.throws(()=>engine.advance(w,{annual:'preseason',decision:'digest'}));pre('finish');
  until('opening-promo');const promote=(decision,extra={})=>{w=engine.advance(w,{annual:'commerce',decision,...extra});};
  promote('start');promote('plan',{value:0});promote('confirm');promote('park');until('opening-promo');promote('opening');promote('finish');
  until('offdesk-opening');a.equal(w.calendarFlow,null);a.equal(w.pendingCeremonyIntro,'opening');a.throws(()=>engine.advance(w,{step:1}));ack({acknowledge:'opening'});
