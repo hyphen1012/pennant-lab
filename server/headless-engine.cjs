@@ -66,13 +66,13 @@ function createHeadlessEngine(){
   if(game.financeCrisis)return [];
   const rows=[],add=(route,id,label)=>rows.push({route,year:game.year,eventKey:String(id),label:String(label).slice(0,160)});
   const d=game.draft,m=game.foreignMarket,move=movementData();
-  if(game.ceremonyStage==='draft'&&d?.year===game.year){
-   for(const row of d.picks||[]){const c=draftCandidate(d,row.candidateId);if(c&&draftRecoveryAllowed(d,team,row,c))add('draft-revival',c.id,c.player.name+' ドラフト交渉復活');}
+  if(game.ceremonyStage==='draft'&&d?.year===game.year&&!d.rareIntro&&!d.announcement){
+   for(const row of d.picks||[]){const c=draftCandidate(d,row.candidateId);if(c&&draftRecoveryAllowed(d,team,row,c)&&(!draftPending(d)||draftPending(d)===row))add('draft-revival',c.id,(secretProspect(c.player)?'????':c.player.name)+' ドラフト交渉復活');}
    if(lotteryRewardAllowed(d,team.id))add('lottery',draftLotteryGroup(d).cid,'ドラフト抽選');
   }
   if(m?.year===game.year){
    const conv=m.negotiations?.[team.id],c=m.candidates.find(x=>x.id===conv?.candidateId);
-   if(c&&foreignRecoveryAllowed(m,team,c,conv))add('foreign-revival',c.id,c.player.name+' 外国人交渉復活');
+   if(c&&foreignRecoveryAllowed(m,team,c,conv))add('foreign-revival',c.id,(secretProspect(c.player)?'????':c.player.name)+' 外国人交渉復活');
   }
   if(move&&!move.closed&&game.ceremonyStage==='movement-declarations'){
    for(const r of move.requests){const p=getPlayer(r.id);if(p?.teamId===team.id&&r.from===team.id&&r.year===game.year&&['fa','posting','overseas-fa'].includes(r.kind)&&r.status==='refused'&&Number.isFinite(r.offer)&&r.offer>0&&team.cash>=r.offer)add('fa-retention',r.id,p.name+' '+movementRequestLabel(r.kind)+' 残留');}
