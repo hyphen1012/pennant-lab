@@ -271,3 +271,6 @@ Project a bounded actual last own-club match (innings, score, teams/emblems, eve
 
 ## Memorial achievement wallet UI (staging)
 Bounded 1–40 item achievement-page endpoint with world/revision check. Reuses existing verified event IDs and own-club eligibility; no new rewards for sharing or client-asserted events. Explicit claim choice, server wallet refresh, duplicate/cooldown/capacity messages, unknown outcome refresh without replay. Current implementation still scans the existing achievement index before slicing; persistent indexed history and SNS art/share remain open. HTTP projection and confirmation regression added; per-claim browser and provider tests remain open. No production activation.
+
+## Committed date and inning playback (staging)
+PR113: use original watchReplaySteps with bounded projection and exact final scores; no synthetic scoring moments. Normal/fast day progression presents actual committed date, inning replay and original newspaper layout, skip retains current direct progression. Replay/skip/pause is presentation-only after revision confirmation. On session change discard transient state, reward/achievement notes and caches. Engine score consistency and browser replay skip regression. Original portrait effects/audio and full parity remain open. No production activation.
