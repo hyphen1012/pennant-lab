@@ -98,3 +98,6 @@ jobs:
 
       - run: node scripts/commerce-client-recovery-check.cjs
         if: always()
+
+      - run: node scripts/save-http-check.cjs
+        if: always()
