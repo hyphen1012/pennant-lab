@@ -9,6 +9,7 @@ const native=Capacitor.isNativePlatform();
 if(native){
   let backup=null,overlay=null,content=null,consentInfo=null;
   function update(online){
+    if(!online)window.dispatchEvent(new Event('pl-native-suspend'));
     const root=document.querySelector('#app');if(root)root.inert=!online;
     if(!overlay){
       overlay=document.createElement('section');

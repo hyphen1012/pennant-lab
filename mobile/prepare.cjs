@@ -13,7 +13,7 @@ fs.rmSync(out,{recursive:true,force:true});fs.mkdirSync(out,{recursive:true});fs
 let html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 function replace(a,b){if(html.split(a).length!==2)throw Error('native integration anchor missing: '+a);html=html.replace(a,b);}
 replace('  const rewardAdProvider=null;', '  const rewardAdProvider=window.PennantNative?.reward||null;');
-replace('      const entry=processCalendarDay();','      if(!window.PennantNative||!await window.PennantNative.check())break;\n      const entry=processCalendarDay();');
+replace('      const entry=processCalendarDay();','      if(!window.PennantNative||!await window.PennantNative.check()||ui.pauseRequested||document.hidden||storageFailure||!window.PennantNative.ready())break;\n      const entry=processCalendarDay();');
 replace('    if(!offDayCanStart(f))return false;\n    const token=', '    if(!offDayCanStart(f)||!window.PennantNative?.ready())return false;\n    const token=');
 replace('const valid=game===token.owner&&flowGet()===token.flow&&token.flow.date===token.from&&!document.hidden;', 'const valid=game===token.owner&&flowGet()===token.flow&&token.flow.date===token.from&&!document.hidden&&window.PennantNative?.ready();');
 replace('      f.date=calendarOffsetDate(f.date,1);flowTick(f);\n      if(flowGet()!==f', '      if(!window.PennantNative?.ready())break;\n      f.date=calendarOffsetDate(f.date,1);flowTick(f);\n      if(flowGet()!==f');

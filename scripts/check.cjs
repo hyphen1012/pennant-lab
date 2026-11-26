@@ -1324,3 +1324,85 @@ assert.match(html,/REPORT_DIGEST_CUTS=\[\['pitch'/);assert.match(html,/report-di
 // v165 R58/R59: policy must reach the click dispatcher.
 assert.match(html,/'annual-pick','annual-auto','annual-clear','annual-run','annual-exhibition-choice'\]\.includes\(action\)\)return;/);
 assert.match(html,/camp-compact-picker/);assert.match(html,/data-camp-selected/);
+
+// v183: rank pagination must equal full-list competition ranks, including ties across pages.
+{
+ const s=inline[1],a=s.indexOf('  function recordPageRows('),b=s.indexOf('  function recordBookScreen(',a);
+ assert(a>=0&&b>a);
+ const api=vm.runInNewContext('(function(){'+s.slice(a,b)+';return {recordPageRows,recordFilterYears};})()');
+ for(const direction of [1,-1]){
+  const rows=Array.from({length:50000},(_,i)=>({value:direction*Math.floor(i/43),id:i}));
+  let rank=0;const expected=rows.map((r,i)=>{if(i===0||r.value!==rows[i-1].value)rank=i+1;return {...r,rank};});
+  for(const page of [0,1,2,10,999,1666,1667]){
+   const actual=api.recordPageRows(rows,page,30);
+   assert.deepEqual(Array.from(actual,r=>({...r})),expected.slice(page*30,(page+1)*30));
+   assert(actual.length<=30);
+  }
+  assert(rows.every(r=>!('rank'in r)));
+ }
+ const same=Array.from({length:91},(_,id)=>({value:7,id}));
+ assert(api.recordPageRows(same,3,30).every(r=>r.rank===1));
+ assert.equal(api.recordPageRows([],0,30).length,0);
+ const players=[{seasonHistory:[{year:2028},{year:2026}]},{seasonHistory:[{year:2028},{year:2030}]},{}];
+ assert.deepEqual(Array.from(api.recordFilterYears(2031,[{year:2027},{year:2028}],players)),[2031,2030,2028,2027,2026]);
+ console.log('PASS: 50k historical rows; bounded page allocation, ties in both sort directions, year union and no mutation');
+}
+
+// v184: cancellation remains latched even if the app becomes visible before the timer fires.
+{
+ const s=inline[1],a=s.indexOf('  function pauseForLifecycle(){'),b=s.indexOf("  window.addEventListener?.('pagehide'",a);
+ assert(a>=0&&b>a);let skips=0;const ui={busy:true,pauseRequested:false,autoWait:{skip:()=>skips++}};
+ const pause=vm.runInNewContext(s.slice(a,b)+';pauseForLifecycle',{ui});
+ assert.equal(pause(),true);assert.equal(ui.pauseRequested,true);assert.equal(skips,1);
+ ui.busy=false;ui.pauseRequested=false;assert.equal(pause(),false);assert.equal(ui.pauseRequested,false);
+ assert.match(html,/if\(valid&&!cancelled&&!storageFailure&&/);
+ const native=fs.readFileSync('mobile/prepare.cjs','utf8');assert(native.includes('ui.pauseRequested||document.hidden||storageFailure||!window.PennantNative.ready()'));
+ assert(fs.readFileSync('mobile/src/index.js','utf8').includes("new Event('pl-native-suspend')"));
+ console.log('PASS: lifecycle pause latch and native connection integration');
+}
+
+// v184: 500/1000-year synthetic archive endurance, not full match simulation.
+{
+ const s=inline[1],segment=(a,b)=>{const x=s.indexOf(a),y=s.indexOf(b,x+a.length);assert(x>=0&&y>x,a);return s.slice(x,y);};
+ const calendar=vm.runInNewContext('(function(){const SEASON_GAMES=143,INTERLEAGUE_GAMES=18;'+segment('  function calendarForSeason(','  function calendarNextDay(')+'return calendarForSeason;})()');
+ const records=vm.runInNewContext('(function(){'+segment('  function careerRows(','  function recordBookScreen(')+'return {recordRankRows,recordPageRows,recordFilterYears};})()',{newStats:p=>p?{g:0,outs:0,er:0,w:0,k:0,sv:0}:{g:0,pa:0,ab:0,h:0,bb:0,hr:0,doubles:0,triples:0},isPitch:p=>p.pos==='SP',getTeam:id=>({league:id<6?'E':'W'})});
+ const z=require('node:zlib'),crypto=require('node:crypto');
+ const snapshot={year:2027,players:[],seasonArchive:[],milestoneNews:[]};
+ for(let n=1;n<=1000;n++){
+  const year=2026+n,cal=calendar(year),days=cal.days.filter(d=>d.type==='game');
+  assert.equal(days.length,143);assert.equal(new Set(cal.days.map(d=>d.date)).size,cal.days.length);
+  assert(days.every((d,i)=>d.gameNo===i+1));assert(cal.days.every((d,i)=>i===0||d.date>cal.days[i-1].date));
+  snapshot.year=year+1;snapshot.seasonArchive.push({year,calendarStart:cal.startDate,calendarEnd:cal.endDate,awards:[]});
+  for(let j=0;j<50;j++){
+   const id=(n-1)*50+j,teamId=j%12,p={id,pos:j%2?'SP':'OF',teamId:-1,name:'歴代選手'+id,seasonHistory:[{year,teamId,stats:{g:143,pa:500,ab:450,h:100+j,hr:j,w:10+j%5,outs:450,er:35}}]};
+   if(j===0&&n>1)p.reincarnation={parentId:id-50,rootId:0,generation:n-1};
+   snapshot.players.push(p);
+  }
+  snapshot.milestoneNews.push({year,playerId:(n-1)*50,title:'記録 '+year});
+  if(n===500||n===1000){
+   const raw=Buffer.from(JSON.stringify(snapshot)),packed=z.gzipSync(raw),restoredRaw=z.gunzipSync(packed);
+   assert(raw.equals(restoredRaw));const restored=JSON.parse(restoredRaw);
+   assert.equal(restored.players.length,n*50);assert.equal(restored.seasonArchive.length,n);assert.equal(restored.milestoneNews.length,n);
+   assert.equal(new Set(restored.players.map(p=>p.id)).size,n*50);
+   for(const p of restored.players)if(p.reincarnation){const q=restored.players[p.reincarnation.parentId];assert.equal(q.id,p.reincarnation.parentId);assert.equal((q.reincarnation?.generation||0)+1,p.reincarnation.generation);assert.equal(p.reincarnation.rootId,0);}
+   const rows=records.recordRankRows(restored.players.filter(p=>p.pos==='OF'),restored.year,'career','h');
+   assert.equal(rows.length,n*25);assert.equal(records.recordPageRows(rows,0,30).length,30);
+   const last=Math.floor((rows.length-1)/30);assert.equal(records.recordPageRows(rows,last,30).length,rows.length-last*30);
+   assert.equal(records.recordFilterYears(restored.year,restored.seasonArchive,restored.players).length,n+1);
+   console.log('PASS synthetic archive endurance',JSON.stringify({years:n,players:restored.players.length,rawBytes:raw.length,gzipBytes:packed.length,sha256:crypto.createHash('sha256').update(raw).digest('hex')}));
+  }
+ }
+}
+
+// v185: a pending old successful write must not clear a newer serialization failure.
+(async()=>{
+ const s=inline[1],a=s.indexOf('  function save(){'),b=s.indexOf('  async function load(){',a);assert(a>=0&&b>a);
+ const writes=[],controls=[];
+ const api=vm.runInNewContext('(function(){let game={day:1},activeSlot=1,saveRevision=0,failedSaveRevision=0,storageFailure=false,saveDraining=false,slotOpening=false,saveQueue=Promise.resolve();const pendingSaves=new Map(),ui={page:"game"},scenarioLab=null;const slotPreview=g=>({day:g.day}),writeSlotPreview=()=>{},showToast=()=>{},render=()=>{};'+s.slice(a,b)+'return {save,game:g=>{game=g;},failed:()=>storageFailure,flush:()=>saveQueue};})()', {console:{warn(){}},writeDatabaseSlot:(slot,snapshot)=>new Promise((resolve,reject)=>{writes.push({slot,day:JSON.parse(snapshot).day});controls.push({resolve,reject});})});
+ assert(api.save());const bad={day:2};bad.self=bad;api.game(bad);assert.equal(api.save(),false);assert(api.failed());controls[0].resolve();await api.flush();assert(api.failed(),'old completion must not clear newer failure');
+ api.game({day:3});assert(api.save());controls[1].resolve();await api.flush();assert(!api.failed(),'new successful snapshot recovers');
+ api.game({day:4});assert(api.save());api.game({day:5});assert(api.save());api.game({day:6});assert(api.save());controls[2].resolve();await new Promise(resolve=>setImmediate(resolve));assert.equal(writes.at(-1).day,6);controls[3].resolve();await api.flush();assert.deepEqual(writes.map(x=>x.day),[1,3,4,6]);
+ api.game({day:7});assert(api.save());controls[4].reject(Error('quota'));await api.flush();assert(api.failed());api.game({day:8});assert(api.save());controls[5].resolve();await api.flush();assert(!api.failed());
+ assert.match(html,/skipChunk=0;if\(!save\(\)\)break;updateSkipProgress\(\);[\s\S]{0,240}await saveQueue;/);
+ console.log('PASS: save revision isolation, coalescing, quota failure/recovery, skip checkpoint barrier');
+})().catch(e=>{console.error(e);process.exitCode=1;});
