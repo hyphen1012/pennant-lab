@@ -5,7 +5,8 @@ const {chromium}=require('playwright'),esbuild=require('esbuild');
 const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHeadlessEngine}=require('../server/headless-engine.cjs');
 (async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pl-title-browser-')),owner='a'.repeat(64),deny=async()=>null;
- const runtime=createServiceRuntime({dataDir:dir,authenticate:async t=>t==='a'?{authenticated:true,account:owner}:{authenticated:false},verifyRecentReauth:deny,verifyReceipt:deny,verifyCurrent:deny,verifyNotification:deny,verifyEvent:deny,verifyAction:deny,verifyCompletion:deny,canonicalEngine:createHeadlessEngine(),units:{android:{unit:'123',item:'ticket',amount:1}},origins:[]});
+ let clockOffset=0;
+ const runtime=createServiceRuntime({now:()=>Date.now()+clockOffset,dataDir:dir,authenticate:async t=>t==='a'?{authenticated:true,account:owner}:{authenticated:false},verifyRecentReauth:deny,verifyReceipt:deny,verifyCurrent:deny,verifyNotification:deny,verifyEvent:deny,verifyAction:deny,verifyCompletion:deny,canonicalEngine:createHeadlessEngine(),units:{android:{unit:'123',item:'ticket',amount:1}},origins:[]});
  let browser;
  try{
   await new Promise(ok=>runtime.server.listen(0,'127.0.0.1',ok));
@@ -37,6 +38,7 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
    const body=await response.text();
    if(p.endsWith('/create')){creates++;if(lost){lost=false;a.equal(response.status,200);await r.abort();return;}}
    if(p.endsWith('/advance')){advances++;if(lostAdvance){lostAdvance=false;a.equal(response.status,200);await r.abort();return;}}
+   if(response.status===429)throw Error('Unexpected fixture rate limit: '+p);
    await r.fulfill({status:response.status,contentType:'application/json',body});
   });
   await page.goto('http://127.0.0.1:8765/mobile/www/');
@@ -84,6 +86,9 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   if(beforeWeekly.game.headquarters.canCalendar){await page.locator('[data-action="canonical-hq-run"][data-kind="weekly"]').click();await page.waitForFunction(()=>!document.querySelector('[data-action="canonical-hq-pause"]'),null,{timeout:30000});const afterWeekly=await post('read',{slot:1});a.ok(afterWeekly.game.calendarIndex>beforeWeekly.game.calendarIndex);a.ok(afterWeekly.game.calendarIndex<=beforeWeekly.game.headquarters.goals.weekly);a.ok(afterWeekly.game.calendarIndex===beforeWeekly.game.headquarters.goals.weekly||!afterWeekly.game.headquarters.canCalendar);a.equal(afterWeekly.revision-beforeWeekly.revision,afterWeekly.game.calendarIndex-beforeWeekly.game.calendarIndex);}
   await page.locator('[data-action="canonical-return"]').first().click();await slot(1).waitFor();
   a.equal(await slot(1).getAttribute('data-action'),'continue-slot');
+  // Separate the two long integration scenarios by a real limiter window in the fixture clock.
+  // Do not change production rate limits or bypass individual request accounting.
+  clockOffset+=61000;
   await slot(2).click();await page.getByText('サーバー保存の確認画面（開発試験）').waitFor();
   a.equal((await post('read',{slot:2})).world,seeded.world);
   await page.locator('[data-action="canonical-hq-open"]').click();await page.locator('.hero-stadium').waitFor();
@@ -102,6 +107,7 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   const afterFarm=await post('read',{slot:2});a.equal(afterFarm.revision,afterOps.revision+1);a.equal(afterFarm.game.club.farmMode,targetMode);
   await page.locator('[data-action="canonical-ops-back"]').click();
   await page.locator('[data-action="canonical-return"]').first().click();await slot(3).waitFor();
+  clockOffset+=61000;
   await slot(3).click();await finish.waitFor();lost=true;await finish.click();
   await page.locator('button[data-slot="3"][data-action="continue-slot"]').waitFor();
   a.equal(creates,2);a.equal((await post('read',{slot:3})).revision,1);
