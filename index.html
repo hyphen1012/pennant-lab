@@ -2324,6 +2324,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @keyframes rc-eternal{0%{opacity:.15;transform:scale(1.35) rotate(-18deg)}38%{opacity:.55;transform:scale(.87) rotate(8deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
 @media(prefers-reduced-motion:reduce){.rare-cinematic .rc-motion,.rare-film-overlay .rc-motion{animation:none!important}}
 .legacy-film-scene .rare-film-overlay{position:absolute;inset:0;width:100%;height:100%;opacity:.75;pointer-events:none}.rare-film-overlay[data-rc="eternal-cycle"] .rc-motion{animation:rc-eternal 5.4s ease-out both}
+/* Stage-specific depth; composite receives its own cinematic sequence, not the ordinary cycle. */
+.club-moment[data-cinema="eternal-cycle"] .cinema-overlay{animation:cinemaSingularity 6.2s cubic-bezier(.2,.7,.2,1) both}
+.club-moment[data-cinema="eternal-cycle"] .club-moment-person{animation:cinemaSingularityPerson 6.2s ease-out both}
+.club-moment[data-cinema="eternal-cycle"] [data-stage-plane="left"]{transform-origin:300px 122px;animation:cinemaPlaneLeft 6.2s ease-out both}
+.club-moment[data-cinema="eternal-cycle"] [data-stage-plane="right"]{transform-origin:300px 122px;animation:cinemaPlaneRight 6.2s ease-out both}
+.club-moment[data-cinema="eternal-cycle"] .cinema-note{color:#e8eaff;text-shadow:0 1px 6px #000}
+@keyframes cinemaSingularity{0%{opacity:.18;transform:scale(1.25)}28%{opacity:.7;transform:scale(1.08)}58%{opacity:.9;transform:scale(.97)}100%{opacity:1;transform:scale(1)}}
+@keyframes cinemaSingularityPerson{0%{opacity:.02;filter:grayscale(1) brightness(.2);transform:scale(.88)}42%{opacity:.25;filter:grayscale(.8) brightness(.6);transform:scale(.96)}100%{opacity:1;filter:drop-shadow(0 0 12px #c6bff1);transform:scale(1)}}
+@keyframes cinemaPlaneLeft{from{transform:translateX(-120px);opacity:.2}to{transform:translateX(0);opacity:1}}
+@keyframes cinemaPlaneRight{from{transform:translateX(120px);opacity:.2}to{transform:translateX(0);opacity:1}}
+@media(prefers-reduced-motion:reduce){.club-moment[data-cinema="eternal-cycle"] .cinema-overlay,.club-moment[data-cinema="eternal-cycle"] .club-moment-person,.club-moment[data-cinema="eternal-cycle"] [data-stage-plane]{animation:none!important;filter:none!important;opacity:1!important;transform:none!important}}
 /* Cinematic stage direction: different silhouettes, no flashing, respects reduced motion. */
 .club-moment-stage>.cinema-overlay{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;animation:cinemaReveal 1.5s cubic-bezier(.17,.68,.22,1) both}
 .club-moment-person,.club-moment-host,.club-moment-recipient{z-index:2}
@@ -13969,11 +13980,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     星煌転生:['星々の軌跡がひとつに','nova','#fff1b8'],
     伝説転生:['伝説が時代を越えて戻る','temple','#ffa9a1']
   };
-  function cinemaLayer(n,kind){
-    const c=CINEMA_THEMES[n],tone=c?.[2]||'#d0c3a6',mode=c?.[1]||'normal';
+  function cinemaLayer(n,kind,composite=false){
+    const c=CINEMA_THEMES[n],tone=c?.[2]||'#d0c3a6',mode=composite?'eternal-cycle':c?.[1]||'normal';
     const ring=(r,opacity=.55)=>'<circle cx="300" cy="122" r="'+r+'" fill="none" stroke="'+tone+'" opacity="'+opacity+'" stroke-width="1.4"/>';
     let geom='';
-    if(mode==='eclipse'){
+    if(mode==='eternal-cycle'){
+      // The stage itself changes after the previous identity is disclosed.
+      // Two spatial planes and an isolated singularity, not just recoloring.
+      geom='<rect width="600" height="250" fill="#02030b" opacity=".87"/><g data-stage-singularity="true">'+
+        Array.from({length:9},(_,i)=>'<ellipse cx="300" cy="122" rx="'+(97+i*23)+'" ry="'+(33+i*7)+'" transform="rotate('+(-74+i*18)+' 300 122)" fill="none" stroke="'+(i%2?'#e8eaff':tone)+'" stroke-width="'+(i%3===0?2.2:1.1)+'" opacity="'+(.22+i%4*.11)+'"/>').join('')+
+        '<circle cx="300" cy="122" r="102" fill="none" stroke="#e8eaff" stroke-width="3" opacity=".72"/><circle cx="300" cy="122" r="82" fill="#010207" stroke="#b7b1ed" stroke-width="2"/>'+
+        '<g data-stage-plane="left"><path d="M0 18H138L220 122 138 232H0M0 60H105L168 122 105 190H0" stroke="#b7b1ed" fill="none" opacity=".7" stroke-width="2"/></g>'+
+        '<g data-stage-plane="right"><path d="M600 18H462L380 122 462 232H600M600 60H495L432 122 495 190H600" stroke="#e8eaff" fill="none" opacity=".7" stroke-width="2"/></g>'+
+        Array.from({length:40},(_,i)=>'<circle cx="'+(8+i*113%584)+'" cy="'+(7+i*79%236)+'" r="'+(i%7===0?1.8:.65)+'" fill="#e5e2fa" opacity="'+(.12+i%4*.13)+'"/>').join('')+'</g>';
+    }else if(mode==='eclipse'){
       geom='<rect width="600" height="250" fill="#010207" opacity=".86"/>'+ring(116,.22)+ring(101,.95)+'<circle cx="300" cy="122" r="90" fill="#020207" stroke="#e8f7ff" stroke-width="1"/><path d="M0 122H600M300 0V250" stroke="#d8f2ff" opacity=".2"/>';
       geom+=Array.from({length:52},(_,i)=>'<circle cx="'+(17+i*79%566)+'" cy="'+(9+i*41%224)+'" r="'+(i%5===0?1.6:.6)+'" fill="#d9f2ff" opacity="'+(.10+i%4*.14)+'"/>').join('');
     }else if(mode==='cycle'){
@@ -14012,6 +14032,39 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     return true;
   }
   const RARE_CINEMA_EVENTS={scout:'発掘・調査',nomination:'指名発表',lottery:'競合抽選',win:'交渉権獲得',loss:'獲得結果',contract:'契約交渉',join:'入団発表',news:'特別速報',field:'試合中の活躍',hero:'ヒーローインタビュー',record:'特殊記録',award:'表彰',medical:'医療支援',tv:'テレビ出演',consult:'去就相談',farewell:'引退・功績',film:'功績記念映像',renewal:'契約更改'};
+  // Event-specific set design. All geometry is original and presentation-only.
+  // No player/lineage state is read here.
+  function rareCinemaStage(kind,tone,path){
+    const rails=path('M0 205H600M0 220H600',1,.3),ground='<path d="M0 240V205L300 144 600 205V240Z" fill="#315a4a"/><path d="M300 231L210 193 300 156 390 193Z" fill="#a5835c"/>';
+    const stands='<path d="M0 125Q300 55 600 125V205H0Z" fill="#20354c"/>'+Array.from({length:7},(_,i)=>path('M0 '+(128+i*9)+'Q300 '+(62+i*9)+' 600 '+(128+i*9),1,.23)).join('');
+    const room='<rect width="600" height="240" fill="#17273a"/>'+path('M40 18H560V182H40ZM300 18V182M40 100H560',2,.24);
+    const desk='<path d="M135 178H465L530 236H70Z" fill="#604f43"/>';
+    const stage='<path d="M0 240L130 158H470L600 240Z" fill="#22344b"/>'+path('M30 230H570M65 211H535M100 192H500',2,.36);
+    const beam='<path d="M40 0L200 188H285L80 0ZM560 0L400 188H315L520 0Z" fill="'+tone+'" opacity=".11"/>';
+    const board=(x,y,w,h)=>'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="4" fill="#101b2d" stroke="'+tone+'" stroke-opacity=".4"/>';
+    let art='';
+    switch(kind){
+      case 'scout':art=room+board(40,32,126,145)+board(434,32,126,145)+Array.from({length:7},(_,i)=>path('M52 '+(49+i*17)+'H154M446 '+(49+i*17)+'H548',1,.38)).join('')+path('M175 206L300 145 425 206',2,.4);break;
+      case 'nomination':art=stage+beam+board(24,26,132,126)+board(444,26,132,126)+path('M42 46H138M42 68H138M462 46H558M462 68H558',2,.55);break;
+      case 'lottery':art=stage+board(34,36,118,145)+board(448,36,118,145)+Array.from({length:4},(_,i)=>'<rect x="'+(53+i*21)+'" y="66" width="18" height="76" rx="2" fill="#d4c4a4" opacity=".68"/><rect x="'+(467+i*21)+'" y="66" width="18" height="76" rx="2" fill="#d4c4a4" opacity=".68"/>').join('');break;
+      case 'win':art=stage+beam+Array.from({length:8},(_,i)=>path('M'+(20+i*22)+' 35L'+(35+i*22)+' 62M'+(580-i*22)+' 35L'+(565-i*22)+' 62',3,.55)).join('');break;
+      case 'loss':art=stage+board(36,36,118,100)+board(446,36,118,100)+path('M42 104H142M458 104H558M0 208H600',2,.33);break;
+      case 'contract':art=room+desk+board(94,38,100,76)+board(406,38,100,76)+path('M158 194H246M354 194H442M178 205H232M368 205H422',2,.65);break;
+      case 'join':art=stage+beam+Array.from({length:5},(_,i)=>board(35+i*26,50,22,92)+board(439+i*26,50,22,92)).join('')+path('M300 150V220M278 202H322',3,.7);break;
+      case 'news':art=room+board(16,32,164,112)+board(420,32,164,112)+path('M28 114L56 88 87 100 120 64 166 96M432 72H568M432 90H568M432 108H568',2,.55)+desk;break;
+      case 'field':art=stands+ground+path('M38 17V120M562 17V120M16 17H60M540 17H584',4,.5);break;
+      case 'hero':art=stands+ground+board(28,44,126,72)+board(446,44,126,72)+path('M98 214V179L120 164M502 214V179L480 164',3,.6);break;
+      case 'record':art=stands+ground+board(32,22,144,100)+board(424,22,144,100)+Array.from({length:5},(_,i)=>path('M44 '+(42+i*16)+'H164M436 '+(42+i*16)+'H556',1,.42)).join('');break;
+      case 'award':art=stage+beam+path('M78 54H142V108Q110 144 78 108ZM110 132V157M89 157H131M458 54H522V108Q490 144 458 108ZM490 132V157M469 157H511',3,.65);break;
+      case 'medical':art=room+board(36,24,142,104)+path('M46 78H74L86 48 105 94 118 65 134 78H166',3,.8)+'<path d="M475 36h16v18h18v16h-18v18h-16V70h-18V54h18Z" fill="#91c8c9"/><path d="M52 194H175V218H52ZM58 169H126V193H58Z" fill="#a2b8bd"/>'+rails;break;
+      case 'tv':art=room+board(22,34,128,94)+board(450,34,128,94)+path('M54 145L86 112 118 145M482 145L514 112 546 145',4,.65)+desk;break;
+      case 'consult':art=room+desk+'<rect x="52" y="136" width="84" height="48" rx="7" fill="#3d4b63"/><rect x="464" y="136" width="84" height="48" rx="7" fill="#3d4b63"/>'+path('M90 24V104M510 24V104',4,.25);break;
+      case 'farewell':art=stands+ground+beam+Array.from({length:10},(_,i)=>'<circle cx="'+(30+i*17)+'" cy="'+(124+i%2*12)+'" r="3.3" fill="'+tone+'" opacity=".55"/><circle cx="'+(570-i*17)+'" cy="'+(124+i%2*12)+'" r="3.3" fill="'+tone+'" opacity=".55"/>').join('');break;
+      case 'film':art=stands+ground+Array.from({length:7},(_,i)=>'<rect x="'+(12+i*84)+'" y="8" width="70" height="17" fill="#b6bfcd" opacity=".28"/><rect x="'+(12+i*84)+'" y="215" width="70" height="17" fill="#b6bfcd" opacity=".28"/>').join('');break;
+      case 'renewal':art=room+desk+board(20,26,138,98)+board(442,26,138,98)+path('M36 45H144M36 63H144M36 81H144M456 45H564M456 63H564M456 81H564M158 195H246M354 195H442',2,.45);break;
+    }
+    return '<g data-rc-set="'+kind+'">'+art+'</g>';
+  }
   function rareCinemaArt(p,kind,disclosed=false){
     const theme=playerTitleTheme(p),mode=rareCinemaMode(p,disclosed);
     if(!theme||!mode||!Object.hasOwn(RARE_CINEMA_EVENTS,kind))return '';
@@ -14019,11 +14072,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     const path=(d,w=2,o=.8)=>'<path d="'+d+'" stroke="'+tone+'" stroke-width="'+w+'" opacity="'+o+'" fill="none"/>';
     const ellipse=(rx,ry,a,o=.7,w=2)=>'<ellipse cx="300" cy="120" rx="'+rx+'" ry="'+ry+'" transform="rotate('+a+' 300 120)" fill="none" stroke="'+tone+'" opacity="'+o+'" stroke-width="'+w+'"/>';
     const particles=Array.from({length:mode==='eternal-cycle'?120:mode==='eclipse'||mode==='cycle'?78:36},(_,i)=>'<circle cx="'+(12+i*137%576)+'" cy="'+(8+i*73%223)+'" r="'+(i%7===0?2.1:.75)+'" fill="'+(i%5===0?'#fff':tone)+'" opacity="'+(.16+i%5*.13)+'"/>').join('');
-    let stage='';
-    if(['field','hero','record','farewell','film'].includes(kind)){stage='<path d="M0 125Q300 55 600 125V205H0Z" fill="#20354c"/>'+Array.from({length:7},(_,i)=>path('M0 '+(128+i*9)+'Q300 '+(62+i*9)+' 600 '+(128+i*9),1,.23)).join('')+'<path d="M0 240V205L300 144 600 205V240Z" fill="#315a4a"/><path d="M300 231L210 193 300 156 390 193Z" fill="#a5835c"/>';}
-    else if(['contract','renewal','consult','medical'].includes(kind)){stage='<rect width="600" height="240" fill="#17273a"/>'+path('M40 18H560V182H40ZM300 18V182M40 100H560',2,.24)+'<path d="M135 178H465L530 236H70Z" fill="#604f43"/>'+(kind==='medical'?'<path d="M70 36h18v18h18v18H88v18H70V72H52V54H70Z" fill="#91c8c9"/>':'');}
-    else if(['nomination','lottery','join','award','tv','win','loss'].includes(kind)){stage='<path d="M0 240L130 158H470L600 240Z" fill="#22344b"/>'+path('M30 230H570M65 211H535M100 192H500',2,.36)+'<path d="M40 0L200 188H285L80 0ZM560 0L400 188H315L520 0Z" fill="'+tone+'" opacity=".11"/>';}
-    else stage=Array.from({length:8},(_,i)=>path('M'+i*85+' 0V240M0 '+i*34+'H600',1,.12)).join('');
+    const stage=rareCinemaStage(kind,tone,path);
     let motif='';
     switch(mode){
       case 'fracture':motif=path('M100 22L240 66 187 104 320 128 270 216M500 22L360 66 413 104 280 128 330 216',4)+path('M300 12L432 120 300 228 168 120Z',2);break;
@@ -14057,9 +14106,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const cinemaMomentBase=clubMoment;
   clubMoment=function(p,label,kind='award',category=null,team=null){
     const raw=cinemaMomentBase(p,label,kind,category,team);if(!raw)return raw;
-    const n=category||playerTitleTheme(p)?.name||'',spec=CINEMA_THEMES[n],mode=spec?.[1]||'normal',facts=n==='輪廻転生'&&p?.reincarnation?pastLifeFacts(p):null;
-    const note=spec?'<div class="cinema-note">'+h(spec[0])+(facts&&(facts.club||facts.year)?'<small>'+h([facts.club,facts.year?facts.year+'年':null,facts.metric].filter(Boolean).join(' · '))+'</small>':'')+'</div>':'';
-    return raw.replace('<div class="club-moment"','<div class="club-moment" data-cinema="'+mode+'" data-event-kind="'+h(kind)+'"').replace('</svg>','</svg>'+cinemaLayer(n,kind)+note)+(n&&playerTitleTheme(p)?.name===n?rareCinemaArt(p,kind==='medical'?'medical':kind==='contract'?'contract':kind==='farewell'?'farewell':kind==='hero'?'hero':kind==='record'?'record':kind==='consult'?'consult':'award',rareCinemaKnown(p)):'');
+    const n=category||playerTitleTheme(p)?.name||'',spec=CINEMA_THEMES[n],disclosed=rareCinemaKnown(p),composite=n==='輪廻転生'&&rareCinemaMode(p,disclosed)==='eternal-cycle',mode=composite?'eternal-cycle':spec?.[1]||'normal',facts=n==='輪廻転生'&&disclosed&&p?.reincarnation?pastLifeFacts(p):null;
+    const note=spec?'<div class="cinema-note">'+h(composite?'終わったはずの時間が、終わりのない存在へ収束する。':spec[0])+(facts&&(facts.club||facts.year)?'<small>'+h([facts.club,facts.year?facts.year+'年':null,facts.metric].filter(Boolean).join(' · '))+'</small>':'')+'</div>':'';
+    return raw.replace('<div class="club-moment"','<div class="club-moment" data-cinema="'+mode+'" data-event-kind="'+h(kind)+'"').replace('</svg>','</svg>'+cinemaLayer(n,kind,composite)+note)+(n&&playerTitleTheme(p)?.name===n?rareCinemaArt(p,kind==='medical'?'medical':kind==='contract'?'contract':kind==='farewell'?'farewell':kind==='hero'?'hero':kind==='record'?'record':kind==='consult'?'consult':'award',rareCinemaKnown(p)):'');
   };
   const foreignCinemaBase=foreignNegotiationView;
   foreignNegotiationView=function(m,t,c,conv){

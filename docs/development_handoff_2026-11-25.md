@@ -185,3 +185,12 @@ PR29の総合回帰45738672338成功、PR28開発ブランチへ統合4269ab59�
 - Accepted request quarantines the server account; explicit local purge removes only the authenticated account's 3 records/recovery copies and hints, leaving revision tombstones to prevent stale overwrite. No purge on ambiguous or rejected request. Offline executor requires stopped writers, exact request ID, verified provider revocation, reviewed purchase retention and verified backup reconciliation; retries are idempotent and incomplete steps remain processing. No actual provider revocation or retention/backup policy adapter has been deployed. External web request/status UI, provider-specific revocation and cross-device cleanup still required.
 - AdMob native SSV adapter passes opaque customData and checks authenticated server evidence, never SDK success. Bounded status polling only; interruption returns no proof. Real production callback, consent and native ad display must be tested after credentials. Production block remains; actual authoritative application of rewards to game actions and all event integration remain unimplemented. No advertising revenue or reward grant enabled by this change.
 - Previous PRs 37/39/40 and independent G PR38 remain draft; consult latest CI before integration. No main/Pages deployment.
+
+
+## 2026-11-26 継続開発（PR42〜45）
+- PR37 df6f076c、PR40 7d3e8193、PR41 21804edf の総合回帰・ブラウザ・100年耐久が合格。PR40/41ネイティブビルドも合格。PR42 9d5cacc1 の公式ライブラリ読込・専用fixture・総合回帰が合格。実ストア取引ではない。
+- PR42 Apple現時点照会・署名、Google現時点照会・認証済みpush、暗号化トークン。sandbox opt-in、linked token未対応、正式資格情報なし。
+- PR44 サーバー正本・原子的報酬台帳・実績ID・特別治療と監督慰留の実処理、他ルートfixture。正本エンジン全体は未統合、HTTP/ゲーム本体には未接続。
+- G不採用（50/55年合計最大:1937=153/155,4391=153/154,8821=153/155）。F基準H PR43 df419574、成熟球場の既存価格範囲内で平日・休日の営業収益を最適化。価格範囲・維持費・留保・難易度・収入計算は変更なし。3seed 55年試験継続、採用保留。
+- 特殊演出: 18イベントの固有セットを追加。前世開示済みIMMORTAL由来輪廻転生のclubMoment主舞台を専用二平面/特異点レイヤー・6.2秒モーションに分離。通常輪廻転生/IMMORTALとは別。未開示前世の事実・合成演出を抑制。ゲーム状態や出現率、能力値には変更なし。ブラウザ監査と実機視認性を確認する。既存正式素材に変更なし。
+- main・公開v0.9.189未変更。全PR draft、正式配信不可。工程8-8H/9は全統合・実環境検証待ち。
