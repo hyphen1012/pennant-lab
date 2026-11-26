@@ -13,6 +13,7 @@ function createAccountBootstrap({baseUrl,provider,fetcher=globalThis.fetch,onlin
   const ctl=new AbortController();request=ctl;const timer=setTimeout(()=>ctl.abort(),10000);
   try{
    const r=await fetcher(base+'/v1/identity',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:'{}',cache:'no-store',credentials:'omit',redirect:'error',signal:ctl.signal});
+   if(r.status===401||r.status===403)throw Object.assign(Error('identity rejected'),{code:'identity_rejected'});
    if(r.status!==200||!r.body?.getReader)throw Error('identity unavailable');
    const reader=r.body.getReader(),parts=[];let size=0;
    try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>4096)throw Error('identity response too large');parts.push(value);}}finally{void reader.cancel().catch(()=>{});reader.releaseLock();}
@@ -44,11 +45,12 @@ function createAccountBootstrap({baseUrl,provider,fetcher=globalThis.fetch,onlin
   if(!context||!session)return false;
   const gen=generation,owner=session.account;try{
    const token=await provider.getAccessToken();if(gen!==generation)return false;
+   if(!token)throw Object.assign(Error('identity expired'),{code:'identity_rejected'});
    const account=await identity(token);if(gen!==generation)return false;
-   if(account!==owner)throw Error('identity changed');
+   if(account!==owner)throw Object.assign(Error('identity changed'),{code:'identity_rejected'});
    if(token!==session.token){suspend();session={account,token};onSession({...session});}
    return true;
-  }catch{if(gen===generation)invalidate();return false;}
+  }catch(e){if(gen===generation&&e?.code==='identity_rejected')invalidate();return false;}
  }
  return {start,suspend,invalidate,revalidate,context:()=>context};
 }
