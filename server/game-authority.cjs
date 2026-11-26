@@ -50,7 +50,18 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
    return view({world:worldId,revision:1,state});
   });
  }
- async function read(token,slot){const account=await identity(token);return ledger.transact(account,(s,db)=>{const r=world(db,account,slot);return {...view(r),actions:options(db,r,s),wallet:publicWallet(s)};});}
+ async function read(token,slot){const account=await identity(token);return ledger.transact(account,(s,db)=>{const r=world(db,account,slot);return {...view(r),actions:options(db,r,s),pending:db.prepare('SELECT operation,attempt FROM authority_actions WHERE account=? AND world=? AND result IS NULL').all(account,r.world).filter(x=>s.orders[x.operation]?.status==='pending').map(x=>({operationId:x.operation,attempt:x.attempt,mode:s.orders[x.operation].mode})),wallet:publicWallet(s)};});}
+ // Recover from a lost reserve/settle response without consulting the store
+ // or reapplying a game effect. A pending order may no longer be in actions().
+ async function orderStatus(token,slot,operation){
+  const account=await identity(token);checkOperation(operation);
+  return ledger.transact(account,(s,db)=>{
+   const r=world(db,account,slot),row=lookup(db,account,operation),o=s.orders[operation];
+   if(!row||row.world!==r.world||!o)return {world:r.world,revision:r.revision,order:null,wallet:publicWallet(s)};
+   if(row.attempt!==o.attempt||(o.status==='committed')!==(row.result!==null))throw Error('canonical journal mismatch');
+   return {world:r.world,revision:r.revision,order:{operationId:operation,attempt:o.attempt,mode:o.mode,status:o.status,result:row.result===null?null:JSON.parse(row.result)},wallet:publicWallet(s)};
+  });
+ }
  async function advance(token,slot,expectedRevision,command){
   const account=await identity(token);if(!n(expectedRevision))throw Error('invalid revision');
   return ledger.transact(account,(s,db)=>{
@@ -126,6 +137,6 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
   const r=world(db,account,slot),events=sync(engine.achievements(r.state));if(!Array.isArray(events)||events.length>50000)throw Error('invalid canonical achievements');
   return events.filter(e=>e?.eligible===true&&id(e.key)&&typeof e.label==='string'&&e.label.length<=160).map(e=>{const eventId=digest([r.world,e.key]);return {eventId,label:e.label,claimed:Object.hasOwn(s.claims,eventId)};});
  });}
- return {create,read,advance,reserve,settle,cancel,claim,achievements};
+ return {create,read,advance,reserve,settle,cancel,claim,achievements,orderStatus};
 }
 module.exports={installAuthorityTables,createGameAuthority};

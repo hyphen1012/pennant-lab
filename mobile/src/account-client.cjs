@@ -18,7 +18,23 @@ function createAccountClient({baseUrl,fetcher=globalThis.fetch,timeoutMs=10000}=
  const wallet=v=>v&&integer(v.tickets)&&v.tickets<=30&&integer(v.points)&&integer(v.claimCount)&&(v.nextAt===null||integer(v.nextAt))&&Array.isArray(v.owned)&&v.owned.every(x=>typeof x==='string')&&new Set(v.owned).size===v.owned.length;
  const order=v=>v&&id(v.operationId)&&modes.includes(v.mode)&&['pending','committed','cancelled'].includes(v.status)&&integer(v.attempt)&&v.attempt>0;
  const deletion=x=>x&&typeof x.requestId==='string'&&['requested','processing','completed'].includes(x.status)&&integer(x.requestedAt)&&integer(x.updatedAt);
+ const canonicalId=v=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
+ const worldId=v=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
+ const object=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
+ const worldVersion=v=>v&&worldId(v.world)&&integer(v.revision)&&v.revision>0;
+ const worldView=v=>worldVersion(v)&&object(v.game);
+ const pending=v=>v&&canonicalId(v.operationId)&&modes.includes(v.mode)&&integer(v.attempt)&&v.attempt>0;
+ const action=v=>v&&canonicalId(v.operationId)&&['draft-revival','foreign-revival','lottery','fa-retention','fa-sign','retirement','manager','medical'].includes(v.route)&&integer(v.year)&&typeof v.label==='string'&&v.label.length<=160&&['available','pending','cancelled'].includes(v.status);
+ const claimResult=v=>wallet(v?.wallet)&&typeof v.result?.ok==='boolean'&&(v.result.ok?['ticket','point'].includes(v.result.kind)&&[1,2].includes(v.result.amount):typeof v.result.reason==='string');
  const checks={
+  'game/create':worldView,'game/advance':worldView,
+  'game/read':v=>worldView(v)&&wallet(v.wallet)&&Array.isArray(v.actions)&&v.actions.length<=5000&&v.actions.every(action)&&Array.isArray(v.pending)&&v.pending.length<=1&&v.pending.every(pending),
+  'game/order':v=>worldVersion(v)&&wallet(v.wallet)&&(v.order===null||pending(v.order)&&['pending','committed','cancelled'].includes(v.order.status)&&Object.hasOwn(v.order,'result')&&(v.order.status==='committed'||v.order.result===null)),
+  'game/reserve':v=>wallet(v?.wallet)&&canonicalId(v.operationId)&&(v.mode==='none'&&v.status==='unavailable'||pending(v)&&['pending','committed','cancelled'].includes(v.status)&&typeof v.replay==='boolean'),
+  'game/settle':v=>v?.status==='committed'?wallet(v.wallet)&&typeof v.replay==='boolean'&&integer(v.revision)&&v.revision>0&&Object.hasOwn(v,'result'):['awaiting_proof','entitlement_expired','reconcile_required'].includes(v?.status)||['pending','cancelled'].includes(v?.status)&&wallet(v.wallet),
+  'game/cancel':v=>['pending','committed','cancelled','settlement_required'].includes(v?.status)&&(v.status==='settlement_required'||wallet(v.wallet)),
+  'game/achievements':v=>Array.isArray(v)&&v.length<=50000&&v.every(e=>e&&canonicalId(e.eventId)&&typeof e.label==='string'&&e.label.length<=160&&typeof e.claimed==='boolean'),
+  'game/claim':claimResult,
   wallet:wallet,
   restore:v=>v&&typeof v.recorded==='boolean',
   'purchase-finish':v=>v?.authorized===true,
@@ -44,7 +60,7 @@ function createAccountClient({baseUrl,fetcher=globalThis.fetch,timeoutMs=10000}=
     const response=await fetcher(base+'/v1/'+route,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store',redirect:'error',signal:ctl.signal});
     if(!response||response.status!==200)throw fail('request_rejected',mutation);
     const value=await response.json();
-    if(!checks[route](value)||(route==='entitlements'&&value.account!==owner)||(route==='order'&&value.order&&value.order.operationId!==body.id))throw fail('invalid_response',mutation);
+    if(!checks[route](value)||(route==='entitlements'&&value.account!==owner)||(route==='order'&&value.order&&value.order.operationId!==body.id)||(route==='game/order'&&value.order&&value.order.operationId!==body.operationId)||(route==='game/reserve'&&value.operationId!==body.operationId))throw fail('invalid_response',mutation);
     return value;
    };
    const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{ctl.abort();reject(fail('timeout',mutation));},timeoutMs);});
@@ -58,6 +74,8 @@ function createAccountClient({baseUrl,fetcher=globalThis.fetch,timeoutMs=10000}=
    throw e?.code&&typeof e.uncertain==='boolean'?e:fail('network_error',mutation);
   }finally{clearTimeout(timer);active.delete(ctl);if(mutation&&gen===generation)busy=false;}
  }
- return {setSession,issueAd:body=>request('ads/issue',body,true),adStatus:body=>request('ads/status',body),deletionStatus:()=>request('deletion/status',{}),requestDeletion:(reauthProof,confirmed)=>{if(confirmed!==true)throw Error('explicit deletion confirmation required');return request('deletion/request',{confirmed:true,reauthProof},true);},snapshot:()=>request('wallet',{}),entitlements:()=>request('entitlements',{}),restorePurchase:(store,proof)=>request('restore',{store,proof},true),authorizeFinish:(store,proof)=>request('purchase-finish',{store,proof},true),claim:(eventProof,choice='ticket')=>request('claim',{eventProof,choice},true),exchange:key=>request('exchange',{key},true),reserve:(actionProof,choice)=>request('reserve',{actionProof,choice},true),finish:completionProof=>request('finish',{completionProof},true),orderStatus:id=>request('order',{id})};
+ const slot=n=>{if(![1,2,3].includes(n))throw Error('invalid slot');return n;};
+ const op=x=>{if(!canonicalId(x))throw Error('invalid operation');return x;};
+ return {setSession,gameCreate:(s,command)=>request('game/create',{slot:slot(s),command},true),gameRead:s=>request('game/read',{slot:slot(s)}),gameAdvance:(s,revision,command)=>request('game/advance',{slot:slot(s),revision,command},true),gameOrder:(s,operationId)=>request('game/order',{slot:slot(s),operationId:op(operationId)}),gameReserve:(s,operationId,choice)=>request('game/reserve',{slot:slot(s),operationId:op(operationId),choice},true),gameSettle:(s,operationId,attempt)=>request('game/settle',{slot:slot(s),operationId:op(operationId),attempt},true),gameCancel:(s,operationId,attempt,confirmed)=>{if(confirmed!==true)throw Error('explicit cancellation required');return request('game/cancel',{slot:slot(s),operationId:op(operationId),attempt,confirmed},true);},gameAchievements:s=>request('game/achievements',{slot:slot(s)}),gameClaim:(s,eventId,choice)=>request('game/claim',{slot:slot(s),eventId:op(eventId),choice},true),issueAd:body=>request('ads/issue',body,true),adStatus:body=>request('ads/status',body),deletionStatus:()=>request('deletion/status',{}),requestDeletion:(reauthProof,confirmed)=>{if(confirmed!==true)throw Error('explicit deletion confirmation required');return request('deletion/request',{confirmed:true,reauthProof},true);},snapshot:()=>request('wallet',{}),entitlements:()=>request('entitlements',{}),restorePurchase:(store,proof)=>request('restore',{store,proof},true),authorizeFinish:(store,proof)=>request('purchase-finish',{store,proof},true),claim:(eventProof,choice='ticket')=>request('claim',{eventProof,choice},true),exchange:key=>request('exchange',{key},true),reserve:(actionProof,choice)=>request('reserve',{actionProof,choice},true),finish:completionProof=>request('finish',{completionProof},true),orderStatus:id=>request('order',{id})};
 }
 module.exports={createAccountClient};

@@ -35,6 +35,8 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{rosterTre
   const op=(await req('/v1/game/read',{slot:1}))[1].actions[0].operationId;
   const reserve=(await req('/v1/game/reserve',{slot:1,operationId:op,choice:'ad'}))[1];
   assert.equal(reserve.status,'pending');const attempt=reserve.attempt;
+  assert.equal((await req('/v1/game/order',{slot:1,operationId:op}))[1].order.attempt,attempt);
+  assert.equal((await req('/v1/game/read',{slot:1}))[1].pending[0].operationId,op);
   assert.equal((await req('/v1/game/settle',{slot:1,operationId:op,attempt}))[1].status,'awaiting_proof');
   assert.equal((await req('/v1/game/advance',{slot:1,revision:2,command:{step:1}}))[0],403);
   const issue=(await req('/v1/ads/issue',{operationId:op,attempt,platform:'android'}))[1];
@@ -43,6 +45,8 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{rosterTre
   assert.equal((await fetch(base+'/v1/admob/ssv?'+raw+'&signature='+sig+'&key_id=7')).status,200);
   assert.equal((await req('/v1/game/read',{slot:1}))[1].game.days,9);
   const done=(await req('/v1/game/settle',{slot:1,operationId:op,attempt}))[1];assert.equal(done.result.after,5);assert.equal(done.wallet.tickets,1);
+  const recovered=(await req('/v1/game/order',{slot:1,operationId:op}))[1];assert.equal(recovered.order.status,'committed');assert.equal(recovered.order.result.after,5);
+  assert.equal((await req('/v1/game/read',{slot:1}))[1].pending.length,0);
   assert.equal((await req('/v1/game/settle',{slot:1,operationId:op,attempt}))[1].replay,true);
   assert.equal((await req('/v1/deletion/request',{confirmed:true,reauthProof:'fresh'}))[0],200);
   assert.equal((await req('/v1/game/read',{slot:1}))[0],403);
