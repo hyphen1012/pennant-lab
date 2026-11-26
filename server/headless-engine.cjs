@@ -32,11 +32,9 @@ function createHeadlessEngine(){
   const a=medical().find(x=>x.eventKey===input.action.eventKey&&input.action.route==='medical');
   if(!a)throw Error('medical action unavailable');
   const p=getPlayer(a.playerId),before=p.injury.daysLeft;
-  // Preserve original diagnosis, reuse real game mutation, and update a
-  // matching pending injury popup if one exists.
-  const pending=game.pendingEvent;
-  const e=pending?.playerId===p.id&&pending.date===a.date&&pending.teamId===team.id?pending:{year:game.year,teamId:team.id,playerId:p.id,date:a.date,days:before};
-  if(!applySpecialTreatment(e,p)||p.injury.daysLeft!==Math.ceil(before/2))throw Error('real medical mutation failed');
+  // Shared production mutation supports both the roster and popup, while
+  // applySpecialTreatment additionally requires the actual pending popup.
+  if(!applyRosterTreatment(p)||p.injury.daysLeft!==Math.ceil(before/2))throw Error('real medical mutation failed');
   return JSON.stringify({state:game,result:{before,after:p.injury.daysLeft,date:a.date}});
  }
  if(op==='advance'){
