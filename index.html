@@ -173,6 +173,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .launch-start small{font-size:11px;letter-spacing:.22em;color:#d0d8e4}.launch-start span{animation:launch-glow 2.2s ease-in-out infinite}
 @keyframes launch-glow{50%{opacity:.55;text-shadow:0 0 18px #ffe6a5}}
 .official-startup-active::after{content:"";position:fixed;inset:0;background:#000;z-index:2147482999;pointer-events:auto}
+.official-startup-consent{position:fixed;inset:0;z-index:2147483001;display:grid;place-items:center;background:#070510f5;padding:24px;box-sizing:border-box;color:#f1e7ff}.official-startup-consent-panel{display:grid;gap:14px;width:min(100%,340px);text-align:center}.official-startup-consent-panel strong{font-size:20px;letter-spacing:.16em;color:#e8d5a0}.official-startup-consent-panel p{font-size:13px;color:#d6c8ec;margin:0}.official-startup-consent-panel button{min-height:48px;border-radius:10px;border:1px solid #a58bd6;color:#fff;background:#302052;font:inherit;font-weight:750;padding:12px}.official-startup-consent-panel .official-startup-silent{background:transparent;color:#d6c8ec;border-color:#63557c}.official-startup-consent-panel button:disabled{opacity:.55}
 .official-startup-video{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;background:#000;z-index:2147483000;pointer-events:auto}
 .official-launch{position:relative;isolation:isolate;display:grid;place-items:center;width:100%;height:100vh;height:100dvh;overflow:hidden;background:#090510}
 .official-launch-frame{position:relative;width:min(100%,56.25vh);width:min(100%,56.25dvh);aspect-ratio:9/16;overflow:hidden;isolation:isolate}
@@ -6341,15 +6342,47 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   async function showStartupVideo(){
     if(startupAttempted||!STARTUP_MEDIA.video)return;
     startupAttempted=true;startupPlaying=true;document.body.classList?.add('official-startup-active');
-    let video=null,watchdog=null,done=false;
+    let video=null,watchdog=null,done=false,prompt=null,retrying=false,waiting=false;
+    const clearPrompt=()=>{prompt?.remove();prompt=null;waiting=false;};
     const finish=()=>{
-      if(done)return;done=true;clearTimeout(watchdog);startupPlaying=false;document.body.classList?.remove('official-startup-active');
+      if(done)return;done=true;clearTimeout(watchdog);clearPrompt();startupPlaying=false;document.body.classList?.remove('official-startup-active');
       document.removeEventListener?.('visibilitychange',visibility);
       window.removeEventListener?.('pl-native-suspend',finish);
       if(video){video.pause?.();video.removeAttribute?.('src');video.load?.();video.remove();}
     };
     const visibility=()=>{if(document.hidden)finish();};
-    const arm=()=>{clearTimeout(watchdog);if(!done)watchdog=setTimeout(finish,12000);};
+    const arm=()=>{clearTimeout(watchdog);if(!done&&!waiting)watchdog=setTimeout(finish,12000);};
+    // A rejected audible autoplay must not silently discard the soundtrack.
+    // A real user tap starts the untouched MP4 with sound in the same event.
+    const offerPlayback=()=>{
+      if(done||prompt)return;
+      waiting=true;clearTimeout(watchdog);
+      prompt=document.createElement('div');prompt.className='official-startup-consent';
+      const panel=document.createElement('div');panel.className='official-startup-consent-panel';
+      const brand=document.createElement('strong');brand.textContent='PARALAB GAMES';
+      const play=document.createElement('button');play.type='button';play.className='official-startup-audio';play.textContent='音声付きで再生';
+      const silent=document.createElement('button');silent.type='button';silent.className='official-startup-silent';silent.textContent='音声なしで再生';
+      const status=document.createElement('p');status.setAttribute('role','status');status.textContent='タップして起動映像を再生';
+      panel.appendChild(brand);panel.appendChild(status);panel.appendChild(play);panel.appendChild(silent);prompt.appendChild(panel);
+      const retry=async mute=>{
+        if(done||retrying||document.hidden)return;
+        if(window.PennantNative&&!window.PennantNative.ready()){finish();return;}
+        retrying=true;play.disabled=true;silent.disabled=true;waiting=false;arm();
+        try{
+          video.muted=mute;
+          // No await before play(): preserve transient user activation.
+          await video.play();
+          if(!done){clearPrompt();arm();}
+        }catch(e){
+          if(done)return;
+          if(mute){finish();return;}
+          waiting=true;clearTimeout(watchdog);status.textContent='音声再生が許可されませんでした。再試行するか音声なしを選択してください。';
+          play.disabled=false;silent.disabled=false;
+        }finally{retrying=false;}
+      };
+      play.addEventListener('click',()=>void retry(false));silent.addEventListener('click',()=>void retry(true));
+      document.body.appendChild(prompt);
+    };
     arm();
     try{
       if(document.hidden||(window.PennantNative&&!await window.PennantNative.check())){finish();return;}
@@ -6365,27 +6398,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       video.src=STARTUP_MEDIA.video;document.body.appendChild(video);
       try{await video.play();}catch(e){
         if(done)return;
-        if(video.muted){finish();return;}
-        video.muted=true;try{await video.play();}catch{finish();}
+        if(video.muted||e?.name!=='NotAllowedError'){finish();return;}
+        offerPlayback();
       }
     }catch(e){finish();}
-  }
-  function launchTapSound(){
-    if(launchMuted())return;
-    try{
-      const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;
-      const ctx=new Audio();const play=()=>{const now=ctx.currentTime,osc=ctx.createOscillator(),gain=ctx.createGain();
-        osc.type='sine';osc.frequency.setValueAtTime(440,now);osc.frequency.exponentialRampToValueAtTime(660,now+.14);
-        gain.gain.setValueAtTime(.001,now);gain.gain.exponentialRampToValueAtTime(.035,now+.025);gain.gain.exponentialRampToValueAtTime(.001,now+.19);
-        osc.connect(gain);gain.connect(ctx.destination);osc.onended=()=>{void ctx.close().catch(()=>{});};osc.start(now);osc.stop(now+.2);
-      };if(ctx.state==='suspended')void ctx.resume().then(play,()=>ctx.close());else play();
-    }catch{}
   }
   function startOfficialTitleTransition(){
     if(startupPlaying||launchTransition||ui.page!=='title'||!ui.launchTitle||slotOpening||slotDeleteDialog)return;
     if(window.PennantNative&&!window.PennantNative.ready())return;
     if(!STARTUP_MEDIA.title||titleMediaFailed){ui.launchTitle=false;ui.rarePreview=null;render();window.scrollTo(0,0);return;}
-    launchTransition=true;launchTapSound();
+    launchTransition=true; // Silent transition: avoid transient Web Audio noise on mobile.
     const root=document.querySelector('[data-launch-screen]');root?.classList?.add('official-launch-exit');
     const complete=()=>{launchTransition=false;if(ui.page!=='title'||!ui.launchTitle||document.hidden||(window.PennantNative&&!window.PennantNative.ready())){root?.classList?.remove('official-launch-exit');return;}ui.launchTitle=false;ui.rarePreview=null;render();window.scrollTo(0,0);};
     if(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches)complete();else setTimeout(complete,420);
