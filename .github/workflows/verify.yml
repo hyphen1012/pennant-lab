@@ -119,3 +119,6 @@ jobs:
 
       - run: node scripts/release-blocker-check.cjs
         if: always()
+
+      - run: node scripts/save-codec-check.cjs
+        if: always()
