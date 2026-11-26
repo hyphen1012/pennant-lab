@@ -248,10 +248,11 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   console.log('PASS real HTTP memorial claim, ticket exchange and treatment, lost committed response without duplicate charge');
   // Return to the multiverse; deletion is hidden until an intentional gesture.
   await page.locator('[data-action="canonical-rewards-back"]').click();
+  await page.locator('[data-action="canonical-events-back"]').click();
   await page.locator('[data-action="canonical-return"]').first().click();await slot(3).waitFor();
   const delete3=page.locator('[data-action="canonical-world-delete"][data-slot="3"]');
   a.equal(await delete3.isVisible(),false);
-  const box=await slot(3).boundingBox();a.ok(box);
+  await slot(3).scrollIntoViewIfNeeded();const box=await slot(3).boundingBox();a.ok(box);
   await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await delete3.waitFor({timeout:5000});await page.mouse.up();
   a.equal(await slot(3).getAttribute('data-action'),'continue-slot');
   page.once('dialog',d=>d.dismiss());await delete3.click();a.equal(await slot(3).getAttribute('data-action'),'continue-slot');
