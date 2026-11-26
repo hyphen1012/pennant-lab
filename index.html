@@ -12244,14 +12244,30 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       x.prices=vals;const v=stadiumDemand(t,null,date,Math.max(1,game.day));const score=net(v)+(a.style===2?v.attendance*180:0);
       if(v.satisfaction>=65&&v.attendance>=baseline.attendance*.85&&score>bestScore){bestScore=score;best=vals;}
     }
-    // Mature parks may price premium sections separately, while cheap seats
-    // retain the original bands. Every adjustment still uses actual demand.
+    // Trial H: mature venue pricing optimizes weekday/weekend expected
+    // operating cash, not one potentially unrepresentative preseason sample.
+    // Existing price ceilings, annual change rate, attendance and satisfaction
+    // protections remain. No extra income is created outside actual demand.
     if(x.park>=15){
-      for(let i=0;i<5;i++)for(const ratio of [.9,.95,1,1.05,1.1]){
-        const vals=best.slice(),ceiling=i===0?1.65:i===1?1.5:1.3;
-        vals[i]=clamp(Math.round(old[i]*ratio/100)*100,Math.round(STADIUM_DEFAULT[i]*.7/100)*100,Math.round(STADIUM_DEFAULT[i]*ceiling/100)*100);
-        x.prices=vals;const v=stadiumDemand(t,null,date,Math.max(1,game.day)),score=net(v)+(a.style===2?v.attendance*180:0);
-        if(v.satisfaction>=65&&v.attendance>=baseline.attendance*.85&&score>bestScore){bestScore=score;best=vals;}
+      const day=Math.max(1,game.day),mix=vals=>{
+        x.prices=vals;
+        const wd=stadiumDemand(t,null,'2027-06-04',day),we=stadiumDemand(t,null,'2027-06-06',day);
+        return {score:(5*(net(wd)+(a.style===2?wd.attendance*180:0))+2*(net(we)+(a.style===2?we.attendance*180:0)))/7,
+          attendance:(5*wd.attendance+2*we.attendance)/7,satisfaction:Math.min(wd.satisfaction,we.satisfaction)};
+      };
+      const initial=mix(old),acceptable=v=>v.satisfaction>=65&&v.attendance>=initial.attendance*.85;
+      let q=mix(best);
+      if(!acceptable(q)||q.score<initial.score){best=old.slice();q=initial;}
+      // Exact 100-yen steps in the same ±10% annual price band, with
+      // coordinate passes to account for satisfaction/attendance coupling.
+      for(let pass=0;pass<2;pass++)for(let i=0;i<5;i++){
+        const ceiling=i===0?1.65:i===1?1.5:1.3;
+        const lo=clamp(Math.round(old[i]*.9/100)*100,Math.round(STADIUM_DEFAULT[i]*.7/100)*100,Math.round(STADIUM_DEFAULT[i]*ceiling/100)*100);
+        const hi=clamp(Math.round(old[i]*1.1/100)*100,Math.round(STADIUM_DEFAULT[i]*.7/100)*100,Math.round(STADIUM_DEFAULT[i]*ceiling/100)*100);
+        for(let price=lo;price<=hi;price+=100){
+          const vals=best.slice();vals[i]=price;const v=mix(vals);
+          if(acceptable(v)&&v.score>q.score){best=vals;q=v;}
+        }
       }
     }
     x.prices=old;
