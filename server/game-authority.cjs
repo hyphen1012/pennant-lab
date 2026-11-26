@@ -65,6 +65,21 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
    return view({world:worldId,revision:1,state});
   });
  }
+ // Delete only the world explicitly observed by the user. Keep the account-level
+ // wallet, claims and settlement journal, including old operation identities.
+ async function deleteWorld(token,slot,expectedWorld,expectedRevision,confirmed){
+  const account=await identity(token);slotCheck(slot);
+  if(confirmed!==true||typeof expectedWorld!=='string'||! /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(expectedWorld)||!n(expectedRevision)||expectedRevision<1)throw Error('explicit world deletion required');
+  return ledger.transact(account,(s,db)=>{
+   const r=world(db,account,slot);
+   if(r.world!==expectedWorld||r.revision!==expectedRevision)throw Error('world revision conflict');
+   const pending=db.prepare('SELECT operation FROM authority_actions WHERE account=? AND world=? AND result IS NULL').all(account,r.world);
+   if(pending.some(x=>s.orders[x.operation]?.status==='pending'))throw Error('reward reconciliation required');
+   const q=db.prepare('DELETE FROM authority_worlds WHERE account=? AND slot=? AND world=? AND revision=?').run(account,slot,r.world,r.revision);
+   if(q.changes!==1)throw Error('canonical revision conflict');
+   return {deleted:true,slot,world:r.world,revision:r.revision};
+  });
+ }
  async function read(token,slot){const account=await identity(token);return inspect(account,(s,db)=>{const r=world(db,account,slot);return {...view(r),actions:options(db,r,s),pending:db.prepare('SELECT operation,attempt FROM authority_actions WHERE account=? AND world=? AND result IS NULL').all(account,r.world).filter(x=>s.orders[x.operation]?.status==='pending').map(x=>({operationId:x.operation,attempt:x.attempt,mode:s.orders[x.operation].mode})),wallet:publicWallet(s)};});}
  // Recover from a lost reserve/settle response without consulting the store
  // or reapplying a game effect. A pending order may no longer be in actions().
@@ -192,6 +207,6 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
   const r=world(db,account,slot),events=sync(engine.achievements(r.state));if(!Array.isArray(events)||events.length>50000)throw Error('invalid canonical achievements');
   return events.filter(e=>e?.eligible===true&&id(e.key)&&typeof e.label==='string'&&e.label.length<=160).map(e=>{const eventId=digest([r.world,e.key]);return {eventId,label:e.label,claimed:Object.hasOwn(s.claims,eventId)};});
  });}
- return {create,read,advance,reserve,settle,cancel,claim,achievements,orderStatus,slots,freePage,playerPage,achievementPage,reportPage,tradePage};
+ return {create,deleteWorld,read,advance,reserve,settle,cancel,claim,achievements,orderStatus,slots,freePage,playerPage,achievementPage,reportPage,tradePage};
 }
 module.exports={installAuthorityTables,createGameAuthority};

@@ -304,11 +304,25 @@ async function flush(){for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout
   dispatch('click',{action:'tab',tab:'hq'});
   await window.PennantLab.advance('day');
   // The day action must show the simulated inning-by-inning watch before the final score.
-  for(let tries=0;tries<12&&watchRenders.length===0;tries++){
-    if(app.innerHTML.includes('data-action="auto-day-close"'))dispatch('click',{action:'auto-day-close'});
-    if(app.innerHTML.includes('data-action="finish-month"'))finishMeeting();
-    if(app.innerHTML.includes('data-action="injury-ack"'))dispatch('click',{action:'injury-ack'});
-    await window.PennantLab.advance('day');
+  // Opening dates may contain genuine mandatory news or a negotiation response.
+  // Service them through the same UI as the season regression; keep the
+  // separate bound on actual dates and require every cinematic assertion.
+  for(let attempts=0,days=0;attempts<80&&days<12&&watchRenders.length===0;attempts++){
+    const page=app.innerHTML,inbox=page.match(/data-action="flow-inbox" data-key="([^"]+)"/);
+    if(page.includes('data-action="rare-news-next"'))dispatch('click',{action:'rare-news-next'});
+    else if(page.includes('data-action="rare-news-ack"'))dispatch('click',{action:'rare-news-ack'});
+    else if(page.includes('data-action="milestone-ack"')){dispatch('click',{action:'milestone-ack'});dispatch('click',{action:'edition-exit-confirm'});}
+    else if(page.includes('data-action="injury-ack"'))dispatch('click',{action:'injury-ack'});
+    else if(page.includes('data-action="finish-month"'))finishMeeting();
+    else if(page.includes('data-action="finish-review"'))dispatch('click',{action:'finish-review'});
+    else if(page.includes('data-action="auto-day-close"'))dispatch('click',{action:'auto-day-close'});
+    else if(inbox)dispatch('click',{action:'flow-inbox',key:inbox[1]});
+    else if(page.includes('data-action="flow-foreign"'))dispatch('click',{action:'flow-foreign'});
+    else if(page.includes('data-action="foreign-counter-decline"'))dispatch('click',{action:'foreign-counter-decline'});
+    else if(page.includes('data-action="foreign-reply-open"'))dispatch('click',{action:'foreign-reply-open'});
+    else if(page.includes('data-action="foreign-close"'))dispatch('click',{action:'foreign-close'});
+    else{days++;await window.PennantLab.advance('day');}
+    await flush();
   }
   assert(dateRenders.length>0,'One-day progression shows a calendar date intro');
   assert(dateRenders.every(v=>!v.includes('data-action="pause-calendar"')&&!v.includes('data-action="auto-return-hq"')),'Date interstitial has no pause or return controls');

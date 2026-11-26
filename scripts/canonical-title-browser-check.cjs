@@ -246,6 +246,20 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   const afterReward=await post('read',{slot:3});a.equal(afterReward.revision,beforeReward.revision+1);a.equal(afterReward.wallet.tickets,0);a.equal(afterReward.game.club.roster.find(x=>x.id===injured.id).injuryDays,4);a.equal(afterReward.pending.length,0);a.equal(afterReward.actions.some(x=>x.operationId===target.operationId),false);a.equal(reserves,1);a.equal(settles,1);
   const medicalOrder=await post('order',{slot:3,operationId:target.operationId});a.equal(medicalOrder.order.status,'committed');a.equal(medicalOrder.order.result.before,8);a.equal(medicalOrder.order.result.after,4);
   console.log('PASS real HTTP memorial claim, ticket exchange and treatment, lost committed response without duplicate charge');
+  // Return to the multiverse; deletion is hidden until an intentional gesture.
+  await page.locator('[data-action="canonical-rewards-back"]').click();
+  await page.locator('[data-action="canonical-events-back"]').click();
+  await page.locator('[data-action="canonical-return"]').first().click();await slot(3).waitFor();
+  const delete3=page.locator('[data-action="canonical-world-delete"][data-slot="3"]');
+  a.equal(await delete3.isVisible(),false);
+  await slot(3).scrollIntoViewIfNeeded();const box=await slot(3).boundingBox();a.ok(box);
+  await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await delete3.waitFor({timeout:5000});await page.mouse.up();
+  a.equal(await slot(3).getAttribute('data-action'),'continue-slot');
+  page.once('dialog',d=>d.dismiss());await delete3.click();a.equal(await slot(3).getAttribute('data-action'),'continue-slot');
+  clockOffset+=61000;
+  page.once('dialog',d=>d.accept());await delete3.click();await page.locator('button[data-slot="3"][data-action="new-slot"]').waitFor();
+  a.equal(await slot(1).getAttribute('data-action'),'continue-slot');a.equal(await slot(2).getAttribute('data-action'),'continue-slot');a.equal(await delete3.count(),0);
+  console.log('PASS long press, cancellation and confirmed server world deletion');
   a.deepEqual(errors,[]);console.log('PASS packaged canonical title, actual HTTP create/reopen, lost commit recovery, offline and local save isolation');
  }finally{await browser?.close();await runtime.close();fs.rmSync(dir,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

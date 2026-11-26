@@ -286,3 +286,6 @@ PR117: explicit rival selection, eligible roster and original gmTradeQuote read 
 
 ## Manager meeting and scouting profile (staging)
 PR118: original office entry and portrait/grade helpers, actual manager profile, tendencies versus effective tactics, trust/discontent risk and last 15 games of actual manager moves (latest six). Existing authoritative hire/renew/orders only; meeting entry is read-only and cannot change relationship. Engine regression checks actual stored move count and rating fields. Browser visual parity remains open.
+
+## Server-owned world deletion (staging)
+The multiverse exposes deletion only after a hold, left swipe or context-menu gesture on an occupied slot. Explicit confirmation names the selected slot/club; the authenticated API compares the exact world UUID and revision before deleting its active row in the ledger transaction. Pending reward reservations block deletion. No state decompression, automatic retry, legacy save mutation or account deletion. A lost response triggers fresh slot metadata; a newly created world has a different UUID. Account wallet, achievement claims and settlement journal remain intact; physical erasure from database pages/WAL/backups is not claimed and requires retention policy work. Added metadata, real HTTP session and browser regression. Production remains disabled.

@@ -5,7 +5,7 @@ const {createAccountClient}=require('../mobile/src/account-client.cjs'),{createC
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pl-game-session-')),owner='a'.repeat(64),other='b'.repeat(64);
  const deny=async()=>null,auth=async t=>t==='a'||t==='b'?{authenticated:true,account:t==='a'?owner:other}:{authenticated:false};
  const runtime=createServiceRuntime({dataDir:dir,authenticate:auth,verifyRecentReauth:deny,verifyReceipt:deny,verifyCurrent:deny,verifyNotification:deny,verifyEvent:deny,verifyAction:deny,verifyCompletion:deny,canonicalEngine:createHeadlessEngine(),units:{android:{unit:'123',item:'ticket',amount:1}},origins:[]});
- let lost=false,advances=0,creates=0,online=true,delayRead=null;
+ let lost=false,advances=0,creates=0,online=true,delayRead=null,lostDelete=false,deletes=0;
  try{
   await new Promise(ok=>runtime.server.listen(0,'127.0.0.1',ok));
   const base='http://127.0.0.1:'+runtime.server.address().port;
@@ -13,7 +13,9 @@ const {createAccountClient}=require('../mobile/src/account-client.cjs'),{createC
    const route=new URL(url).pathname;
    if(route==='/v1/game/advance'){advances++;const b=JSON.parse(options.body);a.match(b.world,/^[0-9a-f-]{36}$/);a.ok(Number.isSafeInteger(b.revision));}
    if(route==='/v1/game/create')creates++;
+   if(route==='/v1/game/delete')deletes++;
    const res=await fetch(base+route,options);
+   if(route==='/v1/game/delete'&&lostDelete){lostDelete=false;a.equal(res.status,200);await res.text();throw Error('fixture lost deletion response');}
    if(route==='/v1/game/advance'&&lost){lost=false;await res.text();throw Error('fixture lost committed response');}
    if(route==='/v1/game/read'&&delayRead){const d=delayRead;delayRead=null;await d;}
    return res;
@@ -63,6 +65,12 @@ const {createAccountClient}=require('../mobile/src/account-client.cjs'),{createC
   const archive=await one.reportPage({kind:'matches',year:0,offset:0,limit:1});a.equal(archive.status,'ready');a.equal(archive.page.total,0);a.equal(archive.page.nextOffset,null);
   await a.rejects(observer.gameReportPage(1,b.snapshot.world,one.inspect().snapshot.revision-1,{kind:'matches',year:0,offset:0,limit:1}));
   await a.rejects(observer.gameReportPage(1,b.snapshot.world,one.inspect().snapshot.revision,{kind:'matches',year:0,offset:0,limit:2}));
+  const target=(await one.listSlots()).slots[0];await a.rejects(one.deleteWorld(target,false));a.equal(deletes,0);
+  lostDelete=true;const uncertainDelete=await one.deleteWorld(target,true);a.equal(uncertainDelete.status,'refresh-required');a.equal(uncertainDelete.uncertain,true);a.equal(one.inspect().snapshot,null);a.equal(deletes,1);
+  a.deepEqual((await one.listSlots()).slots,[]);a.equal(deletes,1);a.equal((await two.refresh()).snapshot.world,first.snapshot.world);
+  one.select(1);const recreated=await one.create({team:1},true);a.equal(recreated.status,'ready');a.notEqual(recreated.snapshot.world,target.world);
+  const staleDelete=await one.deleteWorld(target,true);a.equal(staleDelete.status,'refresh-required');a.equal(deletes,2);a.equal((await one.listSlots()).slots[0].world,recreated.snapshot.world);
+  console.log('PASS real HTTP deletion loss observation, no replay, stale deletion cannot remove replacement');
   console.log('PASS real engine HTTP session, explicit create, revision conflict, committed response loss, no replay, offline and identity isolation; bounded achievement page and confirmation guard');
  }finally{await runtime.close();fs.rmSync(dir,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});
