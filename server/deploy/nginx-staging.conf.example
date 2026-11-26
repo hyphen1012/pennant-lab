@@ -1,0 +1,26 @@
+# Example only. Replace host, certificate paths and private upstream deliberately.
+# Never log $request_uri, $args, Authorization or request bodies: SSV URLs contain proof.
+# This file is not a deployed TLS service.
+limit_req_zone $binary_remote_addr zone=pl_api:10m rate=20r/s;
+server {
+    listen 443 ssl;
+    server_name api-staging.example.invalid;
+    ssl_certificate /run/secrets/tls-cert.pem;
+    ssl_certificate_key /run/secrets/tls-key.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    access_log off;
+    error_log /var/log/nginx/pennant-staging-error.log crit;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    client_max_body_size 64m;
+    client_body_timeout 120s;
+    location / {
+        limit_req zone=pl_api burst=40 nodelay;
+        proxy_pass http://127.0.0.1:8787;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_request_buffering on;
+        proxy_read_timeout 125s;
+        proxy_send_timeout 125s;
+    }
+}
