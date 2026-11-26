@@ -18,6 +18,7 @@ function createServiceRouter({accountHttp,saveHttp,adService,deletionService,sto
  const gameRoutes=new Map([
   ['/v1/game/create',['create',['slot','command']]],
   ['/v1/game/read',['read',['slot']]],
+  ['/v1/game/order',['orderStatus',['slot','operationId']]],
   ['/v1/game/advance',['advance',['slot','revision','command']]],
   ['/v1/game/reserve',['reserve',['slot','operationId','choice']]],
   ['/v1/game/settle',['settle',['slot','operationId','attempt']]],
