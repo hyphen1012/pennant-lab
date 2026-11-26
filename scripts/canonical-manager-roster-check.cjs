@@ -52,3 +52,24 @@ a.equal(club().cash,oldCash);a.equal(w.seed,oldSeed);a.equal(w.year,oldYear);a.e
 console.log('PASS canonical custom club creation and identity updates with no simulation or finance changes');
 console.log('PASS bounded free market pagination/search, read-only projection and reveal guard');
 console.log('PASS manager hiring/renewal, ordinary free-agent and release, archived match acknowledgement, terminal finance and guard');
+
+// Mandatory inbox fixtures: server-side data projection, not a browser claim.
+w=engine.newWorld({team:0});
+const recruit=w.players.find(p=>p.teamId===w.selectedId);
+w.pendingDraftReveal={year:w.year-1,entries:[{id:recruit.id,revealStage:0,revealed:false}]};
+let rookie=v().inbox.rookie.entries[0];
+a.equal(rookie.stage,0);a.equal(rookie.abilities,null);a.equal(v().club,null);
+a.throws(()=>engine.advance(w,{acknowledge:'rookie-finish'}));
+a.throws(()=>engine.advance(w,{acknowledge:'rookie-reveal',playerId:99999999}));
+go({acknowledge:'rookie-reveal',playerId:recruit.id});
+a.equal(v().inbox.rookie.entries[0].stage,1);a.equal(v().inbox.rookie.entries[0].abilities,null);
+go({acknowledge:'rookie-reveal',playerId:recruit.id});
+rookie=v().inbox.rookie.entries[0];a.equal(rookie.stage,2);a.equal(rookie.name,recruit.name);a.ok(Object.keys(rookie.abilities).length>0);
+a.throws(()=>engine.advance(w,{acknowledge:'rookie-reveal',playerId:recruit.id}));
+go({acknowledge:'rookie-finish'});a.equal(v().inbox.rookie,null);
+a.throws(()=>engine.advance(w,{acknowledge:'rookie-finish'}));
+w.pendingDecade=w.year;
+a.throws(()=>engine.advance(w,{acknowledge:'decade',eventKey:'wrong'}));
+go({acknowledge:'decade',eventKey:String(w.year)});a.equal(v().inbox.decade,null);
+a.throws(()=>engine.advance(w,{acknowledge:'decade',eventKey:String(w.year)}));
+console.log('PASS mandatory rookie staged disclosure and decade acknowledgement duplicate guards');
