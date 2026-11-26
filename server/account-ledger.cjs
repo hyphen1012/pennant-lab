@@ -17,7 +17,12 @@ function openLedger(filename){
       write.run(account,JSON.stringify(state));db.exec('COMMIT');return result;
     }catch(err){db.exec('ROLLBACK');throw err;}
   }
-  return {transact,close:()=>db.close()};
+  function readOrder(account,id){
+ if(typeof account!=='string'||!account||typeof id!=='string'||!id)return null;
+ const row=read.get(account);if(!row)return null;const s=JSON.parse(row.payload);
+ const o=Object.hasOwn(s.orders,id)?s.orders[id]:null;return o?{mode:o.mode,status:o.status,attempt:o.attempt??1}:null;
+ }
+ return {transact,readOrder,close:()=>db.close()};
 }
 function createAccountService({ledger,authenticate,verifyEvent,verifyEntitlements,verifyAction,verifyCompletion,purchaseService=null,now=Date.now}){
   if(!ledger?.transact||[authenticate,verifyEvent,verifyEntitlements,verifyAction,verifyCompletion].some(f=>typeof f!=='function'))throw Error('trusted adapters required');
