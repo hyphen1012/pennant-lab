@@ -189,7 +189,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @keyframes official-crowd{from{opacity:.04;transform:translateX(0)}to{opacity:.13;transform:translateX(2px)}}
 @keyframes official-particle{0%,100%{transform:translate3d(0,4px,0);opacity:.08}50%{transform:translate3d(3px,-8px,0);opacity:.55}}
 @media(prefers-reduced-motion:reduce){.official-title-metal,.official-stadium-lights,.official-crowd,.official-embedded-prompt,.official-title-particles i{animation:none;opacity:0}}
-.official-launch-hit{position:absolute;inset:0;border:0;background:transparent;width:100%;height:100%;padding:0;touch-action:manipulation;color:#f6e6bd}
+/* The full-screen title is one button: suppress mobile Chromium/WebKit's
+   default blue tap overlay locally, not keyboard focus or the intended exit. */
+[data-launch-screen],[data-launch-screen] *{-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+.official-launch-hit{position:absolute;inset:0;border:0;background:transparent;width:100%;height:100%;padding:0;touch-action:manipulation;color:#f6e6bd;appearance:none;-webkit-appearance:none;-webkit-tap-highlight-color:transparent}
+.official-launch-hit:active,.official-launch-hit:hover,.official-launch-hit:focus{background:transparent;box-shadow:none}
+.official-launch-hit:focus:not(:focus-visible){outline:none}
 .official-launch-hit:focus-visible{outline:2px solid #e7d2a1;outline-offset:-5px}
 .official-launch-prompt{position:absolute;bottom:max(5%,env(safe-area-inset-bottom));left:0;width:100%;text-align:center;text-shadow:0 2px 8px #080411;font-size:clamp(13px,3.8vw,20px);letter-spacing:.12em;animation:launch-glow 3.2s ease-in-out infinite}
 .official-launch-exit::after{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;background:radial-gradient(ellipse at center,#b797f057, #23113dbb 60%,#080510);animation:official-exit .42s ease-in both}
