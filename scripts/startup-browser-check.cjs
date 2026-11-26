@@ -45,6 +45,33 @@ const dir='test-results/browser';fs.mkdirSync(dir,{recursive:true});
   assert.deepEqual(errors,[]);
   console.log('PASS original full-length media, title aspect/embedded text, tap and portal to setup',JSON.stringify(result));
   await page.close();
+  // Emulate the first browser autoplay-policy rejection only. Subsequent
+  // playback is the original MP4 through the real browser decoder.
+  const gated=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+  await gated.addInitScript(()=>{
+   const play=HTMLMediaElement.prototype.play;let denied=false;window.__audioAudit={attempts:[],ended:null,contexts:0};
+   HTMLMediaElement.prototype.play=function(...args){
+    if(this.classList.contains('official-startup-video')){
+     window.__audioAudit.attempts.push({muted:this.muted,activated:navigator.userActivation?.isActive===true});
+     if(!denied){denied=true;return Promise.reject(new DOMException('autoplay blocked','NotAllowedError'));}
+    }
+    return play.apply(this,args);
+   };
+   document.addEventListener('ended',e=>{if(e.target.classList?.contains('official-startup-video'))window.__audioAudit.ended={time:e.target.currentTime,muted:e.target.muted};},true);
+   for(const key of ['AudioContext','webkitAudioContext'])if(window[key]){const Original=window[key];window[key]=new Proxy(Original,{construct(target,args,newTarget){window.__audioAudit.contexts++;return Reflect.construct(target,args,newTarget);}});}
+  });
+  await gated.goto(base);
+  await gated.locator('.official-startup-audio').waitFor({state:'visible'});
+  assert.deepEqual((await gated.evaluate(()=>window.__audioAudit.attempts)).map(a=>a.muted),[false],'no automatic mute after rejection');
+  await gated.locator('.official-startup-audio').tap();
+  await gated.waitForFunction(()=>window.__audioAudit.ended,{},{timeout:20000});
+  const audit=await gated.evaluate(()=>window.__audioAudit);
+  assert.equal(audit.attempts.length,2);assert.equal(audit.attempts[1].muted,false);assert.equal(audit.attempts[1].activated,true);assert.equal(audit.ended.muted,false);assert(Math.abs(audit.ended.time-7)<.1);
+  await gated.locator('[data-action="launch-start"]').tap();
+  await gated.locator('.world-orb').first().waitFor({state:'visible'});
+  assert.equal(await gated.evaluate(()=>window.__audioAudit.contexts),0,'no title-tap AudioContext');
+  await gated.close();
+  console.log('PASS autoplay rejection, real gesture-triggered audible media and silent title transition');
   const fallback=await browser.newPage({viewport:{width:360,height:740},reducedMotion:'reduce'});
   await fallback.route('**/PARALAB_GAMES_startup_v8_SFX_reverb.mp4',route=>route.abort());
   await fallback.goto(base);
