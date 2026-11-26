@@ -36,10 +36,12 @@ function createHeadlessEngine(){
   const injury=injuryNotice(),rare=pendingRareNews()[0],career=careerNotice();
   return {injury:injury?{eventKey:String(injury.playerId)+':'+injury.date,playerId:injury.playerId,date:injury.date,days:injury.days}:null,
    rare:rare?{eventKey:rare.id,year:rare.year,date:rare.date,category:rare.category}:null,
+   rookie:game.pendingDraftReveal?{year:game.pendingDraftReveal.year,entries:game.pendingDraftReveal.entries.map(r=>{const p=getPlayer(r.id),stage=r.revealed?2:r.revealStage||0;return {id:r.id,name:p?.name,pos:p?.pos,stage,abilities:stage===2&&p?Object.fromEntries(seasonSkillKeys(p).map(k=>[k,p[k]])):null};})}:null,
+   decade:game.pendingDecade??null,opening:game.pendingCeremonyIntro==='opening',
    career:career?{playerId:career.p.id,stage:career.e.type,options:['consult','plan'].includes(career.e.type)?farewellChoices(career.p).map(([key,label,cost])=>({key,label,cost})):[]}:null};
  };
- const commercialJobs=['fan-fest','tv','fanclub','sponsor','broadcast','naming'];
- const annualSupported=['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter',...commercialJobs,'movement-market'];
+ const commercialJobs=['fan-fest','tv','fanclub','sponsor','broadcast','naming','opening-promo'];
+ const annualSupported=['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter',...commercialJobs,'movement-market','booking','self','winter-return','camp','exhibition','opening-promo','offdesk-opening'];
  const draftPending=d=>d.picks.find(x=>x.teamId===team.id&&(x.recoveryPending||x.recoveryCelebration));
  const draftOwnRow=d=>d.picks.find(x=>x.teamId===team.id&&x.status==='rights');
  const candidateView=c=>({id:c.id,name:secretProspect(c.player)?'????':c.player.name,pos:c.player.pos,type:c.type,category:playerTitleTheme(c.player)?.name||null});
@@ -66,7 +68,7 @@ function createHeadlessEngine(){
   const s=j.state;if(!s)return null;
   if(j.id==='sponsor')return {job:j.id,stage:s.stage,year:s.year,candidates:s.candidates.map(c=>({id:c.id,name:c.name,industry:c.industry,annual:c.annual})),selected:s.selected,contract:s.stage==='result'?sponsorContract(team,s.year):null};
   return {job:j.id,stage:s.stage,year:s.year,due:s.due,plan:s.plan,players:s.players,name:s.name,fee:s.fee,perk:s.perk,color:s.color,font:s.font,delta:s.delta,choice:s.choice,report:s.report,result:s.result,
-   ...(j.id==='fan-fest'?{plans:FAN_FEST_PLANS.map((p,index)=>({index,name:p.name,cost:p.cost}))}:{}),
+   ...(['fan-fest','opening-promo'].includes(j.id)?{plans:(j.id==='fan-fest'?FAN_FEST_PLANS:OPENING_PROMO_PLANS).map((p,index)=>({index,name:p.name,cost:p.cost}))}:{}),
    ...(j.id==='tv'?{eligible:own(team).filter(p=>!retirementScheduled(p)).map(p=>({id:p.id,name:p.name,pos:p.pos}))}:{}),
    ...(j.id==='fanclub'?{perks:FAN_PERKS.map(([key,label,cost])=>({key,label,cost})),estimate:fanEstimate(team,s)}:{}),
    ...(j.id==='broadcast'?{base:commerceBase(team),chance:broadcastChance(s.delta),contract:commerceData(team).broadcasts[s.year]||null}:{}),
@@ -85,11 +87,26 @@ function createHeadlessEngine(){
    deals:active&&d?(d.deals||[]).filter(a=>a.from===team.id||a.to===team.id).map(a=>({id:a.id,kind:a.kind,from:a.from,to:a.to,salary:a.salary,years:a.years,rank:a.rank,comp:a.comp,compMode:a.compMode,compOptions:d.cpuDone?movementCompOptions(d,a).map(p=>({id:p.id,name:p.name,pos:p.pos})):[]})):[],
    free:active&&x.view==='other'&&!x.news&&!d.cpuDone?movementPool(d).filter(r=>r.kind==='free').map(r=>({id:r.id,name:getPlayer(r.id).name,demand:r.demand})):[]};
  };
+ const preView=f=>{
+  const phase=f.active,j=f.jobs[phase];
+  if(!['booking','self','winter-return','camp','exhibition'].includes(phase))return null;
+  if(phase==='winter-return'){
+   const r=game.annualTraining?.results?.[(game.year-1)+':winter'];
+   return {phase,report:r?.returned?{rows:r.rows||[],entries:(r.entries||[]).filter(e=>e.teamId===team.id)}:null};
+  }
+  if(['booking','camp'].includes(phase)){
+   const p=annualPlan(team,'camp'),sites=campChoice(team),r=annualReport('camp');
+   return {phase,sites,step:p.step||0,paid:!!p.paid,cost:campCost(sites),visit:p.visit||null,visitPending:!!p.visitPending,options:CAMP_SITES.map(([key,label,cost])=>({key,label,cost})),report:r?{rows:r.rows,clubs:r.clubs,cost:r.cost,sites:r.sites}:null};
+  }
+  const r=annualReport(phase);
+  if(phase==='exhibition')return {phase,policy:annualPlan(team,phase).exhibition,meeting:!!j.state.reportMeeting,report:r?{games:r.games.filter(g=>g.home===team.id||g.away===team.id),rows:r.rows,leagueGames:r.games.length}:null};
+  return {phase,...trainingView(phase),support:!!j.state.reportSelfSupport,supportOptions:Object.entries(CLUB_SUPPORT).filter(([k,p])=>p.phase?.includes('self')).map(([key,p])=>({key,label:p.label,cost:p.cost,eligible:clubSupportEligible(team,key,'self')}))};
+ };
  const annualView=()=>{
   const f=flowGet(),d=movementData();
   if(!f)return {mode:null,canStart:game.day===143&&game.calendarIndex===game.calendar.days.length&&!game.financeCrisis&&!flowInbox()&&!game.pendingMonth&&!game.pendingReview&&!pendingMilestoneNews().length&&!flowForeignResponse()};
   const tasks=Object.values(f.jobs).map(j=>({id:j.id,start:j.start,status:j.status,supported:annualSupported.includes(j.id)}));
-  return {mode:f.mode,date:f.date,active:f.active,tasks,market:marketView(f),commerce:commercialJobs.includes(f.active)?commercialView(f,f.jobs[f.active]):null,canAdvance:!f.active&&!flowInbox()&&!game.financeCrisis&&!flowBlocking(f),renewal:['renewal1','renewal2'].includes(f.active)?renewalView():null,training:['autumn','winter'].includes(f.active)?trainingView(f.active):null,draft:f.active==='draft'?draftView(game.draft):null,roster:f.active==='roster-cut'?{projection:draftRosterProjection(game.draft,team),selected:draftCutIds(game.draft,team),eligible:draftCutOptions(game.draft,team).map(p=>({id:p.id,name:p.name,pos:p.pos,salary:p.salary,warnings:draftCutReasons(p)}))}:null,requests:f.active==='movement-declarations'?(d?.requests||[]).filter(r=>r.from===team.id).map(r=>({id:r.id,kind:r.kind,status:r.status,demand:r.demand,offer:r.offer})):[]};
+  return {mode:f.mode,date:f.date,active:f.active,tasks,preseason:preView(f),market:marketView(f),commerce:commercialJobs.includes(f.active)?commercialView(f,f.jobs[f.active]):null,canAdvance:!f.active&&!flowInbox()&&!game.financeCrisis&&!flowBlocking(f),renewal:['renewal1','renewal2'].includes(f.active)?renewalView():null,training:['autumn','winter'].includes(f.active)?trainingView(f.active):null,draft:f.active==='draft'?draftView(game.draft):null,roster:f.active==='roster-cut'?{projection:draftRosterProjection(game.draft,team),selected:draftCutIds(game.draft,team),eligible:draftCutOptions(game.draft,team).map(p=>({id:p.id,name:p.name,pos:p.pos,salary:p.salary,warnings:draftCutReasons(p)}))}:null,requests:f.active==='movement-declarations'?(d?.requests||[]).filter(r=>r.from===team.id).map(r=>({id:r.id,kind:r.kind,status:r.status,demand:r.demand,offer:r.offer})):[]};
  };
  const medical=()=>own(team).filter(p=>rosterTreatmentEligible(p)&&p.injury&&typeof p.injury.date==='string').map(p=>({route:'medical',year:game.year,eventKey:String(p.id)+':'+p.injury.date,label:p.name+' 特別治療',playerId:p.id,date:p.injury.date}));
  // Same eligibility as the checked-in manager staff continuation handler:
@@ -191,6 +208,14 @@ function createHeadlessEngine(){
    if(game.financeCrisis||!e||input.eventKey!==e.id)throw Error('rare acknowledgement unavailable');
    game.pendingRareIds=(game.pendingRareIds||[]).filter(id=>id!==e.id&&!(game.rareNews||[]).some(x=>x.id===id&&rareObsoleteCutin(x)));
    if(!pendingRareNews().length)game.rareResume=false;
+  }else if(kind==='rookie-reveal'){
+   const b=game.pendingDraftReveal,r=b?.entries.find(x=>x.id===input.playerId);if(!r||b.year!==game.year-1||r.revealed||(r.revealStage||0)>=2)throw Error('rookie reveal unavailable');r.revealStage=(r.revealStage||0)+1;
+  }else if(kind==='rookie-finish'){
+   if(!game.pendingDraftReveal||game.pendingDraftReveal.entries.some(r=>!r.revealed&&(r.revealStage||0)<2))throw Error('rookie report unfinished');game.pendingDraftReveal=null;
+  }else if(kind==='decade'){
+   if(game.pendingDecade==null||String(game.pendingDecade)!==input.eventKey)throw Error('decade acknowledgement unavailable');game.lastDecadeViewed=game.pendingDecade;game.pendingDecade=null;game.decadeSection=null;
+  }else if(kind==='opening'){
+   if(flowGet()||game.day!==0||game.pendingCeremonyIntro!=='opening')throw Error('opening acknowledgement unavailable');game.pendingCeremonyIntro=null;
   }else throw Error('unsupported acknowledgement');
   return JSON.stringify(game);
  }
@@ -219,12 +244,12 @@ function createHeadlessEngine(){
    if(!ensureSeasonFinanceClosed())throw Error('season finance not closed');
    f=flowInit();if(!f||f.mode!=='off')throw Error('annual flow unavailable');flowRefresh(f);
   }else{
-   if(!f||f.mode!=='off')throw Error('annual flow unavailable');
+   if(!f||!['off','pre'].includes(f.mode))throw Error('annual flow unavailable');
    if(input.choice==='day'){
     // Never bypass a ready event, and never cross into an unsupported rollover.
     const m=f.jobs['movement-market'];
     if(m?.status==='ready'&&(!m.state||['eve','opening','results'].includes(m.state.news)))throw Error('market news acknowledgement required');
-    if(f.date>=game.year+'-12-31'&&(!m||m.status==='done'||f.date>=String(game.year+1)+'-01-31'))throw Error('annual rollover not connected');
+    if(f.mode==='off'&&f.date>=String(game.year+1)+'-01-31'&&Object.values(f.jobs).some(j=>j.status!=='done'))throw Error('annual market exceeded defensive date bound');
     if(!flowDay(f))throw Error('annual date blocked');
    }else if(input.choice==='open'){
     const j=f.jobs[input.job];
@@ -233,11 +258,11 @@ function createHeadlessEngine(){
     if(!opened)throw Error('annual event unavailable');
     if(j.id==='movement-declarations')movementInit();
     if(['renewal1','renewal2'].includes(j.id))renewalData(team,true);
-    game.pendingCeremonyIntro=null;
+    if(j.id!=='offdesk-opening')game.pendingCeremonyIntro=null;
    }else if(input.choice==='complete'){
     const j=f.jobs[f.active];
     if(!j||j.id!==input.job||!annualSupported.includes(j.id))throw Error('annual event unavailable');
-    if(commercialJobs.includes(j.id)||j.id==='movement-market')throw Error('explicit result confirmation required');
+    if(commercialJobs.includes(j.id)||['movement-market','booking','self','winter-return','camp','exhibition','offdesk-opening'].includes(j.id))throw Error('explicit result confirmation required');
     if(j.id==='movement-declarations'&&movementData()?.requests.some(r=>r.from===team.id&&['request','refused'].includes(r.status)))throw Error('movement decision required');
     if(j.id==='draft'&&(game.draft?.phase!=='done'||game.draft.announcement||game.draft.rareIntro))throw Error('draft unfinished');
     if(j.id==='roster-cut'){
@@ -250,6 +275,48 @@ function createHeadlessEngine(){
     }
     if(['autumn','winter'].includes(j.id)&&!annualReport(j.id))throw Error('training report required');
     flowComplete(f,j);
+   }else if(input.choice==='preseason'){
+    const phase=f.active,j=f.jobs[phase],k=input.decision;
+    if(!j||j.status!=='active'||!['booking','self','winter-return','camp','exhibition'].includes(phase))throw Error('preseason event unavailable');
+    const p=annualPlan(team,'camp',false);
+    if(k==='site'&&['booking','camp'].includes(phase)){
+     const sites=campChoice(team,true),plan=annualPlan(team,'camp',true);
+     if(plan.paid||plan.step||!CAMP_SITES.some(s=>s[0]===input.value))throw Error('camp selection unavailable');
+     if(input.group==='farm'&&CAMP_SITES.indexOf(campSite(input.value))<CAMP_SITES.indexOf(campSite(sites.first)))throw Error('farm site exceeds first team tier');
+     sites[input.group]=input.value;
+     if(CAMP_SITES.indexOf(campSite(sites.farm))<CAMP_SITES.indexOf(campSite(sites.first)))sites.farm=sites.first;
+    }else if(k==='confirm-sites'&&['booking','camp'].includes(phase)){
+     const plan=annualPlan(team,'camp',true),sites=campChoice(team,true);
+     if(plan.paid||plan.step||!refCharge(team,campCost(sites)))throw Error('camp purchase unavailable');
+     plan.paid=true;plan.cost=campCost(sites);plan.step=1;
+     if(phase==='booking')flowComplete(f,j);
+    }else if(k==='kickoff'&&phase==='camp'){
+     if(!p.paid||p.step!==1||annualReport('camp'))throw Error('camp kickoff unavailable');
+     p.step=2;j.state.waiting='visit';j.state.due=annualDate('camp');if(j.state.due<=f.date)j.state.due=calendarOffsetDate(f.date,1);flowPark(f,j,'waiting');
+    }else if(k==='visit'&&phase==='camp'){
+     if(p.step!==2||p.visitPending||annualReport('camp'))throw Error('camp visit unavailable');
+     p.visit=input.value;p.visitPending=true;
+     if(input.value==='inside'||input.value==='outside')game.fans+=input.value==='inside'?250:500;
+     if(input.value==='meeting')game.fieldRating=clamp(game.fieldRating+2,0,100);
+     if(input.value==='outside')game.fieldRating=clamp(game.fieldRating-2,0,100);
+    }else if(k==='visit-finish'&&phase==='camp'){
+     if(p.step!==2||!p.visitPending)throw Error('camp visit unfinished');p.visitPending=false;p.step=3;
+     j.state.waiting='visit';j.state.due=annualDate('camp');if(j.state.due<=f.date)j.state.due=calendarOffsetDate(f.date,1);flowPark(f,j,'waiting');
+    }else if(k==='policy'&&phase==='exhibition'){
+     if(j.state.reportMeeting||annualReport(phase))throw Error('exhibition policy locked');annualPlan(team,phase,true).exhibition=input.value;
+    }else if(k==='support'&&phase==='self'){
+     if(!j.state.reportSelfSupport||annualReport(phase)||!CLUB_SUPPORT[input.value]?.phase?.includes('self')||!clubSupportSpend(team,input.value,'self'))throw Error('training support unavailable');
+    }else if(k==='run'&&['self','camp','exhibition'].includes(phase)){
+     if(annualReport(phase)||phase==='camp'&&p.step!==3)throw Error('preseason run unavailable');
+     if(phase==='self'&&!j.state.reportSelfSupport)j.state.reportSelfSupport=true;
+     else if(phase==='exhibition'&&!j.state.reportMeetingDone){j.state.reportMeeting=true;j.state.reportMeetingDone=true;}
+     else{j.state.reportMeeting=false;j.state.waiting=true;j.state.due=annualDate(phase,true);if(j.state.due<=f.date)j.state.due=calendarOffsetDate(f.date,1);flowPark(f,j,'waiting');}
+    }else if(k==='finish'){
+     if(phase==='winter-return'){
+      const r=game.annualTraining?.results?.[(game.year-1)+':winter'];if(!r?.returned)throw Error('winter return report missing');
+     }else if(!['self','camp','exhibition'].includes(phase)||!annualReport(phase))throw Error('preseason report missing');
+     flowComplete(f,j);
+    }else throw Error('preseason decision unavailable');
    }else if(input.choice==='market'){
     const j=f.jobs['movement-market'],k=input.decision;
     if(!j)throw Error('market unavailable');
@@ -324,8 +391,8 @@ function createHeadlessEngine(){
      if(job!=='fanclub'||s.stage!=='selection')throw Error('fanclub name unavailable');
      s.name=input.value;
     }else{
-     const action={start:'commerce-start',back:'commerce-back',finish:'commerce-finish',confirm:'commerce-confirm',decline:'commerce-decline',park:'commerce-schedule-finish',plan:'commerce-plan',player:'commerce-player',fee:'commerce-fee',perk:'commerce-perk',color:'commerce-color',font:'commerce-font',delta:'commerce-delta',choice:'commerce-choice',live:'commerce-live-finish',tv:'commerce-tv-finish'}[k];
-     const allowed={plan:['fan-fest'],player:['tv'],fee:['fanclub'],perk:['fanclub'],color:['fanclub'],font:['fanclub'],delta:['broadcast'],choice:['naming'],live:['fan-fest'],tv:['tv'],park:['fan-fest','tv'],decline:['fan-fest','tv']};
+     const action={start:'commerce-start',back:'commerce-back',finish:'commerce-finish',confirm:'commerce-confirm',decline:'commerce-decline',park:'commerce-schedule-finish',plan:'commerce-plan',player:'commerce-player',fee:'commerce-fee',perk:'commerce-perk',color:'commerce-color',font:'commerce-font',delta:'commerce-delta',choice:'commerce-choice',live:'commerce-live-finish',tv:'commerce-tv-finish',opening:'commerce-opening-live-finish'}[k];
+     const allowed={plan:['fan-fest','opening-promo'],player:['tv'],fee:['fanclub'],perk:['fanclub'],color:['fanclub'],font:['fanclub'],delta:['broadcast'],choice:['naming'],live:['fan-fest'],tv:['tv'],opening:['opening-promo'],park:['fan-fest','tv','opening-promo'],decline:['fan-fest','tv','opening-promo']};
      if(!action||allowed[k]&&!allowed[k].includes(job))throw Error('commerce decision unavailable');
      if(k==='player'&&!s.players.includes(input.value)&&s.players.length>=5)throw Error('TV roster full');
      if(!commerceAction(action,{dataset:{value:String(input.value??'')}}))throw Error('commerce decision rejected');
@@ -353,8 +420,8 @@ function createHeadlessEngine(){
     }else throw Error('renewal operation unavailable');
    }else if(input.choice==='training'){
     const phase=f.active,j=f.jobs[phase],k=input.decision;
-    if(!['autumn','winter'].includes(phase)||game.ceremonyStage!==phase||annualReport(phase)||!j?.state?.open)throw Error('training operation unavailable');
-    if(k==='menu'&&phase==='autumn'){
+    if(!['autumn','winter','self'].includes(phase)||game.ceremonyStage!==phase||annualReport(phase)||!j?.state?.open)throw Error('training operation unavailable');
+    if(k==='menu'&&['autumn','self'].includes(phase)&&!j.state.reportSelfSupport){
      const p=annualPlayers(team,phase).find(p=>p.id===input.playerId);
      if(!p||!['balanced',...seasonSkillKeys(p)].includes(input.focus)||p.injury&&input.intensity!=='rest')throw Error('training menu unavailable');
      annualPlan(team,phase,true).menus[p.id]={focus:input.focus,intensity:input.intensity};
@@ -364,7 +431,7 @@ function createHeadlessEngine(){
      if(input.destination==='none')delete plan[p.id];else{if(!plan[p.id]&&Object.keys(plan).length>=4)throw Error('winter roster full');plan[p.id]=input.destination;}
      if(winterCost(plan)>team.cash)throw Error('winter budget insufficient');
      annualPlan(team,'winter',true).destinations=plan;
-    }else if(k==='run'){
+    }else if(k==='run'&&phase!=='self'){
      if(!ensureSeasonFinanceClosed())throw Error('season finance not closed');
      if(phase==='winter'){if(!annualRunPhase('winter'))throw Error('winter dispatch unavailable');}
      else{const x=j.state;x.waiting=true;x.due=annualDate(phase,true);if(x.due<=f.date)x.due=calendarOffsetDate(f.date,1);flowPark(f,j,'waiting');}
@@ -418,7 +485,7 @@ function createHeadlessEngine(){
  if(op==='advance'){
   // Verified entitlement is supplied by the authority, not a command or save.
   vipStatusProvider=()=>({verified:true,vip:input.verifiedVip===true});
-  if(game.day>=143||game.financeCrisis)throw Error('pilot season boundary');
+  if(game.day>=143||game.financeCrisis||flowGet()||game.pendingCeremonyIntro==='opening'||game.pendingDraftReveal||game.pendingDecade!=null)throw Error('pilot season boundary');
   if(pendingRareNews().length||game.pendingMilestoneIds?.length||game.pendingEvent||game.pendingMonth||game.pendingReview||careerEventPending()||foreignHasCounter())throw Error('pilot event acknowledgement required');
   const e=processCalendarDay();if(!e)throw Error('calendar ended');
   collectMilestoneNews(e);scoutDiscoveryDaily(e);rareDaily(e);careerDecisionTick(e);
@@ -463,8 +530,18 @@ function createHeadlessEngine(){
   advance(state,command,rights){
    const verifiedVip=rights?.verified===true&&rights.vip===true;
    if(exact(command,['annual'])&&['start','day'].includes(command.annual))return run('annual',state,{choice:command.annual,verifiedVip});
-   if(exact(command,['annual','job'])&&['open','complete'].includes(command.annual)&&['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter','fan-fest','tv','fanclub','sponsor','broadcast','naming'].includes(command.job))return run('annual',state,{choice:command.annual,job:command.job,verifiedVip});
+   if(exact(command,['annual','job'])&&['open','complete'].includes(command.annual)&&['awards-all','settlement','movement-declarations','draft','roster-cut','renewal1','renewal2','autumn','winter','fan-fest','tv','fanclub','sponsor','broadcast','naming','booking','self','winter-return','camp','exhibition','opening-promo','offdesk-opening'].includes(command.job))return run('annual',state,{choice:command.annual,job:command.job,verifiedVip});
    if(exact(command,['annual','playerId'])&&command.annual==='cut'&&Number.isSafeInteger(command.playerId))return run('annual',state,{choice:'cut',playerId:command.playerId,verifiedVip});
+   if(command?.annual==='preseason'){
+    const k=command.decision,base=['annual','decision'];
+    let valid=['confirm-sites','kickoff','visit-finish','run','finish'].includes(k)&&exact(command,base);
+    if(k==='site')valid=exact(command,[...base,'group','value'])&&['first','farm'].includes(command.group)&&['usa','miyazaki','ginowan','naha','korea','taiwan','ishigaki','miyako','kagoshima','ehime','amami','club','none'].includes(command.value);
+    if(k==='visit')valid=exact(command,[...base,'value'])&&['inside','outside','rest','meeting'].includes(command.value);
+    if(k==='policy')valid=exact(command,[...base,'value'])&&['balanced','first','youth'].includes(command.value);
+    if(k==='support')valid=exact(command,[...base,'value'])&&['drinks','training'].includes(command.value);
+    if(!valid)throw Error('invalid preseason command');
+    return run('annual',state,{choice:'preseason',decision:k,group:command.group,value:command.value,verifiedVip});
+   }
    if(command?.annual==='market'){
     const k=command.decision,base=['annual','decision'],id=n=>Number.isSafeInteger(n)&&n>0;
     let valid=['news','home','close','finish'].includes(k)&&exact(command,base);
@@ -480,7 +557,7 @@ function createHeadlessEngine(){
    }
    if(command?.annual==='commerce'){
     const k=command.decision,base=['annual','decision'],v=command.value;
-    let valid=['start','back','finish','confirm','decline','park','live','tv'].includes(k)&&exact(command,base);
+    let valid=['start','back','finish','confirm','decline','park','live','tv','opening'].includes(k)&&exact(command,base);
     if(exact(command,[...base,'value'])){
      if(k==='name')valid=typeof v==='string'&&v.trim().length>0&&v.length<=30&&!/[\u0000-\u001f]/.test(v);
      else if(k==='toggle')valid=typeof v==='string'&&v.length<=100;
@@ -525,10 +602,11 @@ function createHeadlessEngine(){
    }
    if(exact(command,['annual','playerId','decision'])&&command.annual==='movement'&&Number.isSafeInteger(command.playerId)&&['allow','deny'].includes(command.decision))return run('annual',state,{choice:'movement',playerId:command.playerId,decision:command.decision,verifiedVip});
    if(exact(command,['annual','playerId','decision','multiplier'])&&command.annual==='movement'&&Number.isSafeInteger(command.playerId)&&command.decision==='retain'&&[1,1.15].includes(command.multiplier))return run('annual',state,{choice:'movement',playerId:command.playerId,decision:command.decision,multiplier:command.multiplier,verifiedVip});
-   if(exact(command,['acknowledge','eventKey'])&&['injury','rare'].includes(command.acknowledge)&&typeof command.eventKey==='string'&&command.eventKey.length<=512)return run('ack',state,{kind:command.acknowledge,eventKey:command.eventKey});
+   if(exact(command,['acknowledge','eventKey'])&&['injury','rare','decade'].includes(command.acknowledge)&&typeof command.eventKey==='string'&&command.eventKey.length<=512)return run('ack',state,{kind:command.acknowledge,eventKey:command.eventKey});
    if(exact(command,['career','playerId','options'])&&command.career==='accept'&&Number.isSafeInteger(command.playerId)&&Array.isArray(command.options)&&command.options.length<=5&&command.options.every(x=>typeof x==='string'))return run('career',state,{choice:'accept',playerId:command.playerId,options:command.options});
    if(exact(command,['career','playerId'])&&command.career==='dismiss'&&Number.isSafeInteger(command.playerId))return run('career',state,{choice:'dismiss',playerId:command.playerId});
-   if(exact(command,['acknowledge'])&&['month','milestones'].includes(command.acknowledge))return run('ack',state,{kind:command.acknowledge});if(!exact(command,['step'])||command.step!==1)throw Error('pilot accepts one calendar day or explicit report acknowledgement');return run('advance',state,{verifiedVip:rights?.verified===true&&rights.vip===true});},
+   if(exact(command,['acknowledge','playerId'])&&command.acknowledge==='rookie-reveal'&&Number.isSafeInteger(command.playerId))return run('ack',state,{kind:'rookie-reveal',playerId:command.playerId});
+   if(exact(command,['acknowledge'])&&['month','milestones','rookie-finish','opening'].includes(command.acknowledge))return run('ack',state,{kind:command.acknowledge});if(!exact(command,['step'])||command.step!==1)throw Error('pilot accepts one calendar day or explicit report acknowledgement');return run('advance',state,{verifiedVip:rights?.verified===true&&rights.vip===true});},
   actions:state=>run('actions',state),achievements:state=>run('achievements',state).map(e=>e.key.startsWith('memorial:')?{...e,key:'memorial:'+createHash('sha256').update(e.key).digest('hex')}:e),view:state=>run('view',state),
   applyAction(state,action){if(!['medical','manager','retirement','draft-revival','foreign-revival','lottery','fa-retention','fa-sign'].includes(action?.route))throw Error('pilot route unavailable');return run('apply',state,{action:{route:action.route,eventKey:action.eventKey}});}
  });
