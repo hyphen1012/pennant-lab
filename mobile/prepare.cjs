@@ -15,6 +15,8 @@ const oauthEnabled=!!accountApi||Object.values(oauthFields).some(Boolean);
 const validHttps=s=>{try{const u=new URL(s);return u.protocol==='https:'&&!u.username&&!u.password&&!u.search&&!u.hash;}catch{return false;}};
 if(oauthEnabled&&(!validHttps(accountApi)||!['authorizeUrl','tokenUrl','issuer'].every(k=>validHttps(oauthFields[k]))||!oauthFields.clientId||!oauthFields.scope||oauthFields.redirectUri!==require('./capacitor.config.json').appId+'://auth/callback'))throw Error('Complete valid OAuth/API configuration required');
 const oauth=oauthEnabled?oauthFields:null;
+const billingCatalog=process.env.PL_BILLING_CATALOG_JSON?JSON.parse(process.env.PL_BILLING_CATALOG_JSON):null;
+if(billingCatalog!==null){if(!oauthEnabled||!billingCatalog||Object.keys(billingCatalog).sort().join(',')!=='android,ios')throw Error('billing catalog requires authenticated API and both platforms');for(const [platform,rows] of Object.entries(billingCatalog)){require('./src/native-billing-adapter.cjs').createNativeBillingAdapter({plugin:{},platform,catalog:rows,account:()=>null,online:()=>false});if(rows.some(r=>typeof r.label!=='string'||!r.label.trim()||r.label.length>100))throw Error('product label required');}}
 const health=process.env.PL_HEALTH_URL||'https://hyphen1012.github.io/pennant-lab/health.txt';
 if(!health.startsWith('https://'))throw Error('HTTPS health endpoint required');
 fs.rmSync(out,{recursive:true,force:true});fs.mkdirSync(out,{recursive:true});fs.cpSync(path.join(root,'assets'),path.join(out,'assets'),{recursive:true});
@@ -44,6 +46,6 @@ html=html.replace('<div class="title-slot-title">','<button type="button" class=
 if(production)html=require('./release-surface.cjs').releaseSurface(html);
 const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];if(!script)throw Error('game script missing');new Function(script);
 fs.writeFileSync(path.join(out,'index.html'),html);
-esbuild.buildSync({entryPoints:[path.join(__dirname,'src/index.js')],bundle:true,format:'iife',platform:'browser',outfile:path.join(out,'native-runtime.js'),define:{__PL_CONFIG__:JSON.stringify({health,units,production,accountApi,oauth})}});
+esbuild.buildSync({entryPoints:[path.join(__dirname,'src/index.js')],bundle:true,format:'iife',platform:'browser',outfile:path.join(out,'native-runtime.js'),define:{__PL_CONFIG__:JSON.stringify({health,units,production,accountApi,oauth,billingCatalog})}});
 fs.writeFileSync(path.join(__dirname,'native-build-config.json'),JSON.stringify({apps,production,oauth},null,2));
 console.log('Prepared native web assets',production?'production configuration':'Google test ads');

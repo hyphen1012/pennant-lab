@@ -6473,7 +6473,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     return `<div class="title-screen save-terminal multiverse-terminal"><header class="save-terminal-head"><span class="title-serial">VERSION 0.9.189 · CLUB LEGACY</span><button class="ghost-btn" data-action="launch-back">‹ タイトル</button></header><div class="title-slot-title">セーブデータを選択</div><div class="multiverse-map" aria-label="セーブデータを選択">${cosmicAtlas()}<div class="title-slots">${[1,2,3].map(i=>{
       const d=slotData(i),t=d?.teams?.find(t=>t.id===d.selectedId),started=!!(d?.started&&t);
       return `<div class="save-slot-group" data-slot-group="${i}" style="--world-tone:${WORLD_TONES[i-1]}"><button class="save-slot world-node ${started?'has-game':'empty-slot'} ${t?leagueClass(t.league):''}" data-action="${started?'continue-slot':'new-slot'}" data-slot="${i}">${worldOrb(i,t,started)}<span class="slot-label world-label"><span class="world-number">DATA 0${i} <i></i></span>${started?`<strong>${h(t.name)}</strong><small>${leagueTag(t.league)}　${d.year}年</small><small>${d.day}/143試合 · ${h(d.gmName||'GM')}</small><small>${t.wins||0}勝　${fmtMoney(t.cash)}</small>`:`<strong>新しい球団で始める</strong><small>空きデータ ${i}</small>`}</span></button><button class="slot-delete-button" data-action="slot-delete" data-slot="${i}" aria-label="DATA ${i} のセーブデータを削除">削除</button></div>`;
-    }).join('')}</div></div><p class="save-terminal-hint">長押し・左スワイプでデータ管理</p>${accountContext&&accountCurrent()?'<button type="button" class="btn outline full" data-cloud-save-open>クラウドセーブ管理 ›</button><button type="button" class="btn outline full" data-cloud-account-logout>ログアウト</button>':''}<button class="btn outline full" data-action="rare-preview-open">特殊選手の演出確認モード ›</button><div class="title-info">本体データは端末内データベースに保存されます。バックアップは「経営」からJSON形式で書き出せます。<br>v0.3以前のテストセーブは引き継がれません。</div></div>`;
+    }).join('')}</div></div><p class="save-terminal-hint">長押し・左スワイプでデータ管理</p>${accountContext&&accountCurrent()?'<button type="button" class="btn outline full" data-cloud-save-open>クラウドセーブ管理 ›</button><button type="button" class="btn outline full" data-cloud-account-logout>ログアウト</button>':''}${accountContext&&accountCurrent()&&window.PennantNative?.billingAvailable?'<button type="button" class="btn outline full" data-native-billing>ストア・購入管理 ›</button>':''}<button class="btn outline full" data-action="rare-preview-open">特殊選手の演出確認モード ›</button><div class="title-info">本体データは端末内データベースに保存されます。バックアップは「経営」からJSON形式で書き出せます。<br>v0.3以前のテストセーブは引き継がれません。</div></div>`;
   }
   // Gestures reveal a separate button; never delete or load as a side effect of a gesture.
   let slotGesture=null,slotGestureTimer=null,slotClickBlock=null;
@@ -14948,6 +14948,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   // Cloud management is only available at the save selector. The game holds
   // its slot-open lock until the dialog closes and all previews are refreshed.
   document.addEventListener('click',e=>{
+    if(e.target.closest?.('[data-native-billing]')){
+      e.preventDefault();e.stopImmediatePropagation();
+      if(!accountContext||!accountCurrent()||ui.page!=='title'||ui.launchTitle||slotOpening||slotDeleteDialog||ui.busy||ui.rewardBusy||scenarioLab||storageFailure||typeof window.PennantNative?.openBilling!=='function')return;
+      slotOpening=true;render();
+      void (async()=>{try{await saveQueue;if(storageFailure||!accountCurrent())throw Error('Save state unavailable');await window.PennantNative.openBilling();}catch{showToast('ストア情報を確認できませんでした。',true);}finally{slotOpening=false;render();}})();
+      return;
+    }
     if(e.target.closest?.('[data-cloud-account-logout]')){
       e.preventDefault();e.stopImmediatePropagation();
       if(!accountContext||!accountCurrent()||ui.page!=='title'||ui.launchTitle||slotOpening||slotDeleteDialog||ui.busy||ui.rewardBusy||scenarioLab||storageFailure||typeof window.PennantNative?.logoutAccount!=='function')return;

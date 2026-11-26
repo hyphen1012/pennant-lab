@@ -1,10 +1,11 @@
-import {Capacitor,CapacitorHttp} from '@capacitor/core';
+import {Capacitor,CapacitorHttp,registerPlugin} from '@capacitor/core';
 import {App} from '@capacitor/app';
 import {Browser} from '@capacitor/browser';
 import {createNativeOAuth} from './native-oauth.cjs';
 import {createAccountBootstrap} from './account-bootstrap.cjs';
 import {createEntitlementBridge} from './entitlement-bridge.cjs';
 import {createCommerceLifecycle} from './commerce-lifecycle.cjs';
+import {openNativeBillingDialog} from './native-billing-dialog.cjs';
 import {Filesystem,Directory,Encoding} from '@capacitor/filesystem';
 import {Share} from '@capacitor/share';
 import {AdMob,AdmobConsentStatus} from '@capacitor-community/admob';
@@ -16,7 +17,8 @@ if(native){
   const accountEnabled=!!(config.accountApi&&config.oauth);
   let accountAccess=!accountEnabled,accountInitialized=false,authStarted=false,accountEpoch=0,checkingIdentity=null,identityAt=-Infinity;
   let appActive=true,visible=!document.hidden;
-  let bootstrap=null,provider=null,life=null;
+  let bootstrap=null,provider=null,life=null,bridge=null,billingDialog=null;
+  const billingPlugin=registerPlugin('PennantBilling');
   function usable(){return gate.ready()&&accountAccess;}
   // Prior to title tap, only the startup movie and title may be shown.
   function interfaceReady(){return usable()||(accountEnabled&&!authStarted&&!accountInitialized&&gate.ready());}
@@ -45,7 +47,7 @@ if(native){
   }
   function suspendAccount(){
     if(!accountEnabled)return;
-    accountEpoch++;accountAccess=false;identityAt=-Infinity;bootstrap?.suspend();life?.invalidate();
+    accountEpoch++;accountAccess=false;identityAt=-Infinity;bootstrap?.suspend();billingDialog?.abort();life?.invalidate();
   }
   async function verifyIdentity(){
     if(!accountEnabled)return true;
@@ -78,10 +80,10 @@ if(native){
   },onChange:update});
   if(accountEnabled){
     provider=createNativeOAuth({config:config.oauth,openExternal:url=>Browser.open({url}),closeExternal:()=>Browser.close()});
-    const bridge=createEntitlementBridge({baseUrl:config.accountApi});
+    bridge=createEntitlementBridge({baseUrl:config.accountApi});
     life=createCommerceLifecycle({bridge,online:async()=>usable()});
     life.setVisible(visible);life.setActive(appActive);
-    bootstrap=createAccountBootstrap({baseUrl:config.accountApi,provider,online:usable,onSession:s=>life.setSession(s)});
+    bootstrap=createAccountBootstrap({baseUrl:config.accountApi,provider,online:usable,onSession:s=>{billingDialog?.abort();life.setSession(s);}});
   }
   let accountReadyTask=null;
   async function accountReady(){
@@ -133,6 +135,8 @@ if(native){
   window.PennantNative={
     ready:interfaceReady,check:async force=>await gate.check(force)&&interfaceReady(),accountRequired:accountEnabled,reward:config.production?null:reward,
     get accountContext(){return bootstrap?.context()??null;},accountReady,
+    billingAvailable:!!config.billingCatalog,
+    async openBilling(){const ctx=bootstrap?.context();if(!ctx?.isCurrent()||!usable()||billingDialog||!config.billingCatalog)throw Error('billing unavailable');const ctl=new AbortController();billingDialog=ctl;try{await openNativeBillingDialog({plugin:billingPlugin,platform:Capacitor.getPlatform(),catalog:config.billingCatalog[Capacitor.getPlatform()],account:()=>ctx.isCurrent()?ctx.account:null,online:usable,bridge,signal:ctl.signal,transactionsEnabled:false});}finally{if(billingDialog===ctl)billingDialog=null;}},
     logoutAccount(){if(!accountEnabled)return;accountAccess=false;provider.logout();bootstrap.invalidate();suspendAccount();paint(false);window.location.reload();}, // SDK callback is development-only; no production reward authority
     setBackup(fn){backup=fn;paint(interfaceReady());},
     async exportSave(json,name){
