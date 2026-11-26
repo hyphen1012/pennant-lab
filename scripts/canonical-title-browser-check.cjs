@@ -104,7 +104,23 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   a.equal(await page.locator('.player-card').count(),afterOps.game.club.roster.length);
   const targetMode=afterOps.game.club.farmMode==='manual'?'auto':'manual';
   page.once('dialog',d=>d.accept());await page.locator('[data-action="canonical-farm-mode"][data-mode="'+targetMode+'"]').click();await page.getByText('サーバーに変更を保存しました。').waitFor();
-  const afterFarm=await post('read',{slot:2});a.equal(afterFarm.revision,afterOps.revision+1);a.equal(afterFarm.game.club.farmMode,targetMode);
+  let afterFarm=await post('read',{slot:2});a.equal(afterFarm.revision,afterOps.revision+1);a.equal(afterFarm.game.club.farmMode,targetMode);
+  if(afterFarm.game.club.farmMode!=='manual'){
+    page.once('dialog',d=>d.accept());await page.locator('[data-action="canonical-farm-mode"][data-mode="manual"]').click();await page.getByText('サーバーに変更を保存しました。').waitFor();afterFarm=await post('read',{slot:2});
+  }
+  const farm=afterFarm.game.club,bench=farm.roster.find(p=>p.tier===2&&!p.injured);
+  if(bench&&farm.roster.filter(p=>p.tier===1).length<farm.farmLimit){
+    page.once('dialog',d=>d.accept());await page.locator('[data-action="canonical-farm-move"][data-id="'+bench.id+'"]').click();await page.getByText('サーバーに変更を保存しました。').waitFor();
+    const promoted=await post('read',{slot:2});a.equal(promoted.revision,afterFarm.revision+1);a.equal(promoted.game.club.roster.find(p=>p.id===bench.id).tier,1);
+  }
+  await page.locator('[data-action="canonical-ops-back"]').click();
+  await page.locator('[data-action="canonical-ops-open"][data-kind="free"]').click();await page.locator('[data-action="canonical-free-next"]').waitFor();
+  const beforeSign=await post('read',{slot:2}),free=await post('free-page',{slot:2,world:beforeSign.world,revision:beforeSign.revision,command:{offset:0,limit:30,query:''}});
+  const affordable=free.page.items.find(p=>p.cost<=beforeSign.game.team.cash);
+  if(affordable&&beforeSign.game.club.roster.length<beforeSign.game.club.rosterLimit){
+    page.once('dialog',d=>d.accept());await page.locator('[data-action="canonical-free-sign"][data-id="'+affordable.id+'"]').click();await page.getByText('サーバーに変更を保存しました。').waitFor();await page.locator('[data-action="canonical-free-next"]').waitFor();
+    const signed=await post('read',{slot:2});a.equal(signed.revision,beforeSign.revision+1);a.ok(signed.game.club.roster.some(p=>p.id===affordable.id));
+  }
   await page.locator('[data-action="canonical-ops-back"]').click();
   await page.locator('[data-action="canonical-return"]').first().click();await slot(3).waitFor();
   clockOffset+=61000;
