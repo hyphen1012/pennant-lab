@@ -12257,6 +12257,30 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     x.prices=old;
     if(stadiumSetPrices(t,best)){cpuLog(t,date,'price','チケット価格を見直し');return true;}return false;
   }
+  // Trial F: choose sales terms from expected contract proceeds and existing
+  // risk, without looking at the deterministic future negotiation/incident hash.
+  function cpuSponsorPlan(t,candidates){
+    const style=cpuEconomy(t).style,ordered=candidates.slice().sort((p,q)=>q.annual-p.annual||p.id.localeCompare(q.id));
+    const demand=stadiumDemand(t,null,null,Math.max(1,game.day)),gate=(demand.ticket+demand.food+demand.goods)*71.5/1e8;
+    const riskWeight=[1.35,1.0,.8][style]??1;
+    let best={ids:[],score:0};
+    for(let n=1;n<=ordered.length;n++){
+      const risk=sponsorRisk(n),annual=sponsorAnnual(ordered.slice(0,n));
+      // Conservative half-year lost income plus a full-season fan-loss stress.
+      const score=annual*(1-.5*risk.cancellation/100)-riskWeight*gate*.008*(1+risk.burden/100);
+      if(score>best.score)best={ids:ordered.slice(0,n).map(p=>p.id),score};
+    }
+    return best.ids;
+  }
+  function cpuBroadcastPlan(t){
+    const style=cpuEconomy(t).style,stress=t.cash<cpuReserve(t)?2:[.75,.3,.5][style]??.5;
+    let best=0,score=-Infinity;
+    for(let delta=0;delta<=3;delta++){
+      const p=broadcastChance(delta)/100,value=p*delta-(1-p)*(1+stress);
+      if(value>score){score=value;best=delta;}
+    }
+    return best;
+  }
   function cpuCommercialCalendar(f){
     if(!f||scenarioLab)return;const date=f.date,y=f.year,next=y+1;
     for(const t of game.teams){
@@ -12271,8 +12295,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         }
         if(date>=y+'-12-17'&&!d.events.some(e=>e.year===y&&e.id==='tv')){const players=own(t).filter(p=>!retirementScheduled(p)).sort((p,q)=>rating(q)-rating(p)).slice(0,5).map(p=>p.id);commerceEvent(t,y,'tv',{players,decline:players.length!==5},date);}
         if(date>=y+'-12-21'){
-          if(!sponsorContract(t,next)){const cs=sponsorCandidates(t,next).sort((p,q)=>q.annual-p.annual),n=t.cash<cpuReserve(t)?10:[5,7,8][a.style];if(sponsorSign(t,next,cs.slice(0,n).map(p=>p.id),date,cs))cpuLog(t,date,'sales',n+'社とスポンサー契約');}
-          if(!d.broadcasts[next]){const delta=t.cash<cpuReserve(t)?0:a.style===0?1:a.style===1?2:1;if(broadcastSign(t,next,delta))cpuLog(t,date,'sales','放映権契約');}
+          if(!sponsorContract(t,next)){const cs=sponsorCandidates(t,next),ids=cpuSponsorPlan(t,cs);if(sponsorSign(t,next,ids,date,cs))cpuLog(t,date,'sales',ids.length+'社とスポンサー契約');}
+          if(!d.broadcasts[next]){const delta=cpuBroadcastPlan(t);if(broadcastSign(t,next,delta))cpuLog(t,date,'sales','放映権契約');}
           if(!commerceNaming(t,next)){const n=NAMING_OPTIONS.slice().sort((p,q)=>a.style===0?p.years-q.years:q.annual-p.annual)[0];d.names.push({...n,start:next,end:next+n.years-1});cpuLog(t,date,'sales','命名権契約');}
         }
       }else if(f.mode==='pre'){
