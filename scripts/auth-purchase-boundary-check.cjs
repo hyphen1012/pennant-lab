@@ -11,7 +11,7 @@ const {createStorePurchaseFlow}=require('../mobile/src/store-purchase-flow.cjs')
  let finish=0,restore=0,mode='pending',verified=false;
  const bridge={invalidate(){},status:()=>({verified}),restorePurchase:async()=>{restore++;return {verified};}};
  const sdk={products:async()=>[{id:'test-product',formattedPrice:'TEST'}],purchase:async id=>({id,status:mode,store:'apple',proof:'fixture'}),restore:async()=>[],finish:async()=>{finish++;}};
- const flow=createStorePurchaseFlow({sdk,bridge,catalog:['test-product']});
+ const flow=createStorePurchaseFlow({sdk,bridge,catalog:['test-product'],authorizeFinish:async()=>verified});
  await assert.rejects(flow.list());flow.setAuthenticated(true);await flow.list();
  await assert.rejects(flow.purchase('test-product',false));assert.equal((await flow.purchase('test-product',true)).phase,'pending');assert.equal(restore,0);
  mode='purchased';assert.equal((await flow.purchase('test-product',true)).phase,'verification_required');assert.equal(finish,0);
