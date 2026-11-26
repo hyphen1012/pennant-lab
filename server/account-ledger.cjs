@@ -5,6 +5,7 @@ const {normalizeRights}=require('./purchase-rights.cjs');
 function openLedger(filename){
   const db=new DatabaseSync(filename);
   db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS account_ledger (id TEXT PRIMARY KEY, payload TEXT NOT NULL)');
+  require('./game-authority.cjs').installAuthorityTables(db);
   const read=db.prepare('SELECT payload FROM account_ledger WHERE id=?');
   const write=db.prepare('INSERT INTO account_ledger(id,payload) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload');
   function transact(account,fn){
@@ -12,7 +13,7 @@ function openLedger(filename){
     db.exec('BEGIN IMMEDIATE');
     try{
       const row=read.get(account),state=row?JSON.parse(row.payload):rules.newAccount();
-      const result=fn(state);
+      const result=fn(state,db);
       if(result&&typeof result.then==='function')throw Error('transaction must be synchronous');
       write.run(account,JSON.stringify(state));db.exec('COMMIT');return result;
     }catch(err){db.exec('ROLLBACK');throw err;}
