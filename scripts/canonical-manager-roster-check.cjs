@@ -56,11 +56,18 @@ console.log('PASS manager hiring/renewal, ordinary free-agent and release, archi
 // Isolated rookie disclosure fixture: no premature actual abilities or portrait seed.
 w=engine.newWorld({team:0});
 const rookie=w.players.find(p=>p.teamId===w.selectedId&&!p.retired);
-a.ok(rookie);w.pendingDraftReveal={year:w.year-1,entries:[{id:rookie.id,revealStage:0}]};
-a.equal(v().club,null);a.equal(v().inbox.rookie.entries[0].abilities,null);a.equal(v().inbox.rookie.entries[0].appearanceSeed,null);
+a.ok(rookie);rookie.specialCategory='IMMORTAL';rookie.originCategory='RINNE';rookie.pastLifeAppearance={seed:123,baseCategory:'IMMORTAL'};w.pendingDraftReveal={year:w.year-1,entries:[{id:rookie.id,revealStage:0}]};
+a.equal(v().club,null);a.equal(v().inbox.rookie.entries[0].name,'????');a.equal(v().inbox.rookie.entries[0].pastLifeAppearance,null);a.equal(v().inbox.rookie.entries[0].abilities,null);a.equal(v().inbox.rookie.entries[0].appearanceSeed,null);
 a.throws(()=>engine.advance(w,{acknowledge:'rookie-finish'}));
 a.throws(()=>engine.advance(w,{acknowledge:'rookie-reveal',playerId:-1}));
 go({acknowledge:'rookie-reveal',playerId:rookie.id});a.equal(v().inbox.rookie.entries[0].stage,1);a.equal(v().inbox.rookie.entries[0].abilities,null);a.equal(v().inbox.rookie.entries[0].appearanceSeed,null);
-go({acknowledge:'rookie-reveal',playerId:rookie.id});a.equal(v().inbox.rookie.entries[0].stage,2);a.ok(v().inbox.rookie.entries[0].abilities);a.throws(()=>engine.advance(w,{acknowledge:'rookie-reveal',playerId:rookie.id}));
+go({acknowledge:'rookie-reveal',playerId:rookie.id});a.equal(v().inbox.rookie.entries[0].stage,2);a.ok(v().inbox.rookie.entries[0].abilities);a.equal(v().inbox.rookie.entries[0].pastLifeAppearance.baseCategory,'IMMORTAL');a.throws(()=>engine.advance(w,{acknowledge:'rookie-reveal',playerId:rookie.id}));
 go({acknowledge:'rookie-finish'});a.equal(v().inbox.rookie,null);a.ok(v().club);
 console.log('PASS explicit rookie stage progression, early finish denial and ability/portrait disclosure');
+
+// The archived rare event stays authoritative; undisclosed prospects cannot expose article text.
+const newsPlayer=w.players.find(p=>p.id===rookie.id);const event={id:'test-rare-disclosure',year:w.year,date:'2027-04-01',playerId:newsPlayer.id,category:'IMMORTAL',title:'Saved headline',body:'Saved article'};w.rareNews=[event];w.pendingRareIds=[event.id];
+a.equal(v().inbox.rare.title,event.title);a.equal(v().inbox.rare.body,event.body);a.equal(v().inbox.rare.player.id,newsPlayer.id);
+event.kind='foreign-discovery';a.equal(v().inbox.rare.title,null);a.equal(v().inbox.rare.body,null);a.equal(v().inbox.rare.player,null);
+a.throws(()=>engine.advance(w,{acknowledge:'rare',eventKey:'wrong'}));go({acknowledge:'rare',eventKey:event.id});a.equal(v().inbox.rare,null);a.throws(()=>engine.advance(w,{acknowledge:'rare',eventKey:event.id}));
+console.log('PASS archived rare report and conservative prospect disclosure');

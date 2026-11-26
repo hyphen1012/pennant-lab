@@ -43,14 +43,20 @@ function createHeadlessEngine(){
  const restoredFlow=flowGet();if(restoredFlow?.active&&restoredFlow.jobs[restoredFlow.active]?.state)game.offseasonDesk=restoredFlow.jobs[restoredFlow.active].state;
  const injuryNotice=()=>{const e=game.pendingEvent;return e?.type==='injury'&&e.teamId===team.id&&Number.isSafeInteger(e.playerId)&&typeof e.date==='string'?e:null;};
  const careerNotice=()=>{const e=careerCurrentEvent(),p=e&&getPlayer(e.id),q=p?.retirePlan;return e&&p&&q?.year===game.year&&q.teamId===team.id?{e,p,q}:null;};
+ const rareInbox=e=>{
+  if(!e)return null;
+  const p=getPlayer(e.playerId),prospect=['foreign-discovery','tournament'].includes(e.kind)||String(e.id).includes(':tournament:')||String(e.id).includes(':university:');
+  const known=!!p&&!prospect&&!game.pendingDraftReveal&&!flowForeignResponse()&&rareCinemaKnown(p);
+  return {eventKey:e.id,year:e.year,date:e.date,category:e.category,hidden:!known,title:known?e.title:null,body:known?e.body:null,player:known?{id:p.id,name:p.name,pos:p.pos,age:p.age,teamId:p.teamId,specialCategory:p.specialCategory||null,originCategory:p.originCategory||null,appearanceSeed:p.appearanceSeed??null,pastLifeAppearance:p.pastLifeAppearance||null}:null};
+ };
  const inbox=()=>{
   const injury=injuryNotice(),rare=pendingRareNews()[0],career=careerNotice();
   const review=game.pendingReview,g=review&&game.games.find(x=>x.id===review.gameId&&x.year===review.year);
   const crisis=game.financeCrisis,monthly=game.pendingMonth&&game.monthlyArchive?.find(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id&&m.teamId===team.id),milestones=archivedMilestones()?(game.milestoneNews||[]).filter(m=>game.pendingMilestoneIds.includes(m.id)):[];
   return {monthly:monthly?{month:monthly.month,date:monthly.date,wins:monthly.wins,losses:monthly.losses,ties:monthly.ties,cash:monthly.cashAtClose,finance:monthly.actualFinance?{revenue:monthly.actualFinance.revenue,payroll:monthly.actualFinance.payroll,net:monthly.actualFinance.net}:null,matches:(monthly.matches||[]).map(m=>({date:m.date,opponent:m.opponent,rs:m.rs,ra:m.ra}))}:null,milestones:milestones.slice(0,80).map(m=>({title:m.title,date:m.date})),milestoneCount:milestones.length,review:g?{gameId:String(g.id),date:g.date,home:g.home,away:g.away,homeScore:g.homeScore,awayScore:g.awayScore}:null,
    finance:crisis&&crisis.teamId===team.id?{year:crisis.year,date:crisis.date,shortfall:crisis.shortfall,status:crisis.status,loanAvailable:false}:null,injury:injury?{eventKey:String(injury.playerId)+':'+injury.date,playerId:injury.playerId,date:injury.date,days:injury.days}:null,
-   rare:rare?{eventKey:rare.id,year:rare.year,date:rare.date,category:rare.category}:null,
-   rookie:game.pendingDraftReveal?{year:game.pendingDraftReveal.year,entries:game.pendingDraftReveal.entries.map(r=>{const p=getPlayer(r.id),stage=r.revealed?2:r.revealStage||0;const hidden=!!p&&secretProspect(p)&&stage!==2;return {id:r.id,name:hidden?'????':p?.name,pos:p?.pos,stage,hidden,specialCategory:p?.specialCategory||null,originCategory:p?.originCategory||null,appearanceSeed:stage===2?p?.appearanceSeed:null,age:stage===2?p?.age:null,abilities:stage===2&&p?Object.fromEntries(seasonSkillKeys(p).map(k=>[k,p[k]])):null};})}:null,
+   rare:rareInbox(rare),
+   rookie:game.pendingDraftReveal?{year:game.pendingDraftReveal.year,entries:game.pendingDraftReveal.entries.map(r=>{const p=getPlayer(r.id),stage=r.revealed?2:r.revealStage||0;const hidden=!!p&&secretProspect(p)&&stage!==2;return {id:r.id,name:hidden?'????':p?.name,pos:p?.pos,stage,hidden,specialCategory:p?.specialCategory||null,originCategory:p?.originCategory||null,appearanceSeed:stage===2?p?.appearanceSeed:null,age:stage===2?p?.age:null,pastLifeAppearance:stage===2?p?.pastLifeAppearance||null:null,abilities:stage===2&&p?Object.fromEntries(seasonSkillKeys(p).map(k=>[k,p[k]])):null};})}:null,
    decade:game.pendingDecade??null,opening:game.pendingCeremonyIntro==='opening',
    career:career?{playerId:career.p.id,stage:career.e.type,options:['consult','plan'].includes(career.e.type)?farewellChoices(career.p).map(([key,label,cost])=>({key,label,cost})):[]}:null};
  };
@@ -332,7 +338,7 @@ function createHeadlessEngine(){
   }else if(kind==='rookie-finish'){
    if(game.financeCrisis||pendingRareNews().length||game.pendingEvent||careerEventPending()||!game.pendingDraftReveal||game.pendingDraftReveal.year!==game.year-1||game.pendingDraftReveal.entries.some(r=>!r.revealed&&(r.revealStage||0)<2))throw Error('rookie report unfinished');game.pendingDraftReveal=null;
   }else if(kind==='decade'){
-   if(game.pendingDecade==null||String(game.pendingDecade)!==input.eventKey)throw Error('decade acknowledgement unavailable');game.lastDecadeViewed=game.pendingDecade;game.pendingDecade=null;game.decadeSection=null;
+   if(game.financeCrisis||pendingRareNews().length||game.pendingEvent||careerEventPending()||game.pendingDraftReveal||game.pendingDecade==null||String(game.pendingDecade)!==input.eventKey)throw Error('decade acknowledgement unavailable');game.lastDecadeViewed=game.pendingDecade;game.pendingDecade=null;game.decadeSection=null;
   }else if(kind==='opening'){
    if(flowGet()||game.day!==0||game.pendingCeremonyIntro!=='opening')throw Error('opening acknowledgement unavailable');game.pendingCeremonyIntro=null;
   }else throw Error('unsupported acknowledgement');
