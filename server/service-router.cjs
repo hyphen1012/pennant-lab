@@ -24,6 +24,7 @@ function createServiceRouter({accountHttp,saveHttp,adService,deletionService,all
     res.writeHead(204,{'Access-Control-Allow-Methods':'GET,POST,PUT','Access-Control-Allow-Headers':'Authorization,Content-Type,X-Save-Revision,X-Save-SHA256,X-Save-Confirmed','Access-Control-Max-Age':'300'});return res.end();
    }
    if(req.url==='/healthz'&&req.method==='GET')return json(res,200,{status:'ok'});
+   if(/^\/health\.txt(?:\?n=\d{1,20})?$/.test(req.url)&&req.method==='GET'){res.writeHead(200,{'Content-Type':'text/plain; charset=utf-8'});return res.end('PENNANT-LAB-ONLINE-v1');}
    if(req.url.startsWith('/v1/admob/ssv?')){
     if(req.method!=='GET'||req.headers['transfer-encoding']||Number(req.headers['content-length']||0)!==0||req.url.length>8300)return reject(400,'invalid_callback');
     if(await allowRequest({token:'admob-callback',remoteAddress:req.socket.remoteAddress,route:'ssv'})!==true)return reject(429,'rate_limited');

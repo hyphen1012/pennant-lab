@@ -27,7 +27,7 @@ function createServiceRuntime({environment='staging',dataDir,authenticate,verify
   const auth=async token=>{const a=await authenticate(token);return a?.authenticated===true&&!deletion.blocked(a.account)?a:{authenticated:false};};
   const ledger=open(openLedger,'account'),storage=open(openSaveTransfer,'saves',{maxBytes,now}),registry=open(openPurchaseRegistry,'purchases'),proofs=open(openAdProofRegistry,'ad-proofs',{now});
   const purchases=createPurchaseService({registry,authenticate:auth,verifyReceipt,verifyCurrent,verifyNotification,now});
-  const account=createAccountService({ledger,authenticate:auth,verifyEntitlements:purchases.verifyEntitlements,purchaseService:purchases,verifyEvent,verifyAction,verifyCompletion,now});
+  const account=createAccountService({ledger,authenticate:auth,verifyEntitlements:purchases.verifyEntitlements,purchaseService:purchases,verifyEvent,verifyAction,verifyCompletion:async(a,p)=>{const v=await verifyCompletion(a,p);if(v?.verified===true&&v.mode==='ad'&&v.applied===true&&!proofs.hasProof({account:a,operationId:v.id,attempt:v.attempt}))return null;return v;},now});
   const saves=createSaveTransferService({storage,authenticate:auth,validateSave:createGameSaveValidator({maxBytes:maxDecodedBytes})});
   const adService=createAdSsvService({registry:proofs,authenticate:auth,readOrder:(a,o)=>deletion.blocked(a)?null:ledger.readOrder(a,o),verifyCallback:createAdMobVerifier({resolveKey,units:Object.values(units).map(u=>u.unit)}),units});
   const deletionService=createDeletionService({registry:deletion,authenticate,verifyRecentReauth});
