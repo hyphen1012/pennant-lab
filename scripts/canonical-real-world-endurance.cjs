@@ -36,6 +36,9 @@ globalThis.__plSaveProfile=(saved,data)=>{
   a.equal(digest(JSON.stringify(restored)),expected,'complete world digest must match');
   ledger.transact(other,(s,db)=>{a.equal(codec.decode(db.prepare('SELECT state FROM authority_worlds WHERE account=? AND slot=1').get(other).state).sentinel,'other');});
   const view=timed('headlessViewMs',()=>engine.view(restored));a.equal(view.year,data.year);a.equal(view.team.id,data.selectedId);
+  const separateActions=timed('headlessActionsMs',()=>engine.actions(restored));
+  const projection=timed('headlessReadProjectionMs',()=>engine.readProjection(restored));
+  a.deepEqual(projection,{game:view,actions:separateActions});
   const achievements=timed('achievementReadMs',()=>engine.achievements(restored));report.achievements=achievements.length;
   a.ok(achievements.length<=50000,'authority achievement bound');
   a.equal(new Set(achievements.map(x=>x.key)).size,achievements.length);
