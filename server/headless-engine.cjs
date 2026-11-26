@@ -332,7 +332,7 @@ function createHeadlessEngine(){
   }else if(kind==='rookie-finish'){
    if(game.financeCrisis||pendingRareNews().length||game.pendingEvent||careerEventPending()||!game.pendingDraftReveal||game.pendingDraftReveal.year!==game.year-1||game.pendingDraftReveal.entries.some(r=>!r.revealed&&(r.revealStage||0)<2))throw Error('rookie report unfinished');game.pendingDraftReveal=null;
   }else if(kind==='decade'){
-   if(game.pendingDecade==null||String(game.pendingDecade)!==input.eventKey)throw Error('decade acknowledgement unavailable');game.lastDecadeViewed=game.pendingDecade;game.pendingDecade=null;game.decadeSection=null;
+   if(game.financeCrisis||pendingRareNews().length||game.pendingEvent||careerEventPending()||game.pendingDraftReveal||game.pendingDecade==null||String(game.pendingDecade)!==input.eventKey)throw Error('decade acknowledgement unavailable');game.lastDecadeViewed=game.pendingDecade;game.pendingDecade=null;game.decadeSection=null;
   }else if(kind==='opening'){
    if(flowGet()||game.day!==0||game.pendingCeremonyIntro!=='opening')throw Error('opening acknowledgement unavailable');game.pendingCeremonyIntro=null;
   }else throw Error('unsupported acknowledgement');
