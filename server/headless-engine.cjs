@@ -36,6 +36,12 @@ function createHeadlessEngine(){
    rare:rare?{eventKey:rare.id,year:rare.year,date:rare.date,category:rare.category}:null,
    career:career?{playerId:career.p.id,stage:career.e.type,options:['consult','plan'].includes(career.e.type)?farewellChoices(career.p).map(([key,label,cost])=>({key,label,cost})):[]}:null};
  };
+ const annualView=()=>{
+  const f=flowGet(),d=movementData();
+  if(!f)return {mode:null,canStart:game.day===143&&game.calendarIndex===game.calendar.days.length&&!game.financeCrisis&&!flowInbox()&&!game.pendingMonth&&!game.pendingReview&&!pendingMilestoneNews().length&&!flowForeignResponse()};
+  const tasks=Object.values(f.jobs).map(j=>({id:j.id,start:j.start,status:j.status,supported:['awards-all','settlement','movement-declarations'].includes(j.id)}));
+  return {mode:f.mode,date:f.date,active:f.active,tasks,canAdvance:!f.active&&!flowInbox()&&!game.financeCrisis&&!flowBlocking(f),requests:f.active==='movement-declarations'?(d?.requests||[]).filter(r=>r.from===team.id).map(r=>({id:r.id,kind:r.kind,status:r.status,demand:r.demand,offer:r.offer})):[]};
+ };
  const medical=()=>own(team).filter(p=>rosterTreatmentEligible(p)&&p.injury&&typeof p.injury.date==='string').map(p=>({route:'medical',year:game.year,eventKey:String(p.id)+':'+p.injury.date,label:p.name+' 特別治療',playerId:p.id,date:p.injury.date}));
  // Same eligibility as the checked-in manager staff continuation handler:
  // seven years, late season, one continuation per year, own club only.
@@ -155,13 +161,47 @@ function createHeadlessEngine(){
   else throw Error('career decision unavailable');
   return JSON.stringify(game);
  }
+ if(op==='annual'){
+  vipStatusProvider=()=>({verified:true,vip:input.verifiedVip===true});
+  if(game.financeCrisis||flowInbox()||game.pendingMonth||game.pendingReview||pendingMilestoneNews().length||flowForeignResponse())throw Error('annual inbox unresolved');
+  let f=flowGet();
+  if(input.choice==='start'){
+   if(f||game.day!==143||game.calendarIndex!==game.calendar.days.length||!game.postseason||!Array.isArray(game.awards))throw Error('annual start unavailable');
+   if(!ensureSeasonFinanceClosed())throw Error('season finance not closed');
+   f=flowInit();if(!f||f.mode!=='off')throw Error('annual flow unavailable');flowRefresh(f);
+  }else{
+   if(!f||f.mode!=='off')throw Error('annual flow unavailable');
+   if(input.choice==='day'){
+    // Never bypass a ready event, and never cross into an unsupported rollover.
+    if(f.date>=game.year+'-12-31'||!flowDay(f))throw Error('annual date blocked');
+   }else if(input.choice==='open'){
+    const j=f.jobs[input.job];
+    if(!['awards-all','settlement','movement-declarations'].includes(input.job)||!flowOpen(f,j))throw Error('annual event unavailable');
+    if(j.id==='movement-declarations')movementInit();
+    game.pendingCeremonyIntro=null;
+   }else if(input.choice==='complete'){
+    const j=f.jobs[f.active];
+    if(!j||j.id!==input.job||!['awards-all','settlement','movement-declarations'].includes(j.id))throw Error('annual event unavailable');
+    if(j.id==='movement-declarations'&&movementData()?.requests.some(r=>r.from===team.id&&['request','refused'].includes(r.status)))throw Error('movement decision required');
+    flowComplete(f,j);
+   }else if(input.choice==='movement'){
+    if(f.active!=='movement-declarations'||game.ceremonyStage!=='movement-declarations')throw Error('movement stage unavailable');
+    const r=movementData()?.requests.find(x=>x.id===input.playerId&&x.from===team.id);
+    if(!r||!['request','refused'].includes(r.status))throw Error('movement request unavailable');
+    const before=JSON.stringify(r),action={allow:'movement-allow',deny:'movement-deny',retain:'movement-retain'}[input.decision];
+    movementAction(action,{dataset:{id:String(r.id),value:String(input.multiplier??1)}});
+    if(JSON.stringify(r)===before)throw Error('movement decision rejected');
+   }else throw Error('unsupported annual operation');
+  }
+  return JSON.stringify(game);
+ }
  if(op==='advance'){
   // Verified entitlement is supplied by the authority, not a command or save.
   vipStatusProvider=()=>({verified:true,vip:input.verifiedVip===true});
   if(game.day>=143||game.financeCrisis)throw Error('pilot season boundary');
   if(pendingRareNews().length||game.pendingMilestoneIds?.length||game.pendingEvent||game.pendingMonth||game.pendingReview||careerEventPending()||foreignHasCounter())throw Error('pilot event acknowledgement required');
   const e=processCalendarDay();if(!e)throw Error('calendar ended');
-  collectMilestoneNews(e);scoutDiscoveryDaily(e);rareDaily(e);
+  collectMilestoneNews(e);scoutDiscoveryDaily(e);rareDaily(e);careerDecisionTick(e);
   return JSON.stringify(game);
  }
  if(op==='achievements'){
@@ -183,7 +223,7 @@ function createHeadlessEngine(){
   }
   return JSON.stringify([...entries.values()]);
  }
- if(op==='view')return JSON.stringify({year:game.year,day:game.day,calendarIndex:game.calendarIndex,team:{id:team.id,name:team.name,wins:team.wins,losses:team.losses,ties:team.ties,cash:team.cash},games:game.games.length,inbox:inbox(),vipIncome:r2((game.financeLedger?.clubs?.[team.id]?.vipIncome||0)+vipOffTotal(team,game.year)),retirementEligible:retirement().length===1,medical:medical().length,managerEligible:manager().length===1,acknowledgements:{month:!!(game.pendingMonth&&game.monthlyArchive?.some(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id)),milestones:!!game.pendingMilestoneIds?.length},blocked:!!(game.financeCrisis||pendingRareNews().length||game.pendingMilestoneIds?.length||game.pendingEvent||game.pendingMonth||game.pendingReview||careerEventPending()||foreignHasCounter()||game.day>=143)});
+ if(op==='view')return JSON.stringify({year:game.year,day:game.day,calendarIndex:game.calendarIndex,team:{id:team.id,name:team.name,wins:team.wins,losses:team.losses,ties:team.ties,cash:team.cash},games:game.games.length,inbox:inbox(),annual:annualView(),vipIncome:r2((game.financeLedger?.clubs?.[team.id]?.vipIncome||0)+vipOffTotal(team,game.year)),retirementEligible:retirement().length===1,medical:medical().length,managerEligible:manager().length===1,acknowledgements:{month:!!(game.pendingMonth&&game.monthlyArchive?.some(m=>m.year===game.pendingMonth.year&&m.id===game.pendingMonth.id)),milestones:!!game.pendingMilestoneIds?.length},blocked:!!(game.financeCrisis||pendingRareNews().length||game.pendingMilestoneIds?.length||game.pendingEvent||game.pendingMonth||game.pendingReview||careerEventPending()||foreignHasCounter()||game.day>=143)});
  throw Error('unsupported pilot operation');
  `;
  const compiled=new vm.Script(pre+source.replace('(() => {','(() => {')+tail+'})();',{filename:'pennant-lab-headless-pilot.js'});
@@ -201,6 +241,11 @@ function createHeadlessEngine(){
   sourceHash:hash,
   newWorld(command){if(exact(command,[]))return run('new',null);if(!exact(command,['team'])||!Number.isSafeInteger(command.team)||command.team<0||command.team>11)throw Error('invalid pilot team');return run('new',null,{team:command.team});},
   advance(state,command,rights){
+   const verifiedVip=rights?.verified===true&&rights.vip===true;
+   if(exact(command,['annual'])&&['start','day'].includes(command.annual))return run('annual',state,{choice:command.annual,verifiedVip});
+   if(exact(command,['annual','job'])&&['open','complete'].includes(command.annual)&&['awards-all','settlement','movement-declarations'].includes(command.job))return run('annual',state,{choice:command.annual,job:command.job,verifiedVip});
+   if(exact(command,['annual','playerId','decision'])&&command.annual==='movement'&&Number.isSafeInteger(command.playerId)&&['allow','deny'].includes(command.decision))return run('annual',state,{choice:'movement',playerId:command.playerId,decision:command.decision,verifiedVip});
+   if(exact(command,['annual','playerId','decision','multiplier'])&&command.annual==='movement'&&Number.isSafeInteger(command.playerId)&&command.decision==='retain'&&[1,1.15].includes(command.multiplier))return run('annual',state,{choice:'movement',playerId:command.playerId,decision:command.decision,multiplier:command.multiplier,verifiedVip});
    if(exact(command,['acknowledge','eventKey'])&&['injury','rare'].includes(command.acknowledge)&&typeof command.eventKey==='string'&&command.eventKey.length<=512)return run('ack',state,{kind:command.acknowledge,eventKey:command.eventKey});
    if(exact(command,['career','playerId','options'])&&command.career==='accept'&&Number.isSafeInteger(command.playerId)&&Array.isArray(command.options)&&command.options.length<=5&&command.options.every(x=>typeof x==='string'))return run('career',state,{choice:'accept',playerId:command.playerId,options:command.options});
    if(exact(command,['career','playerId'])&&command.career==='dismiss'&&Number.isSafeInteger(command.playerId))return run('career',state,{choice:'dismiss',playerId:command.playerId});
