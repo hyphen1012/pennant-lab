@@ -137,3 +137,6 @@ jobs:
 
       - run: node scripts/native-billing-adapter-check.cjs
         if: always()
+
+      - run: node scripts/deletion-ssv-adapter-check.cjs
+        if: always()

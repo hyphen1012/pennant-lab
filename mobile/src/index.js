@@ -6,6 +6,9 @@ import {createAccountBootstrap} from './account-bootstrap.cjs';
 import {createEntitlementBridge} from './entitlement-bridge.cjs';
 import {createCommerceLifecycle} from './commerce-lifecycle.cjs';
 import {openNativeBillingDialog} from './native-billing-dialog.cjs';
+import {openDeletionDialog} from './deletion-dialog.cjs';
+import {createAccountClient} from './account-client.cjs';
+import {createSsvAdAdapter} from './ssv-adapter.cjs';
 import {Filesystem,Directory,Encoding} from '@capacitor/filesystem';
 import {Share} from '@capacitor/share';
 import {AdMob,AdmobConsentStatus} from '@capacitor-community/admob';
@@ -17,7 +20,7 @@ if(native){
   const accountEnabled=!!(config.accountApi&&config.oauth);
   let accountAccess=!accountEnabled,accountInitialized=false,authStarted=false,accountEpoch=0,checkingIdentity=null,identityAt=-Infinity;
   let appActive=true,visible=!document.hidden;
-  let bootstrap=null,provider=null,life=null,bridge=null,billingDialog=null;
+  let bootstrap=null,provider=null,life=null,bridge=null,billingDialog=null,deletionBusy=false,reauthProvider=null,evidenceClient=null,ssv=null;
   const billingPlugin=registerPlugin('PennantBilling');
   function usable(){return gate.ready()&&accountAccess;}
   // Prior to title tap, only the startup movie and title may be shown.
@@ -47,7 +50,7 @@ if(native){
   }
   function suspendAccount(){
     if(!accountEnabled)return;
-    accountEpoch++;accountAccess=false;identityAt=-Infinity;bootstrap?.suspend();billingDialog?.abort();life?.invalidate();
+    accountEpoch++;accountAccess=false;identityAt=-Infinity;bootstrap?.suspend();billingDialog?.abort();ssv?.invalidate();life?.invalidate();
   }
   async function verifyIdentity(){
     if(!accountEnabled)return true;
@@ -81,9 +84,11 @@ if(native){
   if(accountEnabled){
     provider=createNativeOAuth({config:config.oauth,openExternal:url=>Browser.open({url}),closeExternal:()=>Browser.close()});
     bridge=createEntitlementBridge({baseUrl:config.accountApi});
+    evidenceClient=createAccountClient({baseUrl:config.accountApi});
+    if(config.production)ssv=createSsvAdAdapter({client:evidenceClient,sdk:AdMob,platform:Capacitor.getPlatform(),adId:config.units[Capacitor.getPlatform()],online:async()=>await gate.check(true)&&usable(),consent:rewardConsent});
     life=createCommerceLifecycle({bridge,online:async()=>usable()});
     life.setVisible(visible);life.setActive(appActive);
-    bootstrap=createAccountBootstrap({baseUrl:config.accountApi,provider,online:usable,onSession:s=>{billingDialog?.abort();life.setSession(s);}});
+    bootstrap=createAccountBootstrap({baseUrl:config.accountApi,provider,online:usable,onSession:s=>{billingDialog?.abort();ssv?.invalidate();evidenceClient.setSession(s);life.setSession(s);}});
   }
   let accountReadyTask=null;
   async function accountReady(){
@@ -91,8 +96,8 @@ if(native){
     if(accountReadyTask)return accountReadyTask;
     authStarted=true;paint(false);
     accountReadyTask=(async()=>{
-      await App.addListener('appUrlOpen',({url})=>{void provider.handleCallback(url);});
-      await Browser.addListener('browserFinished',()=>{setTimeout(()=>provider.cancel(),500);});
+      await App.addListener('appUrlOpen',({url})=>{void (async()=>{if(reauthProvider&&await reauthProvider.handleCallback(url))return;await provider.handleCallback(url);})();});
+      await Browser.addListener('browserFinished',()=>{const target=reauthProvider||provider;setTimeout(()=>target.cancel(),500);});
       await new Promise(resolve=>{
         const dlg=document.createElement('dialog');
         dlg.style.cssText='width:min(90vw,420px);padding:24px;border-radius:18px;background:#101d32;color:#fff;border:1px solid #8394b1;text-align:center';
@@ -121,13 +126,13 @@ if(native){
     consentPending=AdMob.requestConsentInfo();
     try{consentInfo=await consentPending;return consentInfo;}finally{consentPending=null;}
   }
-  const reward=createReward({
-    online:async()=>await gate.check(true)&&usable(),
-    consent:async()=>{
+  async function rewardConsent(){
       let info=consentInfo||await refreshConsent();
       if(info.isConsentFormAvailable&&info.status===AdmobConsentStatus.REQUIRED)info=await AdMob.showConsentForm();
       consentInfo=info;return info.canRequestAds===true;
-    },
+  }
+  const reward=createReward({
+    online:async()=>await gate.check(true)&&usable(),consent:rewardConsent,
     initialize:()=>AdMob.initialize(),
     prepare:()=>AdMob.prepareRewardVideoAd({adId:config.units[Capacitor.getPlatform()],npa:true}),
     show:()=>AdMob.showRewardVideoAd()
@@ -135,6 +140,26 @@ if(native){
   window.PennantNative={
     ready:interfaceReady,check:async force=>await gate.check(force)&&interfaceReady(),accountRequired:accountEnabled,reward:config.production?null:reward,
     get accountContext(){return bootstrap?.context()??null;},accountReady,
+    deletionAvailable:config.deletionEnabled===true,
+    // Evidence-only. No production reward application is connected here.
+    requestAdProof:config.production&&ssv?o=>ssv.requestAdProof(o):null,
+    async openDeletion({purgeLocal}={}){
+      const ctx=bootstrap?.context();if(!config.deletionEnabled||!ctx?.isCurrent()||!usable()||deletionBusy||typeof purgeLocal!=='function')throw Error('deletion unavailable');
+      deletionBusy=true;const client=createAccountClient({baseUrl:config.accountApi});
+      try{
+        const token=await provider.getAccessToken();if(!ctx.isCurrent()||!token)throw Error('session changed');
+        client.setSession({account:ctx.account,token});
+        return await openDeletionDialog({client,purgeLocal:()=>purgeLocal(ctx.account),externalUrl:config.deletionUrl,openExternal:url=>Browser.open({url}),
+          reauthenticate:async()=>{
+            if(!ctx.isCurrent())throw Error('session changed');
+            const reauth=createNativeOAuth({config:config.oauth,openExternal:url=>Browser.open({url}),closeExternal:()=>Browser.close()});reauthProvider=reauth;
+            try{const proof=await reauth.login({reauthenticate:true});if(!ctx.isCurrent()||!proof||!appActive||!visible)throw Error('reauthentication interrupted');return proof;}
+            finally{reauth.logout();if(reauthProvider===reauth)reauthProvider=null;}
+          },
+          onAccepted:()=>window.PennantNative.logoutAccount()
+        });
+      }finally{client.setSession(null);deletionBusy=false;}
+    },
     billingAvailable:!!config.billingCatalog,
     async openBilling(){const ctx=bootstrap?.context();if(!ctx?.isCurrent()||!usable()||billingDialog||!config.billingCatalog)throw Error('billing unavailable');const ctl=new AbortController();billingDialog=ctl;try{await openNativeBillingDialog({plugin:billingPlugin,platform:Capacitor.getPlatform(),catalog:config.billingCatalog[Capacitor.getPlatform()],account:()=>ctx.isCurrent()?ctx.account:null,online:usable,bridge,signal:ctl.signal,transactionsEnabled:false});}finally{if(billingDialog===ctl)billingDialog=null;}},
     logoutAccount(){if(!accountEnabled)return;accountAccess=false;provider.logout();bootstrap.invalidate();suspendAccount();paint(false);window.location.reload();}, // SDK callback is development-only; no production reward authority

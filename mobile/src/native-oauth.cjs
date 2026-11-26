@@ -27,11 +27,11 @@ function createNativeOAuth({config,openExternal,closeExternal=async()=>{},fetche
    return session.access;
   }finally{clearTimeout(timer);if(request===ctl)request=null;}
  }
- async function login(){
+ async function login({reauthenticate=false}={}){
   if(attempt||refreshing||request)throw Error('sign-in already in progress');
   logout();const gen=generation,verifier=random(),state=random(),challenge=base64url(await cryptoImpl.subtle.digest('SHA-256',new TextEncoder().encode(verifier)));
   if(gen!==generation)throw Error('sign-in cancelled');
-  const u=new URL(auth);u.search=new URLSearchParams({response_type:'code',client_id:config.clientId,redirect_uri:redirectUri,scope:config.scope,state,code_challenge:challenge,code_challenge_method:'S256'}).toString();
+  const u=new URL(auth);u.search=new URLSearchParams({response_type:'code',client_id:config.clientId,redirect_uri:redirectUri,scope:config.scope,state,code_challenge:challenge,code_challenge_method:'S256',...(reauthenticate===true?{prompt:'login',max_age:'0'}:{})}).toString();
   return new Promise((resolve,reject)=>{
    const current={gen,verifier,state,resolve,reject,timer:setTimeout(()=>{if(attempt===current)cancel();},180000)};
    attempt=current;

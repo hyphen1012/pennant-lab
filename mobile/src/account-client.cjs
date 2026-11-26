@@ -17,10 +17,15 @@ function createAccountClient({baseUrl,fetcher=globalThis.fetch,timeoutMs=10000}=
  const modes=['ad','ticket','entitlement'];
  const wallet=v=>v&&integer(v.tickets)&&v.tickets<=30&&integer(v.points)&&integer(v.claimCount)&&(v.nextAt===null||integer(v.nextAt))&&Array.isArray(v.owned)&&v.owned.every(x=>typeof x==='string')&&new Set(v.owned).size===v.owned.length;
  const order=v=>v&&id(v.operationId)&&modes.includes(v.mode)&&['pending','committed','cancelled'].includes(v.status)&&integer(v.attempt)&&v.attempt>0;
+ const deletion=x=>x&&typeof x.requestId==='string'&&['requested','processing','completed'].includes(x.status)&&integer(x.requestedAt)&&integer(x.updatedAt);
  const checks={
   wallet:wallet,
   restore:v=>v&&typeof v.recorded==='boolean',
   'purchase-finish':v=>v?.authorized===true,
+  'ads/issue':v=>typeof v?.customData==='string'&&/^[a-f0-9]{64}$/.test(v.customData),
+  'ads/status':v=>typeof v?.verified==='boolean',
+  'deletion/status':v=>v&&Object.hasOwn(v,'request')&&(v.request===null||deletion(v.request)),
+  'deletion/request':v=>deletion(v?.request),
   entitlements:v=>v?.verified===true&&typeof v.account==='string'&&integer(v.serverNow)&&integer(v.verifiedAt)&&v.verifiedAt<=v.serverNow&&v.serverNow-v.verifiedAt<300000&&typeof v.entitlements?.adSkip?.active==='boolean'&&v.entitlements.adSkip.expiresAt===null&&typeof v.entitlements?.vip?.active==='boolean'&&(v.entitlements.vip.active?integer(v.entitlements.vip.expiresAt)&&v.entitlements.vip.expiresAt>v.serverNow:v.entitlements.vip.expiresAt===null),
   order:v=>wallet(v?.wallet)&&(v.order===null||order(v.order)),
   claim:v=>wallet(v?.wallet)&&typeof v.result?.ok==='boolean'&&(v.result.ok?['ticket','point'].includes(v.result.kind)&&[1,2].includes(v.result.amount):typeof v.result.reason==='string'),
@@ -53,6 +58,6 @@ function createAccountClient({baseUrl,fetcher=globalThis.fetch,timeoutMs=10000}=
    throw e?.code&&typeof e.uncertain==='boolean'?e:fail('network_error',mutation);
   }finally{clearTimeout(timer);active.delete(ctl);if(mutation&&gen===generation)busy=false;}
  }
- return {setSession,snapshot:()=>request('wallet',{}),entitlements:()=>request('entitlements',{}),restorePurchase:(store,proof)=>request('restore',{store,proof},true),authorizeFinish:(store,proof)=>request('purchase-finish',{store,proof},true),claim:(eventProof,choice='ticket')=>request('claim',{eventProof,choice},true),exchange:key=>request('exchange',{key},true),reserve:(actionProof,choice)=>request('reserve',{actionProof,choice},true),finish:completionProof=>request('finish',{completionProof},true),orderStatus:id=>request('order',{id})};
+ return {setSession,issueAd:body=>request('ads/issue',body,true),adStatus:body=>request('ads/status',body),deletionStatus:()=>request('deletion/status',{}),requestDeletion:(reauthProof,confirmed)=>{if(confirmed!==true)throw Error('explicit deletion confirmation required');return request('deletion/request',{confirmed:true,reauthProof},true);},snapshot:()=>request('wallet',{}),entitlements:()=>request('entitlements',{}),restorePurchase:(store,proof)=>request('restore',{store,proof},true),authorizeFinish:(store,proof)=>request('purchase-finish',{store,proof},true),claim:(eventProof,choice='ticket')=>request('claim',{eventProof,choice},true),exchange:key=>request('exchange',{key},true),reserve:(actionProof,choice)=>request('reserve',{actionProof,choice},true),finish:completionProof=>request('finish',{completionProof},true),orderStatus:id=>request('order',{id})};
 }
 module.exports={createAccountClient};
