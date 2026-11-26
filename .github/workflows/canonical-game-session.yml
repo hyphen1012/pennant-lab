@@ -1,0 +1,25 @@
+name: Canonical game session
+on:
+  push:
+    paths:
+      - 'mobile/src/canonical-game-session.cjs'
+      - 'scripts/canonical-game-session-check.cjs'
+      - '.github/workflows/canonical-game-session.yml'
+  pull_request:
+    paths:
+      - 'mobile/src/canonical-game-session.cjs'
+      - 'scripts/canonical-game-session-check.cjs'
+      - '.github/workflows/canonical-game-session.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  session:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/canonical-game-session-check.cjs
