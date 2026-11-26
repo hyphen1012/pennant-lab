@@ -1,9 +1,9 @@
 name: Canonical metadata storage
 on:
   push:
-    paths: ['server/**','mobile/src/account-client.cjs','scripts/canonical-metadata-check.cjs','scripts/canonical-admission-check.cjs','scripts/canonical-read-projection-check.cjs','.github/workflows/canonical-metadata.yml']
+    paths: ['server/**','mobile/src/account-client.cjs','scripts/canonical-metadata-check.cjs','scripts/canonical-admission-check.cjs','scripts/canonical-read-projection-check.cjs','scripts/canonical-decade-check.cjs','scripts/decade-fixture.cjs','.github/workflows/canonical-metadata.yml']
   pull_request:
-    paths: ['server/**','mobile/src/account-client.cjs','scripts/canonical-metadata-check.cjs','scripts/canonical-admission-check.cjs','scripts/canonical-read-projection-check.cjs','.github/workflows/canonical-metadata.yml']
+    paths: ['server/**','mobile/src/account-client.cjs','scripts/canonical-metadata-check.cjs','scripts/canonical-admission-check.cjs','scripts/canonical-read-projection-check.cjs','scripts/canonical-decade-check.cjs','scripts/decade-fixture.cjs','.github/workflows/canonical-metadata.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,3 +22,5 @@ jobs:
       - run: node scripts/canonical-admission-check.cjs
 
       - run: node scripts/canonical-read-projection-check.cjs
+
+      - run: node scripts/canonical-decade-check.cjs
