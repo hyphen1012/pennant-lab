@@ -158,3 +158,6 @@ jobs:
 
       - run: node scripts/headless-engine-check.cjs
         if: always()
+
+      - run: node scripts/canonical-state-codec-check.cjs
+        if: always()
