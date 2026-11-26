@@ -149,3 +149,6 @@ jobs:
 
       - run: node scripts/rare-cinema-stage-check.cjs
         if: always()
+
+      - run: node scripts/canonical-service-check.cjs
+        if: always()

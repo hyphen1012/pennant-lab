@@ -1,6 +1,6 @@
 // Compose existing authenticated services on one listener behind a TLS ingress.
 const http=require('node:http');
-function createServiceRouter({accountHttp,saveHttp,adService,deletionService,storeNotifications=null,allowRequest,origins=[]}={}){
+function createServiceRouter({accountHttp,saveHttp,adService,deletionService,storeNotifications=null,gameAuthority=null,allowRequest,origins=[]}={}){
  const account=accountHttp?.listeners('request')?.[0],save=saveHttp?.listeners('request')?.[0];
  if(typeof account!=='function'||typeof save!=='function'||!adService||!deletionService||typeof allowRequest!=='function'||!Array.isArray(origins)||origins.some(x=>typeof x!=='string'||!(/^(https:\/\/[^/]+|capacitor:\/\/localhost|http:\/\/localhost)$/.test(x))))throw Error('service router configuration required');
  const allowed=new Set(origins),metrics={requests:0,rejected:0,errors:0};
@@ -13,6 +13,19 @@ function createServiceRouter({accountHttp,saveHttp,adService,deletionService,sto
   '/v1/deletion/request':['request',['confirmed','reauthProof']],
   '/v1/deletion/status':['status',[]]
  };
+ // Only a server-injected engine can enable these routes. No client state
+ // upload, seed, entitlement flag, or completion proof is accepted.
+ const gameRoutes=new Map([
+  ['/v1/game/create',['create',['slot','command']]],
+  ['/v1/game/read',['read',['slot']]],
+  ['/v1/game/advance',['advance',['slot','revision','command']]],
+  ['/v1/game/reserve',['reserve',['slot','operationId','choice']]],
+  ['/v1/game/settle',['settle',['slot','operationId','attempt']]],
+  ['/v1/game/cancel',['cancel',['slot','operationId','attempt','confirmed']]],
+  ['/v1/game/achievements',['achievements',['slot']]],
+  ['/v1/game/claim',['claim',['slot','eventId','choice']]]
+ ]);
+ if(gameAuthority&&[...gameRoutes.values()].some(([m])=>typeof gameAuthority[m]!=='function'))throw Error('invalid game authority');
  const server=http.createServer({requestTimeout:120000,headersTimeout:10000,maxHeaderSize:8192},async(req,res)=>{
   metrics.requests++;res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
   const reject=(s,e)=>{metrics.rejected++;req.resume();json(res,s,{error:e});};
@@ -20,7 +33,7 @@ function createServiceRouter({accountHttp,saveHttp,adService,deletionService,sto
    const origin=req.headers.origin;
    if(origin!==undefined){if(!allowed.has(origin))return reject(403,'origin_rejected');res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Expose-Headers','X-Save-Revision,X-Save-SHA256,Content-Length');}
    if(req.method==='OPTIONS'){
-    if(!origin||!/^\/v1\/(?:[a-z]+)(?:\/[a-z0-9]+)*$/.test(req.url)||!['GET','POST','PUT'].includes(req.headers['access-control-request-method']))return reject(405,'preflight_rejected');
+    if(!origin||!/^\/v1\/(?:[a-z]+)(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/.test(req.url)||!['GET','POST','PUT'].includes(req.headers['access-control-request-method']))return reject(405,'preflight_rejected');
     res.writeHead(204,{'Access-Control-Allow-Methods':'GET,POST,PUT','Access-Control-Allow-Headers':'Authorization,Content-Type,X-Save-Revision,X-Save-SHA256,X-Save-Confirmed','Access-Control-Max-Age':'300'});return res.end();
    }
    if(req.url==='/healthz'&&req.method==='GET')return json(res,200,{status:'ok'});
@@ -47,6 +60,16 @@ function createServiceRouter({accountHttp,saveHttp,adService,deletionService,sto
     res.writeHead(204);return res.end();
    }
    if(/^\/v1\/saves(?:\/|$)/.test(req.url))return await save(req,res);
+   if(gameRoutes.has(req.url)){
+    if(!gameAuthority)return reject(503,'game_authority_disabled');
+    if(req.method!=='POST')return reject(405,'method_not_allowed');
+    const token=/^Bearer ([A-Za-z0-9._~+\/=-]{1,4096})$/.exec(req.headers.authorization||'')?.[1];
+    if(!token)return reject(401,'authentication_required');
+    if(await allowRequest({token,remoteAddress:req.socket.remoteAddress,route:req.url})!==true)return reject(429,'rate_limited');
+    const [method,keys]=gameRoutes.get(req.url),b=await read(req);
+    if(!exact(b,keys)||![1,2,3].includes(b.slot)||('command' in b&&(!b.command||Object.getPrototypeOf(b.command)!==Object.prototype)))return reject(400,'invalid_fields');
+    return json(res,200,await gameAuthority[method](token,...keys.map(k=>b[k])));
+   }
    if(Object.hasOwn(handlers,req.url)){
     if(req.method!=='POST')return reject(405,'method_not_allowed');
     const token=/^Bearer ([A-Za-z0-9._~+\/=-]{1,4096})$/.exec(req.headers.authorization||'')?.[1];
