@@ -29,7 +29,7 @@ function createRecentReauthVerifier({authenticate,now=Date.now,maxAgeSeconds=120
  return async({token,account,proof})=>{
   if(typeof token!=='string'||typeof proof!=='string'||proof===token)return null;
   const [a,b]=await Promise.all([authenticate(token),authenticate(proof)]),t=Math.floor(now()/1000);
-  if(a?.authenticated!==true||b?.authenticated!==true||a.account!==account||b.account!==account||!Number.isSafeInteger(b.authTime)||b.authTime>t||t-b.authTime>maxAgeSeconds)return null;
+  if(!Number.isSafeInteger(t)||a?.authenticated!==true||b?.authenticated!==true||a.account!==account||b.account!==account||!Number.isSafeInteger(b.authTime)||b.authTime>t||t-b.authTime>maxAgeSeconds)return null;
   return {verified:true,account};
  };
 }

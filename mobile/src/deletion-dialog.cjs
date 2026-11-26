@@ -12,7 +12,7 @@ function openDeletionDialog({client,reauthenticate,purgeLocal,onAccepted,documen
  function close(){if(busy||closed)return;closed=true;try{dlg.close();}catch{}dlg.remove();resolveDone(accepted);}
  async function showRequest(request){
   if(!request||!['requested','processing','completed'].includes(request.status)||typeof request.requestId!=='string')throw Error('invalid deletion status');
-  accepted=true;body.replaceChildren();
+  accepted=true;body.replaceChildren();status.textContent='';
   try{await purgeLocal();}catch{status.textContent='申請を受け付けました。端末データの消去状態は未確認です。';}
   status.textContent+=(status.textContent.includes('申請を受け付け')?' ':'')+(request.status==='completed'?'サーバーの削除完了を確認しました。':'削除申請を受け付けました。サーバーでの削除完了とは異なります。')+' 受付番号：'+request.requestId;
   button('閉じてログアウト',()=>{close();onAccepted();});
