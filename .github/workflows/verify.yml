@@ -96,6 +96,9 @@ jobs:
       - run: node scripts/startup-asset-check.cjs
         if: always()
 
+      - run: node scripts/roster-ux-check.cjs
+        if: always()
+
       - run: node scripts/purchase-rights-check.cjs
         if: always()
 
