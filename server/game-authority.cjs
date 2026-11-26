@@ -167,6 +167,11 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
    return {result:rules.claim(s,{eventId,now:now(),entitlements,choice}),wallet:publicWallet(s)};
   });
  }
+ async function reportPage(token,slot,worldId,revision,command){
+  const account=await identity(token);if(typeof worldId!=='string'||!n(revision)||revision<1||typeof engine.reportPage!=='function')throw Error('invalid report page');
+  return inspect(account,(s,db)=>{const r=world(db,account,slot);if(r.world!==worldId||r.revision!==revision)throw Error('canonical revision conflict');
+  return {world:r.world,revision:r.revision,page:JSON.parse(json(sync(engine.reportPage(r.state,JSON.parse(json(command,4096)))),262144))};});
+ }
  async function achievementPage(token,slot,worldId,revision,command){
   const account=await identity(token);
   if(typeof worldId!=='string'||!n(revision)||revision<1||!command||Object.keys(command).length!==2||!n(command.offset)||!n(command.limit)||command.limit<1||command.limit>40)throw Error('invalid achievement page');
@@ -183,6 +188,6 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
   const r=world(db,account,slot),events=sync(engine.achievements(r.state));if(!Array.isArray(events)||events.length>50000)throw Error('invalid canonical achievements');
   return events.filter(e=>e?.eligible===true&&id(e.key)&&typeof e.label==='string'&&e.label.length<=160).map(e=>{const eventId=digest([r.world,e.key]);return {eventId,label:e.label,claimed:Object.hasOwn(s.claims,eventId)};});
  });}
- return {create,read,advance,reserve,settle,cancel,claim,achievements,orderStatus,slots,freePage,playerPage,achievementPage};
+ return {create,read,advance,reserve,settle,cancel,claim,achievements,orderStatus,slots,freePage,playerPage,achievementPage,reportPage};
 }
 module.exports={installAuthorityTables,createGameAuthority};
