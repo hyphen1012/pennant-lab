@@ -29,13 +29,19 @@ globalThis.__plAnnualEntryCheck=saved=>{
  a.throws(()=>engine.advance(w,{annual:'open',job:'draft'}));
  ready('draft');step({annual:'open',job:'draft'});
  const draft=(decision,extra={})=>step({annual:'draft',decision,...extra});
- a.throws(()=>engine.advance(w,{annual:'complete',job:'draft'}));draft('start');
+ a.throws(()=>engine.advance(w,{annual:'complete',job:'draft'}));
+ const scouted=engine.view(w).annual.draft,prospect=scouted.candidates.find(c=>c.canResearch);a.ok(prospect);
+ a.ok(scouted.candidates.filter(c=>c.hidden).every(c=>c.report===null&&c.name==='????'&&c.appearanceSeed===null));
+ draft('research',{playerId:prospect.id,key:'field'});const afterResearch=engine.view(w).annual.draft;
+ a.equal(afterResearch.researchUsed,scouted.researchUsed+1);a.ok(afterResearch.candidates.find(c=>c.id===prospect.id).tasks.includes('field'));
+ a.throws(()=>engine.advance(w,{annual:'draft',decision:'research',playerId:prospect.id,key:'field'}));a.throws(()=>engine.advance(w,{annual:'draft',decision:'research',playerId:-1,key:'analysis'}));
+ draft('start');
  let rounds=0,ownNominations=0,ownContracts=0;
  for(let guard=0;guard<300;guard++){
   const v=engine.view(w).annual.draft;
   if(v.phase==='done')break;
   if(v.rareIntro){a.throws(()=>engine.advance(w,{annual:'draft',decision:'pass'}));draft('intro');}
-  else if(v.announcement)draft('announcement');
+  else if(v.announcement){a.ok(v.announcementRow&&v.announcementRow.cursor<v.announcementRow.total);const cursor=v.announcementRow.cursor;draft('announcement-next');const next=engine.view(w).annual.draft;if(next.announcement)a.equal(next.announcementRow.cursor,cursor+1);}
   else if(v.phase==='first'||v.phase==='later'){
    if(v.canNominate){const c=v.candidates[0];a.ok(c);a.throws(()=>engine.advance(w,{annual:'draft',decision:'nominate',playerId:-1}));draft('nominate',{playerId:c.id});ownNominations++;}
    else draft('cpu');
