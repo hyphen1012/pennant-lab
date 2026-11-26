@@ -33,7 +33,7 @@ function createServiceRouter({accountHttp,saveHttp,adService,deletionService,sto
    const origin=req.headers.origin;
    if(origin!==undefined){if(!allowed.has(origin))return reject(403,'origin_rejected');res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Expose-Headers','X-Save-Revision,X-Save-SHA256,Content-Length');}
    if(req.method==='OPTIONS'){
-    if(!origin||!/^\/v1\/(?:[a-z]+)(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/.test(req.url)||!['GET','POST','PUT'].includes(req.headers['access-control-request-method']))return reject(405,'preflight_rejected');
+    if(!origin||!/^\/v1\/(?:[a-z]+(?:-[a-z0-9]+)*)(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/.test(req.url)||!['GET','POST','PUT'].includes(req.headers['access-control-request-method']))return reject(405,'preflight_rejected');
     res.writeHead(204,{'Access-Control-Allow-Methods':'GET,POST,PUT','Access-Control-Allow-Headers':'Authorization,Content-Type,X-Save-Revision,X-Save-SHA256,X-Save-Confirmed','Access-Control-Max-Age':'300'});return res.end();
    }
    if(req.url==='/healthz'&&req.method==='GET')return json(res,200,{status:'ok'});
