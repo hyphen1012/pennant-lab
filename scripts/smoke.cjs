@@ -25,11 +25,11 @@ const app={
 const db={
   objectStoreNames:{contains:()=>true},
   transaction:(name,mode)=>{
-    const tx={oncomplete:null,onerror:null,onabort:null,
+    const tx={oncomplete:null,onerror:null,onabort:null,abort(){queueMicrotask(()=>tx.onabort?.());},
       objectStore:()=>({
         get:slot=>{
           const req={result:store.get(Number(slot))||null,onsuccess:null,onerror:null};
-          queueMicrotask(()=>req.onsuccess?.());
+          queueMicrotask(()=>{req.onsuccess?.();if(mode==='readonly')queueMicrotask(()=>tx.oncomplete?.());});
           return req;
         },
         put:row=>{
