@@ -31,11 +31,45 @@ async function verifyBackup(dir){
  for(const row of m.files){if(!NAMES.includes(row.name)||!Number.isSafeInteger(row.bytes)||row.bytes<1||!/^[a-f0-9]{64}$/.test(row.sha256||''))throw Error('invalid backup member');const f=path.join(dir,row.name),s=fs.lstatSync(f);if(!s.isFile()||s.size!==row.bytes||await digest(f)!==row.sha256)throw Error('backup hash mismatch');integrity(f);}
  return m;
 }
-async function restoreToNewDirectory({backupDir,targetDir}={}){
- if(!path.isAbsolute(backupDir)||!path.isAbsolute(targetDir)||fs.existsSync(targetDir))throw Error('restore requires new directory');
+// The latest deletion registry must be supplied from the stopped live service
+// or an independently retained, current tombstone registry. A historical
+// backup alone must never reopen an account deleted after that backup.
+function reconcileDeletionRegistry(restoredFile,latestFile){
+ const source=new DatabaseSync(latestFile,{readOnly:true});
+ let rows;
+ try{
+  if(source.prepare('PRAGMA quick_check').get().quick_check!=='ok')throw Error('latest deletion registry integrity failure');
+  rows=source.prepare('SELECT * FROM deletion_requests').all();
+ }finally{source.close();}
+ const live=new Map();
+ for(const r of rows){
+  if(!/^[a-f0-9]{64}$/.test(r.account)||typeof r.request_id!=='string'||!r.request_id||!['requested','processing','completed'].includes(r.status)||!Number.isSafeInteger(r.requested_at)||r.requested_at<=0||!Number.isSafeInteger(r.updated_at)||r.updated_at<r.requested_at)throw Error('invalid deletion tombstone');
+  live.set(r.account,r);
+ }
+ const db=new DatabaseSync(restoredFile);
+ try{
+  db.exec('BEGIN IMMEDIATE');
+  try{
+   const old=db.prepare('SELECT * FROM deletion_requests').all(),rank={requested:0,processing:1,completed:2};
+   for(const r of old){const current=live.get(r.account);if(!current||current.request_id!==r.request_id||current.requested_at!==r.requested_at||current.updated_at<r.updated_at||rank[current.status]<rank[r.status])throw Error('latest deletion registry is stale or inconsistent');}
+   const put=db.prepare('INSERT INTO deletion_requests(account,request_id,requested_at,status,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(account) DO UPDATE SET status=excluded.status,updated_at=excluded.updated_at');
+   // Even completed requests must be quarantined and reprocessed after restore:
+   // account, save, ad and purchase data may predate erasure.
+   for(const r of rows)put.run(r.account,r.request_id,r.requested_at,r.status==='completed'?'processing':r.status,r.updated_at);
+   db.exec('COMMIT');
+  }catch(e){db.exec('ROLLBACK');throw e;}
+  db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+ }finally{db.close();}
+}
+async function restoreToNewDirectory({backupDir,targetDir,latestDeletionFile,quiesced=false}={}){
+ if(quiesced!==true||typeof latestDeletionFile!=='string'||!path.isAbsolute(latestDeletionFile)||!path.isAbsolute(backupDir)||!path.isAbsolute(targetDir)||fs.existsSync(targetDir))throw Error('restore requires stopped writers, latest deletion registry and new directory');
+ const latest=fs.realpathSync(latestDeletionFile),backupRoot=fs.realpathSync(backupDir);
+ if(!fs.lstatSync(latestDeletionFile).isFile()||nested(backupRoot,latest)||nested(path.resolve(targetDir),latest))throw Error('independent latest deletion registry required');
  const m=await verifyBackup(backupDir),parent=fs.realpathSync(path.dirname(targetDir)),target=path.join(parent,path.basename(targetDir)),tmp=target+'.tmp-'+randomUUID();
  fs.mkdirSync(tmp,{mode:0o700});
  try{for(const row of m.files){const dst=path.join(tmp,row.name);fs.copyFileSync(path.join(backupDir,row.name),dst,fs.constants.COPYFILE_EXCL);fs.chmodSync(dst,0o600);if(await digest(dst)!==row.sha256)throw Error('restore checksum mismatch');integrity(dst);}
+ reconcileDeletionRegistry(path.join(tmp,'deletion.sqlite'),latest);
+ integrity(path.join(tmp,'deletion.sqlite'));
  if(fs.existsSync(target))throw Error('restore target already exists');fs.renameSync(tmp,target);return target;
  }catch(e){fs.rmSync(tmp,{recursive:true,force:true});throw e;}
 }

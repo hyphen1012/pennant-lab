@@ -64,14 +64,20 @@ function createAccountService({ledger,authenticate,verifyEvent,verifyEntitlement
     if(action?.verified!==true||action.account!==account||action.eligible!==true)throw Error('action not verified');
     if(!['ad','ticket'].includes(choice))throw Error('invalid mode');
     const entitlements=await rights(account);
-    return ledger.transact(account,s=>({operationId:action.id,...rules.reserve(s,action.id,entitlements,choice),wallet:publicState(s)}));
+    return ledger.transact(account,(s,db)=>{
+      if(db.prepare('SELECT 1 FROM authority_actions WHERE account=? AND operation=?').get(account,action.id))throw Error('canonical action requires canonical settlement');
+      return {operationId:action.id,...rules.reserve(s,action.id,entitlements,choice),wallet:publicState(s)};
+    });
   }
   async function finish(token,completionProof){
     const account=await identity(token),receipt=await verifyCompletion(account,completionProof);
     // Completion must be independently verified as applied or cancelled. A
     // lost connection is not cancellation; recover/resolve on server later.
     if(receipt?.verified!==true||receipt.account!==account||typeof receipt.applied!=='boolean'||!['ad','ticket','entitlement'].includes(receipt.mode)||!Number.isSafeInteger(receipt.attempt)||receipt.attempt<1)throw Error('completion not verified');
-    return ledger.transact(account,s=>({ok:Object.hasOwn(s.orders,receipt.id)&&s.orders[receipt.id].mode===receipt.mode&&rules.finish(s,receipt.id,receipt.attempt,receipt.applied),wallet:publicState(s)}));
+    return ledger.transact(account,(s,db)=>{
+      if(db.prepare('SELECT 1 FROM authority_actions WHERE account=? AND operation=?').get(account,receipt.id))throw Error('canonical action requires canonical settlement');
+      return {ok:Object.hasOwn(s.orders,receipt.id)&&s.orders[receipt.id].mode===receipt.mode&&rules.finish(s,receipt.id,receipt.attempt,receipt.applied),wallet:publicState(s)};
+    });
   }
   async function orderStatus(token,id){
     const account=await identity(token);
