@@ -60,6 +60,9 @@ const {createAccountClient}=require('../mobile/src/account-client.cjs'),{createC
   await a.rejects(observer.gameAchievementPage(1,b.snapshot.world,one.inspect().snapshot.revision,{offset:0,limit:41}));
   await a.rejects(observer.gameAchievementPage(1,b.snapshot.world,one.inspect().snapshot.revision-1,{offset:0,limit:30}));
   await a.rejects(one.claimAchievement('a'.repeat(64),'point',false));
+  const archive=await one.reportPage({kind:'matches',year:0,offset:0,limit:1});a.equal(archive.status,'ready');a.equal(archive.page.total,0);a.equal(archive.page.nextOffset,null);
+  await a.rejects(observer.gameReportPage(1,b.snapshot.world,one.inspect().snapshot.revision-1,{kind:'matches',year:0,offset:0,limit:1}));
+  await a.rejects(observer.gameReportPage(1,b.snapshot.world,one.inspect().snapshot.revision,{kind:'matches',year:0,offset:0,limit:2}));
   console.log('PASS real engine HTTP session, explicit create, revision conflict, committed response loss, no replay, offline and identity isolation; bounded achievement page and confirmation guard');
  }finally{await runtime.close();fs.rmSync(dir,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -40,7 +40,7 @@ const pilotCode = `
     }catch{return false;}
   }
   function canonicalReset(){
-    canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalForeignOpen=false;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';canonicalReplay=null;canonicalReplaySkip=false;canonicalAchievementPage=null;canonicalAchievementNote='';canonicalRewardNote='';
+    canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalForeignOpen=false;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';canonicalReplay=null;canonicalReplaySkip=false;canonicalArchive=null;canonicalAchievementPage=null;canonicalAchievementNote='';canonicalRewardNote='';
     canonicalPilot.suspend();ui.clubDraft=null;ui.portalSlot=null;ui.portalOrigin=null;slotOpening=false;
     ui.page='title';ui.launchTitle=false;
   }
@@ -426,11 +426,24 @@ const pilotCode = `
       }else if(p?.date===day.date){canonicalReplay={phase:'paper',paper:p};render();await wait(full?(fast?500:1000):(fast?150:300));}
     }finally{if(epoch===canonicalEpoch){canonicalReplay=null;canonicalReplaySkip=false;}}
   }
+  let canonicalArchive=null,canonicalArchiveKind='matches',canonicalArchiveYear=0;
+  async function canonicalArchiveLoad(kind,year,offset){
+    if(slotOpening||!accountCurrent()||!canonicalSnapshot?.game?.headquarters?.archiveAvailable)return;
+    const epoch=canonicalEpoch;canonicalArchiveKind=kind;canonicalArchiveYear=year;canonicalArchive=null;slotOpening=true;render();
+    try{const r=await canonicalPilot.reportPage({kind,year,offset,limit:kind==='matches'?1:3});if(epoch!==canonicalEpoch)return;if(r.status!=='ready')throw Error('archive observation required');canonicalArchive=r.page;}
+    catch{if(epoch===canonicalEpoch){canonicalSnapshot=null;canonicalArchive=null;}}
+    finally{if(epoch===canonicalEpoch){slotOpening=false;render();draftJump(0);}}
+  }
+  function canonicalArchiveMarkup(g){
+    if(!g.headquarters.archiveAvailable)return '<p class="small">重要イベントの確認後に過去の記録を閲覧できます。</p>';
+    const p=canonicalArchive,disabled=slotOpening?'disabled':'',kind=canonicalArchiveKind,year=canonicalArchiveYear;
+    return '<section class="panel"><h3>過去の試合・新聞</h3><div class="chips"><button class="chip '+(kind==='matches'?'active':'')+'" data-action="canonical-archive-kind" data-kind="matches" '+disabled+'>試合</button><button class="chip '+(kind==='papers'?'active':'')+'" data-action="canonical-archive-kind" data-kind="papers" '+disabled+'>新聞</button></div><label>年度（0＝全年度）<input id="canonical-archive-year" type="number" min="0" max="'+g.year+'" value="'+year+'" '+disabled+'></label><button class="btn outline full" data-action="canonical-archive-search" '+disabled+'>記録を検索</button>'+(p?'<p>'+ (p.total?p.offset+1:0)+'〜'+(p.offset+p.items.length)+' / '+p.total+'件 · 新しい順</p>'+p.items.map(x=>kind==='matches'?canonicalMatchReport(x,g):canonicalPaperMarkup(x)).join('')+'<div class="chips"><button class="btn outline" data-action="canonical-archive-prev" '+(slotOpening||!p.offset?'disabled':'')+'>前のページ</button><button class="btn outline" data-action="canonical-archive-next" '+(slotOpening||p.nextOffset===null?'disabled':'')+'>次のページ</button></div>':slotOpening?'<p role="status">記録を取得中</p>':'')+'<p class="small">球団ロゴ・選手名は保存世界の現在の登録情報を参照します。旧記録にない詳細成績は生成しません。</p></section>';
+  }
   function canonicalReportsRender(){
     const app=$('#app'),g=canonicalSnapshot?.game;if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-reports-back">‹ 本部</button></div>';
     if(!g){app.innerHTML='<div class="setup-screen">'+top+'<p>本部で最新状態を取得してください。</p></div>';return;}
-    app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(g.team)+'">'+top+'<main class="main"><h2 class="page-title">保存済み試合・新聞</h2>'+canonicalMatchReport(g.headquarters.lastReport,g)+canonicalPaperMarkup(g.headquarters.latestPaper)+'</main></div>';
+    app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(g.team)+'">'+top+'<main class="main"><h2 class="page-title">保存済み試合・新聞</h2>'+canonicalMatchReport(g.headquarters.lastReport,g)+canonicalPaperMarkup(g.headquarters.latestPaper)+canonicalArchiveMarkup(g)+'</main></div>';
   }
   function canonicalHqRender(){
     const app=$('#app'),g=canonicalSnapshot?.game,t=g?.team,v=g?.headquarters;if(!app)return;
@@ -897,8 +910,12 @@ const pilotCode = `
     else if(ui.page==='canonical-hq'&&act==='canonical-hq-run')void canonicalRun(b.dataset.kind);
     else if(ui.page==='canonical-hq'&&act==='canonical-hq-mode'&&['normal','fast','skip'].includes(b.dataset.mode)){canonicalPlayback=b.dataset.mode;render();}
     else if(ui.page==='canonical-hq'&&act==='canonical-hq-refresh')void canonicalHqRequest(false);
-    else if(ui.page==='canonical-hq'&&act==='canonical-reports-open'&&canonicalSnapshot?.game&&accountCurrent()){ui.page='canonical-reports';render();draftJump(0);}
-    else if(ui.page==='canonical-reports'&&act==='canonical-reports-back'){ui.page='canonical-hq';render();draftJump(0);}
+    else if(ui.page==='canonical-hq'&&act==='canonical-reports-open'&&canonicalSnapshot?.game&&accountCurrent()){canonicalArchive=null;canonicalArchiveKind='matches';canonicalArchiveYear=0;ui.page='canonical-reports';render();draftJump(0);}
+    else if(ui.page==='canonical-reports'&&act==='canonical-reports-back'){canonicalArchive=null;ui.page='canonical-hq';render();draftJump(0);}
+    else if(ui.page==='canonical-reports'&&act==='canonical-archive-kind'&&['matches','papers'].includes(b.dataset.kind))void canonicalArchiveLoad(b.dataset.kind,canonicalArchiveYear,0);
+    else if(ui.page==='canonical-reports'&&act==='canonical-archive-search'){const year=Number($('#canonical-archive-year')?.value),max=canonicalSnapshot?.game.year;if(Number.isSafeInteger(year)&&(year===0||year>=2027&&year<=max))void canonicalArchiveLoad(canonicalArchiveKind,year,0);else showToast('年度は0または2027年以降を指定してください。',true);}
+    else if(ui.page==='canonical-reports'&&act==='canonical-archive-prev'&&canonicalArchive?.offset>0)void canonicalArchiveLoad(canonicalArchiveKind,canonicalArchiveYear,Math.max(0,canonicalArchive.offset-(canonicalArchiveKind==='matches'?1:3)));
+    else if(ui.page==='canonical-reports'&&act==='canonical-archive-next'&&canonicalArchive?.nextOffset!=null)void canonicalArchiveLoad(canonicalArchiveKind,canonicalArchiveYear,canonicalArchive.nextOffset);
     else if(ui.page==='canonical-hq'&&act==='canonical-events-open'&&canonicalSnapshot?.game&&accountCurrent()){canonicalAwardFilter='all';canonicalForeignOpen=false;ui.page='canonical-events';render();draftJump(0);}
     else if(['canonical-hq','canonical-events'].includes(ui.page)&&act==='canonical-rewards-open'&&canonicalSnapshot?.game&&accountCurrent()){canonicalRewardReturn=ui.page;ui.page='canonical-rewards';void canonicalRewardRequest(null);draftJump(0);}
     else if(ui.page==='canonical-rewards'&&act==='canonical-achievements-open'&&canonicalSnapshot?.wallet&&accountCurrent()){ui.page='canonical-achievements';void canonicalAchievementRequest(0);}

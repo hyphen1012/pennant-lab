@@ -274,3 +274,6 @@ Bounded 1–40 item achievement-page endpoint with world/revision check. Reuses 
 
 ## Committed date and inning playback (staging)
 PR113: use original watchReplaySteps with bounded projection and exact final scores; no synthetic scoring moments. Normal/fast day progression presents actual committed date, inning replay and original newspaper layout, skip retains current direct progression. Replay/skip/pause is presentation-only after revision confirmation. On session change discard transient state, reward/achievement notes and caches. Engine score consistency and browser replay skip regression. Original portrait effects/audio and full parity remain open. No production activation.
+
+## Bounded match and newspaper history (staging)
+PR114: year-filtered reverse chronological own-club matches and archived daily/weekly papers, 1 match or up to 3 papers per read. Server world/revision check, bounded 256 KiB page; no mutations, no invented historical data. Confidential events hold access. Historical player/club presentation uses current saved registry; old missing box stats remain missing. Full state is still decoded per request; indexing and resource isolation remain open. Engine/HTTP regression. No production activation.

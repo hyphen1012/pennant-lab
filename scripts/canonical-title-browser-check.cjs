@@ -90,6 +90,20 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   if(beforeWeekly.game.headquarters.canCalendar){await page.locator('[data-action="canonical-hq-run"][data-kind="weekly"]').click();await page.waitForFunction(()=>!document.querySelector('[data-action="canonical-hq-pause"]'),null,{timeout:30000});const afterWeekly=await post('read',{slot:1});a.ok(afterWeekly.game.calendarIndex>beforeWeekly.game.calendarIndex);a.ok(afterWeekly.game.calendarIndex<=beforeWeekly.game.headquarters.goals.weekly);a.ok(afterWeekly.game.calendarIndex===beforeWeekly.game.headquarters.goals.weekly||!afterWeekly.game.headquarters.canCalendar);a.equal(afterWeekly.revision-beforeWeekly.revision,afterWeekly.game.calendarIndex-beforeWeekly.game.calendarIndex);}
   const beforePresentation=await post('read',{slot:1});
   if(beforePresentation.game.headquarters.canCalendar){await page.locator('[data-action="canonical-hq-mode"][data-mode="normal"]').click();await page.locator('[data-action="canonical-hq-step"]').click();await page.locator('[data-action="canonical-replay-skip"]').waitFor({timeout:15000});await page.locator('[data-action="canonical-replay-skip"]').click();await page.locator('.hero-stadium').waitFor();const afterPresentation=await post('read',{slot:1});a.equal(afterPresentation.revision,beforePresentation.revision+1);a.equal(afterPresentation.game.calendarIndex,beforePresentation.game.calendarIndex+1);}
+  // Exercise nonempty serialized archive records, not merely an empty page.
+  clockOffset+=61000;
+  const archived=await post('read',{slot:1});
+  if(archived.game.headquarters.archiveAvailable){
+   await page.locator('[data-action="canonical-reports-open"]').click();
+   await page.locator('[data-action="canonical-archive-search"]').click();await page.locator('[data-action="canonical-archive-next"]').waitFor();
+   const matches=await post('report-page',{slot:1,world:archived.world,revision:archived.revision,command:{kind:'matches',year:0,offset:0,limit:1}});
+   if(archived.game.headquarters.lastReport){a.ok(matches.page.total>0);a.equal(matches.page.items[0].gameId,archived.game.headquarters.lastReport.gameId);}
+   await page.locator('[data-action="canonical-archive-kind"][data-kind="papers"]').click();await page.locator('[data-action="canonical-archive-next"]').waitFor();
+   const papers=await post('report-page',{slot:1,world:archived.world,revision:archived.revision,command:{kind:'papers',year:0,offset:0,limit:3}});
+   if(archived.game.headquarters.latestPaper){a.ok(papers.page.total>0);a.equal(papers.page.items[0].date,archived.game.headquarters.latestPaper.date);}
+   a.equal((await post('read',{slot:1})).revision,archived.revision);
+   await page.locator('[data-action="canonical-reports-back"]').click();
+  }
   await page.locator('[data-action="canonical-return"]').first().click();await slot(1).waitFor();
   a.equal(await slot(1).getAttribute('data-action'),'continue-slot');
   // Separate the two long integration scenarios by a real limiter window in the fixture clock.

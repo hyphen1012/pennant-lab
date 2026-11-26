@@ -71,6 +71,7 @@ function createCanonicalGameSession({client,online=()=>true}={}){
   });
   return {...r,rewardStatus:r.status==='ready'?outcome:null};
  }
+ async function reportPage(command){return readPage('gameReportPage',command);}
  async function achievementPage(command){return readPage('gameAchievementPage',command);}
  async function claimAchievement(id,choice,confirmed){
   if(confirmed!==true||status!=='ready'||!snapshot||snapshot.pending?.length||typeof client.gameClaim!=='function'||typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id)||!['ticket','point'].includes(choice))throw Error('explicit achievement claim required');
@@ -94,6 +95,6 @@ function createCanonicalGameSession({client,online=()=>true}={}){
    snapshot=null;status='refresh-required';return {status};
   }finally{if(current(t))active=null;}
  }
- return Object.freeze({setSession,suspend,select,refresh,create,advance,inspect,freePage,playerPage,listSlots,reward,achievementPage,claimAchievement});
+ return Object.freeze({setSession,suspend,select,refresh,create,advance,inspect,freePage,playerPage,listSlots,reward,achievementPage,claimAchievement,reportPage});
 }
 module.exports={createCanonicalGameSession};

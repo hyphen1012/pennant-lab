@@ -90,19 +90,29 @@ function createHeadlessEngine(){
    box:g.box?{bat:box(g.box.bat,['ab','h','hr','rbi','bb','sb']),pitch:box(g.box.pitch,['outs','pitches','h','er','k','bb','w','l','sv'])}:null,
    moves:Array.isArray(g.managerMoves)?g.managerMoves.slice(0,80).map(m=>({inning:m.inning,side:m.side,team:reportClub(m.teamId)?.short||'',type:m.type,inName:m.inName,outName:m.outName,role:m.role,reason:m.reason,pitchCount:m.pitchCount})):null};
  };
- const latestPaper=()=>{
-  const p=(game.dailyBulletins||[]).at(-1);
-  if(!p||p.year!==game.year||!Array.isArray(p.articles)||!p.articles.length)return null;
+ const paperReport=p=>{
+  if(!p||!Array.isArray(p.articles)||!p.articles.length)return null;
   const w=p.weekly;
   return {date:p.date,kind:p.kind,reason:p.reason,layout:p.layout,articles:p.articles.slice(0,8).map(a=>({tag:a.tag,headline:a.headline,body:a.body,stat:a.stat,league:a.league})),nextDate:p.nextDate,nextOpponent:p.nextOpponent,
    weekly:w&&w.teamId===team.id?{start:w.start,end:w.end,teamName:w.teamName,record:w.record,scores:(w.scores||[]).slice(0,14),cash:w.cash,leagues:w.leagues}:null};
  };
+ const latestPaper=()=>{const p=(game.dailyBulletins||[]).at(-1);return p?.year===game.year?paperReport(p):null;};
+ const archiveAvailable=()=>!game.pendingDraftReveal&&!flowForeignResponse()&&!pendingRareNews().length&&!flowGet();
+ if(op==='report-page'){
+  if(!archiveAvailable())throw Error('archive unavailable during confidential event');
+  const source=input.kind==='matches'?game.games:(game.dailyBulletins||[]);
+  const matches=x=>(!input.year||x.year===input.year)&&(input.kind==='matches'?(x.home===team.id||x.away===team.id):Array.isArray(x.articles)&&x.articles.length>0);
+  let total=0,items=[];
+  for(let i=source.length-1;i>=0;i--){const x=source[i];if(!matches(x))continue;if(total>=input.offset&&items.length<input.limit)items.push(input.kind==='matches'?matchReport(x):paperReport(x));total++;}
+  if(input.offset>total)throw Error('archive offset out of range');
+  const end=input.offset+items.length;return JSON.stringify({kind:input.kind,year:input.year,offset:input.offset,total,nextOffset:end<total?end:null,items});
+ }
  const headquartersView=()=>{
   const next=game.day<143?game.schedule[game.day]?.find(m=>m.home===team.id||m.away===team.id):null;
   const opp=next?getTeam(next.home===team.id?next.away:next.home):null;
   const last=gameByTeam(team.id),lastOpp=last?getTeam(last.home===team.id?last.away:last.home):null;
   const previous=game.calendar.days[game.calendarIndex-1];
-  return {lastDay:previous?{date:previous.date,type:previous.type,reason:previous.reason,gameNo:previous.gameNo??null}:null,dateText:getDayText(),fans:game.fans,salary:payroll(team),rank:rankings(team.league).findIndex(t=>t.id===team.id)+1,opponent:opp?.short||null,standings:Object.fromEntries(['E','W'].map(l=>[l,rankings(l).map(t=>({id:t.id,short:t.short,league:t.league,wins:t.wins,losses:t.losses,ties:t.ties,rs:t.rs,ra:t.ra}))])),canStep:canStep(),canCalendar:canCalendar(),goals:Object.fromEntries(['date','weekly','month','season'].map(kind=>[kind,calendarGoalFor(kind,game.calendar.days,game.calendarIndex)])),latestMonth:(game.monthlyArchive||[]).filter(m=>m.teamId===team.id).slice(-1).map(m=>({month:m.month,date:m.date,wins:m.wins,losses:m.losses,ties:m.ties}))[0]||null,latestMilestones:(game.milestoneNews||[]).slice(-5).map(m=>({date:m.date,title:m.title})),lastReport:!game.pendingDraftReveal&&!flowForeignResponse()&&!flowGet()?matchReport(last):null,latestPaper:!game.pendingDraftReveal&&!flowForeignResponse()&&!pendingRareNews().length&&!flowGet()?latestPaper():null,last:last&&lastOpp?{year:last.year,day:last.day,opponent:lastOpp.name,ours:last.home===team.id?last.homeScore:last.awayScore,theirs:last.home===team.id?last.awayScore:last.homeScore}:null};
+  return {archiveAvailable:archiveAvailable(),lastDay:previous?{date:previous.date,type:previous.type,reason:previous.reason,gameNo:previous.gameNo??null}:null,dateText:getDayText(),fans:game.fans,salary:payroll(team),rank:rankings(team.league).findIndex(t=>t.id===team.id)+1,opponent:opp?.short||null,standings:Object.fromEntries(['E','W'].map(l=>[l,rankings(l).map(t=>({id:t.id,short:t.short,league:t.league,wins:t.wins,losses:t.losses,ties:t.ties,rs:t.rs,ra:t.ra}))])),canStep:canStep(),canCalendar:canCalendar(),goals:Object.fromEntries(['date','weekly','month','season'].map(kind=>[kind,calendarGoalFor(kind,game.calendar.days,game.calendarIndex)])),latestMonth:(game.monthlyArchive||[]).filter(m=>m.teamId===team.id).slice(-1).map(m=>({month:m.month,date:m.date,wins:m.wins,losses:m.losses,ties:m.ties}))[0]||null,latestMilestones:(game.milestoneNews||[]).slice(-5).map(m=>({date:m.date,title:m.title})),lastReport:!game.pendingDraftReveal&&!flowForeignResponse()&&!flowGet()?matchReport(last):null,latestPaper:!game.pendingDraftReveal&&!flowForeignResponse()&&!pendingRareNews().length&&!flowGet()?latestPaper():null,last:last&&lastOpp?{year:last.year,day:last.day,opponent:lastOpp.name,ours:last.home===team.id?last.homeScore:last.awayScore,theirs:last.home===team.id?last.awayScore:last.homeScore}:null};
  };
  const freeVisible=()=>!game.pendingDraftReveal&&!flowForeignResponse();
  const freeList=()=>freeAgents().filter(p=>!p.retired);
@@ -981,6 +991,10 @@ function createHeadlessEngine(){
    if(!t||state.started!==true)throw Error('invalid canonical preview');
    const e=t.emblem;
    return {year:state.year,day:state.day,gmName:state.gmName||'GM',team:{id:t.id,name:t.name,short:t.short,league:t.league,color:t.color,letter:t.letter,emblem:e?{accent:e.accent,shape:e.shape,pattern:e.pattern,font:e.font,motif:e.motif}:null,wins:t.wins,cash:t.cash}};
+  },
+  reportPage(state,command){
+   if(!exact(command,['kind','year','offset','limit'])||!['matches','papers'].includes(command.kind)||!Number.isSafeInteger(command.year)||command.year!==0&&(command.year<2027||command.year>state.year)||!Number.isSafeInteger(command.offset)||command.offset<0||!Number.isSafeInteger(command.limit)||command.limit<1||command.limit>(command.kind==='matches'?1:3))throw Error('invalid report page');
+   return run('report-page',state,command);
   },
   playerPage(state,command){
    if(!exact(command,['playerId','offset','limit'])||!Number.isSafeInteger(command.playerId)||command.playerId<1||!Number.isSafeInteger(command.offset)||command.offset<0||!Number.isSafeInteger(command.limit)||command.limit<1||command.limit>10)throw Error('invalid player history page');
