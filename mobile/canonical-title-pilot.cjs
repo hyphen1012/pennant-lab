@@ -34,7 +34,7 @@ const pilotCode = `
     }catch{return false;}
   }
   function canonicalReset(){
-    canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;
+    canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalHqError=false;
     canonicalPilot.suspend();ui.clubDraft=null;ui.portalSlot=null;ui.portalOrigin=null;slotOpening=false;
     ui.page='title';ui.launchTitle=false;
   }
@@ -91,7 +91,7 @@ const pilotCode = `
 
   function canonicalRosterOpen(){
     if(!canonicalSnapshot?.game?.club||slotOpening||!accountCurrent())return;
-    canonicalRoster={world:canonicalSnapshot.world,revision:canonicalSnapshot.revision,mode:'field',orderMode:'swap',role:null,order:null,swap:false,note:''};
+    canonicalRoster={returnPage:ui.page,world:canonicalSnapshot.world,revision:canonicalSnapshot.revision,mode:'field',orderMode:'swap',role:null,order:null,swap:false,note:''};
     ui.page='canonical-roster';render();window.scrollTo(0,0);
   }
   function canonicalRosterRender(){
@@ -153,15 +153,44 @@ const pilotCode = `
     if(act==='order190-role'&&s.role&&!s.swap)document.querySelector('.order190 .order-detail')?.scrollIntoView?.({block:'nearest',behavior:'instant'});
     if(act==='order190-exchange'&&s.swap)document.querySelector('.order190 .order-field')?.scrollIntoView?.({block:'nearest',behavior:'instant'});
   }
+  let canonicalHqError=false;
+  function canonicalHqRender(){
+    const app=$('#app'),g=canonicalSnapshot?.game,t=g?.team,v=g?.headquarters;if(!app)return;
+    const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-return">‹ データ選択</button></div>';
+    if(!t||!v){app.innerHTML='<div class="setup-screen">'+top+'<p role="status">確定した日程を取得してください。自動再送は行いません。</p><button class="btn primary full" data-action="canonical-hq-refresh" '+(slotOpening?'disabled':'')+'>最新状態を取得</button></div>';return;}
+    const canStep=v.canStep&&!slotOpening&&!canonicalSnapshot.pending?.length&&accountCurrent();
+    const stop=slotOpening?'日程の確定を確認しています。':canonicalSnapshot.pending?.length?'報酬の確定確認が必要です。':!v.canStep?'確認が必要なイベントまたは日程の区切りです。未接続のイベント処理へは自動進行しません。':'';
+    const last=v.last,score=last?'<div class="box-result"><span class="tag '+(last.ours>last.theirs?'green':last.ours<last.theirs?'red':'')+'">'+(last.ours>last.theirs?'勝利':last.ours<last.theirs?'敗戦':'引分')+'</span> <span class="small">'+last.year+'年 第'+last.day+'戦 / vs '+h(last.opponent)+'</span><div class="score-big">'+last.ours+' - '+last.theirs+'</div></div>':'<div class="empty">シーズンはまだ始まっていません。</div>';
+    const hero=frontOfficeHero(t,{year:g.year,gmName:g.gmName,day:g.day,fans:v.fans,salary:v.salary,rank:v.rank,opponent:v.opponent,dateText:v.dateText});
+    app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(t)+'">'+top+'<main class="main">'+hero+'<section class="panel desk-panel"><div class="desk-heading"><div><div class="eyebrow">GM DESK · FRONT OFFICE</div><h3>業務一覧</h3></div><button class="btn primary" data-action="canonical-hq-step" '+(canStep?'':'disabled')+'>▶ 1日進める</button></div>'+(g.club?'<button class="btn outline full" data-action="canonical-roster-open" '+(slotOpening?'disabled':'')+'>スタメン編成</button>':'')+'</section><section class="panel"><div class="panel-head"><h3 class="panel-title">直近の試合結果</h3></div>'+score+'</section>'+(stop?'<p role="status">'+h(stop)+'</p>':'')+'<p class="small">試験環境 · 本部の概要と1日進行のみ接続済み。イベント演出、その他の業務・倍速・スキップは未接続です。</p></main></div>';
+  }
+  async function canonicalHqRequest(step){
+    if(slotOpening||!accountCurrent()||!canonicalSlot)return;
+    const epoch=canonicalEpoch,old=canonicalSnapshot,previousWorld=old?.world||canonicalHqWorld,scroll=draftScrollY();
+    if(step&&(!old?.game?.headquarters?.canStep||old.pending?.length))return;
+    slotOpening=true;render();
+    try{
+      const result=await (step?canonicalPilot.advance({step:1}):canonicalPilot.refresh());
+      if(epoch!==canonicalEpoch)return;
+      if(result.status!=='ready'||result.snapshot.world!==previousWorld)throw Error('headquarters observation required');
+      canonicalSnapshot=result.snapshot;canonicalHqError=false;
+    }catch{
+      if(epoch!==canonicalEpoch)return;
+      canonicalSnapshot=null;canonicalHqError=true;
+    }finally{if(epoch===canonicalEpoch){slotOpening=false;render();draftJump(scroll);}}
+  }
+  let canonicalHqWorld=null;
+  function canonicalHqOpen(){if(!canonicalSnapshot?.game?.headquarters||slotOpening||!accountCurrent())return;canonicalHqWorld=canonicalSnapshot.world;canonicalHqError=false;ui.page='canonical-hq';render();window.scrollTo(0,0);}
   const canonicalOriginalRender=render;
   render=function(){
+    if(ui.page==='canonical-hq'){canonicalHqRender();return;}
     if(ui.page==='canonical-roster'){canonicalRosterRender();return;}
     if(ui.page==='canonical-ready'||ui.page==='game'){
       const app=$('#app');if(!app)return;
       const g=canonicalSnapshot?.game,t=g?.team;
       app.innerHTML='<div class="setup-screen"><div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-return">‹ データ選択</button></div>'+
        (t?'<div class="hero-team">'+teamBadge(t,'logo')+'<div><h2>'+h(t.name)+'</h2><small>GM '+h(g.gmName)+' · '+g.year+'年 '+g.day+'/143試合</small></div></div>':'')+
-       '<p role="status">サーバー保存の確認画面（開発試験）</p><p>本部と日程進行の画面統合は未完了です。</p>'+(g?.club?'<button class="btn primary full" data-action="canonical-roster-open">スタメン編成</button>':'')+'<button class="btn outline full" data-action="canonical-return">データ選択へ戻る</button></div>';
+       '<p role="status">サーバー保存の確認画面（開発試験）</p><p>試験環境で本部と編成を確認できます。</p>'+(g?.headquarters?'<button class="btn primary full" data-action="canonical-hq-open">本部へ進む</button>':'')+(g?.club?'<button class="btn primary full" data-action="canonical-roster-open">スタメン編成</button>':'')+'<button class="btn outline full" data-action="canonical-return">データ選択へ戻る</button></div>';
       return;
     }
     canonicalOriginalRender();
@@ -176,9 +205,12 @@ const pilotCode = `
     e.preventDefault();e.stopImmediatePropagation();
     if(ui.page==='title'&&!ui.launchTitle&&['new-slot','continue-slot'].includes(act))void openCanonicalSlot(b,act==='new-slot');
     else if(ui.page==='title'&&act==='canonical-retry'||act==='canonical-return'||ui.page==='setup'&&act==='title')void canonicalReturn();
-    else if(ui.page==='canonical-ready'&&act==='canonical-roster-open')canonicalRosterOpen();
+    else if(ui.page==='canonical-ready'&&act==='canonical-hq-open')canonicalHqOpen();
+    else if(ui.page==='canonical-hq'&&act==='canonical-hq-step')void canonicalHqRequest(true);
+    else if(ui.page==='canonical-hq'&&act==='canonical-hq-refresh')void canonicalHqRequest(false);
+    else if(['canonical-ready','canonical-hq'].includes(ui.page)&&act==='canonical-roster-open')canonicalRosterOpen();
     else if(ui.page==='canonical-roster'&&act==='canonical-roster-refresh')void canonicalRosterRequest(null);
-    else if(ui.page==='canonical-roster'&&act==='canonical-roster-back'){if(!canonicalSnapshot)void canonicalReturn();else{canonicalRoster=null;ui.page='canonical-ready';render();window.scrollTo(0,0);}}
+    else if(ui.page==='canonical-roster'&&act==='canonical-roster-back'){if(!canonicalSnapshot)void canonicalReturn();else{const dest=canonicalRoster?.returnPage||'canonical-ready';canonicalRoster=null;ui.page=dest;render();window.scrollTo(0,0);}}
     else if(ui.page==='canonical-roster'&&act.startsWith('order190-'))canonicalRosterClick(b);
     else if(ui.page==='setup'&&act==='finish-setup')void canonicalFinishSetup();
     else if(ui.page==='title'&&act==='canonical-logout')window.PennantNative.logoutAccount();
