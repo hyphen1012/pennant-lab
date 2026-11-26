@@ -124,3 +124,7 @@
 - Canonical advance receives a freshly verified entitlement from server authority. Only that trusted context activates the existing vipStatusProvider and actual eligible revenue accounting. No entitlement value is persisted in the game save or accepted in advance commands. Current limited calendar only; production receipts, expiration timing and full annual flow still require testing.
 - Optional exact `{team: 0..11}` setup selects a real server-generated club without admitting custom seed/state; legacy `{}` remains accepted. Preserve the PRNG cursor after initial roster generation, rather than resetting it to the initial seed. Add same-snapshot replay regression; comprehensive long-period deterministic audit remains open.
 - Staging only; no release/main integration or production activation. CI pending at submission.
+
+
+## Recruitment reward adapters (staging only)
+Connect draft/foreign revival and first-round lottery through existing applyDraftRecovery, applyForeignRecovery, applyLotteryReward. FA/posting/overseas retention uses current own refused request with existing cash requirement. FA signing uses movementPool and movementCanSign, preserves offered years via movementSign; cannot displace a completed rival deal or expired market. No reward for unsupported state; recheck inside atomic settlement. Legacy local reward provider not enabled. Tests use actual generated candidates with isolated fixture negotiation states. Calendar/year rollover, full modern FA UI reward integration and native SSV remain open; do not classify as production ready.
