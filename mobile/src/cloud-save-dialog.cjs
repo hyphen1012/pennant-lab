@@ -39,14 +39,27 @@ function openCloudSaveDialog({document:doc=globalThis.document,session,baseUrl,f
  async function refresh(){
   remote=await transport.list();if(!live)return;
   const localRows=await Promise.all([1,2,3].map(slot=>local.read({account:session.account,slot})));
+  const recoveries=await Promise.all([1,2,3].map(slot=>local.read({account:session.account,slot,recovery:true})));
   if(!live)return;clear();setStatus('最新の一覧を取得しました。');
   for(const slot of [1,2,3]){
    const row=remote.find(x=>x.slot===slot),lr=localRows[slot-1],section=node('section');section.style.cssText='padding:12px 0;border-top:1px solid #53647b';
    section.append(node('h3','DATA 0'+slot),node('p',lr.data?'端末：世代 '+lr.revision+' ／ 更新 '+stamp(lr.updatedAt):'端末：空きデータ'),node('p',row?'クラウド：世代 '+row.revision+' ／ '+bytes(row.bytes)+' ／ 更新 '+stamp(row.updatedAt):'クラウド：空きデータ'));
    if(lr.data)button('端末からアップロード',()=>run(()=>prepareUpload(slot,row)),section);
+   if(recoveries[slot-1].data)button('端末の直前世代を復元',()=>run(()=>prepareRecovery(slot)),section);
    if(row){button('端末へ取り込む',()=>run(()=>prepareImport(slot,row,false)),section);button('過去世代を確認',()=>run(()=>history(slot)),section);}
    body.append(section);
   }
+ }
+ async function prepareRecovery(slot){
+  const account=session.account,backup=await local.read({account,slot,recovery:true}),current=await local.read({account,slot});
+  const exported=await exportGameRecord(backup.data),sha=await sha256(exported.bytes),d=describe(exported.data);
+  if(backup.sha&&backup.sha!==sha)throw Error('recovery checksum mismatch');
+  if(!live)return;
+  showConfirm('端末の直前世代に戻しますか？',['対象：DATA 0'+slot,'直前世代 '+backup.revision+' ／ 更新 '+stamp(backup.updatedAt),'球団：'+d.team+' ／ '+d.year+'年 '+d.day+'/143試合','現在世代 '+current.revision+' は置換前の復旧コピーとして残します。復元後は新しい世代番号になります。クラウドは変更しません。'],async()=>{
+   const result=await local.replace({account,slot,expectedRevision:current.revision,sha,payload:exported.bytes});
+   if(result.ok!==true)throw Error('local save conflict');
+   if(live){await refresh();setStatus('端末の直前世代を復元しました。');}
+  });
  }
  async function prepareUpload(slot,row){
   const record=await local.read({account:session.account,slot}),exported=await exportGameRecord(record.data);
