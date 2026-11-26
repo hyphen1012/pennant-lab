@@ -601,11 +601,11 @@ const pilotCode = `
       else if(inbox.rare){const r=inbox.rare;body+='<section class="rare-news-screen"><header class="edition-heading"><small>'+h(r.date)+' · SPECIAL NEWS</small><h2>特別速報</h2></header><p>'+h(r.category||'特別なニュース')+'</p><p class="small">専用演出・記事本文は接続待ちです。確認操作は保存済みの速報のみを対象とします。</p>'+commandButton('rare-ack','速報を確認する')+'</section>';}
       else if(inbox.injury){const r=inbox.injury;body+='<section class="panel"><h2>重要負傷報告</h2>'+person(r.playerId)+'<p>'+h(r.date)+' · 離脱見込み '+h(r.days)+'日</p><p class="small">特別治療の広告連携は未接続。通常治療は継続します。</p>'+commandButton('injury-ack','負傷報告を確認する')+'</section>';}
       else if(inbox.career){const r=inbox.career,consult=['consult','plan'].includes(r.stage);body+='<section class="panel"><h2>'+ (consult?'引退・去就相談':r.stage==='farewell'?'引退セレモニー':'選手からの報告')+'</h2>'+person(r.playerId)+(consult?'<p>引退に際して準備する行事を選択してください。選択は最大5件です。</p><fieldset id="canonical-farewell-options">'+r.options.map(o=>'<label class="row"><input type="checkbox" value="'+h(o.key)+'" '+dis+'>'+h(o.label)+' · '+fmtMoney(o.cost)+'</label>').join('')+'</fieldset><p class="small">引退慰留の広告連携は未接続です。選択した費用は確定時に支払います。</p>'+commandButton('career-accept','引退と準備内容を確定する'):['thanks','farewell'].includes(r.stage)?commandButton('career-dismiss','報告を確認する'):'<p>未接続の相談段階です。</p>')+'</section>';}
-      else if(inbox.rookie){const r=inbox.rookie;body+='<section class="panel"><header class="edition-heading"><small>'+h(r.year)+' · ROOKIE ARRIVALS</small><h2>新人入団報告</h2></header>'+r.entries.map((p,i)=>{const m=canonicalDraftModel(p);return '<article class="panel"><h3>新人 '+(i+1)+'</h3>'+rarePanel(m,'join')+(p.stage===2?faceMini(m)+'<h3>'+themedPlayerName(m)+'</h3><div class="annual-ability-strip">'+Object.entries(p.abilities||{}).map(([k,v])=>'<span><small>'+h(DRAFT_LABELS[k]||k)+'</small><b>'+h(v)+'</b></span>').join('')+'</div>':'<p>'+h(p.name||'未公開')+' · '+positionMarkup(p.pos)+'</p>')+ (p.stage===1?rareCinemaArt(m,'join'):'')+(p.stage<2?commandButton('rookie-reveal',p.stage===0?'入団報告を開く':'能力を公開する','data-id="'+p.id+'"'):'')+'</article>';}).join('')+commandButton('rookie-finish','新人入団報告を終了する','',blocked||r.entries.some(p=>p.stage<2))+'</section>';}
+      else if(inbox.rookie){const r=inbox.rookie;body+='<section class="panel"><header class="edition-heading"><small>'+h(r.year)+' · ROOKIE ARRIVALS</small><h2>新人入団報告</h2></header>'+r.entries.map((p,i)=>{const m={...canonicalDraftModel(p),abilitiesHidden:p.stage!==2};return '<article class="panel"><h3>新人 '+(i+1)+'</h3>'+rarePanel(m,'join')+(p.stage===2?faceMini(m)+'<h3>'+themedPlayerName(m)+'</h3><div class="annual-ability-strip">'+Object.entries(p.abilities||{}).map(([k,v])=>'<span><small>'+h(DRAFT_LABELS[k]||k)+'</small><b>'+h(v)+'</b></span>').join('')+'</div>':'<p>'+h(p.name||'未公開')+' · '+positionMarkup(p.pos)+'</p>')+ (p.stage===1?rareCinemaArt(m,'join'):'')+(p.stage<2?commandButton('rookie-reveal',p.stage===0?'入団報告を開く':'能力を公開する','data-id="'+p.id+'"'):'')+'</article>';}).join('')+commandButton('rookie-finish','新人入団報告を終了する','',blocked||r.entries.some(p=>p.stage<2))+'</section>';}
       else if(inbox.decade!=null)body+='<section class="panel"><h2>球団史・節目の報告</h2><p>'+h(inbox.decade)+'年の節目を迎えました。</p><p class="small">球団史の専用演出は接続待ちです。保存済みの記録は削除しません。</p>'+commandButton('decade-ack','節目の報告を確認する')+'</section>';
     }
     const held=blocked||important||!!g.foreign?.responsePending||!!inbox.review||!!inbox.monthly||!!inbox.milestoneCount;
-    body+=canonicalForeignMarkup(g,blocked,commandButton);
+    body+=canonicalForeignMarkup(g,blocked||important,commandButton);
     if(inbox.opening)body+='<section class="panel"><h2>新シーズン開幕</h2>'+normalDetailCard('opening','新たなシーズン')+commandButton('opening-ack','新シーズンを始める','',held)+'</section>';
     if(a.canStart)body+='<section class="panel"><h3>シーズン全日程終了</h3>'+normalDetailCard('awards','年間表彰・決算')+commandButton('start','オフシーズン業務を開始','',held)+'</section>';
     if(a.mode){
@@ -650,6 +650,10 @@ const pilotCode = `
     if(act==='canonical-digest-next'&&a.active==='exhibition'&&a.preseason?.report&&!a.preseason.digestSeen){canonicalDigestCut=Math.min(REPORT_DIGEST_CUTS.length-1,canonicalDigestCut+1);render();return;}
     if(act!=='canonical-event-command'||canonicalSnapshot.pending?.length)return;
     const k=b.dataset.kind,job=b.dataset.job;
+    // Ignore stale or forged commands for other jobs while an important
+    // notice is active. Server validation remains the ultimate authority.
+    const important=!!(i.finance||i.rare||i.injury||i.career||i.rookie||i.decade!=null);
+    if(important&&!['finance-end','rare-ack','injury-ack','career-accept','career-dismiss','rookie-reveal','rookie-finish','decade-ack'].includes(k))return;
     let cmd=null;
     if(k.startsWith('foreign-')&&g.foreign?.canOperate){
       const decision=k.slice(8),f=g.foreign,n=f.negotiation,id=Number(b.dataset.id),key=b.dataset.key,level=Number(b.dataset.level);canonicalForeignOpen=true;
