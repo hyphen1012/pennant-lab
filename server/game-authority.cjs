@@ -3,6 +3,7 @@
 // Wallet reservation/settlement, canonical state and outcome journal share one
 // SQLite transaction. The actual full season engine is not integrated yet.
 const {randomUUID,createHash}=require('node:crypto'),rules=require('../shared/monetization.cjs');
+const {createCanonicalStateCodec}=require('./canonical-state-codec.cjs');
 const id=x=>typeof x==='string'&&/^[A-Za-z0-9:_-]{1,180}$/.test(x);
 const owner=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
 const n=x=>Number.isSafeInteger(x)&&x>=0;
@@ -13,13 +14,14 @@ function installAuthorityTables(db){
 }
 function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof,now=Date.now}={}){
  if(!ledger?.transact||[engine?.newWorld,engine?.actions,engine?.achievements,engine?.applyAction,engine?.advance,engine?.view,authenticate,verifyRights,hasAdProof].some(x=>typeof x!=='function'))throw Error('trusted canonical game engine required');
+ const stateCodec=createCanonicalStateCodec();
  function sync(v){if(v&&typeof v.then==='function')throw Error('engine transaction must be synchronous');return v;}
  const json=(v,max=32*1024*1024)=>{const s=JSON.stringify(v);if(typeof s!=='string'||Buffer.byteLength(s)>max)throw Error('canonical state exceeds limit');return s;};
  async function identity(token){const a=await authenticate(token);if(a?.authenticated!==true||!owner(a.account))throw Error('unauthorized');return a.account;}
  async function rights(account){const r=await verifyRights(account);if(r?.verified!==true||typeof r.vip!=='boolean'||typeof r.adSkip!=='boolean')throw Error('rights unavailable');return r;}
  function slotCheck(slot){if(![1,2,3].includes(slot))throw Error('invalid slot');}
- function world(db,account,slot){slotCheck(slot);const r=db.prepare('SELECT * FROM authority_worlds WHERE account=? AND slot=?').get(account,slot);if(!r)throw Error('canonical world absent');return {...r,state:JSON.parse(r.state)};}
- function commitWorld(db,r,state){if(!n(r.revision+1))throw Error('world revision exhausted');const q=db.prepare('UPDATE authority_worlds SET state=?,revision=? WHERE account=? AND world=? AND revision=?').run(json(state),r.revision+1,r.account,r.world,r.revision);if(q.changes!==1)throw Error('canonical revision conflict');}
+ function world(db,account,slot){slotCheck(slot);const r=db.prepare('SELECT * FROM authority_worlds WHERE account=? AND slot=?').get(account,slot);if(!r)throw Error('canonical world absent');return {...r,state:stateCodec.decode(r.state)};}
+ function commitWorld(db,r,state){if(!n(r.revision+1))throw Error('world revision exhausted');const q=db.prepare('UPDATE authority_worlds SET state=?,revision=? WHERE account=? AND world=? AND revision=?').run(stateCodec.encode(state),r.revision+1,r.account,r.world,r.revision);if(q.changes!==1)throw Error('canonical revision conflict');}
  function view(r){return {world:r.world,revision:r.revision,game:JSON.parse(json(sync(engine.view(r.state)),262144))};}
  function publicWallet(s){return {tickets:s.tickets,points:s.points,claimCount:s.claimCount,owned:Object.keys(s.owned).filter(k=>s.owned[k]===true),nextAt:s.claimCount>=3?s.lastClaim+rules.HOUR:null};}
  function actionKey(r,a){
@@ -46,7 +48,7 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
   return ledger.transact(account,(s,db)=>{
    if(db.prepare('SELECT 1 FROM authority_worlds WHERE account=? AND slot=?').get(account,slot))throw Error('canonical slot exists');
    const worldId=randomUUID(),state=sync(engine.newWorld(JSON.parse(json(command,4096)),{account,worldId}));
-   db.prepare('INSERT INTO authority_worlds VALUES(?,?,?,?,?)').run(account,slot,worldId,1,json(state));
+   db.prepare('INSERT INTO authority_worlds VALUES(?,?,?,?,?)').run(account,slot,worldId,1,stateCodec.encode(state));
    return view({world:worldId,revision:1,state});
   });
  }
