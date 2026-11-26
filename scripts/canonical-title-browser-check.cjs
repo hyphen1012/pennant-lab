@@ -122,6 +122,31 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
     const signed=await post('read',{slot:2});a.equal(signed.revision,beforeSign.revision+1);a.ok(signed.game.club.roster.some(p=>p.id===affordable.id));
   }
   await page.locator('[data-action="canonical-ops-back"]').click();
+  clockOffset+=61000;
+  await page.locator('[data-action="canonical-ops-open"][data-kind="facilities"]').click();
+  a.equal(await page.locator('.canonical-facility').count(),8);a.equal(await page.locator('.stadium-map svg').count(),1);
+  const beforeFacility=await post('read',{slot:2}),medical=beforeFacility.game.club.facilities.find(f=>f.key==='medical');
+  a.ok(medical.nextCost<=beforeFacility.game.team.cash);
+  page.once('dialog',d=>d.accept());await page.locator('[data-action="canonical-facility-change"][data-key="medical"][data-direction="1"]').click();await page.getByText('サーバーに変更を保存しました。').waitFor();
+  let afterFacility=await post('read',{slot:2});a.equal(afterFacility.revision,beforeFacility.revision+1);a.equal(afterFacility.game.club.facilities.find(f=>f.key==='medical').level,medical.level+1);a.ok(Math.abs(afterFacility.game.team.cash-beforeFacility.game.team.cash+medical.nextCost)<.011);
+  page.once('dialog',d=>d.accept());await page.locator('[data-action="canonical-facility-change"][data-key="medical"][data-direction="-1"]').click();await page.getByText('サーバーに変更を保存しました。').waitFor();
+  let afterDown=await post('read',{slot:2});a.equal(afterDown.revision,afterFacility.revision+1);a.equal(afterDown.game.team.cash,afterFacility.game.team.cash);a.equal(afterDown.game.club.facilities.find(f=>f.key==='medical').level,medical.level);
+  if(afterDown.game.club.canPrice){
+    const price=afterDown.game.club.prices[0],next=price===20000?price-100:price+100;
+    await page.locator('.canonical-price').first().fill(String(next));page.once('dialog',d=>d.accept());await page.locator('[data-action="canonical-prices"]').click();await page.getByText('サーバーに変更を保存しました。').waitFor();
+    const priced=await post('read',{slot:2});a.equal(priced.revision,afterDown.revision+1);a.equal(priced.game.club.prices[0],next);afterDown=priced;
+  }
+  const travel=(afterDown.game.club.travel+1)%4;page.once('dialog',d=>d.accept());await page.locator('[data-action="canonical-travel"][data-index="'+travel+'"]').click();await page.getByText('サーバーに変更を保存しました。').waitFor();
+  const travelled=await post('read',{slot:2});a.equal(travelled.revision,afterDown.revision+1);a.equal(travelled.game.club.travel,travel);
+  await page.locator('[data-action="canonical-ops-back"]').click();
+  await page.locator('[data-action="canonical-ops-open"][data-kind="manager"]').click();const order=travelled.game.club.manager.orders[0],policy=order.value==='attack'?'safe':'attack';
+  await page.locator('[data-action="canonical-manager-order"][data-key="'+order.key+'"][data-value="'+policy+'"]').click();await page.getByText('サーバーに変更を保存しました。').waitFor();
+  const ordered=await post('read',{slot:2});a.equal(ordered.revision,travelled.revision+1);a.equal(ordered.game.club.manager.orders[0].value,policy);
+  await page.locator('[data-action="canonical-ops-back"]').click();
+  await page.locator('[data-action="canonical-players"]').click();await page.locator('.player-row').first().click();const focus=page.locator('[data-action="canonical-focus"]:enabled').first();const key=await focus.getAttribute('data-key');
+  await focus.click();await page.getByText('サーバーに変更を保存しました。').waitFor();const focused=await post('read',{slot:2});a.equal(focused.revision,ordered.revision+1);
+  a.equal(focused.game.club.roster.filter(p=>p.focus!==ordered.game.club.roster.find(q=>q.id===p.id)?.focus&&p.focus===key).length,1);
+  await page.locator('[data-action="canonical-info-back"]').click();await page.locator('[data-action="canonical-info-back"]').click();
   await page.locator('[data-action="canonical-return"]').first().click();await slot(3).waitFor();
   clockOffset+=61000;
   await slot(3).click();await finish.waitFor();lost=true;await finish.click();
