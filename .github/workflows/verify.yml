@@ -131,3 +131,6 @@ jobs:
 
       - run: node scripts/native-oauth-check.cjs
         if: always()
+
+      - run: node scripts/service-runtime-check.cjs
+        if: always()
