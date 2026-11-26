@@ -28,13 +28,14 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/native-runtime.js',r=>r.fulfill({contentType:'application/javascript',body:fixture}));
   await page.route('**/*.mp4',r=>r.abort()); // startup video has its own independent audit
-  let creates=0,lost=false,failSlots=false;
+  let creates=0,lost=false,failSlots=false,lostAdvance=false,advances=0;
   await page.route('**/canonical-fixture/v1/**',async r=>{
    const q=r.request(),p=new URL(q.url()).pathname.replace('/canonical-fixture','');
    if(p.endsWith('/slots')&&failSlots){await r.abort();return;}
    const response=await fetch(base+p,{method:'POST',headers:{Authorization:q.headers().authorization,'Content-Type':'application/json'},body:q.postData()});
    const body=await response.text();
    if(p.endsWith('/create')){creates++;if(lost){lost=false;a.equal(response.status,200);await r.abort();return;}}
+   if(p.endsWith('/advance')){advances++;if(lostAdvance){lostAdvance=false;a.equal(response.status,200);await r.abort();return;}}
    await r.fulfill({status:response.status,contentType:'application/json',body});
   });
   await page.goto('http://127.0.0.1:8765/mobile/www/');
@@ -52,6 +53,13 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   await page.locator('input[data-field="name"]').fill('試験球団');
   await finish.click();await page.getByText('サーバー保存の確認画面（開発試験）').waitFor();
   const one=await post('read',{slot:1});a.equal(one.game.team.name,'試験球団');a.equal(one.game.gmName,'試験GM');a.equal(one.revision,1);a.equal(creates,1);
+  await page.locator('[data-action="canonical-roster-open"]').click();await page.locator('.order190 .order-field').waitFor();a.equal(await page.locator('.order190 .order-node').count(),9);
+  await page.locator('[data-action="order190-mode"][data-mode="order"]').click();
+  await page.locator('[data-action="order190-order"][data-index="0"]').click();await page.locator('[data-action="order190-order"][data-index="1"]').click();await page.getByText('サーバーに編成を保存しました。').waitFor();
+  let roster=await post('read',{slot:1});a.equal(roster.revision,2);a.equal(roster.game.club.lineup[0],one.game.club.lineup[1]);a.equal(advances,1);
+  lostAdvance=true;await page.locator('[data-action="order190-undo"]').click();await page.getByText('編成の確定状態を取得してください。自動再送は行いません。').waitFor();a.equal(await page.locator('.order190').count(),0);a.equal(advances,2);
+  await page.locator('[data-action="canonical-roster-refresh"]').click();await page.getByText('最新の編成を取得しました。').waitFor();roster=await post('read',{slot:1});a.equal(roster.revision,3);a.deepEqual(roster.game.club.lineup,one.game.club.lineup);a.equal(advances,2);
+  await page.locator('[data-action="canonical-roster-back"]').click();await page.getByText('サーバー保存の確認画面（開発試験）').waitFor();
   await page.locator('[data-action="canonical-return"]').first().click();await slot(1).waitFor();
   a.equal(await slot(1).getAttribute('data-action'),'continue-slot');
   await slot(2).click();await page.getByText('サーバー保存の確認画面（開発試験）').waitFor();

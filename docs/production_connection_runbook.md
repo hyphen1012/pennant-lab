@@ -196,3 +196,7 @@ PR81 UI/test patch ported to the canonical stack in PR82, preserving account and
 
 ## Canonical one-step lineup undo
 Trusted world stores one bounded previous batting order/fielding assignment and resulting fingerprint. No client snapshot accepted. Require same team/year/day, exact current fingerprint, eligible players and normal management/reveal guards. Clear on successful undo or unrelated game mutation, including reward application; a new roster change replaces the entry. Read-only calls and persistence do not clear it. Revision CAS still applies; invalid or stale operations do not commit. Tests cover reopen, injury, invalid payload, changed roster and HTTP recovery. Actual game screen integration remains open. No production activation.
+
+
+## Canonical roster screen pilot
+Extract the original v190 field/order markup into a shared renderer. Staging pilot supplies bounded visible roster fields and server candidate reasons; no local world assignment, save, or simulation. All changes use the authenticated session commands and show only returned canonical state. A lost response removes the editor until explicit observation of the same world; no automatic replay. Startup/slot and roster UI are connected for staging; full HQ and gameplay remain deliberately held. Browser fixture now exercises original field screen, actual HTTP order and lost undo response, and local-save isolation. Portrait projection contains only visible roster appearance fields. Physical device and full UI remain open; no production activation.
