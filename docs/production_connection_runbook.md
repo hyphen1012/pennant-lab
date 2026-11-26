@@ -256,3 +256,10 @@ Reuse original player cards and standings table with explicit projection argumen
 
 ## Canonical important inbox first connection (staging)
 - Connect explicitly acknowledged injury, retirement consultation and farewell selection (maximum five, original fees and authority), rookie staged arrival, finance terminal decision with confirmation, rare-category and decade acknowledgements. No fabricated loan or ad proof; medical and retirement ad UI remains pending. Rare news full text/cinematic and decade presentation are not complete. Rookie secret names masked until stage two; actual ability and appearance seed withheld for every rookie until stage two. Roster and player history remain blocked before finish. No main or production activation. Added isolated rookie stage regression to the existing manager/roster check; visual/browser walkthrough and other important-event branches require additional tests.
+
+
+## Mandatory inbox priority and browser regression (staging)
+- Follow-up to PR103, which passed all seven registered workflows. During a mandatory notice, disable foreign event controls and reject stale unrelated event commands at the UI boundary; server authority remains unchanged except for decade acknowledgement priority. Do not acknowledge the decade while injury, rare, career, rookie or finance holds remain.
+- Final rookie portrait model no longer retains the provisional hidden-ability marker after stage two. Earlier stages retain PR103's masked name for secret categories and null appearance/ability fields.
+- Extend the existing engine regression for wrong, early and duplicate decade acknowledgements. Extend packaged-browser/real HTTP regression with an isolated third-slot rookie fixture, premature finish, stage-one committed but lost response, explicit refresh, stage-two reveal and final completion. This is an isolated fixture, not a complete annual browser walkthrough.
+- No loans, rewards, production or public version changes. Actual CI outcomes and remaining cinematic parity must be checked before integration.
