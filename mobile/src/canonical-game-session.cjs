@@ -44,6 +44,22 @@ function createCanonicalGameSession({client,online=()=>true}={}){
    snapshot=null;status=slot?'refresh-required':'select-slot';return {status:'refresh-required'};
   }finally{if(current(t))active=null;}
  }
+ async function deleteWorld(row,confirmed){
+  if(confirmed!==true||typeof client.gameDelete!=='function'||!validSlot(row?.slot)||typeof row.world!=='string'||!Number.isSafeInteger(row.revision)||row.revision<1)throw Error('explicit world deletion required');
+  const expected={slot:row.slot,world:row.world,revision:row.revision},t=start(false);
+  try{
+   if(!await online()||!current(t))throw Error('connection unavailable');
+   const result=await client.gameDelete(expected.slot,expected.world,expected.revision,true);
+   if(!current(t))return {status:'stale'};
+   if(result.deleted!==true||result.slot!==expected.slot||result.world!==expected.world||result.revision!==expected.revision)throw Error('unexpected deletion response');
+   invalidate('select-slot');slot=null;
+   return {status:'deleted'};
+  }catch{
+   if(!current(t))return {status:'stale'};
+   invalidate('select-slot');slot=null;
+   return {status:'refresh-required',uncertain:true};
+  }finally{if(current(t))active=null;}
+ }
  function refresh(){return run('read',t=>client.gameRead(t.slot));}
  function create(command,confirmed){if(confirmed!==true||snapshot||status!=='refresh-required')throw Error('explicit new game confirmation required');return run('create',async t=>{
   if(typeof client.gameSlots!=='function')throw Error('slot metadata unavailable');
@@ -102,6 +118,6 @@ function createCanonicalGameSession({client,online=()=>true}={}){
    snapshot=null;status='refresh-required';return {status};
   }finally{if(current(t))active=null;}
  }
- return Object.freeze({setSession,suspend,select,refresh,create,advance,inspect,freePage,playerPage,listSlots,reward,achievementPage,claimAchievement,reportPage,exchangeTicket,tradePage});
+ return Object.freeze({setSession,suspend,select,refresh,create,deleteWorld,advance,inspect,freePage,playerPage,listSlots,reward,achievementPage,claimAchievement,reportPage,exchangeTicket,tradePage});
 }
 module.exports={createCanonicalGameSession};
