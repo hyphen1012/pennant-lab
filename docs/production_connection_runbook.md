@@ -180,3 +180,7 @@ Authenticated `/v1/game/free-page` reads a bounded page (1–80) or normalized n
 
 ## Canonical club identity and slot selection increment
 Original club/GM identity editor fields are accepted on canonical creation or explicit confirmed identity update; enum/length/hex validation rejects additional fields, image/CSS payloads and arbitrary state. Actual applyIdentity is used, with safe public team identity in the projection. Session offers authenticated metadata-only slot listing and checks confirmed empty occupancy before issuing creation; server still rejects racing duplicate creation. Dedicated original-engine and HTTP integration checks expanded. Existing game title/setup UI integration still open. No production flag or public release change.
+
+
+## Canonical slot previews without long-history decode
+Nullable preview migration on authority_worlds, updated atomically with each trusted state write including reward settlement. Existing preview-less rows remain occupied and are not decoded for listing. The actual engine derives a bounded public team/GM/year/day/wins/cash/logo projection without VM execution or history copying; no hidden players or client data. Native account client validates the optional preview. Corrupt-world metadata and rollback checks plus actual HTTP slot tests updated. Old backups remain readable, deletion removes the same row. No production activation; native screen wiring still pending.

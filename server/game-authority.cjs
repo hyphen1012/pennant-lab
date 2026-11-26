@@ -11,7 +11,10 @@ const digest=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const routes=new Set(['draft-revival','foreign-revival','lottery','fa-retention','fa-sign','retirement','manager','medical']);
 function installAuthorityTables(db){
  db.exec('CREATE TABLE IF NOT EXISTS authority_worlds(account TEXT NOT NULL,slot INTEGER NOT NULL,world TEXT UNIQUE NOT NULL,revision INTEGER NOT NULL,state TEXT NOT NULL,PRIMARY KEY(account,slot)); CREATE TABLE IF NOT EXISTS authority_actions(account TEXT NOT NULL,operation TEXT NOT NULL,world TEXT NOT NULL,route TEXT NOT NULL,descriptor TEXT NOT NULL,result TEXT,attempt INTEGER,PRIMARY KEY(account,operation)); CREATE INDEX IF NOT EXISTS authority_world_actions ON authority_actions(account,world);');
+ if(!db.prepare('PRAGMA table_info(authority_worlds)').all().some(c=>c.name==='preview'))db.exec('ALTER TABLE authority_worlds ADD COLUMN preview TEXT');
 }
+// Nullable migration: older worlds remain occupied but have no preview until
+// a successful canonical write. Never decompress them merely to list slots.
 function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof,now=Date.now}={}){
  if(!ledger?.transact||[engine?.newWorld,engine?.actions,engine?.achievements,engine?.applyAction,engine?.advance,engine?.view,authenticate,verifyRights,hasAdProof].some(x=>typeof x!=='function'))throw Error('trusted canonical game engine required');
  const stateCodec=createCanonicalStateCodec();
@@ -29,8 +32,9 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
   return r;
  }
  const inspect=(account,fn)=>typeof ledger.inspect==='function'?ledger.inspect(account,fn):ledger.transact(account,fn);
- async function slots(token){const account=await identity(token);return inspect(account,(s,db)=>db.prepare('SELECT slot,world,revision FROM authority_worlds WHERE account=? ORDER BY slot').all(account));}
- function commitWorld(db,r,state){if(!n(r.revision+1))throw Error('world revision exhausted');const q=db.prepare('UPDATE authority_worlds SET state=?,revision=? WHERE account=? AND world=? AND revision=?').run(stateCodec.encode(state),r.revision+1,r.account,r.world,r.revision);if(q.changes!==1)throw Error('canonical revision conflict');}
+ function previewFor(state){return typeof engine.preview==='function'?json(sync(engine.preview(state)),4096):null;}
+ async function slots(token){const account=await identity(token);return inspect(account,(s,db)=>db.prepare('SELECT slot,world,revision,preview FROM authority_worlds WHERE account=? ORDER BY slot').all(account).map(({preview,...row})=>preview===null?row:{...row,preview:JSON.parse(preview)}));}
+ function commitWorld(db,r,state){if(!n(r.revision+1))throw Error('world revision exhausted');const q=db.prepare('UPDATE authority_worlds SET state=?,revision=?,preview=? WHERE account=? AND world=? AND revision=?').run(stateCodec.encode(state),r.revision+1,previewFor(state),r.account,r.world,r.revision);if(q.changes!==1)throw Error('canonical revision conflict');}
  function view(r){return {world:r.world,revision:r.revision,game:JSON.parse(json(sync(engine.view(r.state)),262144))};}
  function publicWallet(s){return {tickets:s.tickets,points:s.points,claimCount:s.claimCount,owned:Object.keys(s.owned).filter(k=>s.owned[k]===true),nextAt:s.claimCount>=3?s.lastClaim+rules.HOUR:null};}
  function actionKey(r,a){
@@ -57,7 +61,7 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
   return ledger.transact(account,(s,db)=>{
    if(db.prepare('SELECT 1 FROM authority_worlds WHERE account=? AND slot=?').get(account,slot))throw Error('canonical slot exists');
    const worldId=randomUUID(),state=sync(engine.newWorld(JSON.parse(json(command,4096)),{account,worldId}));
-   db.prepare('INSERT INTO authority_worlds VALUES(?,?,?,?,?)').run(account,slot,worldId,1,stateCodec.encode(state));
+   db.prepare('INSERT INTO authority_worlds(account,slot,world,revision,state,preview) VALUES(?,?,?,?,?,?)').run(account,slot,worldId,1,stateCodec.encode(state),previewFor(state));
    return view({world:worldId,revision:1,state});
   });
  }
