@@ -195,9 +195,9 @@ globalThis.__plAnnualEntryCheck=saved=>{
  a.throws(()=>engine.advance(w,{annual:'open',job:'movement-market'}));
  a.throws(()=>engine.advance(w,{annual:'day'}));
  a.throws(()=>engine.advance(w,{annual:'market',decision:'open',room:'other'}));
- market('open',{room:'news'});a.equal(engine.view(w).annual.market.news,'eve');
+ a.deepEqual(engine.view(w).annual.market.roomOptions,['news']);market('open',{room:'news'});a.equal(engine.view(w).annual.market.news,'eve');
  a.throws(()=>engine.advance(w,{annual:'market',decision:'home'}));
- market('news');a.equal(w.calendarFlow.jobs['movement-market'].state.news,'opening-wait');
+ market('news');a.equal(w.calendarFlow.jobs['movement-market'].state.news,'opening-wait');a.deepEqual(engine.view(w).annual.market.roomOptions,[]);
  a.throws(()=>engine.advance(w,{annual:'market',decision:'open',room:'news'}));
  step({annual:'day'});a.equal(w.calendarFlow.jobs['movement-market'].state.news,'opening');
  market('open',{room:'news'});market('news');
@@ -210,19 +210,19 @@ globalThis.__plAnnualEntryCheck=saved=>{
    a.throws(()=>engine.advance(w,{annual:'market',decision:'submit',playerId:row.id}));
    a.throws(()=>engine.advance(w,{annual:'market',decision:'years',playerId:row.id,years:11}));
    market('years',{playerId:row.id,years:3});market('talk',{playerId:row.id,key:'listen'});market('talk',{playerId:row.id,key:'trust'});
-   a.equal(engine.view(w).annual.market.rows.find(r=>r.id===row.id).talk.years,3);
+   const talked=engine.view(w).annual.market.rows.find(r=>r.id===row.id);a.equal(talked.talk.years,3);a.ok(Number.isFinite(talked.bounds.min)&&Number.isFinite(talked.bounds.max)&&Number.isFinite(talked.cost));a.equal(typeof talked.canSubmit,'boolean');
    dialogue++;
   }
   market('home');
  }
- market('open',{room:'other'});a.throws(()=>engine.advance(w,{annual:'complete',job:'movement-market'}));
+ market('open',{room:'other'});const other=engine.view(w).annual.market;a.equal(other.tradeClubs.length,12);a.ok(other.tradeClubs.every(t=>new Set(t.players.map(p=>p.id)).size===t.players.length));a.ok(other.free.every(r=>Number.isFinite(r.cost)));a.throws(()=>engine.advance(w,{annual:'complete',job:'movement-market'}));
  a.throws(()=>engine.advance(w,{annual:'market',decision:'finish'}));
  a.throws(()=>engine.advance(w,{annual:'market',decision:'free',playerId:999999999,salary:1}));
  market('close');a.equal(w.calendarFlow.jobs['movement-market'].state.news,'results');
  market('open',{room:'news'});
  for(const r of engine.view(w).annual.market.specialResults){a.throws(()=>engine.advance(w,{annual:'market',decision:'news'}));market('special-result',{playerId:r.id});a.throws(()=>engine.advance(w,{annual:'market',decision:'special-result',playerId:r.id}));}
  market('news');
- market('open',{room:'other'});a.equal(engine.view(w).annual.market.cpuDone,true);
+ market('open',{room:'other'});a.equal(engine.view(w).annual.market.cpuDone,true);a.equal(engine.view(w).annual.market.tradeClubs.length,0);
  market('finish');a.equal(w.calendarFlow.jobs['movement-market'].status,'done');
  a.throws(()=>engine.advance(w,{annual:'market',decision:'finish'}));
  console.log('PASS actual market opening news, room validation, CPU closure, results and compensation confirmation',JSON.stringify({dialogue,date:w.calendarFlow.date}));
