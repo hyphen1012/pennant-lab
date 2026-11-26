@@ -159,7 +159,9 @@ globalThis.__plAnnualEntryCheck=saved=>{
  a.throws(()=>engine.advance(w,{annual:'market',decision:'finish'}));
  a.throws(()=>engine.advance(w,{annual:'market',decision:'free',playerId:999999999,salary:1}));
  market('close');a.equal(w.calendarFlow.jobs['movement-market'].state.news,'results');
- market('open',{room:'news'});market('news');
+ market('open',{room:'news'});
+ for(const r of engine.view(w).annual.market.specialResults){a.throws(()=>engine.advance(w,{annual:'market',decision:'news'}));market('special-result',{playerId:r.id});a.throws(()=>engine.advance(w,{annual:'market',decision:'special-result',playerId:r.id}));}
+ market('news');
  market('open',{room:'other'});a.equal(engine.view(w).annual.market.cpuDone,true);
  market('finish');a.equal(w.calendarFlow.jobs['movement-market'].status,'done');
  a.throws(()=>engine.advance(w,{annual:'market',decision:'finish'}));
