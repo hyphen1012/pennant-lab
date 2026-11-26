@@ -14937,7 +14937,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function roster190SwapOrder(t,a,b){if(!Number.isInteger(a)||!Number.isInteger(b)||a===b||a<0||b<0||a>=t.lineup.length||b>=t.lineup.length)return false;[t.lineup[a],t.lineup[b]]=[t.lineup[b],t.lineup[a]];return true;}
   function roster190MoveOrder(t,a,b){if(!Number.isInteger(a)||!Number.isInteger(b)||a===b||a<0||b<0||a>=t.lineup.length||b>=t.lineup.length)return false;const [id]=t.lineup.splice(a,1);t.lineup.splice(b,0,id);return true;}
   function roster190Candidate(t,role,p){
-    if(!p||!firstHitters(t).some(x=>x.id===p.id)||!availableForGame(p))return '起用不可';
+    if(!p||p.teamId!==t.id||p.farmTier===2||isPitch(p)||!availableForGame(p))return '起用不可';
     if(fieldingTier(p,role)==='off')return '守備適性外';
     const old=t.lineup.find(n=>t.fieldingRoles[n]===role);
     if(old===p.id)return '現在の選手';
