@@ -277,3 +277,6 @@ PR113: use original watchReplaySteps with bounded projection and exact final sco
 
 ## Bounded match and newspaper history (staging)
 PR114: year-filtered reverse chronological own-club matches and archived daily/weekly papers, 1 match or up to 3 papers per read. Server world/revision check, bounded 256 KiB page; no mutations, no invented historical data. Confidential events hold access. Historical player/club presentation uses current saved registry; old missing box stats remain missing. Full state is still decoded per request; indexing and resource isolation remain open. Engine/HTTP regression. No production activation.
+
+## Ticket exchange and real HTTP reward regression (staging)
+PR116: expose only the existing 1-point ticket exchange, with confirmation, server wallet reread and no automatic retries. Do not expose purchases of unconnected cosmetic benefits. Isolated packaged-browser fixture persists a test memorial record and 8-day injury; exercises actual HTTP claim, exchange, special treatment, deliberately lost settlement response, read-only recovery and exact one-ticket/one-revision deduction. No fake ad proof or production activation. Other reward routes still require browser coverage.
