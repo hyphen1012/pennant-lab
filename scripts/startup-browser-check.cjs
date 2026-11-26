@@ -34,6 +34,16 @@ const dir='test-results/browser';fs.mkdirSync(dir,{recursive:true});
    await page.screenshot({path:dir+'/official-title-'+width+'x'+height+'.png'});
   }
   await page.setViewportSize({width:390,height:844});
+  // A full-viewport native tap highlight would tint the entire title blue.
+  // Verify the actual computed WebKit style, and the keyboard focus affordance.
+  const hit=page.locator('.official-launch-hit');
+  const highlight=await hit.evaluate(el=>({tap:getComputedStyle(el).webkitTapHighlightColor,bg:getComputedStyle(el).backgroundColor}));
+  assert.equal(highlight.tap,'rgba(0, 0, 0, 0)','mobile tap highlight must be transparent');
+  assert.equal(highlight.bg,'rgba(0, 0, 0, 0)','title hit target must remain transparent');
+  await page.keyboard.press('Tab');
+  await hit.focus();
+  assert.notEqual(await hit.evaluate(el=>getComputedStyle(el).outlineStyle),'none','keyboard focus remains visible');
+  await hit.evaluate(el=>el.blur());
   await page.locator('[data-action="launch-start"]').tap();
   await page.locator('.world-orb').first().waitFor({state:'visible'});
   assert.equal(await page.locator('.world-orb').count(),3);
