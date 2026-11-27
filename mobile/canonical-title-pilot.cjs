@@ -1128,14 +1128,19 @@ const pilotCode = `
   // Never use a hidden player's category for an audio cue.
   const sceneAudio=window.PennantAudio;
   if(sceneAudio){
-    let audioScene=null;
+    let audioScene=null,lastReplayCue=null;
     const refreshSceneAudio=()=>{
       const g=canonicalSnapshot?.game;
-      const next=sceneAudio.sceneFor({page:ui.page,launchTitle:ui.launchTitle,annual:g?.annual?.active,inbox:g?.inbox,foreign:canonicalForeignOpen||g?.foreign?.responsePending,replay:canonicalReplay?.phase,skip:canonicalRunning&&canonicalPlayback==='skip',portal:!!ui.portalSlot,startup:startupPlaying||document.body.classList?.contains('official-startup-active'),available:ui.page==='title'||ui.page==='setup'||!!g});
+      const next=sceneAudio.sceneFor({page:ui.page,launchTitle:ui.launchTitle,annual:g?.annual?.active,inbox:g?.inbox,foreign:canonicalForeignOpen||g?.foreign?.responsePending,foreignCandidate:g?.foreign?.negotiation?.candidate,replay:canonicalReplay?.phase,skip:canonicalReplaySkip||canonicalRunning&&canonicalPlayback==='skip',portal:!!ui.portalSlot,startup:startupPlaying||document.body.classList?.contains('official-startup-active'),available:ui.page==='title'||ui.page==='setup'||!!g});
       if(next!==audioScene){
         audioScene=next;sceneAudio.setScene(next);
-        const cue=({mystery:'alert',legend:'rare',immortal:'immortal',rebirth:'rebirth',transcendent:'transcendent',awards:'awards',crisis:'alert'})[next];
+        const cue=({mystery:'alert',parallel:'parallel',star:'star',legend:'rare',immortal:'immortal',rebirth:'rebirth',transcendent:'transcendent',awards:'awards',crisis:'alert'})[next];
         if(cue)sceneAudio.cue(cue);
+      }
+      if(!canonicalReplay)lastReplayCue=null;
+      if(next==='match'&&ui.page==='canonical-hq'){
+        const cue=sceneAudio.replayCue(canonicalReplay,g?.team?.id);
+        if(cue&&cue.key!==lastReplayCue){lastReplayCue=cue.key;sceneAudio.cue(cue.kind);}
       }
     };
     function audioPanel(){

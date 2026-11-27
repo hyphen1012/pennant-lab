@@ -1,6 +1,6 @@
 // Original synthesized guide tracks. No external music, network or game-state writes.
 // Staging evaluation only; replace/arrange guide tracks after listening approval.
-(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.PennantAudio=Object.assign(api.createAudio({host:root}),{sceneFor:api.sceneFor});})(typeof window!=='undefined'?window:globalThis,function(){
+(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.PennantAudio=Object.assign(api.createAudio({host:root}),{sceneFor:api.sceneFor,replayCue:api.replayCue});})(typeof window!=='undefined'?window:globalThis,function(){
 'use strict';
 const track=(bpm,chords,melody,wave='sine')=>({bpm,chords,melody,wave});
 // Four-bar loops, each row is an original chord and eight half-beat melody slots.
@@ -20,24 +20,26 @@ const tracks={
  farewell:track(64,[[48,55,59,64],[45,52,57,60],[41,48,53,57],[43,50,55,62]],[76,0,0,74,72,0,0,0,72,0,0,69,67,0,0,0,69,0,0,72,77,0,0,0,74,0,0,71,72,0,0,0]),
  crisis:track(56,[[41,48,53,56],[40,47,52,55],[42,49,54,57],[40,47,52,56]],[56,0,0,0,60,0,0,0,55,0,0,0,59,0,0,0,57,0,0,0,61,0,0,0,56,0,0,0,59,0,0,0]),
  mystery:track(58,[[45,52,58,64],[44,51,57,63],[41,48,54,60],[40,47,53,59]],[76,0,0,0,70,0,0,0,75,0,0,0,69,0,0,0,72,0,0,0,66,0,0,0,71,0,0,0,65,0,0,0]),
+ parallel:track(78,[[45,52,59,64],[48,55,62,67],[43,50,57,62],[46,53,60,65]],[76,0,71,0,79,0,76,0,74,0,72,0,79,0,83,0,74,0,69,0,76,0,74,0,77,0,72,0,81,0,77,0]),
+ star:track(112,[[48,55,60,67],[43,50,55,62],[45,52,57,64],[41,48,53,60]],[72,76,79,0,76,79,84,0,74,77,79,0,83,79,74,0,76,81,84,0,81,76,72,0,77,81,84,0,89,84,81,0],'triangle'),
  legend:track(92,[[45,52,57,64],[41,48,53,60],[48,55,60,67],[43,50,55,62]],[76,79,84,0,81,0,76,0,77,81,84,0,89,0,84,0,79,84,88,0,91,0,88,0,86,83,79,0,84,0,79,0],'triangle'),
  immortal:track(46,[[33,45,52,58],[32,44,51,57],[35,47,54,60],[34,46,53,59]],[81,0,0,0,70,0,0,0,80,0,0,0,69,0,0,0,83,0,0,0,72,0,0,0,82,0,0,0,71,0,0,0]),
  rebirth:track(52,[[45,52,60,64],[41,48,57,60],[44,51,57,63],[40,47,56,59]],[84,79,76,0,0,0,0,0,81,77,72,0,0,0,0,0,80,75,69,0,0,0,0,0,83,76,68,0,0,0,0,0]),
  transcendent:track(42,[[29,41,48,54],[32,44,51,57],[28,40,47,53],[33,45,52,58]],[89,0,0,78,0,0,66,0,92,0,0,81,0,0,69,0,88,0,0,77,0,0,65,0,93,0,0,82,0,0,70,0])
 };
-const rareScene=(category,hidden)=>hidden?'mystery':category==='IMMORTAL輪廻転生'?'transcendent':category==='IMMORTAL'?'immortal':category==='輪廻転生'||category==='転生'?'rebirth':category==='LEGEND'||category==='STAR'||category==='PARALLEL'?'legend':'mystery';
-function sceneFor({page,launchTitle,annual,inbox,foreign,replay,skip,portal,startup,available=true}={}){
+const rareScene=(category,hidden)=>hidden?'mystery':category==='IMMORTAL輪廻転生'?'transcendent':category==='IMMORTAL'?'immortal':category==='輪廻転生'||category==='転生'?'rebirth':category==='LEGEND'?'legend':category==='STAR'?'star':category==='PARALLEL'?'parallel':'mystery';
+function sceneFor({page,launchTitle,annual,inbox,foreign,foreignCandidate,replay,skip,portal,startup,available=true}={}){
  if(startup||portal||!available||skip)return null;
  if(page==='title')return launchTitle?'title':'worlds';
  if(page==='setup')return 'worlds';
- if(page==='canonical-hq'&&replay==='watch')return 'match';
+ if(page==='canonical-hq'&&['watch','final'].includes(replay))return 'match';
  if(page==='canonical-events'){
   if(inbox?.finance)return 'crisis';
   if(inbox?.rare)return rareScene(inbox.rare.category,inbox.rare.hidden!==false);
   if(inbox?.career)return 'farewell';
-  if(inbox?.rookie){const shown=inbox.rookie.entries?.find(x=>x.stage===2&&x.specialCategory);return shown?rareScene(shown.specialCategory,false):'draft';}
+  if(inbox?.rookie){const shown=inbox.rookie.entries?.find(x=>x.stage===2&&x.hidden!==true&&x.specialCategory);return shown?rareScene(shown.pastLifeAppearance?.baseCategory==='IMMORTAL'&&(shown.specialCategory==='輪廻転生'||shown.originCategory==='RINNE')?'IMMORTAL輪廻転生':shown.specialCategory,false):'draft';}
   if(inbox?.injury)return 'crisis';
-  if(foreign)return 'foreign';
+  if(foreign){const p=foreignCandidate;return p?.hidden===false&&p.category?rareScene(p.pastLifeAppearance?.baseCategory==='IMMORTAL'&&p.category==='輪廻転生'?'IMMORTAL輪廻転生':p.category,false):'foreign';}
   if(annual==='draft')return 'draft';
   if(['movement-declarations','movement-market','renewal1','renewal2','roster-cut'].includes(annual))return 'negotiation';
   if(['autumn','winter','self','booking','winter-return','camp','exhibition','opening-promo','offdesk-opening'].includes(annual))return 'training';
@@ -53,19 +55,55 @@ function sceneFor({page,launchTitle,annual,inbox,foreign,replay,skip,portal,star
 function createAudio({host}){
  const key='pl-scene-audio-v1',clamp=v=>Math.min(1,Math.max(0,v)),defaults={enabled:true,bgm:.45,sfx:.35};
  let prefs={...defaults};try{const p=JSON.parse(host.localStorage?.getItem(key)||'null');if(p&&typeof p.enabled==='boolean'&&Number.isFinite(p.bgm)&&Number.isFinite(p.sfx))prefs={enabled:p.enabled,bgm:clamp(p.bgm),sfx:clamp(p.sfx)};}catch{}
- let ctx=null,bgm=null,sfx=null,scene=null,timer=null,step=0,busy=false,visible=!host.document?.hidden,unlocked=false,voices=new Set();
+ let ctx=null,bgm=null,sfx=null,scene=null,timer=null,step=0,lifecycle=null,requestSerial=0,visible=!host.document?.hidden,unlocked=false,voices=new Set();
  const stop=()=>{if(timer!==null){host.clearInterval(timer);timer=null;}for(const n of voices){try{n.stop();}catch{}}voices.clear();};
  function volume(){if(!ctx)return;for(const [node,value] of [[bgm,prefs.bgm],[sfx,prefs.sfx]]){const now=ctx.currentTime;node.gain.cancelScheduledValues(now);node.gain.setTargetAtTime(prefs.enabled&&visible?value:0,now,.06);}}
  function note(m,when,len,amp,wave,bus){if(!m||!ctx||ctx.state!=='running'||voices.size>=32)return;const o=ctx.createOscillator(),g=ctx.createGain();o.type=wave;o.frequency.value=440*Math.pow(2,(m-69)/12);g.gain.setValueAtTime(.0001,when);g.gain.exponentialRampToValueAtTime(Math.max(.0002,amp),when+.025);g.gain.exponentialRampToValueAtTime(.0001,when+len);o.connect(g);g.connect(bus);voices.add(o);o.onended=()=>{voices.delete(o);o.disconnect();g.disconnect();};o.start(when);o.stop(when+len+.02);}
  function tick(){if(!prefs.enabled||!visible||!scene||!ctx||ctx.state!=='running')return;const t=tracks[scene],d=30/t.bpm,now=ctx.currentTime+.025,i=step%32,ch=t.chords[Math.floor(i/8)];if(i%8===0){note(ch[0]-12,now,d*6,.055,'sine',bgm);for(const m of ch.slice(1))note(m,now,d*6,.026,'sine',bgm);}if(i%2===0)note(ch[(i/2)%ch.length|0],now,d*1.4,.035,'triangle',bgm);note(t.melody[i],now,d*1.8,.06,t.wave,bgm);step++;}
  function start(){if(timer!==null||!scene||!prefs.enabled||!visible||!unlocked||ctx?.state!=='running')return;tick();timer=host.setInterval(tick,30000/tracks[scene].bpm);}
- async function unlock(){if(!prefs.enabled||!visible||busy)return false;busy=true;try{if(!ctx){const C=host.AudioContext||host.webkitAudioContext;if(!C)return false;ctx=new C();bgm=ctx.createGain();sfx=ctx.createGain();bgm.connect(ctx.destination);sfx.connect(ctx.destination);volume();}if(ctx.state!=='running')await ctx.resume();unlocked=ctx.state==='running';start();return unlocked;}catch{return false;}finally{busy=false;}}
+ // Serialize resume/suspend; re-check intent after each async transition.
+ function reconcile(){
+  if(!ctx)return Promise.resolve(false);
+  requestSerial++;
+  if(lifecycle)return lifecycle;
+  let seen=0;
+  const run=async()=>{
+   try{
+    for(;;){
+     seen=requestSerial;
+     const wanted=prefs.enabled&&visible;
+     if(!wanted){stop();if(ctx.state==='running')await ctx.suspend();if(prefs.enabled&&visible)continue;return false;}
+     if(ctx.state!=='running')await ctx.resume();
+     if(ctx.state==='running')unlocked=true;
+     if(!prefs.enabled||!visible)continue;
+     volume();start();return unlocked&&ctx.state==='running';
+    }
+   }catch{return false;}
+  };
+  lifecycle=run().finally(()=>{lifecycle=null;if(seen!==requestSerial)void reconcile();});
+  return lifecycle;
+ }
+ async function unlock(){if(!prefs.enabled||!visible||!scene)return false;try{if(!ctx){const C=host.AudioContext||host.webkitAudioContext;if(!C)return false;ctx=new C();bgm=ctx.createGain();sfx=ctx.createGain();bgm.connect(ctx.destination);sfx.connect(ctx.destination);volume();}return await reconcile();}catch{return false;}}
  function setScene(next){if(next!==null&&!Object.hasOwn(tracks,next))next=null;if(next===scene)return;stop();scene=next;step=0;start();}
- const cues={tap:[72],open:[67,72],alert:[52,49],rare:[76,83,88],immortal:[45,46,69],rebirth:[84,76,72],transcendent:[36,42,81,90],awards:[72,76,79,84]};
+ const cues={tap:[72],open:[67,72],alert:[52,49],parallel:[71,76,79],star:[72,79,84],rare:[76,83,88],immortal:[45,46,69],rebirth:[84,76,72],transcendent:[36,42,81,90],awards:[72,76,79,84],homer:[55,67,79,84],strike:[48,60,72],win:[60,67,72,76,84],loss:[67,63,60],draw:[64,67,64]};
  function cue(kind){if(!prefs.enabled||!visible||!unlocked||!scene||!ctx||ctx.state!=='running'||!Object.hasOwn(cues,kind))return;const now=ctx.currentTime+.01;cues[kind].forEach((m,i)=>note(m,now+i*.13,kind==='tap'?.075:.38,kind==='tap'?.05:.09,'sine',sfx));}
- function settings(next){prefs={enabled:typeof next.enabled==='boolean'?next.enabled:prefs.enabled,bgm:Number.isFinite(next.bgm)?clamp(next.bgm):prefs.bgm,sfx:Number.isFinite(next.sfx)?clamp(next.sfx):prefs.sfx};try{host.localStorage?.setItem(key,JSON.stringify(prefs));}catch{}volume();if(!prefs.enabled)stop();else start();return {...prefs};}
- function visibility(v){visible=!!v;volume();if(!visible){stop();if(ctx?.state==='running')void ctx.suspend().catch(()=>{});}else if(unlocked&&prefs.enabled)void unlock();}
+ function settings(next){prefs={enabled:typeof next.enabled==='boolean'?next.enabled:prefs.enabled,bgm:Number.isFinite(next.bgm)?clamp(next.bgm):prefs.bgm,sfx:Number.isFinite(next.sfx)?clamp(next.sfx):prefs.sfx};try{host.localStorage?.setItem(key,JSON.stringify(prefs));}catch{}volume();if(!prefs.enabled){stop();if(ctx)void reconcile();}else if(unlocked)void reconcile();return {...prefs};}
+ function visibility(v){visible=!!v;volume();if(!visible){stop();if(ctx)void reconcile();}else if(unlocked&&prefs.enabled)void reconcile();}
  return {unlock,setScene,cue,settings,visibility,inspect:()=>({scene,prefs:{...prefs},unlocked,active:timer!==null,voices:voices.size})};
 }
-return {createAudio,sceneFor,tracks};
+// Only already presented replay frames may emit sound. No cue from future frames.
+function replayCue(replay,teamId){
+ if(!replay?.report)return null;
+ const r=replay.report;if(!Number.isSafeInteger(teamId)||![r.home?.id,r.away?.id].includes(teamId))return null;
+ if(replay.phase==='watch'&&Number.isSafeInteger(replay.step)&&replay.step>0&&replay.step<=r.replay?.length){
+  const v=r.replay[replay.step-1],kind=v?.phase!=='end'&&v?.play?.kind;
+  return kind==='hr'||v?.phase==='strike'&&v.play?{key:r.year+':'+r.day+':'+replay.step,kind:kind==='hr'?'homer':'strike'}:null;
+ }
+ if(replay.phase==='final'&&Number.isFinite(r.homeScore)&&Number.isFinite(r.awayScore)){
+  const diff=(r.homeScore-r.awayScore)*(r.home.id===teamId?1:-1);
+  return {key:r.year+':'+r.day+':final',kind:diff>0?'win':diff<0?'loss':'draw'};
+ }
+ return null;
+}
+return {createAudio,sceneFor,replayCue,tracks};
 });
