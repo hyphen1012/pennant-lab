@@ -851,16 +851,16 @@ const pilotCode = `
     out+='<p>調査回数 '+f.used+' / '+f.budget+'</p>';
     const n=f.negotiation;
     if(!n)return out+(f.candidates.length?f.candidates.map(p=>'<article class="panel draft-card">'+prospect(p)+f.research.map(t=>cmd('research',h(t.label)+' '+fmtMoney(t.cost)+(p.tasks.includes(t.key)?' ✓':''),'data-id="'+p.id+'" data-key="'+t.key+'"',held||p.tasks.includes(t.key)||f.used>=f.budget||g.team.cash<t.cost)).join('')+cmd('begin','獲得交渉に進む','data-id="'+p.id+'"',held||!p.canBegin)+'</article>').join(''):'<p>現在確認できる候補者はありません。</p>')+'</section>';
-    const p=n.candidate;out+='<article class="panel">'+prospect(p)+rareCinemaArt(model(p),'negotiation')+'<p>交渉状況 · '+h(({talk:'交渉中',waiting:'回答待ち',counter:'再交渉',response:'回答到着',signed:'契約成立',refused:'交渉不成立',rival:'他球団契約','rival-pending':'他球団契約',overseas:'海外残留'})[n.status]||n.status)+'</p>';
+    const p=n.candidate;out+='<article class="panel">'+prospect(p)+rareCinemaArt(model(p),'contract')+'<p>交渉状況 · '+h(({talk:'交渉中',waiting:'回答待ち',counter:'再交渉',response:'回答到着',signed:'契約成立',refused:'交渉不成立',rival:'他球団契約','rival-pending':'他球団契約',overseas:'海外残留'})[n.status]||n.status)+'</p>';
     if(n.status==='talk'){
-      out+='<p>交渉意欲 '+n.interest+' · 会話 '+n.answerCount+' / 3</p>'+(!n.interpreter?cmd('interpreter','交渉通訳を依頼 '+fmtMoney(n.interpreterCost),'',held||g.team.cash<n.interpreterCost):'<p>通訳あり</p>');
+      out+='<p>交渉意欲 '+(n.interest===null?'……判定不能':n.interest)+' · 会話 '+n.answerCount+' / 3</p>'+(!n.interpreter?cmd('interpreter','交渉通訳を依頼 '+fmtMoney(n.interpreterCost),'',held||g.team.cash<n.interpreterCost):'<p>通訳あり</p>');
       if(n.question)out+='<h3>'+h(n.question.text)+'</h3>'+n.question.options.map(x=>cmd('reply',h(x.label),'data-key="'+h(x.key)+'"')).join('');
       else if(n.answerCount===3){out+='<h3>生活・待遇支援</h3>'+f.supportOptions.map(x=>cmd('support',h(x.label)+' '+fmtMoney(x.cost)+(n.support?.[x.key]?' ✓':''),'data-key="'+x.key+'" data-enabled="'+(!n.support?.[x.key])+'"')).join('')+'<h3>契約条件</h3>'+n.offers.map(o=>cmd('offer',['基本条件','標準条件','好条件'][o.level]+' · 契約金 '+fmtMoney(o.fee)+' · 年俸 '+fmtMoney(o.salary)+' · 支援 '+fmtMoney(o.supportCost)+(n.offerLevel===o.level?' ✓':''),'data-level="'+o.level+'"',held||!o.affordable)).join('')+cmd('submit','正式オファーを提出','',held||n.offerLevel==null);}
     }else if(n.status==='waiting'){out+='<p>回答予定 '+h(n.due||'未定')+'</p>'+(n.ready?cmd('open','回答を確認する'):'<p>本部に戻って日程を進めてください。</p>');}
     else if(n.status==='counter'&&n.counter){out+='<p>当初年俸 '+fmtMoney(n.counter.originalSalary)+' → 希望年俸 '+fmtMoney(n.counter.salary)+'</p>'+cmd('counter','希望額を受け入れる','data-accept="true"',held||!n.counter.affordable)+cmd('counter','当初の条件を維持','data-accept="false"');}
     else if(!n.opened)out+=cmd('open','回答を確認する');
     else if(n.status==='signed'){out+='<h3>契約成立</h3>'+rareCinemaArt(model(p),'join',n.stage===2)+(n.result?.offer?'<p>契約金 '+fmtMoney(n.result.offer.fee)+' · 年俸 '+fmtMoney(n.result.offer.salary)+'</p>':'')+(n.stage<2?cmd('reveal','能力を段階公開する（'+(n.stage+1)+'/2）'):cmd('finish','入団報告を完了する'));}
-    else {out+='<p>交渉結果を確認してください。</p>'+(n.result?.recovery?'<p class="small">広告券・確認済み権利による復活は上部の報酬画面から利用できます。</p>':'')+cmd('finish','この交渉を終了する');}
+    else {out+=rareCinemaArt(model(p),'loss')+'<p>交渉結果を確認してください。</p>'+(n.result?.recovery?'<p class="small">広告券・確認済み権利による復活は上部の報酬画面から利用できます。</p>':'')+cmd('finish','この交渉を終了する');}
     return out+'</article></section>';
   }
   function canonicalEventRender(){
