@@ -11,28 +11,34 @@ if(mode==='generate'){
  globalThis.__plSaveProfile=(saved,data)=>{
   if(data.seasonArchive.length===years){
    fs.writeFileSync(path.join(root,'world.json'),saved);
-   fs.writeFileSync(path.join(root,'world-meta.json'),JSON.stringify({years,year:data.year,bytes:Buffer.byteLength(saved),sha256:hash(saved),players:data.players.length}));
+   fs.writeFileSync(path.join(root,'world-meta.json'),JSON.stringify({years,year:data.year,bytes:Buffer.byteLength(saved),sha256:hash(saved),players:data.players.length,selectedId:data.selectedId}));
   }
   return {bytes:Buffer.byteLength(saved)};
  };
  try{require('./long-run.cjs');}finally{delete globalThis.__plSaveProfile;}
  a.ok(fs.existsSync(path.join(root,'world.json')));
-}else if(mode==='sync'||mode==='worker'){
+}else if(mode==='encode'){
+ const raw=fs.readFileSync(path.join(root,'world.json'),'utf8'),meta=JSON.parse(fs.readFileSync(path.join(root,'world-meta.json'),'utf8'));a.equal(hash(raw),meta.sha256);
+ const stored=require('../server/canonical-state-codec.cjs').createCanonicalStateCodec().encode(JSON.parse(raw));fs.writeFileSync(path.join(root,'world.stored'),stored);
+ fs.writeFileSync(path.join(root,'encode.json'),JSON.stringify({bytes:Buffer.byteLength(stored),sha256:hash(stored)}));
+}else if(['sync','worker','worker-encoded'].includes(mode)){
  (async()=>{
   const file=path.join(root,'world.json'),meta=JSON.parse(fs.readFileSync(path.join(root,'world-meta.json'),'utf8'));
   const report={mode,years,seed,world:meta,passed:false};const output=path.join(root,mode+'.json');let timer;
   try{
-   const started=performance.now();let raw=fs.readFileSync(file,'utf8');a.equal(hash(raw),meta.sha256);const state=JSON.parse(raw);raw=null;
-   report.loadMs=performance.now()-started;a.equal(state.seasonArchive.length,years);
+   const started=performance.now();let state;
+   if(mode==='worker-encoded'){state=fs.readFileSync(path.join(root,'world.stored'),'utf8');const stored=JSON.parse(fs.readFileSync(path.join(root,'encode.json'),'utf8'));a.equal(hash(state),stored.sha256);report.storedBytes=stored.bytes;}
+   else{let raw=fs.readFileSync(file,'utf8');a.equal(hash(raw),meta.sha256);state=JSON.parse(raw);raw=null;a.equal(state.seasonArchive.length,years);}
+   report.loadMs=performance.now()-started;
    const {createHeadlessEngine}=require('../server/headless-engine.cjs'),engine=createHeadlessEngine();
    report.sourceHash=engine.sourceHash;
    let ticks=0;timer=setInterval(()=>ticks++,20);
    const begin=performance.now();
-   const p=mode==='sync'?engine.readProjection(state):await require('../server/projection-worker-trial.cjs').createProjectionWorkerTrial().project(state);
+   const p=mode==='sync'?engine.readProjection(state):await require('../server/projection-worker-trial.cjs').createProjectionWorkerTrial()[mode==='worker'?'project':'projectEncoded'](state);
    report.projectionMs=performance.now()-begin;clearInterval(timer);timer=null;
    report.intervalTicks=ticks;report.projectionSha256=hash(JSON.stringify(p));report.actions=p.actions.length;
-   a.equal(p.game.year,state.year);a.equal(p.game.team.id,state.selectedId);
-   if(mode==='worker')a.ok(ticks>0,'worker must yield to event loop');
+   a.equal(p.game.year,meta.year);a.equal(p.game.team.id,meta.selectedId);
+   if(mode!=='sync')a.ok(ticks>0,'worker must yield to event loop');
    report.passed=true;
   }catch(e){report.error=String(e);throw e;}
   finally{clearInterval(timer);report.rssBytes=process.memoryUsage().rss;report.maxRssKiB=process.resourceUsage().maxRSS;fs.writeFileSync(output,JSON.stringify(report,null,2));console.log('CENTURY PROJECTION',JSON.stringify(report));}
@@ -51,9 +57,11 @@ if(mode==='generate'){
  };
  try{
   a.ok(stage('generate'),'world generation failed');
-  const syncOK=stage('sync'),workerOK=stage('worker');a.ok(syncOK&&workerOK,'projection stage failed');
+  a.ok(stage('encode'),'storage encoding failed');
+  const syncOK=stage('sync'),workerOK=stage('worker'),encodedOK=stage('worker-encoded');a.ok(syncOK&&workerOK&&encodedOK,'projection stage failed');
   a.equal(report.sync.world.sha256,report.worker.world.sha256);a.equal(report.sync.sourceHash,report.worker.sourceHash);
   a.equal(report.sync.projectionSha256,report.worker.projectionSha256,'worker projection differs');
+  a.equal(report.sync.sourceHash,report['worker-encoded'].sourceHash);a.equal(report.sync.projectionSha256,report['worker-encoded'].projectionSha256,'encoded worker projection differs');
   report.passed=true;
  }finally{fs.writeFileSync(output,JSON.stringify(report,null,2));fs.rmSync(dir,{recursive:true,force:true});}
 }

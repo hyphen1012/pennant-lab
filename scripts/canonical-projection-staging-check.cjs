@@ -3,7 +3,7 @@ const a=require('node:assert/strict'),{openLedger}=require('../server/account-le
 (async()=>{
  const owner='a'.repeat(64),other='b'.repeat(64),ledger=openLedger(':memory:'),engine=createHeadlessEngine(),actual=createProjectionWorkerTrial();
  let allowed=true,account=owner,hold=false,started,resume,fail=false,calls=0;
- const adapter={async project(state){calls++;if(hold){await new Promise(r=>{resume=r;started();});}if(fail)throw Error('fixture worker failure');return actual.project(state);}};
+ const adapter={project(){throw Error('decoded fallback must not be called');},async projectEncoded(state){a.equal(typeof state,'string');calls++;if(hold){await new Promise(r=>{resume=r;started();});}if(fail)throw Error('fixture worker failure');return actual.projectEncoded(state);}};
  const args={ledger,engine,authenticate:async token=>({authenticated:allowed&&token==='a',account}),verifyRights:async()=>({verified:true,vip:false,adSkip:false}),hasAdProof:()=>false};
  const direct=createGameAuthority(args),asyncRead=createGameAuthority({...args,projectionWorker:adapter});
  try{
@@ -23,6 +23,13 @@ const a=require('node:assert/strict'),{openLedger}=require('../server/account-le
   hold=false;resume();await a.rejects(read,/revision conflict/);
   a.equal((await asyncRead.read('a',1)).world,replacement.world);
   fail=true;await a.rejects(asyncRead.read('a',1),/fixture worker failure/);fail=false;
+  a.deepEqual(await asyncRead.read('a',1),await direct.read('a',1));
+  entered=gate();read=asyncRead.read('a',1);await entered;
+  ledger.transact(owner,s=>{s.points=5;});hold=false;resume();a.equal((await read).wallet.points,5);
+  const stored=ledger.inspect(owner,(s,db)=>db.prepare('SELECT state FROM authority_worlds WHERE account=? AND slot=1').get(owner).state);
+  ledger.transact(owner,(s,db)=>db.prepare('UPDATE authority_worlds SET state=? WHERE account=? AND slot=1').run('pl-gzip-v1:999:bad',owner));
+  await a.rejects(asyncRead.read('a',1),/failed|exited/);a.equal((await direct.slots('a'))[0].world,replacement.world);
+  ledger.transact(owner,(s,db)=>db.prepare('UPDATE authority_worlds SET state=? WHERE account=? AND slot=1').run(stored,owner));
   a.deepEqual(await asyncRead.read('a',1),await direct.read('a',1));
   console.log('PASS actual engine worker and authority: equal response, pre-decode admission, stale revision, revoked identity, account switch, delete/recreate, failure recovery');
  }finally{ledger.close();}

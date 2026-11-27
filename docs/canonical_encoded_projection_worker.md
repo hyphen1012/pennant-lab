@@ -1,0 +1,2 @@
+# Encoded projection worker (trial)
+Stored canonical state is read under revision fence, no decompression or object clone in main event loop when trusted worker supports projectEncoded. Same bounded codec and hash checks in worker. Legacy injected project-only adapter unchanged. Authentication, revision, current wallet rechecked after await; corrupt row fails closed. Measure 2/100-year real simulation across sync, object worker, encoded worker, separate encode stage. No hard RSS ceiling or production activation. Worker memory and timeout remain potential limit.
