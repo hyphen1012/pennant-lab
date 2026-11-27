@@ -14,11 +14,12 @@ function createCanonicalStateCodec({rawLimit=RAW_LIMIT,zipLimit=ZIP_LIMIT,smallL
   const zip=gzipSync(raw,{level:3});if(zip.length>zipLimit)throw Error('canonical compressed state exceeds limit');
   return 'pl-gzip-v1:'+raw.length+':'+sha(raw)+':'+zip.toString('base64');
  }
- function decode(value){
+ // Internal verified UTF-8 text; callers must parse and validate the world.
+ function decodeText(value){
   if(typeof value!=='string')throw Error('invalid canonical stored state');
   if(!value.startsWith('pl-gzip-v1:')){
    if(Buffer.byteLength(value)>rawLimit)throw Error('canonical legacy state exceeds limit');
-   return validate(JSON.parse(value));
+   return value;
   }
   // Reject oversized serialized input before the regex allocates a capture.
   if(value.length>11+9+1+64+1+Math.ceil(zipLimit/3)*4)throw Error('invalid canonical compressed state');
@@ -28,8 +29,9 @@ function createCanonicalStateCodec({rawLimit=RAW_LIMIT,zipLimit=ZIP_LIMIT,smallL
   if(zipped.length>zipLimit||zipped.toString('base64')!==m[3])throw Error('invalid canonical compression encoding');
   const raw=gunzipSync(zipped,{maxOutputLength:Math.min(rawLimit,Number(m[1]))});
   if(raw.length!==Number(m[1])||sha(raw)!==m[2])throw Error('canonical state integrity failure');
-  return validate(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw)));
+  return new TextDecoder('utf-8',{fatal:true}).decode(raw);
  }
- return {encode,decode};
+ function decode(value){return validate(JSON.parse(decodeText(value)));}
+ return {encode,decode,decodeText};
 }
 module.exports={createCanonicalStateCodec,RAW_LIMIT,ZIP_LIMIT};
