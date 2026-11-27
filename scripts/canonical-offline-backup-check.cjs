@@ -63,6 +63,27 @@ async function post(base,route,body){const res=await fetch(base+'/v1/game/'+rout
   fs.renameSync=(from,to)=>{if(to===enc){a.equal(fs.existsSync(enc),false);publishedCandidate=true;}return rename(from,to);};
   let envelope;try{envelope=encryptOffline({...eo,source,destination:enc});}finally{fs.renameSync=rename;}
   a.equal(publishedCandidate,true);noStage();a.deepEqual(envelope,{version:3,backupId,files:5});
+  // Real SIGKILL in a disposable child, rather than a caught exception.
+  // Synthetic key only; do not pass real secrets through argv or environment.
+  if(process.platform!=='win32'){
+   const crashDest=path.join(root,'crash-restore'),crashLock=lockFor(crashDest);
+   const crashCode=`const fs=require('node:fs');const {decryptOffline}=require('./server/encrypted-backup-trial.cjs');const o=JSON.parse(process.argv[1]);o.key=Buffer.from(o.key,'hex');const rename=fs.renameSync;fs.renameSync=(from,to)=>{if(to===o.destination)process.kill(process.pid,'SIGKILL');return rename(from,to);};decryptOffline(o);`;
+   const child=require('node:child_process').spawnSync(process.execPath,['-e',crashCode,JSON.stringify({...eo,key:key.toString('hex'),source:enc,destination:crashDest})],{cwd:path.resolve(__dirname,'..'),timeout:30000});
+   a.equal(child.signal,'SIGKILL',String(child.stderr));a.equal(fs.existsSync(crashDest),false);
+   a.equal(fs.existsSync(crashLock),true);const orphanStage=fs.readdirSync(root).filter(n=>n.startsWith('.pl-publish-stage-'));
+   const orphanScratch=fs.readdirSync(scratchRoot).filter(n=>n.startsWith('.pl-backup-'));
+   a.equal(orphanStage.length,1);a.equal(orphanScratch.length,1);
+   a.deepEqual(hashes(path.join(root,orphanStage[0],'complete')),originals);
+   a.throws(()=>decryptOffline({...eo,source:enc,destination:crashDest}),/EEXIST/);
+   a.equal(fs.existsSync(crashLock),true);a.equal(fs.existsSync(crashDest),false);
+   // Reclaim only test-owned disposable paths after the child is confirmed dead.
+   fs.rmSync(path.join(scratchRoot,orphanScratch[0]),{recursive:true});
+   fs.rmSync(path.join(root,orphanStage[0]),{recursive:true});fs.rmdirSync(crashLock);
+   noStage();a.equal(fs.readdirSync(scratchRoot).length,0);
+   decryptOffline({...eo,source:enc,destination:crashDest});
+   a.deepEqual(hashes(crashDest),originals);a.deepEqual(hashes(source),originals);noStage();
+   console.log('PASS SIGKILL before restore publication, orphan lock refuses retry, isolated test cleanup and exact recovery');
+  }
   a.deepEqual(fs.readdirSync(enc).sort(),[...FILES,'manifest.json'].map(n=>n+'.enc').sort());a.deepEqual(hashes(source),originals);
   for(const name of fs.readdirSync(enc)){const b=fs.readFileSync(path.join(enc,name));a.equal(b.subarray(0,5).toString(),'PLBK3');if(name.endsWith('.sqlite.enc'))a.notEqual(b.subarray(17,33).toString(),'SQLite format 3\0');}
   const clean=()=>{a.equal(fs.existsSync(dec),false);a.equal(fs.readdirSync(scratchRoot).length,0);};
