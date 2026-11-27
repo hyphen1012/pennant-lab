@@ -43,18 +43,20 @@ async function post(base,route,body){const res=await fetch(base+'/v1/game/'+rout
   const sr=restoreOffline({...opts,source:secure,destination:secureRestore,authentication:auth});a.deepEqual(sr,signed);a.deepEqual(hashes(secureRestore),originals);
   base=await open(secureRestore);a.deepEqual(await post(base,'read',{slot:1}),before);a.deepEqual(await post(base,'read',{slot:2}),before2);await close();a.deepEqual(hashes(source),originals);
   const {encryptOffline,decryptOffline}=require('../server/encrypted-backup-trial.cjs');
-  const enc=path.join(root,'encrypted'),dec=path.join(root,'decrypted'),key=randomBytes(32),backupId=randomUUID(),eo={...opts,key,backupId};
+  const enc=path.join(root,'encrypted'),dec=path.join(root,'decrypted'),key=randomBytes(32),backupId=randomUUID(),scratchRoot=path.join(root,'private-scratch'),eo={...opts,key,backupId,scratchRoot};fs.mkdirSync(scratchRoot,{mode:0o700});
+  for(const bad of [{scratchRoot:undefined},{scratchRoot:source},{scratchRoot:root},{scratchRoot:enc}]){a.throws(()=>encryptOffline({...eo,source,destination:enc,...bad}));a.equal(fs.existsSync(enc),false);}
+  const loose=path.join(root,'loose-scratch');fs.mkdirSync(loose,{mode:0o755});if(process.platform!=='win32')a.throws(()=>encryptOffline({...eo,source,destination:enc,scratchRoot:loose}),/private directory/);
   const envelope=encryptOffline({...eo,source,destination:enc});a.deepEqual(envelope,{version:3,backupId,files:5});
   a.deepEqual(fs.readdirSync(enc).sort(),[...FILES,'manifest.json'].map(n=>n+'.enc').sort());a.deepEqual(hashes(source),originals);
   for(const name of fs.readdirSync(enc)){const b=fs.readFileSync(path.join(enc,name));a.equal(b.subarray(0,5).toString(),'PLBK3');if(name.endsWith('.sqlite.enc'))a.notEqual(b.subarray(17,33).toString(),'SQLite format 3\0');}
-  const clean=()=>{a.equal(fs.existsSync(dec),false);a.equal(fs.readdirSync(root).some(n=>n.startsWith('.pl-backup-')),false);};
+  const clean=()=>{a.equal(fs.existsSync(dec),false);a.equal(fs.readdirSync(scratchRoot).length,0);};
   for(const bad of [{key:randomBytes(32)},{backupId:randomUUID()},{environment:'production'},{confirmedOffline:false}]){a.throws(()=>decryptOffline({...eo,source:enc,destination:dec,...bad}));clean();}
   const efile=path.join(enc,'account.sqlite.enc'),original=fs.readFileSync(efile);
   for(const b of [original.subarray(0,original.length-1),Buffer.from(original)]){if(b.length===original.length)b[b.length-17]^=1;fs.writeFileSync(efile,b);a.throws(()=>decryptOffline({...eo,source:enc,destination:dec}));clean();}fs.writeFileSync(efile,original);
   const swapped=path.join(enc,'deletion.sqlite.enc'),other=fs.readFileSync(swapped);fs.writeFileSync(efile,other);fs.writeFileSync(swapped,original);a.throws(()=>decryptOffline({...eo,source:enc,destination:dec}));clean();fs.writeFileSync(efile,original);fs.writeFileSync(swapped,other);
   fs.writeFileSync(path.join(enc,'unexpected'),'fixture');a.throws(()=>decryptOffline({...eo,source:enc,destination:dec}),/inventory/);clean();fs.unlinkSync(path.join(enc,'unexpected'));
   a.throws(()=>encryptOffline({...eo,source,destination:enc}));a.throws(()=>decryptOffline({...eo,source:enc,destination:source}));a.deepEqual(hashes(source),originals);
-  const dm=decryptOffline({...eo,source:enc,destination:dec});a.equal(dm.version,2);a.deepEqual(hashes(dec),originals);a.equal(fs.readdirSync(root).some(n=>n.startsWith('.pl-backup-')),false);
+  const dm=decryptOffline({...eo,source:enc,destination:dec});a.equal(dm.version,2);a.deepEqual(hashes(dec),originals);a.equal(fs.readdirSync(scratchRoot).length!==0,false);
   base=await open(dec);a.deepEqual(await post(base,'slots',{}),slots);a.deepEqual(await post(base,'read',{slot:1}),before);a.deepEqual(await post(base,'read',{slot:2}),before2);await close();
   a.deepEqual(hashes(source),originals);key.fill(0);
   console.log('PASS encrypted backup AES-GCM, generation/key/tamper/truncation/swap/inventory refusal, scratch cleanup, actual HTTP recovery');
