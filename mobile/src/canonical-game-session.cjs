@@ -111,6 +111,13 @@ function createCanonicalGameSession({client,online=()=>true}={}){
   const r=await run('exchange',async(t,old)=>{const x=await client.exchange('profile');if(!current(t))throw Error('session changed');exchanged=x.ok===true;return client.gameRead(t.slot);});
   return {...r,exchangeOk:r.status==='ready'?exchanged:null};
  }
+ async function exchangeDecor(key,confirmed){
+  const cost=key==='hq'?15:key==='museum'?20:null;
+  if(cost===null||confirmed!==true||status!=='ready'||!snapshot||snapshot.pending?.length||!snapshot.wallet||snapshot.wallet.points<cost||snapshot.wallet.owned?.includes(key)||typeof client.exchange!=='function')throw Error('explicit decoration exchange unavailable');
+  let exchanged=false;
+  const r=await run('exchange',async(t,old)=>{const x=await client.exchange(key);if(!current(t))throw Error('session changed');exchanged=x.ok===true;return client.gameRead(t.slot);});
+  return {...r,exchangeOk:r.status==='ready'?exchanged:null};
+ }
  async function exchangeTicket(confirmed){
   if(confirmed!==true||status!=='ready'||!snapshot||snapshot.pending?.length||!snapshot.wallet||snapshot.wallet.points<1||snapshot.wallet.tickets>=30||typeof client.exchange!=='function')throw Error('explicit ticket exchange unavailable');
   let exchanged=false;
@@ -142,6 +149,6 @@ function createCanonicalGameSession({client,online=()=>true}={}){
    snapshot=null;status='refresh-required';return {status};
   }finally{if(current(t))active=null;}
  }
- return Object.freeze({setSession,suspend,select,refresh,create,deleteWorld,advance,inspect,freePage,playerPage,listSlots,reward,achievementPage,claimAchievement,reportPage,exchangeTicket,exchangeFrame,exchangeProfile,readEntitlements,tradePage});
+ return Object.freeze({setSession,suspend,select,refresh,create,deleteWorld,advance,inspect,freePage,playerPage,listSlots,reward,achievementPage,claimAchievement,reportPage,exchangeTicket,exchangeFrame,exchangeProfile,exchangeDecor,readEntitlements,tradePage});
 }
 module.exports={createCanonicalGameSession};
