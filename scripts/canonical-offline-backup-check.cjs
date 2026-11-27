@@ -1,5 +1,5 @@
 'use strict';
-const a=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{createHash}=require('node:crypto');
+const a=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{createHash,randomBytes,randomUUID}=require('node:crypto');
 const {backupOffline,restoreOffline,FILES}=require('../server/offline-backup-trial.cjs'),{createServiceRuntime}=require('../server/service-runtime.cjs'),{createHeadlessEngine}=require('../server/headless-engine.cjs'),{openLedger}=require('../server/account-ledger.cjs');
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'pl-offline-')),source=path.join(root,'source'),backup=path.join(root,'backup'),restored=path.join(root,'restored'),owner='a'.repeat(64),deny=async()=>null;
 const opts={environment:'staging',confirmedOffline:true};
@@ -30,6 +30,20 @@ async function post(base,route,body){const res=await fetch(base+'/v1/game/'+rout
   const result=restoreOffline({...opts,source:backup,destination:restored});a.deepEqual(result,manifest);a.deepEqual(hashes(restored),originals);
   base=await open(restored);a.deepEqual(await post(base,'slots',{}),slots);a.deepEqual(await post(base,'read',{slot:1}),before);a.deepEqual(await post(base,'read',{slot:2}),before2);await close();
   a.deepEqual(hashes(source),originals);a.deepEqual(hashes(backup),originals);
+  const auth={key:randomBytes(32),backupId:randomUUID()},secure=path.join(root,'secure'),secureRestore=path.join(root,'secure-restore');
+  a.throws(()=>backupOffline({...opts,source,destination:secure,authentication:{...auth,key:Buffer.alloc(31)}}),/authentication options/);
+  const signed=backupOffline({...opts,source,destination:secure,authentication:auth});a.equal(signed.version,2);a.equal(signed.backupId,auth.backupId);a.ok(/^[a-f0-9]{64}$/.test(signed.mac));
+  a.throws(()=>restoreOffline({...opts,source:secure,destination:secureRestore}),/manifest/);
+  a.throws(()=>restoreOffline({...opts,source:backup,destination:secureRestore,authentication:auth}),/manifest/);
+  a.throws(()=>restoreOffline({...opts,source:secure,destination:secureRestore,authentication:{...auth,key:randomBytes(32)}}),/authentication failed/);
+  a.throws(()=>restoreOffline({...opts,source:secure,destination:secureRestore,authentication:{...auth,backupId:randomUUID()}}),/authenticated backup manifest/);
+  const sm=path.join(secure,'manifest.json'),orig=fs.readFileSync(sm,'utf8'),tampered=JSON.parse(orig),sf=path.join(secure,'account.sqlite'),oldBytes=fs.readFileSync(sf);
+  fs.appendFileSync(sf,'tamper');const row=tampered.files.find(x=>x.name==='account.sqlite');row.bytes=fs.statSync(sf).size;row.sha256=hash(sf);fs.writeFileSync(sm,JSON.stringify(tampered));
+  a.throws(()=>restoreOffline({...opts,source:secure,destination:secureRestore,authentication:auth}),/authentication failed/);a.equal(fs.existsSync(secureRestore),false);fs.writeFileSync(sf,oldBytes);fs.writeFileSync(sm,orig);
+  const sr=restoreOffline({...opts,source:secure,destination:secureRestore,authentication:auth});a.deepEqual(sr,signed);a.deepEqual(hashes(secureRestore),originals);
+  base=await open(secureRestore);a.deepEqual(await post(base,'read',{slot:1}),before);a.deepEqual(await post(base,'read',{slot:2}),before2);await close();a.deepEqual(hashes(source),originals);
+  auth.key.fill(0);
+  console.log('PASS authenticated backup manifest, wrong key/identity, downgrade, recomputed hash tamper refusal, real HTTP recovery');
   console.log('PASS offline five-database backup, explicit staging confirmation, sidecar/unknown DB refusal, non-overwrite, manifest/hash rejection, real HTTP world/wallet recovery');
  }finally{await close();fs.rmSync(root,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});
