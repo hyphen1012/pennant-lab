@@ -1,0 +1,44 @@
+name: Trial AC mature capital allocation with AB revenue
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/facility-trial-ac*.cjs'
+      - 'scripts/year-cycle-trial-ac.cjs'
+      - '.github/workflows/facility-transition-capital-trial-ac.yml'
+jobs:
+  natural-investment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [1937, 4391, 8821]
+    env:
+      FACILITY_SEED: ${{ matrix.seed }}
+      FIXED_TEAM: -1
+      STOP_AFTER_FACILITY: '1'
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/facility-trial-u-check.cjs
+      - run: node scripts/facility-trial-v-check.cjs
+      - run: node scripts/facility-trial-w-check.cjs
+      - run: node scripts/facility-trial-x-check.cjs
+      - run: node scripts/facility-trial-y-check.cjs
+      - run: node scripts/facility-trial-ab-check.cjs
+      - run: node scripts/facility-trial-ac-check.cjs
+      - run: node scripts/cpu-economy-check.cjs
+      - run: |
+          mkdir -p test-results
+          set -o pipefail
+          node scripts/year-cycle-trial-ac.cjs 55 "$FACILITY_SEED" | tee test-results/facility-cycle-ac.log
+          node scripts/facility-endurance.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: facility-transition-capital-trial-ac-${{ matrix.seed }}
+          path: test-results/
