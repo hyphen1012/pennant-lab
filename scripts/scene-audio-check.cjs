@@ -2,6 +2,8 @@
 const a=require('node:assert/strict'),{createAudio,sceneFor,replayCue,tracks}=require('../mobile/src/scene-audio.js');
 (async()=>{
  const cases=[
+ ...[['fan-fest','festival'],['tv','festival'],['opening-promo','opening'],['offdesk-opening','opening'],['settlement','finance']].map(([annual,name])=>[{page:'canonical-events',annual},name]),
+ [{page:'canonical-events',inbox:{opening:true}},'opening'],[{page:'canonical-events',inbox:{monthly:{}}},'finance'],[{page:'canonical-events',inbox:{decade:2036}},'archive'],[{page:'canonical-events',inbox:{milestones:[{}]}},'archive'],[{page:'canonical-achievements'},'archive'],[{page:'canonical-reports'},'archive'],
  [{page:'title',launchTitle:true},'title'],[{page:'title'},'worlds'],[{page:'setup'},'worlds'],
  [{page:'canonical-hq'},'hq'],[{page:'canonical-roster'},'roster'],[{page:'canonical-manager'},'manager'],[{page:'canonical-facilities'},'finance'],
  [{page:'canonical-hq',replay:'watch'},'match'],[{page:'canonical-hq',skip:true},null],
@@ -34,13 +36,16 @@ const a=require('node:assert/strict'),{createAudio,sceneFor,replayCue,tracks}=re
  a.equal(sceneFor({page:'canonical-hq',replay:'final',skip:true}),null);
  a.equal(new Set(['parallel','star','legend','immortal','rebirth','transcendent'].map(k=>JSON.stringify(tracks[k]))).size,6);
  for(const [name,t] of Object.entries(tracks)){a.equal(t.chords.length,4,name);a.equal(t.melody.length,32,name);a.ok(t.bpm>0);a.ok(t.melody.every(Number.isFinite));}
- let made=0,resumes=0,starts=0,stops=0,stored=null,serial=0;const timers=new Map();
+ let made=0,resumes=0,starts=0,stops=0,stored=null,serial=0;const timers=new Map(),timeouts=new Map();
  const gain=()=>({gain:{cancelScheduledValues(){},setTargetAtTime(){},setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}});
  class Context{constructor(){made++;this.state='suspended';this.currentTime=1;this.destination={};}createGain(){return gain();}createOscillator(){return {frequency:{},connect(){},disconnect(){},start(){starts++;},stop(){stops++;}};}async resume(){resumes++;this.state='running';}async suspend(){this.state='suspended';}}
- const host={AudioContext:Context,document:{hidden:false},localStorage:{getItem:()=>stored,setItem:(_,v)=>{stored=v;}},setInterval:f=>{timers.set(++serial,f);return serial;},clearInterval:i=>timers.delete(i)};
+ const host={AudioContext:Context,document:{hidden:false},localStorage:{getItem:()=>stored,setItem:(_,v)=>{stored=v;}},setInterval:f=>{timers.set(++serial,f);return serial;},clearInterval:i=>timers.delete(i),setTimeout:f=>{timeouts.set(++serial,f);return serial;},clearTimeout:i=>timeouts.delete(i)};
  const audio=createAudio({host});audio.setScene('title');a.equal(made,0);a.equal(timers.size,0);a.equal(await audio.unlock(),true);a.equal(made,1);a.equal(resumes,1);a.equal(timers.size,1);a.ok(starts>0);
- const before=starts;audio.setScene('title');a.equal(starts,before);a.equal(timers.size,1);audio.setScene('worlds');a.equal(timers.size,1);a.ok(starts>before);
- audio.cue('tap');a.ok(starts>before);audio.setScene(null);a.equal(timers.size,0);a.equal(audio.inspect().voices,0);
+ const before=starts;audio.setScene('title');a.equal(starts,before);a.equal(timers.size,1);audio.setScene('worlds');a.equal(timers.size,1);a.ok(starts>before);a.equal(audio.inspect().fading,true);a.equal(timeouts.size,1);
+ audio.setScene('hq');a.equal(timers.size,1);a.equal(timeouts.size,1);a.ok(audio.inspect().voices<=32);const [fadeId,finishFade]=[...timeouts][0];timeouts.delete(fadeId);finishFade();a.equal(audio.inspect().fading,false);
+ audio.setScene('roster');a.equal(audio.inspect().fading,true);audio.setScene('mystery');a.equal(timeouts.size,0);a.equal(audio.inspect().fading,false);audio.setScene('immortal');a.equal(audio.inspect().fading,false);audio.setScene('hq');a.equal(audio.inspect().fading,false);
+ audio.setScene('roster');a.equal(timeouts.size,1);audio.visibility(false);a.equal(timeouts.size,0);a.equal(audio.inspect().voices,0);audio.visibility(true);await new Promise(r=>setImmediate(r));a.equal(timers.size,1);
+ audio.cue('tap');a.ok(starts>before);audio.setScene(null);a.equal(timers.size,0);a.equal(timeouts.size,0);a.equal(audio.inspect().voices,0);
  audio.setScene('hq');audio.settings({enabled:false,bgm:0,sfx:.2});a.equal(timers.size,0);a.equal(audio.inspect().prefs.bgm,0);a.equal(createAudio({host}).inspect().prefs.enabled,false);
  audio.settings({enabled:true});await new Promise(r=>setImmediate(r));a.equal(timers.size,1);audio.visibility(false);a.equal(timers.size,0);a.equal(audio.inspect().voices,0);audio.visibility(true);await new Promise(r=>setImmediate(r));a.equal(timers.size,1);
  audio.setScene(null);a.equal(timers.size,0);a.ok(stops>0);
