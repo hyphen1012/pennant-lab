@@ -90,7 +90,19 @@ function createFinanceLedgerTrial({verifyBankProof=()=>false,clubRole='player'}=
   for(const row of next.pending.rows){const l=next.loans.find(l=>l.id===row.id);a(l&&l.rows[l.paid]?.month===row.month,'installment mismatch');l.paid++;}
   next.closedMonth=month;next.pending=null;return {state:next,status:'paid'};
  }
- function statement(s){return {cash:s.cash,...eligibility(s),pending:s.pending?clone(s.pending):null,loans:s.loans.map(l=>({id:l.id,kind:l.kind,principal:l.principal,remaining:l.paid?l.rows[l.paid-1].remaining:l.principal,paid:l.paid,next:l.rows[l.paid]?{...l.rows[l.paid],dueMonth:l.openedMonth+l.rows[l.paid].month}:null}))};}
+ function statement(s){
+  assertRole(s);
+  const loans=s.loans.map(l=>{
+   const rows=l.rows.slice(0,l.paid),principalPaid=sum(...rows.map(r=>r.principalPaid)),interestPaid=sum(...rows.map(r=>r.interest));
+   const remaining=l.paid?l.rows[l.paid-1].remaining:l.principal;
+   a(sum(principalPaid,remaining)===l.principal,'principal conservation');
+   return {id:l.id,kind:l.kind,principal:l.principal,remaining,paid:l.paid,principalPaid,interestPaid,interestScheduled:sum(...l.rows.slice(l.paid).map(r=>r.interest)),next:l.rows[l.paid]?{...l.rows[l.paid],dueMonth:l.openedMonth+l.rows[l.paid].month}:null};
+  });
+  const debtOutstanding=sum(...loans.map(l=>l.remaining)),borrowedPrincipal=sum(...loans.map(l=>l.principal)),principalRepaid=sum(...loans.map(l=>l.principalPaid)),interestPaid=sum(...loans.map(l=>l.interestPaid));
+  // Cash less principal is a liquidity indicator, not total club equity.
+  // Borrowing is financing, not operating revenue; principal is not an expense.
+  return {cash:s.cash,...eligibility(s),pending:s.pending?clone(s.pending):null,loans,financing:{borrowedPrincipal,principalRepaid,interestPaid,debtOutstanding,netCashAfterPrincipal:sum(s.cash,-debtOutstanding),scheduledInterest:sum(...loans.map(l=>l.interestScheduled))}};
+ }
  return {create,period,beginMonth,borrow,investWithParent,settleMonth,statement,eligibility};
 }
 module.exports={createFinanceLedgerTrial};
