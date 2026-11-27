@@ -298,9 +298,16 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   page.once('dialog',d=>d.dismiss());await buyProfile.click();a.equal((await post('read',{slot:3})).wallet.points,5);
   page.once('dialog',d=>d.accept());await buyProfile.click();await page.getByText('GMプロフィールへの交換を確認しました。').waitFor();
   const profile=await post('read',{slot:3});a.equal(profile.wallet.points,0);a.ok(profile.wallet.owned.includes('profile'));a.equal(profile.revision,ownedFrame.revision);a.deepEqual(profile.game,ownedFrame.game);a.equal(await buyProfile.count(),0);
+  const decorLedger=require('../server/account-ledger.cjs').openLedger(path.join(dir,'account.sqlite'));
+  try{decorLedger.transact(owner,s=>{s.points=35;});}finally{decorLedger.close();}
+  clockOffset+=61000;await page.locator('[data-action="canonical-rewards-refresh"]').click();
+  for(const key of ['hq','museum']){const button=page.locator('[data-action="canonical-decor-exchange"][data-key="'+key+'"]:enabled');await button.waitFor();page.once('dialog',d=>d.accept());await button.click();await page.getByText('装飾品への交換を確認しました。').waitFor();await button.waitFor({state:'detached'});}
+  const decor=await post('read',{slot:3});a.equal(decor.wallet.points,0);a.ok(decor.wallet.owned.includes('hq')&&decor.wallet.owned.includes('museum'));a.equal(decor.revision,profile.revision);a.deepEqual(decor.game,profile.game);
+  await page.locator('[data-action="canonical-achievements-open"]').click();await page.locator('[data-canonical-museum]').waitFor();await page.locator('[data-canonical-museum-exhibit]').filter({has:page.getByRole('heading',{name:'試験用施設実績'})}).waitFor();await page.locator('[data-action="canonical-achievements-back"]').click();await page.locator('[data-action="canonical-rewards-back"]').waitFor();
   // Return to the multiverse; deletion is hidden until an intentional gesture.
   await page.locator('[data-action="canonical-rewards-back"]').click();
   await page.locator('[data-action="canonical-events-back"]').click();
+  await page.locator('[data-canonical-hq-theme]').waitFor();
   const profileCard=page.locator('[data-canonical-gm-profile]');await profileCard.waitFor();await profileCard.locator('summary').click();a.ok((await profileCard.innerText()).includes(profile.game.gmName));a.ok((await profileCard.innerText()).includes(profile.game.team.name));
   a.ok((await post('read',{slot:2})).wallet.owned.includes('profile'));
   await page.locator('[data-action="canonical-return"]').first().click();await slot(3).waitFor();
