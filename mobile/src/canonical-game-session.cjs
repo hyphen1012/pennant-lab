@@ -105,6 +105,12 @@ function createCanonicalGameSession({client,online=()=>true}={}){
   const r=await run('exchange',async(t,old)=>{const x=await client.exchange('frame');if(!current(t))throw Error('session changed');exchanged=x.ok===true;return client.gameRead(t.slot);});
   return {...r,exchangeOk:r.status==='ready'?exchanged:null};
  }
+ async function exchangeProfile(confirmed){
+  if(confirmed!==true||status!=='ready'||!snapshot||snapshot.pending?.length||!snapshot.wallet||snapshot.wallet.points<5||snapshot.wallet.owned?.includes('profile')||typeof client.exchange!=='function')throw Error('explicit profile exchange unavailable');
+  let exchanged=false;
+  const r=await run('exchange',async(t,old)=>{const x=await client.exchange('profile');if(!current(t))throw Error('session changed');exchanged=x.ok===true;return client.gameRead(t.slot);});
+  return {...r,exchangeOk:r.status==='ready'?exchanged:null};
+ }
  async function exchangeTicket(confirmed){
   if(confirmed!==true||status!=='ready'||!snapshot||snapshot.pending?.length||!snapshot.wallet||snapshot.wallet.points<1||snapshot.wallet.tickets>=30||typeof client.exchange!=='function')throw Error('explicit ticket exchange unavailable');
   let exchanged=false;
@@ -136,6 +142,6 @@ function createCanonicalGameSession({client,online=()=>true}={}){
    snapshot=null;status='refresh-required';return {status};
   }finally{if(current(t))active=null;}
  }
- return Object.freeze({setSession,suspend,select,refresh,create,deleteWorld,advance,inspect,freePage,playerPage,listSlots,reward,achievementPage,claimAchievement,reportPage,exchangeTicket,exchangeFrame,readEntitlements,tradePage});
+ return Object.freeze({setSession,suspend,select,refresh,create,deleteWorld,advance,inspect,freePage,playerPage,listSlots,reward,achievementPage,claimAchievement,reportPage,exchangeTicket,exchangeFrame,exchangeProfile,readEntitlements,tradePage});
 }
 module.exports={createCanonicalGameSession};

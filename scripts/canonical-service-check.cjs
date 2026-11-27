@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{generateKeyPairSync,sign}=require('node:crypto');
 const {createServiceRuntime}=require('../server/service-runtime.cjs'),{rosterTreatment}=require('../server/canonical-care.cjs');
 (async()=>{
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pl-canonical-http-')),a='a'.repeat(64),b='b'.repeat(64),now=1700000000000;
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pl-canonical-http-')),a='a'.repeat(64),b='b'.repeat(64);let now=1700000000000;
  const {privateKey,publicKey}=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
  const deny=async()=>null,auth=async t=>['a','b'].includes(t)?{authenticated:true,account:t==='a'?a:b}:{authenticated:false};
  const engine={
@@ -15,18 +15,23 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{rosterTre
  const cfg={dataDir:dir,authenticate:auth,verifyRecentReauth:async x=>({verified:x.proof==='fresh',account:x.account}),verifyReceipt:deny,verifyCurrent:deny,verifyNotification:deny,verifyEvent:async account=>({verified:true,eligible:true,account,id:'legacy-win'}),verifyAction:async account=>({verified:true,eligible:true,account,id:'legacy-op'}),verifyCompletion:deny,units:{android:{unit:'123',item:'ticket',amount:1}},origins:['https://fixture.invalid'],resolveKey:async()=>publicKey,now:()=>now};
  let runtime,base;
  const start=async config=>{runtime=createServiceRuntime(config);await new Promise(ok=>runtime.server.listen(0,'127.0.0.1',ok));base='http://127.0.0.1:'+runtime.server.address().port;};
- const req=async(p,body,token='a')=>{const r=await fetch(base+p,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Origin:'https://fixture.invalid'},body:JSON.stringify(body)});return [r.status,await r.json()];};
+ const req=async(p,body,token='a')=>{const r=await fetch(base+p,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Origin:'https://fixture.invalid'},body:JSON.stringify(body)});assert.notEqual(r.status,429,'unexpected test rate limit: '+p);return [r.status,await r.json()];};
  try{
   await start(cfg);assert.equal((await req('/v1/game/read',{slot:1}))[0],503);await runtime.close();runtime=null;
   const fixtureLedger=require('../server/account-ledger.cjs').openLedger(path.join(dir,'account.sqlite'));
   try{fixtureLedger.transact(a,s=>{s.points=10;});}finally{fixtureLedger.close();}
   await start({...cfg,canonicalEngine:engine});
   const beforeCatalog=(await req('/v1/wallet',{}))[1];assert.equal(beforeCatalog.points,10);
-  for(const key of ['profile','uniform']){const x=(await req('/v1/exchange',{key}))[1];assert.equal(x.ok,false);assert.deepEqual(x.wallet,beforeCatalog);}
+  for(const key of ['uniform','hq','museum','emblem','deluxeCard','anniversary']){const x=(await req('/v1/exchange',{key}))[1];assert.equal(x.ok,false);assert.deepEqual(x.wallet,beforeCatalog);}
   const exchanged=(await req('/v1/exchange',{key:'ticket'}))[1];assert.equal(exchanged.ok,true);assert.equal(exchanged.wallet.points,9);assert.equal(exchanged.wallet.tickets,1);
   const [first,secondFrame]=await Promise.all([req('/v1/exchange',{key:'frame'}),req('/v1/exchange',{key:'frame'})]);assert.equal([first[1],secondFrame[1]].filter(x=>x.ok).length,1);
   const frameWallet=(await req('/v1/wallet',{}))[1];assert.equal(frameWallet.points,6);assert.deepEqual(frameWallet.owned,['frame']);
+  const profiles=await Promise.all([req('/v1/exchange',{key:'profile'}),req('/v1/exchange',{key:'profile'})]);assert.equal(profiles.filter(x=>x[1].ok).length,1);
+  const profileWallet=(await req('/v1/wallet',{}))[1];assert.equal(profileWallet.points,1);assert.deepEqual(profileWallet.owned,['frame','profile']);
+  const otherProfile=(await req('/v1/exchange',{key:'profile'},'b'))[1];assert.equal(otherProfile.ok,false);assert.deepEqual(otherProfile.wallet.owned,[]);
   const otherFrame=(await req('/v1/exchange',{key:'frame'},'b'))[1];assert.equal(otherFrame.ok,false);assert.deepEqual(otherFrame.wallet.owned,[]);
+  // Separate catalog fixture from later gameplay to respect the actual 40 requests/minute token gate.
+  now+=61000;
   const rights=(await req('/v1/entitlements',{}))[1];assert.equal(rights.verified,true);assert.equal(rights.account,a);assert.equal(rights.entitlements.vip.active,false);assert.equal(rights.entitlements.adSkip.active,false);
   const pre=await fetch(base+'/v1/purchase-finish',{method:'OPTIONS',headers:{Origin:'https://fixture.invalid','Access-Control-Request-Method':'POST'}});assert.equal(pre.status,204);
   assert.equal((await req('/v1/game/create',{slot:1,command:{team:0,state:{}}}))[0],403);

@@ -290,9 +290,19 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   await page.locator('[data-action="canonical-achievements-frame"][data-frame="standard"]').click();a.equal(await art.getAttribute('src'),plain);
   await page.locator('[data-action="canonical-achievements-back"]').click();await page.locator('[data-action="canonical-rewards-back"]').waitFor();
   a.deepEqual((await post('read',{slot:3})).wallet,ownedFrame.wallet);
+  // Profile is another account cosmetic, not a world mutation.
+  const profileLedger=require('../server/account-ledger.cjs').openLedger(path.join(dir,'account.sqlite'));
+  try{profileLedger.transact(owner,s=>{s.points=5;});}finally{profileLedger.close();}
+  clockOffset+=61000;await page.locator('[data-action="canonical-rewards-refresh"]').click();
+  const buyProfile=page.locator('[data-action="canonical-profile-exchange"]:enabled');await buyProfile.waitFor();
+  page.once('dialog',d=>d.dismiss());await buyProfile.click();a.equal((await post('read',{slot:3})).wallet.points,5);
+  page.once('dialog',d=>d.accept());await buyProfile.click();await page.getByText('GMプロフィールへの交換を確認しました。').waitFor();
+  const profile=await post('read',{slot:3});a.equal(profile.wallet.points,0);a.ok(profile.wallet.owned.includes('profile'));a.equal(profile.revision,ownedFrame.revision);a.deepEqual(profile.game,ownedFrame.game);a.equal(await buyProfile.count(),0);
   // Return to the multiverse; deletion is hidden until an intentional gesture.
   await page.locator('[data-action="canonical-rewards-back"]').click();
   await page.locator('[data-action="canonical-events-back"]').click();
+  const profileCard=page.locator('[data-canonical-gm-profile]');await profileCard.waitFor();await profileCard.locator('summary').click();a.ok((await profileCard.innerText()).includes(profile.game.gmName));a.ok((await profileCard.innerText()).includes(profile.game.team.name));
+  a.ok((await post('read',{slot:2})).wallet.owned.includes('profile'));
   await page.locator('[data-action="canonical-return"]').first().click();await slot(3).waitFor();
   const delete3=page.locator('[data-action="canonical-world-delete"][data-slot="3"]');
   a.equal(await delete3.isVisible(),false);
