@@ -13,9 +13,12 @@ const {createAdSsvService}=require('./ad-ssv-service.cjs');
 const {openDeletionRequests,createDeletionService}=require('./deletion-requests.cjs');
 const {createAccountHttp}=require('./account-http.cjs'),{createSaveHttp}=require('./save-http.cjs');
 const {createRateLimiter}=require('./rate-limit.cjs'),{createServiceRouter}=require('./service-router.cjs');
-function createServiceRuntime({environment='staging',dataDir,authenticate,verifyRecentReauth,verifyReceipt,verifyCurrent,verifyNotification,verifyEvent,verifyAction,verifyCompletion,storeConfig=null,canonicalEngine=null,units,origins=[],maxBytes=64*1024*1024,maxDecodedBytes=256*1024*1024,resolveKey=createAdMobKeyResolver(),now=Date.now,gameLimits={},projectionWorker=null}={}){
+function createServiceRuntime({environment='staging',dataDir,authenticate,verifyRecentReauth,verifyReceipt,verifyCurrent,verifyNotification,verifyEvent,verifyAction,verifyCompletion,storeConfig=null,canonicalEngine=null,units,origins=[],maxBytes=64*1024*1024,maxDecodedBytes=256*1024*1024,resolveKey=createAdMobKeyResolver(),now=Date.now,gameLimits={},projectionWorker=null,projectionMode='off'}={}){
  if(environment!=='staging'||typeof dataDir!=='string'||!path.isAbsolute(dataDir)||[authenticate,verifyRecentReauth,verifyReceipt,verifyCurrent,verifyNotification,verifyEvent,verifyAction,verifyCompletion].some(x=>typeof x!=='function'))throw Error('staging and trusted adapters required');
  if(!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>256*1024*1024)throw Error('invalid storage limit');
+ // Explicit staging composition option. Never turn on an injected worker implicitly.
+ if(!['off','direct-text'].includes(projectionMode)||projectionMode!=='off'&&projectionWorker!==null)throw Error('invalid projection mode');
+ if(projectionMode==='direct-text')projectionWorker=require('./projection-worker-trial.cjs').createProjectionWorkerTrial({directText:true});
  // With the experimental worker, never overlap heavy canonical operations.
  // A soft RSS gate is required explicitly: it is not an OS memory ceiling.
  if(projectionWorker!==null&&(!canonicalEngine||!Number.isSafeInteger(gameLimits.rssLimitBytes)||gameLimits.rssLimitBytes<1||gameLimits.heavyLimit!==undefined&&gameLimits.heavyLimit!==1))throw Error('worker requires single heavy lane and explicit RSS admission threshold');
