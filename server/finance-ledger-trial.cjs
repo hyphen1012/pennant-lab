@@ -13,9 +13,11 @@ function createFinanceLedgerTrial({verifyBankProof=()=>false,clubRole='player'}=
  a(typeof verifyBankProof==='function','trusted proof verifier required');
  function create({world,cash,year,closedMonth}){
   a(key(world)&&amount(cash)&&int(year)&&year>=2027&&int(closedMonth)&&closedMonth>=0,'invalid trial opening');
-  return {world,cash,year,phase:'season',closedMonth,bankUses:0,titleYear:null,parentUsedYear:null,loans:[],receipts:{},pending:null};
+  return {world,clubRole,cash,year,phase:'season',closedMonth,bankUses:0,titleYear:null,parentUsedYear:null,loans:[],receipts:{},pending:null};
  }
+ function assertRole(s){a(s?.clubRole===clubRole,'club role mismatch');}
  function period(s,{year,phase,titles=[]}){
+  assertRole(s);
   a(!s.pending,'unsettled month');a(Array.isArray(titles)&&titles.every(t=>['league','japan','world'].includes(t)),'invalid title');
   const next=clone(s);
   if(s.phase==='season'&&phase==='off'&&year===s.year){next.phase='off';if(titles.length){next.titleYear=year;next.parentUsedYear=null;}}
@@ -29,15 +31,17 @@ function createFinanceLedgerTrial({verifyBankProof=()=>false,clubRole='player'}=
  }
  function shortfall(s){return s.pending?Math.max(0,-sum(s.cash,s.pending.operatingNet,-s.pending.total)):0;}
  function eligibility(s){
-  const deficit=shortfall(s),window=titleWindow(s);
-  return {shortfall:deficit,bankRemaining:2-s.bankUses,bankRescue:deficit>0&&s.bankUses<2,parentRescue:deficit>0&&window&&s.parentUsedYear!==s.titleYear,preemptiveWindow:window&&s.bankUses<2,terminal:deficit>0&&s.bankUses>=2&&!(window&&s.parentUsedYear!==s.titleYear)};
+  assertRole(s);const deficit=shortfall(s),window=titleWindow(s),parent=window&&s.parentUsedYear!==s.titleYear,bank=clubRole==='player'&&s.bankUses<2;
+  return {shortfall:deficit,bankRemaining:clubRole==='player'?2-s.bankUses:0,bankRescue:deficit>0&&bank,parentRescue:deficit>0&&parent,preemptiveWindow:clubRole==='player'?window&&bank:parent,terminal:deficit>0&&!bank&&!parent};
  }
  function beginMonth(s,{month,operatingNet}){
+  assertRole(s);
   a(int(month)&&month===s.closedMonth+1&&int(operatingNet)&&Math.abs(operatingNet)<=1e12,'invalid month');
   if(s.pending){a(s.pending.month===month&&s.pending.operatingNet===operatingNet,'month already prepared');return clone(s);}
   const next=clone(s),rows=due(next,month);next.pending={month,operatingNet,rows,total:sum(...rows.map(r=>r.payment))};return next;
  }
  function borrow(s,{id,kind,principal,months,attempt}){
+  assertRole(s);
   a(key(id)&&!['__proto__','constructor','prototype'].includes(id)&&amount(principal)&&principal>0&&[12,24].includes(months)&&int(attempt)&&attempt>0&&(clubRole==='cpu'?['cpuParentAnnual']:['bank','parentMonthly','parentAnnual']).includes(kind),'invalid trial loan');
   const request={id,kind,principal,months,attempt};
   if(Object.hasOwn(s.receipts,id)){a(JSON.stringify(s.receipts[id])===JSON.stringify(request),'loan operation conflict');return {state:clone(s),replay:true};}
@@ -55,7 +59,7 @@ function createFinanceLedgerTrial({verifyBankProof=()=>false,clubRole='player'}=
  // All quote inputs are trusted trial inputs, not client commands or game data.
  // Positive cash is normal. No bonus, penalty or reputation effect for borrowing.
  function investWithParent(s,{id,projectId,cost,reserve,monthlyNet,months,attempt}){
-  a(clubRole==='cpu','CPU-only strategic parent financing');
+  assertRole(s);a(clubRole==='cpu','CPU-only strategic parent financing');
   a(key(id)&&!['__proto__','constructor','prototype'].includes(id)&&key(projectId)&&amount(cost)&&cost>0&&amount(reserve)&&amount(monthlyNet)&&[12,24].includes(months)&&int(attempt)&&attempt>0,'invalid strategic project');
   const request={id,projectId,cost,reserve,monthlyNet,months,attempt,kind:'cpuParentAnnual',purpose:'investment'};
   if(Object.hasOwn(s.receipts,id)){a(JSON.stringify(s.receipts[id])===JSON.stringify(request),'loan operation conflict');return {state:clone(s),replay:true};}
@@ -76,6 +80,7 @@ function createFinanceLedgerTrial({verifyBankProof=()=>false,clubRole='player'}=
   return {state:next,replay:false};
  }
  function settleMonth(s,month){
+  assertRole(s);
   a(int(month),'invalid month');
   if(month===s.closedMonth&&!s.pending)return {state:clone(s),status:'replay'};
   a(s.pending&&s.pending.month===month,'month not prepared');
