@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'server/gm-tenure-trial.cjs'
+      - 'server/gm-archive-adapter-trial.cjs'
+      - 'scripts/gm-archive-adapter-trial-check.cjs'
       - 'scripts/gm-tenure-trial-check.cjs'
       - '.github/workflows/gm-tenure-trial.yml'
   workflow_dispatch:
@@ -17,3 +19,4 @@ jobs:
         with:
           node-version: '22'
       - run: node scripts/gm-tenure-trial-check.cjs
+      - run: node scripts/gm-archive-adapter-trial-check.cjs
