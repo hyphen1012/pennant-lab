@@ -1,6 +1,15 @@
 // Test-only real regular season -> authoritative annual entry. No client state import.
 const fs=require('node:fs'),a=require('node:assert/strict'),{createHeadlessEngine}=require('../server/headless-engine.cjs');
 const engine=createHeadlessEngine();
+// Validate the emitted pilot helper with inert renderer spies: no hidden or unverified cinema calls.
+const pilot=require('../mobile/canonical-title-pilot.cjs').canonicalTitlePilot(fs.readFileSync('index.html','utf8'));
+const helper=pilot.slice(pilot.indexOf('  function canonicalAwardCinema('),pilot.indexOf('  function canonicalDraftModel('));
+a.ok(helper.includes('function canonicalAwardCinema'));
+const seen=[],renderAward=new Function('rarePanel','rareCinemaArt',helper+';return canonicalAwardCinema;')((p,k)=>{seen.push(['panel',k]);return '<p>panel</p>';},(p,k,v)=>{seen.push(['art',k,v]);return '<p>art</p>';});
+for(const p of [null,{}, {cinemaKnown:false,specialCategory:'IMMORTAL'}, {cinemaKnown:true,scoutingHidden:true}, {cinemaKnown:true,abilitiesHidden:true}])a.equal(renderAward({player:p}),'');
+a.equal(seen.length,0);
+for(const specialCategory of ['PARALLEL','STAR','LEGEND','IMMORTAL','輪廻転生','IMMORTAL輪廻転生'])a.match(renderAward({player:{cinemaKnown:true,specialCategory}}),/<details.*特別受賞演出を見る/);
+a.equal(seen.length,12);
 let checked=false;
 globalThis.__plAnnualEntryCheck=saved=>{
  let w=JSON.parse(saved),year=w.year;
@@ -34,7 +43,15 @@ globalThis.__plAnnualEntryCheck=saved=>{
   ready(id);a.throws(()=>engine.advance(w,{annual:'day'}));step({annual:'open',job:id});
   a.equal(engine.view(w).annual.active,id);a.throws(()=>engine.advance(w,{annual:'day'}));
   const report=engine.view(w).annual;
-  if(id==='awards-all'){a.ok(report.awardReport);a.equal(report.awardReport.awards.length,w.awards.filter(x=>x.year===w.year).length);a.ok(report.awardReport.awards.length>0);a.ok(report.awardReport.awards.every(x=>x.player&&typeof x.title==='string'&&typeof x.stat==='string'));a.equal(report.financeReport,null);}
+  if(id==='awards-all'){a.ok(report.awardReport);a.equal(report.awardReport.awards.length,w.awards.filter(x=>x.year===w.year).length);a.ok(report.awardReport.awards.length>0);a.ok(report.awardReport.awards.every(x=>x.player&&typeof x.title==='string'&&typeof x.stat==='string'));a.equal(report.financeReport,null);
+   a.ok(report.awardReport.awards.every(x=>typeof x.player.cinemaKnown==='boolean'));
+   const fixture=structuredClone(w),winner=fixture.players.find(p=>p.id===report.awardReport.awards[0].player.id);a.ok(winner);
+   winner.specialCategory='LEGEND';winner.originCategory=null;winner.scoutingHidden=false;winner.abilitiesHidden=false;
+   const visible=engine.view(fixture).annual.awardReport.awards.find(x=>x.player?.id===winner.id);a.equal(visible.player.cinemaKnown,true);
+   winner.scoutingHidden=true;winner.abilitiesHidden=true;
+   const hidden=engine.view(fixture).annual.awardReport.awards.find(x=>x.player?.id===winner.id);a.equal(hidden.player.cinemaKnown,false);
+   console.log('PASS actual annual award projection guards public rare cinema');
+  }
   if(id==='settlement'){const r=report.financeReport;a.ok(r);a.ok([r.income,r.expense,r.net,r.operating,r.cash].every(Number.isFinite));a.ok(Math.abs(r.income-r.expense-r.net)<.021);a.ok(Math.abs(r.incomeRows.reduce((n,x)=>n+x[1],0)-r.income)<.1);a.ok(Math.abs(r.expenseRows.reduce((n,x)=>n+x[1],0)-r.expense)<.1);a.equal(r.cash,w.teams.find(t=>t.id===w.selectedId).cash);a.equal(report.awardReport,null);}
 
   if(id==='movement-declarations'){
