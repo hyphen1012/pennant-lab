@@ -33,11 +33,12 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/native-runtime.js',r=>r.fulfill({contentType:'application/javascript',body:fixture}));
   await page.route('**/*.mp4',r=>r.abort()); // startup video has its own independent audit
-  let creates=0,lost=false,failSlots=false,lostAdvance=false,advances=0,freeReads=0,failFree=false,lostSettle=false,settles=0,reserves=0;
+  let creates=0,lost=false,failSlots=false,lostAdvance=false,advances=0,freeReads=0,failFree=false,failReports=false,lostSettle=false,settles=0,reserves=0;
   await page.route('**/canonical-fixture/v1/**',async r=>{
    const q=r.request(),p=new URL(q.url()).pathname.replace('/canonical-fixture','');
    if(p.endsWith('/slots')&&failSlots){await r.abort();return;}
    if(p.endsWith('/free-page')){freeReads++;if(failFree){await r.abort();return;}}
+   if(p.endsWith('/report-page')&&failReports){await r.abort();return;}
    const response=await fetch(base+p,{method:'POST',headers:{Authorization:q.headers().authorization,'Content-Type':'application/json'},body:q.postData()});
    const body=await response.text();
    if(p.endsWith('/create')){creates++;if(lost){lost=false;a.equal(response.status,200);await r.abort();return;}}
@@ -139,6 +140,20 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
    await page.locator('[data-action="canonical-archive-kind"][data-kind="papers"]').click();await page.locator('[data-action="canonical-archive-next"]').waitFor();
    const papers=await post('report-page',{slot:1,world:archived.world,revision:archived.revision,command:{kind:'papers',year:0,offset:0,limit:3}});
    if(archived.game.headquarters.latestPaper){a.ok(papers.page.total>0);a.equal(papers.page.items[0].date,archived.game.headquarters.latestPaper.date);}
+   a.equal((await post('read',{slot:1})).revision,archived.revision);
+   clockOffset+=61000;
+   const advancesBeforeReportRecovery=advances;
+   failReports=true;
+   await page.locator('[data-action="canonical-archive-search"]').click();
+   await page.locator('[data-canonical-report-recovery]').waitFor();
+   a.equal(await page.locator('[data-action="canonical-archive-search"]').count(),0);
+   failReports=false;
+   await page.locator('[data-action="canonical-reports-refresh"]').click();
+   await page.locator('[data-action="canonical-archive-search"]').waitFor();
+   await page.locator('[data-action="canonical-archive-search"]').click();
+   await page.locator('[data-action="canonical-archive-next"]').waitFor();
+   a.equal(await page.locator('[data-canonical-report-recovery]').count(),0);
+   a.equal(advances,advancesBeforeReportRecovery);
    a.equal((await post('read',{slot:1})).revision,archived.revision);
    await page.locator('[data-action="canonical-reports-back"]').click();
   }
