@@ -1,0 +1,5 @@
+# Century HTTP recovery trial (H008)
+
+The existing generated 2/100-year worlds are reused in a separate process. The CI fixture inserts the stored world directly into a disposable private SQLite ledger; no import API is added. The encoded worker runs through the real staging HTTP read route. Compare the projection digest to the synchronous reference; verify the response, metadata/health availability, concurrent heavy read and mutation rejection, account isolation, malformed stored row rejection, exact restoration, unchanged revision/wallet/state digest, and fresh runtime restart. Report elapsed times, event-loop ticks, process maxRSS and admission metrics only. The 4 GiB soft RSS threshold is a test setting, not a deployment recommendation or hard OS limit. Recovery is a controlled fixture restore, not an operational backup restore; no production activation, backup policy, or actual device certification.
+
+The codec now checks serialized envelope length before regex parsing and requires full-string matching, including rejection of trailing line breaks. Valid legacy and compressed inputs remain supported.
