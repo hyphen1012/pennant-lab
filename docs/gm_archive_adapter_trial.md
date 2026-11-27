@@ -1,0 +1,2 @@
+# GM archive adapter (trial only)
+PR146 domain is included as isolated code. Candidate league-last policy must be explicitly passed and never defaults. Complete previous-year archive, own club, six clubs per league, 143 games and unique ranks required. Current league mapping is valid only for current fixed 12-club structure; historical league change would need historical membership. The proposed league rank is NOT approved. No live route, state mutation, ranking adoption, transfer or advertising integration. Synthetic archive tests only.
