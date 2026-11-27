@@ -117,6 +117,20 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   // Exercise nonempty serialized archive records, not merely an empty page.
   clockOffset+=61000;
   const archived=await post('read',{slot:1});
+  // Actual persisted match, no client-side re-simulation or fabricated identity.
+  const hq=archived.game.headquarters,confirmed=hq.lastReport;
+  a.ok(hq.last&&confirmed?.home&&confirmed?.away,'expected actual persisted match for headquarters score');
+  const score=page.locator('[data-hq-score="confirmed"]');await score.waitFor();
+  for(const [team,n] of [[confirmed.away,confirmed.awayScore],[confirmed.home,confirmed.homeScore]]){
+    const side=score.locator('[data-hq-score-team="'+team.id+'"]');
+    a.equal(await side.locator('strong').textContent(),team.short||team.name);
+    a.equal(await side.locator('b').textContent(),String(n));
+    a.ok(await side.evaluate(el=>el.style.getPropertyValue('--match-club').length>0));
+    a.ok(await side.locator('.mini-logo').count()>0);
+  }
+  a.ok(await score.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'HQ score overflows');
+  a.equal((await post('read',{slot:1})).revision,archived.revision);
+
   if(archived.game.headquarters.archiveAvailable){
    await page.locator('[data-action="canonical-reports-open"]').click();
    await page.locator('[data-action="canonical-archive-search"]').click();await page.locator('[data-action="canonical-archive-next"]').waitFor();
