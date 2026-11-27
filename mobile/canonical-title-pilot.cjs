@@ -676,8 +676,8 @@ const pilotCode = `
   const canonicalEventStatus={scheduled:'予定',ready:'対応可能',active:'対応中',waiting:'結果待ち',done:'完了'};
   function canonicalAwardCinema(r){
     const p=r.player;
-    if(!p||p.cinemaKnown!==true||p.scoutingHidden===true||p.abilitiesHidden===true)return '';
-    return '<details class="panel award-rare-cinema"><summary>特別受賞演出を見る</summary>'+rarePanel(p,'award')+rareCinemaArt(p,'award',true)+'</details>';
+    if(!p||!Number.isSafeInteger(p.id)||p.id<0||p.cinemaKnown!==true||p.hidden===true||p.scoutingHidden===true||p.abilitiesHidden===true)return '';
+    return '<details class="panel award-rare-cinema" data-award-player="'+p.id+'"><summary>特別受賞演出を見る</summary>'+rarePanel(p,'award')+rareCinemaArt(p,'award',true)+'</details>';
   }
   function canonicalDraftModel(c){
     if(!c)return null;
@@ -1168,6 +1168,16 @@ const pilotCode = `
     },true);
     let audioNativeBlocked=document.querySelector('#app')?.inert===true;
     const audioVisible=()=>!document.hidden&&!audioNativeBlocked&&document.querySelector('#app')?.inert!==true;
+    // Only an opened current award detail may play a rank cue.
+    document.addEventListener('toggle',e=>{
+      const d=e.target;
+      if(!d?.matches?.('details[data-award-player]')||!d.isConnected||!d.open||ui.page!=='canonical-events'||!audioVisible()||!accountCurrent())return;
+      const g=canonicalSnapshot?.game,id=Number(d.dataset.awardPlayer);
+      if(g?.annual?.active!=='awards-all'||!Number.isSafeInteger(id))return;
+      const player=g.annual.awardReport?.awards.find(r=>r.player?.id===id&&r.player.cinemaKnown===true)?.player;
+      const cue=sceneAudio.awardCue({player,open:d.open,scene:audioScene,visible:audioVisible()});
+      if(cue)sceneAudio.cue(cue);
+    },true);
     document.addEventListener('visibilitychange',()=>sceneAudio.visibility(audioVisible()));
     window.addEventListener('pl-native-suspend',()=>{audioNativeBlocked=true;sceneAudio.visibility(false);});
     window.addEventListener('pl-native-ready',()=>{audioNativeBlocked=false;sceneAudio.visibility(audioVisible());});
