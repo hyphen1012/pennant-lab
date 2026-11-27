@@ -29,8 +29,11 @@ function digest(p){
  return {bytes,sha256:h.digest('hex')};
 }
 function checkDb(p){
- const db=new DatabaseSync(p,{readOnly:true});
- try{const rows=db.prepare('PRAGMA quick_check').all();if(rows.length!==1||Object.values(rows[0])[0]!=='ok')throw Error('SQLite integrity check failed');}finally{db.close();}
+ // This is the disposable destination copy only. A read-only WAL opener can
+ // leave sidecars even when no writer exists. Open the copy read/write,
+ // query only, close the last connection, then compare its bytes to source.
+ const db=new DatabaseSync(p);
+ try{db.exec('PRAGMA query_only=ON');const rows=db.prepare('PRAGMA quick_check').all();if(rows.length!==1||Object.values(rows[0])[0]!=='ok')throw Error('SQLite integrity check failed');}finally{db.close();}
 }
 function same(a,b){return JSON.stringify(a)===JSON.stringify(b);}
 function createDestination(source,target){
