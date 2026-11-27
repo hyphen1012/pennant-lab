@@ -611,7 +611,7 @@ const pilotCode = `
   function canonicalReportsRender(){
     const app=$('#app'),g=canonicalSnapshot?.game;if(!app)return;
     const top='<div class="setup-head">'+appLogo()+'<button class="ghost-btn" data-action="canonical-reports-back">‹ 本部</button></div>';
-    if(!g){app.innerHTML='<div class="setup-screen">'+top+'<p>本部で最新状態を取得してください。</p></div>';return;}
+    if(!g){app.innerHTML='<div class="setup-screen">'+top+'<section class="panel" data-canonical-report-recovery><h2 class="panel-title">保存済み記録を再確認</h2><p role="status">'+(slotOpening?'球団の最新状態を取得しています。':'通信状況または保存状態が変わりました。未確認の記録は表示していません。')+'</p><button class="btn primary full" data-action="canonical-reports-refresh" '+(slotOpening?'disabled':'')+'>最新状態を取得</button><p class="small">日程を進めずに再取得します。取得後、記録を検索してください。</p></section></div>';return;}
     app.innerHTML='<div class="app-shell" style="'+clubThemeStyle(g.team)+'">'+top+'<main class="main"><h2 class="page-title">保存済み試合・新聞</h2>'+canonicalMatchReport(g.headquarters.lastReport,g)+canonicalPaperMarkup(g.headquarters.latestPaper)+canonicalArchiveMarkup(g)+'</main></div>';
   }
   function canonicalHqRender(){
@@ -1102,6 +1102,7 @@ const pilotCode = `
     else if(ui.page==='canonical-hq'&&act==='canonical-hq-refresh')void canonicalHqRequest(false);
     else if(ui.page==='canonical-hq'&&act==='canonical-reports-open'&&canonicalSnapshot?.game&&accountCurrent()){canonicalArchive=null;canonicalArchiveKind='matches';canonicalArchiveYear=0;ui.page='canonical-reports';render();draftJump(0);}
     else if(ui.page==='canonical-reports'&&act==='canonical-reports-back'){canonicalArchive=null;ui.page='canonical-hq';render();draftJump(0);}
+    else if(ui.page==='canonical-reports'&&act==='canonical-reports-refresh'&&!canonicalSnapshot)void canonicalHqRequest(false);
     else if(ui.page==='canonical-reports'&&act==='canonical-archive-kind'&&['matches','papers','decades'].includes(b.dataset.kind))void canonicalArchiveLoad(b.dataset.kind,canonicalArchiveYear,0);
     else if(ui.page==='canonical-reports'&&act==='canonical-archive-search'){const year=Number($('#canonical-archive-year')?.value),max=canonicalSnapshot?.game.year+(canonicalArchiveKind==='decades'?9:0);if(Number.isSafeInteger(year)&&(year===0||year>=2027&&year<=max))void canonicalArchiveLoad(canonicalArchiveKind,year,0);else showToast('年度は0または2027年以降を指定してください。',true);}
     else if(ui.page==='canonical-reports'&&act==='canonical-archive-prev'&&canonicalArchive?.offset>0)void canonicalArchiveLoad(canonicalArchiveKind,canonicalArchiveYear,Math.max(0,canonicalArchive.offset-(canonicalArchiveKind==='papers'?3:1)));
