@@ -31,3 +31,25 @@ let player=p.create({world:'player',cash:0,year:2075,closedMonth:0});player=p.pe
 a.throws(()=>p.borrow(player,{id:'low',kind:'cpuParentAnnual',principal:100,months:12,attempt:1}),/invalid trial loan/);
 console.log(JSON.stringify({principal:250000,months:24,oldAnnual5Interest:old.totalInterest,trialAnnual1Interest:interest,repaid:principalPaid,remaining:0}));
 console.log('PASS CPU title-only low-interest strategic investment, reserve, repayment coverage, role isolation, replay, title renewal and full principal repayment');
+
+ // Separate borrowing from operating revenue, and preserve liabilities through reload.
+ let z=f.period(open(),{year:2075,phase:'off',titles:['league']});
+ z=f.investWithParent(z,project).state;
+ const startStatement=f.statement(z);
+ a.deepEqual(startStatement.financing,{borrowedPrincipal:250000,principalRepaid:0,interestPaid:0,debtOutstanding:250000,netCashAfterPrincipal:600000,scheduledInterest:low.totalInterest});
+ z=f.period(z,{year:2076,phase:'season'});
+ const due=f.beginMonth(z,{month:1,operatingNet:25000}),restored=JSON.parse(JSON.stringify(due));
+ a.deepEqual(f.statement(restored),f.statement(due));
+ const first=due.pending.rows[0],paid=f.settleMonth(restored,1).state,totals=f.statement(paid).financing;
+ a.equal(totals.principalRepaid,first.principalPaid);a.equal(totals.interestPaid,first.interest);
+ a.equal(totals.borrowedPrincipal,totals.principalRepaid+totals.debtOutstanding);
+ a.equal(totals.netCashAfterPrincipal,600000+25000-first.interest);
+ // A real shortfall must not silently erase debt, skip a due date or allow rollover.
+ const failed=f.beginMonth(paid,{month:2,operatingNet:-paid.cash});
+ const prior=JSON.stringify(failed),unpaid=f.settleMonth(failed,2);
+ a.equal(unpaid.status,'shortfall');a.equal(JSON.stringify(unpaid.state),prior);
+ a.equal(f.statement(unpaid.state).financing.debtOutstanding,totals.debtOutstanding);
+ a.throws(()=>f.beginMonth(unpaid.state,{month:3,operatingNet:25000}),/invalid month/);
+ a.throws(()=>f.period(unpaid.state,{year:2076,phase:'off',titles:['league']}),/unsettled month/);
+ a.throws(()=>f.borrow(unpaid.state,{id:'repeat-rescue',kind:'cpuParentAnnual',principal:f.eligibility(unpaid.state).shortfall,months:24,attempt:1}),/parent support unavailable/);
+ console.log('PASS financing statement, debt conservation, reload, unpaid installment retained and rollover blocked');
