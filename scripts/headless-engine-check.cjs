@@ -133,6 +133,13 @@ const a=require('node:assert/strict'),{createHeadlessEngine}=require('../server/
   a.ok(actual.games.length>0,'actual match required, not only calendar advancement');
   const expected=actual.games.filter(g=>(g.home===actual.selectedId&&g.homeScore>g.awayScore)||(g.away===actual.selectedId&&g.awayScore>g.homeScore)).map(g=>'win:'+g.year+':'+g.day);
   a.deepEqual(engine.achievements(actual).filter(x=>x.key.startsWith('win:')).map(x=>x.key).sort(),expected.sort());
+  // Synthetic archival threshold, not a natural 50-year run.
+  const anniversary=require('./decade-fixture.cjs').decadeFixture(engine.newWorld({}));
+  const row=anniversary.seasonArchive[0];anniversary.year=2077;anniversary.pendingDecade=null;
+  anniversary.seasonArchive=Array.from({length:49},(_,i)=>({...structuredClone(row),year:2027+i,awards:[]}));
+  a.equal(engine.achievements(anniversary).filter(e=>e.art?.kind==='anniversary').length,0);
+  anniversary.seasonArchive.push({...structuredClone(row),year:2076,awards:[]});
+  const anniversaries=engine.achievements(anniversary).filter(e=>e.art?.kind==='anniversary');a.equal(anniversaries.length,1);a.equal(anniversaries[0].art.year,2076);a.ok(anniversaries[0].label.includes('50年'));
   console.log('PASS actual checked-in headless engine pilot: initial world, calendar, own-club achievements, real medical mutation, isolation; not full season integration');
  }finally{ledger.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
