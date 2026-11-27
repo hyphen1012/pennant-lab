@@ -7,6 +7,8 @@ on:
       - 'scripts/canonical-projection-staging-check.cjs'
       - 'server/game-authority.cjs'
       - 'server/service-runtime.cjs'
+      - 'server/game-admission.cjs'
+      - 'scripts/canonical-worker-http-admission-check.cjs'
       - '.github/workflows/canonical-projection-worker-trial.yml'
   workflow_dispatch:
 permissions:
@@ -22,3 +24,4 @@ jobs:
           node-version: '22'
       - run: node scripts/canonical-projection-worker-trial-check.cjs
       - run: node scripts/canonical-projection-staging-check.cjs
+      - run: node scripts/canonical-worker-http-admission-check.cjs
