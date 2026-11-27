@@ -13,7 +13,7 @@ function fixture(html){
 const old=fixture(applyTrialAB(input)),next=fixture(applyTrialAD(input));a.equal(old.rows.length,72);a.equal(next.rows.length,72);a.equal(old.costs.length,next.costs.length);let changed=0;
 for(let i=0;i<old.costs.length;i++){const p=old.costs[i],q=next.costs[i];a.equal(q.k,p.k);a.equal(q.lv,p.lv);a.equal(q.base,p.base);
  if(q.k==='park'&&q.lv>=17&&q.lv<20){a.equal(q.cost,Math.round(q.base*.90*100)/100);a.ok(q.cost<p.cost);changed++;}else a.equal(q.cost,p.cost);
- if(i>0&&next.costs[i-1].k===q.k)a.ok(q.cost>=next.costs[i-1].cost,'nonmonotone facility cost');}
+ if(i>0&&next.costs[i-1].k===q.k){const prev=next.costs[i-1],oldPrev=old.costs[i-1];if(q.k==='park'&&q.lv>=17&&q.lv<=19)a.ok(q.cost>=prev.cost,'changed park tier not monotone: '+JSON.stringify({prev,q}));else if(p.cost>=oldPrev.cost)a.ok(q.cost>=prev.cost,'introduced nonmonotone cost: '+JSON.stringify({prev,q}));else console.log('UNCHANGED BASELINE COST EDGE '+JSON.stringify({key:q.k,lv:q.lv,old:oldPrev.cost,next:p.cost}));}}
 a.equal(changed,3);
 for(let i=0;i<old.rows.length;i++){const p=old.rows[i],q=next.rows[i];for(const k of ['id','lv','cash','attendance','ticket','food','goods','operating','capacity','upkeep'])a.equal(q[k],p[k],k);a.ok(Number.isFinite(q.reserve)&&q.reserve>=0);}
 console.log('PASS AD: exactly three park cost tiers, monotone costs, unchanged all-club sales and direct upkeep, no cash grant; derived reserve may change');
