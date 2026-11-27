@@ -321,8 +321,7 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   a.ok((await post('read',{slot:2})).wallet.owned.includes('profile'));
   const emblem=page.locator('[data-canonical-emblem]');await emblem.waitFor();await emblem.locator('summary').click();a.ok((await emblem.innerText()).includes(extra.game.team.name));
   await page.locator('[data-action="canonical-players"]').click();await page.locator('.player-row').first().click();const uniform=page.locator('[data-canonical-uniform]');await uniform.waitFor();await uniform.locator('summary').click();a.ok((await uniform.innerText()).includes(extra.game.team.name));
-  await page.locator('[data-action="canonical-player-back"]').count().then(async n=>{if(n)await page.locator('[data-action="canonical-player-back"]').click();});
-  await page.getByRole('button',{name:'‹ 本部',exact:true}).click();
+  await page.locator('[data-action="canonical-info-back"]').click();await page.locator('[data-action="canonical-info-back"]').click();
   await page.locator('[data-action="canonical-return"]').first().click();await slot(3).waitFor();
   const delete3=page.locator('[data-action="canonical-world-delete"][data-slot="3"]');
   a.equal(await delete3.isVisible(),false);
