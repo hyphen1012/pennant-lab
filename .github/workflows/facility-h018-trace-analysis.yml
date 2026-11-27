@@ -1,0 +1,29 @@
+name: AF trace analysis H018
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/facility-h018-trace-analysis.cjs'
+      - '.github/workflows/facility-h018-trace-analysis.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 45954949384
+          github-token: ${{ github.token }}
+          pattern: af-h017-decision-trace-*
+          path: trace-input
+      - run: node scripts/facility-h018-trace-analysis.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: af-h018-analysis
+          path: test-results/af-h018-analysis.json
