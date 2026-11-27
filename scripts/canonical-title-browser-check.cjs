@@ -8,7 +8,7 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
  let clockOffset=0,fixtureRookie=false,fixtureDecade=false;
  const engine=createHeadlessEngine();
  // Isolated third-slot fixture, persisted through the real HTTP authority.
- const fixtureEngine={...engine,newWorld(command){const w=engine.newWorld(command);if(fixtureDecade)return require('./decade-fixture.cjs').decadeFixture(w);if(fixtureRookie){const p=w.players.find(p=>p.teamId===w.selectedId&&!p.retired);a.ok(p);w.pendingDraftReveal={year:w.year-1,entries:[{id:p.id,revealStage:0}]};const injured=w.players.find(q=>q.id!==p.id&&q.teamId===w.selectedId&&!q.retired);a.ok(injured);injured.injury={date:w.year+'-03-01',daysLeft:8,label:'試験用負傷'};w.memorialHistory={...(w.memorialHistory||{}),'fixture:facility':{id:'fixture:facility',year:w.year,teamId:w.selectedId,kind:'facility',title:'試験用施設実績',body:'隔離試験用'}};}return w;}};
+ const fixtureEngine={...engine,newWorld(command){const w=engine.newWorld(command);if(fixtureDecade)return require('./decade-fixture.cjs').decadeFixture(w);if(fixtureRookie){const p=w.players.find(p=>p.teamId===w.selectedId&&!p.retired);a.ok(p);w.pendingDraftReveal={year:w.year-1,entries:[{id:p.id,revealStage:0}]};const injured=w.players.find(q=>q.id!==p.id&&q.teamId===w.selectedId&&!q.retired);a.ok(injured);injured.injury={date:w.year+'-03-01',daysLeft:8,label:'試験用負傷'};w.memorialHistory={...(w.memorialHistory||{}),'fixture:facility':{id:'fixture:facility',year:w.year,teamId:w.selectedId,kind:'facility',title:'試験用施設実績',body:'隔離試験用'},'fixture:private':{id:'fixture:private',year:w.year,teamId:w.selectedId,kind:'facility',title:'IMMORTAL輪廻転生 隔離試験',body:'隔離試験用'}};}return w;}};
  const runtime=createServiceRuntime({now:()=>Date.now()+clockOffset,dataDir:dir,authenticate:async t=>t==='a'?{authenticated:true,account:owner}:{authenticated:false},verifyRecentReauth:deny,verifyReceipt:deny,verifyCurrent:deny,verifyNotification:deny,verifyEvent:deny,verifyAction:deny,verifyCompletion:deny,canonicalEngine:fixtureEngine,units:{android:{unit:'123',item:'ticket',amount:1}},origins:[]});
  let browser;
  try{
@@ -251,6 +251,8 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   const claim=page.locator('article.panel').filter({has:page.getByRole('heading',{name:'試験用施設実績'})}).locator('[data-choice="point"]');
   await claim.waitFor();
   const artButton=page.locator('article.panel').filter({has:page.getByRole('heading',{name:'試験用施設実績'})}).locator('[data-action="canonical-achievements-art"]');
+  const privateArt=page.locator('article.panel').filter({has:page.getByRole('heading',{name:'IMMORTAL輪廻転生 隔離試験'})}).locator('[data-action="canonical-achievements-art"]');
+  await privateArt.click();await page.getByText('ゲーム内限定の記念作品です。共有・保存は提供しません。').waitFor();a.equal(await page.locator('[data-action="canonical-achievements-share"]').count(),0);a.equal(await page.evaluate(()=>window.fixtureShares.length),0);await page.locator('[data-action="canonical-achievements-art-close"]').click();
   await artButton.click();const art=page.locator('[data-canonical-memorial] img');
   a.equal(await page.locator('[data-action="canonical-achievements-frame"]').count(),0);
   await art.waitFor();await page.waitForFunction(()=>{const img=document.querySelector('[data-canonical-memorial] img');return img?.complete&&img.naturalWidth===1080&&img.naturalHeight===1350;});
