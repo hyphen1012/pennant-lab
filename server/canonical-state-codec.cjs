@@ -20,8 +20,10 @@ function createCanonicalStateCodec({rawLimit=RAW_LIMIT,zipLimit=ZIP_LIMIT,smallL
    if(Buffer.byteLength(value)>rawLimit)throw Error('canonical legacy state exceeds limit');
    return validate(JSON.parse(value));
   }
+  // Reject oversized serialized input before the regex allocates a capture.
+  if(value.length>11+9+1+64+1+Math.ceil(zipLimit/3)*4)throw Error('invalid canonical compressed state');
   const m=/^pl-gzip-v1:([1-9][0-9]{0,8}):([a-f0-9]{64}):([A-Za-z0-9+/]+={0,2})$/.exec(value);
-  if(!m||Number(m[1])>rawLimit||m[3].length>Math.ceil(zipLimit/3)*4)throw Error('invalid canonical compressed state');
+  if(!m||m[0].length!==value.length||Number(m[1])>rawLimit||m[3].length>Math.ceil(zipLimit/3)*4)throw Error('invalid canonical compressed state');
   const zipped=Buffer.from(m[3],'base64');
   if(zipped.length>zipLimit||zipped.toString('base64')!==m[3])throw Error('invalid canonical compression encoding');
   const raw=gunzipSync(zipped,{maxOutputLength:Math.min(rawLimit,Number(m[1]))});

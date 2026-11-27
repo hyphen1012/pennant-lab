@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'scripts/canonical-century-projection-profile.cjs'
+      - 'scripts/canonical-century-http-recovery.cjs'
       - '.github/workflows/canonical-century-projection-profile.yml'
   workflow_dispatch:
 permissions:

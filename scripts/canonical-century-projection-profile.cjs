@@ -21,6 +21,8 @@ if(mode==='generate'){
  const raw=fs.readFileSync(path.join(root,'world.json'),'utf8'),meta=JSON.parse(fs.readFileSync(path.join(root,'world-meta.json'),'utf8'));a.equal(hash(raw),meta.sha256);
  const stored=require('../server/canonical-state-codec.cjs').createCanonicalStateCodec().encode(JSON.parse(raw));fs.writeFileSync(path.join(root,'world.stored'),stored);
  fs.writeFileSync(path.join(root,'encode.json'),JSON.stringify({bytes:Buffer.byteLength(stored),sha256:hash(stored)}));
+}else if(mode==='http'){
+ require('./canonical-century-http-recovery.cjs');
 }else if(['sync','worker','worker-encoded'].includes(mode)){
  (async()=>{
   const file=path.join(root,'world.json'),meta=JSON.parse(fs.readFileSync(path.join(root,'world-meta.json'),'utf8'));
@@ -62,6 +64,8 @@ if(mode==='generate'){
   a.equal(report.sync.world.sha256,report.worker.world.sha256);a.equal(report.sync.sourceHash,report.worker.sourceHash);
   a.equal(report.sync.projectionSha256,report.worker.projectionSha256,'worker projection differs');
   a.equal(report.sync.sourceHash,report['worker-encoded'].sourceHash);a.equal(report.sync.projectionSha256,report['worker-encoded'].projectionSha256,'encoded worker projection differs');
+  a.ok(stage('http'),'HTTP recovery stage failed');
+  a.equal(report.http.projectionSha256,report.sync.projectionSha256);a.equal(report.http.sourceHash,report.sync.sourceHash);
   report.passed=true;
  }finally{fs.writeFileSync(output,JSON.stringify(report,null,2));fs.rmSync(dir,{recursive:true,force:true});}
 }
