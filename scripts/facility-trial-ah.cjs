@@ -62,7 +62,7 @@ function applyTrialAH(html){
   processCalendarDay=function(){const e=ahDayBase();if(e?.date)for(const t of game.teams)ahPay(t,e.date);return e;};
   const ahCommerceBase=cpuCommercialCalendar;
   cpuCommercialCalendar=function(f){const r=ahCommerceBase(f);if(f?.date)for(const t of game.teams)ahPay(t,f.date);return r;};
-  function ahReport(t){const d=ahDebt(t);return {id:t.id,draws:t.ahParentHistory||[],remaining:d?d.principal-d.principalPaid:0,paid:t.ahParentPaid||0,interestPaid:t.ahParentInterest||0,arrears:d?.arrears||false,cash:t.cash};}
+  function ahReport(t){const d=ahDebt(t);return {id:t.id,draws:(t.ahParentHistory||[]).map(row=>({...row})),remaining:d?d.principal-d.principalPaid:0,paid:t.ahParentPaid||0,interestPaid:t.ahParentInterest||0,arrears:d?.arrears||false,cash:t.cash};}
   const ahArchiveBase=archiveSeason;
   archiveSeason=function(){ahArchiveBase();const a=game.seasonArchive?.find(r=>r.year===game.year);if(a)a.ahParent=game.teams.map(ahReport);};
 `;

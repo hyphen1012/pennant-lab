@@ -22,6 +22,15 @@ const tail=`save=()=>true;render=()=>{};showToast=()=>{};buildFresh();game.start
  a(d.principalPaid===d.principal&&d.paid===d.rows.length&&!d.arrears,'full repayment');
  a(ahMoney(t.cash)===ahMoney(reserve)-d.principalPaid-d.interestPaid,'cash conservation');
  const report=ahReport(t);a(report.remaining===0&&report.paid===d.principal,'report conservation');
+ // Later legitimate borrowing must not rewrite an earlier annual snapshot.
+ const historic=ahReport(t),frozen=JSON.stringify(historic);
+ game.year=2030;game.seasonArchive.push({year:2029,standings:{E:[{id:t.id}],W:[{id:p.id}]}});
+ x.park=19;t.cash=r2(cost+reserve-principal);
+ a(ahTry(t,'2030-04-01',q,100),'new title after completion permits another loan');
+ a(t.ahParentHistory.length===2&&historic.draws.length===1,'historic draw snapshot');
+ a(JSON.stringify(historic)===frozen,'no historical mutation after future loan');
+ a(ahReport(t).draws.reduce((n,r)=>n+r.principal,0)===ahReport(t).paid+ahReport(t).remaining,'cumulative debt conservation');
+ // Restore snapshot of the current loan, not the obsolete completed loan.
  const saved=JSON.parse(JSON.stringify(game));a(saved.teams.find(r=>r.id===t.id).ahParentDebt.principalPaid===d.principal,'JSON roundtrip');
  return {principal:d.principal,interest:d.interestPaid,remaining:report.remaining};`;
 const code=inline.slice(0,end).replace('((Date.now()^0x53e719f1)>>>0)||1937','1937').replace('(() => {','return (() => {')+tail+'})();';
