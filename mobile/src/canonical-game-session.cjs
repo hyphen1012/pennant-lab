@@ -112,7 +112,7 @@ function createCanonicalGameSession({client,online=()=>true}={}){
   return {...r,exchangeOk:r.status==='ready'?exchanged:null};
  }
  async function exchangeDecor(key,confirmed){
-  const cost=key==='hq'?15:key==='museum'?20:null;
+  const cost=Object.hasOwn({hq:15,museum:20,uniform:10,emblem:30,deluxeCard:50},key)?{hq:15,museum:20,uniform:10,emblem:30,deluxeCard:50}[key]:null;
   if(cost===null||confirmed!==true||status!=='ready'||!snapshot||snapshot.pending?.length||!snapshot.wallet||snapshot.wallet.points<cost||snapshot.wallet.owned?.includes(key)||typeof client.exchange!=='function')throw Error('explicit decoration exchange unavailable');
   let exchanged=false;
   const r=await run('exchange',async(t,old)=>{const x=await client.exchange(key);if(!current(t))throw Error('session changed');exchanged=x.ok===true;return client.gameRead(t.slot);});

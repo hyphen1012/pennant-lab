@@ -304,12 +304,24 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   for(const key of ['hq','museum']){const button=page.locator('[data-action="canonical-decor-exchange"][data-key="'+key+'"]:enabled');await button.waitFor();page.once('dialog',d=>d.accept());await button.click();await page.getByText('装飾品への交換を確認しました。').waitFor();await button.waitFor({state:'detached'});}
   const decor=await post('read',{slot:3});a.equal(decor.wallet.points,0);a.ok(decor.wallet.owned.includes('hq')&&decor.wallet.owned.includes('museum'));a.equal(decor.revision,profile.revision);a.deepEqual(decor.game,profile.game);
   await page.locator('[data-action="canonical-achievements-open"]').click();await page.locator('[data-canonical-museum]').waitFor();await page.locator('[data-canonical-museum-exhibit]').filter({has:page.getByRole('heading',{name:'試験用施設実績'})}).waitFor();await page.locator('[data-action="canonical-achievements-back"]').click();await page.locator('[data-action="canonical-rewards-back"]').waitFor();
+  const extraLedger=require('../server/account-ledger.cjs').openLedger(path.join(dir,'account.sqlite'));
+  try{extraLedger.transact(owner,s=>{s.points=90;});}finally{extraLedger.close();}
+  clockOffset+=61000;await page.locator('[data-action="canonical-rewards-refresh"]').click();
+  for(const key of ['uniform','emblem','deluxeCard']){const button=page.locator('[data-action="canonical-decor-exchange"][data-key="'+key+'"]:enabled');await button.waitFor();page.once('dialog',d=>d.accept());await button.click();await page.getByText('装飾品への交換を確認しました。').waitFor();await button.waitFor({state:'detached'});}
+  const extra=await post('read',{slot:3});a.equal(extra.wallet.points,0);a.ok(['uniform','emblem','deluxeCard'].every(k=>extra.wallet.owned.includes(k)));a.deepEqual(extra.game,decor.game);a.equal(extra.revision,decor.revision);
+  await page.locator('[data-action="canonical-achievements-open"]').click();await artButton.waitFor();await artButton.click();await art.waitFor();
+  const standardExtra=await art.getAttribute('src');await page.locator('[data-action="canonical-achievements-frame"][data-frame="deluxe"]').click();const deluxe=await art.getAttribute('src');a.notEqual(deluxe,standardExtra);a.notEqual(deluxe,foil);
+  await page.locator('[data-action="canonical-achievements-share"]').click();await page.waitForFunction(()=>window.fixtureShares.length===3);a.equal(await page.evaluate(()=>window.fixtureShares[2].data),deluxe.slice('data:image/png;base64,'.length));
+  await page.locator('[data-action="canonical-achievements-back"]').click();await page.locator('[data-action="canonical-rewards-back"]').waitFor();
   // Return to the multiverse; deletion is hidden until an intentional gesture.
   await page.locator('[data-action="canonical-rewards-back"]').click();
   await page.locator('[data-action="canonical-events-back"]').click();
   await page.locator('[data-canonical-hq-theme]').waitFor();
   const profileCard=page.locator('[data-canonical-gm-profile]');await profileCard.waitFor();await profileCard.locator('summary').click();a.ok((await profileCard.innerText()).includes(profile.game.gmName));a.ok((await profileCard.innerText()).includes(profile.game.team.name));
   a.ok((await post('read',{slot:2})).wallet.owned.includes('profile'));
+  const emblem=page.locator('[data-canonical-emblem]');await emblem.waitFor();await emblem.locator('summary').click();a.ok((await emblem.innerText()).includes(extra.game.team.name));
+  await page.locator('[data-action="canonical-players"]').click();await page.locator('.player-row').first().click();const uniform=page.locator('[data-canonical-uniform]');await uniform.waitFor();await uniform.locator('summary').click();a.ok((await uniform.innerText()).includes(extra.game.team.name));
+  await page.locator('[data-action="canonical-info-back"]').click();await page.locator('[data-action="canonical-info-back"]').click();
   await page.locator('[data-action="canonical-return"]').first().click();await slot(3).waitFor();
   const delete3=page.locator('[data-action="canonical-world-delete"][data-slot="3"]');
   a.equal(await delete3.isVisible(),false);
