@@ -1,0 +1,60 @@
+name: AF decision trace
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/facility-h017-decision-trace.cjs'
+      - '.github/workflows/facility-h017-decision-trace.yml'
+jobs:
+  equivalence:
+    runs-on: ubuntu-latest
+    env:
+      FIXED_TEAM: -1
+      TRACE_FROM_YEAR: 2027
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          node scripts/year-cycle-trial-af.cjs 1 1937 > /tmp/af-base.log
+          cp test-results/year-cycle--1.json /tmp/af-base.json
+          node scripts/facility-h017-decision-trace.cjs 1 1937 > /tmp/af-traced.log
+          node - <<'JS'
+          const a=require('node:assert/strict'),fs=require('node:fs');
+          const read=p=>JSON.parse(fs.readFileSync(p,'utf8'),(k,v)=>k==='ms'?undefined:v);
+          a.deepEqual(read('/tmp/af-base.json'),read('test-results/year-cycle--1.json'));
+          const rows=fs.readFileSync('test-results/af-decision-trace.ndjson','utf8').trim().split('\n').map(JSON.parse);
+          a.ok(rows.length>0);a.equal(new Set(rows.map(r=>r.club)).size,12);
+          for(const r of rows){a.ok(Number.isFinite(r.cash));a.ok(Number.isFinite(r.reserve));a.ok(Number.isFinite(r.forecast));a.equal(Object.keys(r.levels).length,8);}
+          a.ok(rows.some(r=>r.stage==='selection'));
+          console.log('PASS AF one-year output equivalence and decision trace across twelve clubs');
+          JS
+  natural-trace:
+    needs: equivalence
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [1937, 4391, 8821]
+    env:
+      FIXED_TEAM: -1
+      STOP_AFTER_FACILITY: '1'
+      NODE_OPTIONS: --max-old-space-size=6144
+      TRACE_FROM_YEAR: 2072
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          mkdir -p test-results
+          set -o pipefail
+          node scripts/facility-h017-decision-trace.cjs 55 "${{ matrix.seed }}" | tee test-results/af-decision-cycle.log
+          node scripts/facility-endurance.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: af-h017-decision-trace-${{ matrix.seed }}
+          path: test-results/
