@@ -3,7 +3,7 @@ const fs=require('node:fs'),a=require('node:assert/strict'),{createHeadlessEngin
 const engine=createHeadlessEngine();
 // Validate the emitted pilot helper with inert renderer spies: no hidden or unverified cinema calls.
 const pilot=require('../mobile/canonical-title-pilot.cjs').canonicalTitlePilot(fs.readFileSync('index.html','utf8'));
-const helper=pilot.slice(pilot.indexOf('  function canonicalAwardCinema('),pilot.indexOf('  function canonicalDraftModel('));
+const helper=pilot.slice(pilot.indexOf('  function canonicalAwardCinema('),pilot.indexOf('  function canonicalMysteryArt('));
 a.ok(helper.includes('function canonicalAwardCinema'));
 const seen=[],renderAward=new Function('rarePanel','rareCinemaArt',helper+';return canonicalAwardCinema;')((p,k)=>{seen.push(['panel',k]);return '<p>panel</p>';},(p,k,v)=>{seen.push(['art',k,v]);return '<p>art</p>';});
 for(const p of [null,{}, {cinemaKnown:false,specialCategory:'IMMORTAL'}, {id:42,cinemaKnown:true,scoutingHidden:true}, {id:42,cinemaKnown:true,abilitiesHidden:true}, {id:42,cinemaKnown:true,hidden:true}, {id:-1,cinemaKnown:true}])a.equal(renderAward({player:p}),'');
@@ -67,7 +67,11 @@ globalThis.__plAnnualEntryCheck=saved=>{
  const draft=(decision,extra={})=>step({annual:'draft',decision,...extra});
  a.throws(()=>engine.advance(w,{annual:'complete',job:'draft'}));
  const scouted=engine.view(w).annual.draft,prospect=scouted.candidates.find(c=>c.canResearch);a.ok(prospect);
- a.ok(scouted.candidates.filter(c=>c.hidden).every(c=>c.report===null&&c.name==='????'&&c.appearanceSeed===null));
+ a.ok(scouted.candidates.filter(c=>c.hidden).every(c=>c.report===null&&c.name==='????'&&c.appearanceSeed===null&&c.category===null&&c.specialCategory===null&&c.originCategory===null));
+ const secretDraft=structuredClone(w),candidate=secretDraft.draft.candidates.find(c=>scouted.candidates.some(x=>x.id===c.id));a.ok(candidate);
+ Object.assign(candidate.player,{originCategory:'RINNE',specialCategory:'輪廻転生',pastLifeAppearance:{seed:99521,baseCategory:'IMMORTAL'}});
+ const secretView=engine.view(secretDraft).annual.draft.candidates.find(c=>c.id===candidate.id);a.ok(secretView);a.equal(secretView.hidden,true);for(const k of ['category','specialCategory','originCategory','appearanceSeed','report'])a.equal(secretView[k],null,k);
+ a.equal(secretView.name,'????');console.log('PASS hidden draft lineage redaction');
  draft('research',{playerId:prospect.id,key:'field'});const afterResearch=engine.view(w).annual.draft;
  a.equal(afterResearch.researchUsed,scouted.researchUsed+1);a.ok(afterResearch.candidates.find(c=>c.id===prospect.id).tasks.includes('field'));
  a.throws(()=>engine.advance(w,{annual:'draft',decision:'research',playerId:prospect.id,key:'field'}));a.throws(()=>engine.advance(w,{annual:'draft',decision:'research',playerId:-1,key:'analysis'}));
