@@ -1,0 +1,17 @@
+name: AF annual log diagnostics
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/facility-af-log-diagnostics.cjs'
+      - 'test-fixtures/af-annual-investment-log-extract.json'
+      - '.github/workflows/facility-af-log-diagnostics.yml'
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/facility-af-log-diagnostics.cjs
