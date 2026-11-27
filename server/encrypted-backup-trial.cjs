@@ -22,7 +22,10 @@ function config(o){
  const parent=privateDir(path.dirname(o.destination)),destination=path.join(parent,path.basename(o.destination));
  if(overlaps(source,destination)||overlaps(source,parent)&&source===parent)throw Error('overlapping directories');
  try{fs.lstatSync(destination);throw Error('destination already exists');}catch(e){if(e.code!=='ENOENT')throw e;}
- return {source,parent,destination,backupId:o.backupId,key:o.key};
+ // The caller must designate an independently trusted private scratch root.
+ const scratchRoot=privateDir(o.scratchRoot);
+ if(overlaps(source,scratchRoot)||overlaps(destination,scratchRoot)||scratchRoot===parent)throw Error('scratch root must be separate from backup and restore locations');
+ return {source,parent,destination,scratchRoot,backupId:o.backupId,key:o.key};
 }
 function derive(c,label){return Buffer.from(hkdfSync('sha256',c.key,Buffer.from(c.backupId),Buffer.from('PENNANT-LAB-STAGING-BACKUP-v3:'+label),32));}
 function aad(c,name){return Buffer.from('PENNANT-LAB-STAGING-BACKUP-v3\0'+c.backupId+'\0'+name);}
@@ -67,23 +70,26 @@ function exactEncrypted(dir){
  const a=fs.readdirSync(dir).sort(),b=names.map(n=>n+'.enc').sort();
  if(a.length!==b.length||a.some((n,i)=>n!==b[i]))throw Error('invalid encrypted inventory');
 }
+// Metadata flush is supported on POSIX filesystems; a successful flush is
+// not a guarantee against power loss, filesystem or storage-controller faults.
+function syncDirectory(p){if(process.platform==='win32')return;const fd=fs.openSync(p,fs.constants.O_RDONLY|(fs.constants.O_DIRECTORY||0));try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}}
 function run(o,decrypt){
  const c=config(o),encryption=derive(c,'encryption'),authKey=derive(c,'manifest');
  let scratch,created=false;
  const opts={environment:'staging',confirmedOffline:true,authentication:{key:authKey,backupId:c.backupId}};
  try{
-  scratch=fs.mkdtempSync(path.join(c.parent,'.pl-backup-'));fs.chmodSync(scratch,0o700);
+  scratch=fs.mkdtempSync(path.join(c.scratchRoot,'.pl-backup-'));fs.chmodSync(scratch,0o700);
   const plain=path.join(scratch,'plain');
   if(decrypt){
    exactEncrypted(c.source);fs.mkdirSync(plain,{mode:0o700});
    for(const name of names)transform(c,encryption,name,path.join(c.source,name+'.enc'),path.join(plain,name),true);
    exactEncrypted(c.source);
-   return restoreOffline({...opts,source:plain,destination:c.destination});
+   const restored=restoreOffline({...opts,source:plain,destination:c.destination});created=true;syncDirectory(c.destination);syncDirectory(c.parent);return restored;
   }
   const manifest=backupOffline({...opts,source:c.source,destination:plain});
   fs.mkdirSync(c.destination,{mode:0o700});created=true;
   for(const name of names)transform(c,encryption,name,path.join(plain,name),path.join(c.destination,name+'.enc'),false);
-  exactEncrypted(c.destination);
+  exactEncrypted(c.destination);syncDirectory(c.destination);syncDirectory(c.parent);
   return {version:3,backupId:c.backupId,files:manifest.files.length};
  }catch(e){if(created)fs.rmSync(c.destination,{recursive:true,force:true});throw e;}
  finally{encryption.fill(0);authKey.fill(0);if(scratch)fs.rmSync(scratch,{recursive:true,force:true});}
