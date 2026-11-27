@@ -2,7 +2,7 @@
 const fs=require('node:fs'),a=require('node:assert/strict'),{createHeadlessEngine}=require('../server/headless-engine.cjs');
 const engine=createHeadlessEngine();
 // Validate the emitted pilot helper with inert renderer spies: no hidden or unverified cinema calls.
-const pilot=require('../mobile/canonical-title-pilot.cjs').canonicalTitlePilot;
+const pilot=require('../mobile/canonical-title-pilot.cjs').canonicalTitlePilot(fs.readFileSync('index.html','utf8'));
 const helper=pilot.slice(pilot.indexOf('  function canonicalAwardCinema('),pilot.indexOf('  function canonicalDraftModel('));
 a.ok(helper.includes('function canonicalAwardCinema'));
 const seen=[],renderAward=new Function('rarePanel','rareCinemaArt',helper+';return canonicalAwardCinema;')((p,k)=>{seen.push(['panel',k]);return '<p>panel</p>';},(p,k,v)=>{seen.push(['art',k,v]);return '<p>art</p>';});
