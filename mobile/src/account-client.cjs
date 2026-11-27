@@ -61,8 +61,8 @@ function createAccountClient({baseUrl,fetcher=globalThis.fetch,timeoutMs=10000}=
    }
    return ordinaryReportPage(v);
   },
-  'game/achievement-page':v=>{const p=v?.page;return worldVersion(v)&&object(p)&&integer(p.offset)&&integer(p.total)&&p.total<=50000&&p.offset<=p.total&&Array.isArray(p.items)&&p.items.length<=40&&p.offset+p.items.length<=p.total&&p.nextOffset===(p.offset+p.items.length<p.total?p.offset+p.items.length:null)&&(p.nextOffset===null||p.items.length>0)&&new Set(p.items.map(e=>e?.eventId)).size===p.items.length&&p.items.every(e=>e&&canonicalId(e.eventId)&&typeof e.label==='string'&&e.label.length<=160&&typeof e.claimed==='boolean'&&(!Object.hasOwn(e,'art')||art(e.art)));},
-  'game/achievements':v=>Array.isArray(v)&&v.length<=50000&&v.every(e=>e&&canonicalId(e.eventId)&&typeof e.label==='string'&&e.label.length<=160&&typeof e.claimed==='boolean'&&(!Object.hasOwn(e,'art')||art(e.art))),
+  'game/achievement-page':v=>{const p=v?.page;return worldVersion(v)&&object(p)&&integer(p.offset)&&integer(p.total)&&p.total<=50000&&p.offset<=p.total&&Array.isArray(p.items)&&p.items.length<=40&&p.offset+p.items.length<=p.total&&p.nextOffset===(p.offset+p.items.length<p.total?p.offset+p.items.length:null)&&(p.nextOffset===null||p.items.length>0)&&new Set(p.items.map(e=>e?.eventId)).size===p.items.length&&p.items.every(e=>e&&canonicalId(e.eventId)&&typeof e.label==='string'&&e.label.length<=160&&typeof e.claimed==='boolean'&&(!Object.hasOwn(e,'shareAllowed')||e.shareAllowed===false)&&(!Object.hasOwn(e,'art')||art(e.art)));},
+  'game/achievements':v=>Array.isArray(v)&&v.length<=50000&&v.every(e=>e&&canonicalId(e.eventId)&&typeof e.label==='string'&&e.label.length<=160&&typeof e.claimed==='boolean'&&(!Object.hasOwn(e,'shareAllowed')||e.shareAllowed===false)&&(!Object.hasOwn(e,'art')||art(e.art))),
   'game/claim':claimResult,
   wallet:wallet,
   restore:v=>v&&typeof v.recorded==='boolean',
