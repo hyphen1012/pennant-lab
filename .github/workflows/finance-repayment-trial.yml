@@ -5,6 +5,7 @@ on:
       - 'server/finance-repayment-trial.cjs'
       - 'server/finance-ledger-trial.cjs'
       - 'scripts/finance-ledger-trial-check.cjs'
+      - 'scripts/finance-cpu-parent-check.cjs'
       - 'scripts/finance-repayment-trial-check.cjs'
       - '.github/workflows/finance-repayment-trial.yml'
   workflow_dispatch:
@@ -22,3 +23,5 @@ jobs:
       - run: node scripts/finance-repayment-trial-check.cjs
 
       - run: node scripts/finance-ledger-trial-check.cjs
+
+      - run: node scripts/finance-cpu-parent-check.cjs
