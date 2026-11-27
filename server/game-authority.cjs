@@ -30,7 +30,8 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
  function world(db,account,slot){
   slotCheck(slot);const r=db.prepare('SELECT account,slot,world,revision FROM authority_worlds WHERE account=? AND slot=?').get(account,slot);if(!r)throw Error('canonical world absent');
   let loaded=false,state;
-  Object.defineProperty(r,'state',{enumerable:false,get(){if(!loaded){const row=db.prepare('SELECT state FROM authority_worlds WHERE account=? AND slot=? AND world=? AND revision=?').get(account,slot,r.world,r.revision);if(!row)throw Error('canonical revision conflict');state=stateCodec.decode(row.state);loaded=true;}return state;}});
+  Object.defineProperty(r,'encodedState',{enumerable:false,get(){const row=db.prepare('SELECT state FROM authority_worlds WHERE account=? AND slot=? AND world=? AND revision=?').get(account,slot,r.world,r.revision);if(!row)throw Error('canonical revision conflict');return row.state;}});
+  Object.defineProperty(r,'state',{enumerable:false,get(){if(!loaded){state=stateCodec.decode(r.encodedState);loaded=true;}return state;}});
   return r;
  }
  const inspect=(account,fn)=>typeof ledger.inspect==='function'?ledger.inspect(account,fn):ledger.transact(account,fn);
@@ -93,8 +94,9 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
   if(projectionBusy)throw Error('projection worker busy');
   projectionBusy=true;
   try{
-   const snapshot=inspect(account,(s,db)=>{const r=world(db,account,slot);return {world:r.world,revision:r.revision,state:r.state};});
-   const p=await projectionWorker.project(snapshot.state);
+   const encoded=typeof projectionWorker.projectEncoded==='function';
+   const snapshot=inspect(account,(s,db)=>{const r=world(db,account,slot);return {world:r.world,revision:r.revision,state:encoded?r.encodedState:r.state};});
+   const p=await (encoded?projectionWorker.projectEncoded(snapshot.state):projectionWorker.project(snapshot.state));
    if(!p?.game||!Array.isArray(p.actions))throw Error('invalid read projection');
    // Authentication/deletion state can change while CPU work is in flight.
    if(await identity(token)!==account)throw Error('unauthorized');
