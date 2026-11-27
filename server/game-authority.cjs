@@ -218,6 +218,7 @@ function createGameAuthority({ledger,engine,authenticate,verifyRights,hasAdProof
  }
  function publicAchievement(r,s,e){
   const eventId=digest([r.world,e.key]),out={eventId,label:e.label,claimed:Object.hasOwn(s.claims,eventId)};
+  if(e.shareAllowed===false)out.shareAllowed=false;
   if(Number.isSafeInteger(e.art?.year)&&e.art.year>=2027&&e.art.year<=999999&&['win','facility','championship','league-championship','award','retirement','farewell','club-record','anniversary','record'].includes(e.art.kind))out.art={year:e.art.year,kind:e.art.kind};
   return out;
  }
