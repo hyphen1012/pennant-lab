@@ -55,6 +55,14 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   const slot=n=>page.locator('button.save-slot[data-slot="'+n+'"]');
   await slot(2).waitFor();a.equal(await page.locator('button.save-slot').count(),3);
   a.equal(await page.evaluate(()=>window.PennantAudio.inspect().scene),'worlds');
+  await page.waitForFunction(()=>window.PennantAudio.inspect().active);
+  await page.evaluate(()=>{const root=document.querySelector('#app');root.inert=true;window.dispatchEvent(new Event('pl-native-suspend'));window.dispatchEvent(new Event('focus'));});
+  a.equal(await page.evaluate(()=>window.PennantAudio.inspect().active),false);
+  await page.evaluate(()=>{document.querySelector('#app').inert=false;window.dispatchEvent(new Event('focus'));});
+  a.equal(await page.evaluate(()=>window.PennantAudio.inspect().active),false);
+  await page.evaluate(()=>window.dispatchEvent(new Event('pl-native-ready')));
+  await page.waitForFunction(()=>window.PennantAudio.inspect().active);
+  console.log('PASS audio remains suspended through focus until explicit native readiness');
   const soundPanel=page.locator('[data-pl-audio]');await soundPanel.locator('summary').click();
   await soundPanel.locator('[data-pl-audio-enabled]').uncheck();
   a.equal(await page.evaluate(()=>window.PennantAudio.inspect().prefs.enabled),false);
