@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'server/offline-backup-trial.cjs'
+      - 'server/encrypted-backup-trial.cjs'
       - 'scripts/canonical-offline-backup-check.cjs'
       - 'server/service-runtime.cjs'
       - '.github/workflows/canonical-offline-backup.yml'
