@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'server/projection-worker-trial.cjs'
+      - 'server/headless-engine.cjs'
       - 'server/canonical-state-codec.cjs'
       - 'scripts/canonical-projection-worker-trial-check.cjs'
       - 'scripts/canonical-projection-staging-check.cjs'

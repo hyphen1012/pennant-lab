@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - 'scripts/canonical-century-projection-profile.cjs'
+      - 'server/headless-engine.cjs'
+      - 'server/projection-worker-trial.cjs'
+      - 'server/canonical-state-codec.cjs'
       - 'scripts/canonical-century-http-recovery.cjs'
       - '.github/workflows/canonical-century-projection-profile.yml'
   workflow_dispatch:

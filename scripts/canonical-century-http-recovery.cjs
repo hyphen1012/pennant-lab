@@ -3,10 +3,10 @@
 const a=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{randomUUID,createHash}=require('node:crypto'),{performance}=require('node:perf_hooks');
 const {openLedger}=require('../server/account-ledger.cjs'),{createServiceRuntime}=require('../server/service-runtime.cjs'),{createHeadlessEngine}=require('../server/headless-engine.cjs'),{createProjectionWorkerTrial}=require('../server/projection-worker-trial.cjs');
 const hash=x=>createHash('sha256').update(x).digest('hex');
-const root=process.argv[5],owner='a'.repeat(64),other='b'.repeat(64),world=randomUUID(),revision=17,dir=path.join(root,'http-db'),file=path.join(dir,'account.sqlite');
+const mode=process.argv[2]==='http-direct'?'http-direct':'http',root=process.argv[5],owner='a'.repeat(64),other='b'.repeat(64),world=randomUUID(),revision=17,dir=path.join(root,mode+'-db'),file=path.join(dir,'account.sqlite');
 const meta=JSON.parse(fs.readFileSync(path.join(root,'world-meta.json'),'utf8')),encoded=fs.readFileSync(path.join(root,'world.stored'),'utf8'),stored=JSON.parse(fs.readFileSync(path.join(root,'encode.json'),'utf8'));
-const expected=JSON.parse(fs.readFileSync(path.join(root,'sync.json'),'utf8')),report={mode:'http',years:meta.years,passed:false,storedBytes:stored.bytes,world:meta};
-const deny=async()=>null,engine=createHeadlessEngine(),actual=createProjectionWorkerTrial();
+const expected=JSON.parse(fs.readFileSync(path.join(root,'sync.json'),'utf8')),report={mode,years:meta.years,passed:false,storedBytes:stored.bytes,world:meta};
+const deny=async()=>null,engine=createHeadlessEngine(),actual=createProjectionWorkerTrial({directText:mode==='http-direct'});
 let runtime,release,entered,gate,first,hold=true,calls=0,timer,projectionHash,gameHash;
 const edit=fn=>{const ledger=openLedger(file);try{return ledger.transact(owner,fn);}finally{ledger.close();}};
 const inspect=()=>{const ledger=openLedger(file);try{return ledger.inspect(owner,(s,db)=>{const row=db.prepare('SELECT world,revision,state FROM authority_worlds WHERE account=? AND slot=1').get(owner);return {world:row.world,revision:row.revision,stateHash:hash(row.state),points:s.points};});}finally{ledger.close();}};
@@ -47,5 +47,5 @@ async function post(base,route,body,token='a'){const res=await fetch(base+'/v1/g
   await runtime.close();runtime=null;base=await start();const restarted=await post(base,'read',{slot:1});a.deepEqual(restarted,result);a.deepEqual(inspect(),initial);
   report.projectionSha256=projectionHash;report.sourceHash=engine.sourceHash;report.gameSha256=gameHash;report.calls=calls;report.passed=true;
  }catch(e){report.error=String(e);throw e;}
- finally{clearInterval(timer);hold=false;release?.();if(first)await first.catch(()=>{});if(runtime)await runtime.close();report.maxRssKiB=process.resourceUsage().maxRSS;fs.writeFileSync(path.join(root,'http.json'),JSON.stringify(report,null,2));console.log('CENTURY HTTP',JSON.stringify(report));}
+ finally{clearInterval(timer);hold=false;release?.();if(first)await first.catch(()=>{});if(runtime)await runtime.close();report.maxRssKiB=process.resourceUsage().maxRSS;fs.writeFileSync(path.join(root,mode+'.json'),JSON.stringify(report,null,2));console.log('CENTURY HTTP',JSON.stringify(report));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
