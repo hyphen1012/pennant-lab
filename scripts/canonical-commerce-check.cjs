@@ -6,9 +6,9 @@ const pilot=require('../mobile/canonical-title-pilot.cjs').canonicalTitlePilot(f
 const helper=pilot.slice(pilot.indexOf('  function canonicalAwardCinema('),pilot.indexOf('  function canonicalDraftModel('));
 a.ok(helper.includes('function canonicalAwardCinema'));
 const seen=[],renderAward=new Function('rarePanel','rareCinemaArt',helper+';return canonicalAwardCinema;')((p,k)=>{seen.push(['panel',k]);return '<p>panel</p>';},(p,k,v)=>{seen.push(['art',k,v]);return '<p>art</p>';});
-for(const p of [null,{}, {cinemaKnown:false,specialCategory:'IMMORTAL'}, {cinemaKnown:true,scoutingHidden:true}, {cinemaKnown:true,abilitiesHidden:true}])a.equal(renderAward({player:p}),'');
+for(const p of [null,{}, {cinemaKnown:false,specialCategory:'IMMORTAL'}, {id:42,cinemaKnown:true,scoutingHidden:true}, {id:42,cinemaKnown:true,abilitiesHidden:true}, {id:42,cinemaKnown:true,hidden:true}, {id:-1,cinemaKnown:true}])a.equal(renderAward({player:p}),'');
 a.equal(seen.length,0);
-for(const specialCategory of ['PARALLEL','STAR','LEGEND','IMMORTAL','輪廻転生','IMMORTAL輪廻転生'])a.match(renderAward({player:{cinemaKnown:true,specialCategory}}),/<details.*特別受賞演出を見る/);
+for(const specialCategory of ['PARALLEL','STAR','LEGEND','IMMORTAL','輪廻転生','IMMORTAL輪廻転生'])a.match(renderAward({player:{id:42,cinemaKnown:true,specialCategory}}),/<details.*特別受賞演出を見る/);
 a.equal(seen.length,12);
 let checked=false;
 globalThis.__plAnnualEntryCheck=saved=>{

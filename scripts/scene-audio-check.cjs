@@ -1,6 +1,14 @@
 'use strict';
-const a=require('node:assert/strict'),{createAudio,sceneFor,replayCue,tracks}=require('../mobile/src/scene-audio.js');
+const a=require('node:assert/strict'),{createAudio,sceneFor,replayCue,awardCue,tracks}=require('../mobile/src/scene-audio.js');
 (async()=>{
+ const publicAwards=[['PARALLEL','parallel'],['STAR','star'],['LEGEND','rare'],['IMMORTAL','immortal'],['輪廻転生','rebirth'],['IMMORTAL輪廻転生','transcendent']];
+ for(const [specialCategory,expected] of publicAwards){
+  const player={cinemaKnown:true,specialCategory},x={player,open:true,visible:true,scene:'awards'};
+  a.equal(awardCue(x),expected);
+  for(const patch of [{open:false},{visible:false},{scene:'hq'},{player:{...player,cinemaKnown:false}},{player:{...player,hidden:true}},{player:{...player,scoutingHidden:true}},{player:{...player,abilitiesHidden:true}},{player:{specialCategory}}])a.equal(awardCue({...x,...patch}),null);
+ }
+ a.equal(awardCue({player:{cinemaKnown:true,specialCategory:'輪廻転生',pastLifeAppearance:{baseCategory:'IMMORTAL'}},open:true,visible:true,scene:'awards'}),'transcendent');
+ a.equal(awardCue({player:{cinemaKnown:true,specialCategory:'unknown'},open:true,visible:true,scene:'awards'}),null);
  const cases=[
  ...[['fan-fest','festival'],['tv','festival'],['opening-promo','opening'],['offdesk-opening','opening'],['settlement','finance']].map(([annual,name])=>[{page:'canonical-events',annual},name]),
  [{page:'canonical-events',inbox:{opening:true}},'opening'],[{page:'canonical-events',inbox:{monthly:{}}},'finance'],[{page:'canonical-events',inbox:{decade:2036}},'archive'],[{page:'canonical-events',inbox:{milestones:[{}]}},'archive'],[{page:'canonical-achievements'},'archive'],[{page:'canonical-reports'},'archive'],

@@ -1,6 +1,6 @@
 // Original synthesized guide tracks. No external music, network or game-state writes.
 // Staging evaluation only; replace/arrange guide tracks after listening approval.
-(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.PennantAudio=Object.assign(api.createAudio({host:root}),{sceneFor:api.sceneFor,replayCue:api.replayCue});})(typeof window!=='undefined'?window:globalThis,function(){
+(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.PennantAudio=Object.assign(api.createAudio({host:root}),{sceneFor:api.sceneFor,replayCue:api.replayCue,awardCue:api.awardCue});})(typeof window!=='undefined'?window:globalThis,function(){
 'use strict';
 const track=(bpm,chords,melody,wave='sine')=>({bpm,chords,melody,wave});
 // Four-bar loops, each row is an original chord and eight half-beat melody slots.
@@ -129,5 +129,15 @@ function replayCue(replay,teamId){
  }
  return null;
 }
-return {createAudio,sceneFor,replayCue,tracks};
+// A public annual award panel must already be opened. Do not infer rank
+// from hidden players, labels, other rows or the future game state.
+function awardCue({player,open,scene,visible}={}){
+ if(open!==true||visible!==true||scene!=='awards'||player?.cinemaKnown!==true||player.hidden===true||player.scoutingHidden===true||player.abilitiesHidden===true)return null;
+ const category=player.specialCategory;
+ const composite=category==='IMMORTAL輪廻転生'||player.pastLifeAppearance?.baseCategory==='IMMORTAL'&&(category==='輪廻転生'||player.originCategory==='RINNE');
+ const rank=composite?'IMMORTAL輪廻転生':category;
+ const cues={PARALLEL:'parallel',STAR:'star',LEGEND:'rare',IMMORTAL:'immortal','輪廻転生':'rebirth','IMMORTAL輪廻転生':'transcendent'};
+ return typeof rank==='string'&&Object.hasOwn(cues,rank)?cues[rank]:null;
+}
+return {createAudio,sceneFor,replayCue,awardCue,tracks};
 });
