@@ -36,6 +36,16 @@ const a=require('node:assert/strict'),{createAudio,sceneFor,replayCue,awardCue,t
  }
  a.equal(sceneFor({page:'canonical-events',foreign:true,foreignCandidate:{category:'輪廻転生',hidden:false,pastLifeAppearance:{baseCategory:'IMMORTAL'}}}),'transcendent');
  a.equal(sceneFor({page:'canonical-events',inbox:{rookie:{entries:[{stage:2,hidden:true,specialCategory:'IMMORTAL'}]}}}),'draft');
+ // Simultaneous pending notifications must follow the rendered primary inbox order.
+ const all={finance:{},rare:{hidden:false,category:'awakening',player:{specialCategory:'輪廻転生',pastLifeAppearance:{baseCategory:'IMMORTAL'}}},injury:{},career:{},rookie:{entries:[{stage:2,hidden:false,specialCategory:'IMMORTAL'}]},decade:2036};
+ const context={page:'canonical-events',annual:'awards-all',foreign:true,foreignCandidate:{category:'LEGEND',hidden:false}};
+ const order=[['finance','crisis'],['rare','transcendent'],['injury','crisis'],['career','farewell'],['rookie','immortal'],['decade','archive']];
+ for(const [key,want] of order){a.equal(sceneFor({...context,inbox:all}),want,key);delete all[key];}
+ a.equal(sceneFor({...context,inbox:all}),'legend');
+ const rare={category:'awakening',hidden:false,player:{specialCategory:'LEGEND'}};
+ a.equal(sceneFor({page:'canonical-events',inbox:{rare}}),'legend');
+ for(const patch of [{hidden:true},{scoutingHidden:true},{abilitiesHidden:true}])a.equal(sceneFor({page:'canonical-events',inbox:{rare:{...rare,player:{...rare.player,...patch}}}}),'mystery');
+ console.log('PASS primary inbox audio precedence and revealed player rank, including compound lineage');
  const report={year:2027,day:2,home:{id:0},away:{id:1},homeScore:5,awayScore:2,replay:[{phase:'score',play:{kind:'hr'}},{phase:'strike',play:{kind:'strike'}},{phase:'end'}]};
  a.equal(replayCue({phase:'date',report},0),null);a.equal(replayCue({phase:'watch',step:0,report},0),null);
  a.deepEqual(replayCue({phase:'watch',step:1,report},0),{key:'2027:2:1',kind:'homer'});
