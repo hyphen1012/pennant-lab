@@ -28,5 +28,5 @@ function run(){
    new Function('require','process','console',s)(require,process,console);
  }finally{delete globalThis.__afDecisionTrace;fs.closeSync(fd);}
 }
-if(require.main===module)run();
 module.exports={applyDecisionTrace};
+if(require.main===module)run();
