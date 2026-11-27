@@ -13,13 +13,18 @@ function draw(canvas,entry,options={}){
  const palette=e.kind==='win'?['#07182c','#224f77','#9cd6f3']:['championship','league-championship','award'].includes(e.kind)?['#21170d','#68481e','#f8d892']:['retirement','farewell'].includes(e.kind)?['#1a1828','#4e435f','#e1cfea']:e.kind==='facility'?['#081d1d','#1d534e','#a8e9d1']:['#0c1024','#38315c','#c7bbff'];
  const [dark,mid,accent]=palette,g=c.createLinearGradient(0,0,W,H);g.addColorStop(0,dark);g.addColorStop(.55,mid);g.addColorStop(1,dark);c.fillStyle=g;c.fillRect(0,0,W,H);
  c.strokeStyle=accent;c.lineWidth=3;c.strokeRect(44,44,W-88,H-88);c.lineWidth=1;c.strokeRect(56,56,W-112,H-112);
- if(options.frame==='foil'){
+ if(options.frame==='foil'||options.frame==='deluxe'){
   const foil=c.createLinearGradient(0,0,W,H);for(const [p,col] of [[0,'#92704b'],[.22,'#fff0c1'],[.42,'#ad8953'],[.65,'#fff4cf'],[1,'#806040']])foil.addColorStop(p,col);
   c.strokeStyle=foil;c.lineWidth=13;c.strokeRect(30,30,W-60,H-60);c.lineWidth=3;c.strokeRect(72,72,W-144,H-144);
   for(const [x,y,sx,sy] of [[78,78,1,1],[W-78,78,-1,1],[78,H-78,1,-1],[W-78,H-78,-1,-1]]){c.save();c.translate(x,y);c.scale(sx,sy);c.lineWidth=5;c.beginPath();c.moveTo(0,92);c.lineTo(0,0);c.lineTo(92,0);c.moveTo(10,64);c.lineTo(64,10);c.stroke();c.restore();}
  }
+ if(options.frame==='deluxe'){
+  c.save();c.strokeStyle='#f7e3a7';c.lineWidth=2;c.strokeRect(90,90,W-180,H-180);
+  for(const [x,y,sx,sy] of [[94,94,1,1],[W-94,94,-1,1],[94,H-94,1,-1],[W-94,H-94,-1,-1]]){c.save();c.translate(x,y);c.scale(sx,sy);c.beginPath();c.moveTo(0,150);c.lineTo(30,30);c.lineTo(150,0);c.moveTo(0,80);c.lineTo(80,0);c.stroke();c.restore();}
+  c.restore();
+ }
  const text=(v,y,size,weight=600,color='#fff')=>{c.font=weight+' '+size+'px sans-serif';c.textAlign='center';c.fillStyle=color;c.fillText(v,W/2,y,W-160);};
- text('P E N N A N T  L A B',135,42,700,accent);text('MEMORIAL COLLECTION',186,26,500,accent);
+ text('P E N N A N T  L A B',135,42,700,accent);text(options.frame==='deluxe'?'DELUXE MEMORIAL COLLECTION':'MEMORIAL COLLECTION',186,26,500,accent);
  if(e.year!==null)text(e.year+' SEASON',255,38,700,accent);
  c.save();c.translate(W/2,570);c.strokeStyle=accent;c.globalAlpha=.23;for(let i=0;i<8;i++){c.beginPath();c.ellipse(0,0,155+i*31,155+i*31,0,0,Math.PI*2);c.stroke();}c.globalAlpha=.85;c.lineWidth=6;
  if(e.kind==='win'){c.beginPath();c.moveTo(0,-215);c.lineTo(215,0);c.lineTo(0,215);c.lineTo(-215,0);c.closePath();c.stroke();for(const [x,y] of [[0,-215],[215,0],[0,215],[-215,0]])c.strokeRect(x-16,y-16,32,32);c.beginPath();c.arc(0,0,34,0,Math.PI*2);c.stroke();}
