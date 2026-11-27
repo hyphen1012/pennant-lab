@@ -23,20 +23,20 @@ if(mode==='generate'){
  fs.writeFileSync(path.join(root,'encode.json'),JSON.stringify({bytes:Buffer.byteLength(stored),sha256:hash(stored)}));
 }else if(mode==='http'){
  require('./canonical-century-http-recovery.cjs');
-}else if(['sync','worker','worker-encoded'].includes(mode)){
+}else if(['sync','worker','worker-encoded','worker-direct'].includes(mode)){
  (async()=>{
   const file=path.join(root,'world.json'),meta=JSON.parse(fs.readFileSync(path.join(root,'world-meta.json'),'utf8'));
   const report={mode,years,seed,world:meta,passed:false};const output=path.join(root,mode+'.json');let timer;
   try{
    const started=performance.now();let state;
-   if(mode==='worker-encoded'){state=fs.readFileSync(path.join(root,'world.stored'),'utf8');const stored=JSON.parse(fs.readFileSync(path.join(root,'encode.json'),'utf8'));a.equal(hash(state),stored.sha256);report.storedBytes=stored.bytes;}
+   if(['worker-encoded','worker-direct'].includes(mode)){state=fs.readFileSync(path.join(root,'world.stored'),'utf8');const stored=JSON.parse(fs.readFileSync(path.join(root,'encode.json'),'utf8'));a.equal(hash(state),stored.sha256);report.storedBytes=stored.bytes;}
    else{let raw=fs.readFileSync(file,'utf8');a.equal(hash(raw),meta.sha256);state=JSON.parse(raw);raw=null;a.equal(state.seasonArchive.length,years);}
    report.loadMs=performance.now()-started;
    const {createHeadlessEngine}=require('../server/headless-engine.cjs'),engine=createHeadlessEngine();
    report.sourceHash=engine.sourceHash;
    let ticks=0;timer=setInterval(()=>ticks++,20);
    const begin=performance.now();
-   const p=mode==='sync'?engine.readProjection(state):await require('../server/projection-worker-trial.cjs').createProjectionWorkerTrial()[mode==='worker'?'project':'projectEncoded'](state);
+   const p=mode==='sync'?engine.readProjection(state):await require('../server/projection-worker-trial.cjs').createProjectionWorkerTrial({directText:mode==='worker-direct'})[mode==='worker'?'project':'projectEncoded'](state);
    report.projectionMs=performance.now()-begin;clearInterval(timer);timer=null;
    report.intervalTicks=ticks;report.projectionSha256=hash(JSON.stringify(p));report.actions=p.actions.length;
    a.equal(p.game.year,meta.year);a.equal(p.game.team.id,meta.selectedId);
@@ -64,6 +64,9 @@ if(mode==='generate'){
   a.equal(report.sync.world.sha256,report.worker.world.sha256);a.equal(report.sync.sourceHash,report.worker.sourceHash);
   a.equal(report.sync.projectionSha256,report.worker.projectionSha256,'worker projection differs');
   a.equal(report.sync.sourceHash,report['worker-encoded'].sourceHash);a.equal(report.sync.projectionSha256,report['worker-encoded'].projectionSha256,'encoded worker projection differs');
+  a.ok(stage('worker-direct'),'direct text projection failed');
+  a.equal(report['worker-direct'].sourceHash,report.sync.sourceHash);a.equal(report['worker-direct'].projectionSha256,report.sync.projectionSha256,'direct text projection differs');
+  report.directComparison={priorPeakKiB:report['worker-encoded'].maxRssKiB,directPeakKiB:report['worker-direct'].maxRssKiB,priorMs:report['worker-encoded'].projectionMs,directMs:report['worker-direct'].projectionMs};
   a.ok(stage('http'),'HTTP recovery stage failed');
   a.equal(report.http.projectionSha256,report.sync.projectionSha256);a.equal(report.http.sourceHash,report.sync.sourceHash);
   report.passed=true;
