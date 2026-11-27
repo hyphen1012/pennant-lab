@@ -36,8 +36,17 @@ globalThis.__plAnnualEntryCheck=saved=>{
  const routineNext=readyTask?engine.advance(off,{annual:'open',job:readyTask.id}):engine.advance(off,{annual:'day'});
  a.equal(routineNext.pendingReview,null);a.equal(routineNext.pendingMonth,null);a.deepEqual(routineNext.games,off.games);
  console.log('PASS annual boundary ordinary reports defer, archive preserved, explicit/missing/important notices block');
+ const restoredCheckpoints=[];
+ // The exact same journey continues from serialized state, not a replacement fixture.
+ // This tests engine save compatibility, not production persistence or physical UX.
+ const resume=(label)=>{
+  const before=engine.view(w),saved=JSON.stringify(w),copy=JSON.parse(saved);
+  a.deepEqual(engine.view(copy),before,label+' projection after reload');
+  a.equal(JSON.stringify(copy),saved,label+' read must not mutate saved data');
+  w=copy;restoredCheckpoints.push(label);
+ };
  const initial=JSON.stringify(w),step=(cmd)=>{w=engine.advance(w,cmd);a.equal(w.year,year);a.equal(w.games.length,858);a.equal(w.day,143);};
- step({annual:'start'});a.equal(engine.view(w).annual.mode,'off');a.throws(()=>engine.advance(w,{annual:'start'}));a.throws(()=>engine.advance(w,{annual:'open',job:'settlement'}));a.throws(()=>engine.advance(w,{step:1}));
+ step({annual:'start'});resume('off-season entry');a.equal(engine.view(w).annual.mode,'off');a.throws(()=>engine.advance(w,{annual:'start'}));a.throws(()=>engine.advance(w,{annual:'open',job:'settlement'}));a.throws(()=>engine.advance(w,{step:1}));
  const ready=id=>{for(let i=0;i<100&&engine.view(w).annual.tasks.find(j=>j.id===id).status!=='ready';i++)step({annual:'day'});a.equal(engine.view(w).annual.tasks.find(j=>j.id===id).status,'ready');};
  for(const id of ['awards-all','settlement','movement-declarations']){
   ready(id);a.throws(()=>engine.advance(w,{annual:'day'}));step({annual:'open',job:id});
@@ -72,10 +81,10 @@ globalThis.__plAnnualEntryCheck=saved=>{
  Object.assign(candidate.player,{originCategory:'RINNE',specialCategory:'輪廻転生',pastLifeAppearance:{seed:99521,baseCategory:'IMMORTAL'}});
  const secretView=engine.view(secretDraft).annual.draft.candidates.find(c=>c.id===candidate.id);a.ok(secretView);a.equal(secretView.hidden,true);for(const k of ['category','specialCategory','originCategory','appearanceSeed','report'])a.equal(secretView[k],null,k);
  a.equal(secretView.name,'????');console.log('PASS hidden draft lineage redaction');
- draft('research',{playerId:prospect.id,key:'field'});const afterResearch=engine.view(w).annual.draft;
+ draft('research',{playerId:prospect.id,key:'field'});resume('draft research');const afterResearch=engine.view(w).annual.draft;
  a.equal(afterResearch.researchUsed,scouted.researchUsed+1);a.ok(afterResearch.candidates.find(c=>c.id===prospect.id).tasks.includes('field'));
  a.throws(()=>engine.advance(w,{annual:'draft',decision:'research',playerId:prospect.id,key:'field'}));a.throws(()=>engine.advance(w,{annual:'draft',decision:'research',playerId:-1,key:'analysis'}));
- draft('start');
+ draft('start');resume('draft started');
  let rounds=0,ownNominations=0,ownContracts=0;
  for(let guard=0;guard<300;guard++){
   const v=engine.view(w).annual.draft;
@@ -109,7 +118,7 @@ globalThis.__plAnnualEntryCheck=saved=>{
  a.throws(()=>engine.advance(w,{annual:'cut',playerId:w.players[0].id}));
  a.equal(w.calendarFlow.jobs['roster-cut'].status,'done');
  console.log('PASS draft nominations, ordinary lottery, contract and roster cut',JSON.stringify({ownNominations,ownContracts,rounds,picks:w.draft.picks.length,cutPlan:w.draft.cutPlan}));
- ready('renewal1');step({annual:'open',job:'renewal1'});
+ ready('renewal1');step({annual:'open',job:'renewal1'});resume('contract renewal');
  const renewal=(decision,extra={})=>step({annual:'renewal',decision,...extra});
  const training=(decision,extra={})=>step({annual:'training',decision,...extra});
  a.throws(()=>engine.advance(w,{annual:'open',job:'renewal2'}));
@@ -128,7 +137,7 @@ globalThis.__plAnnualEntryCheck=saved=>{
  training('menu',{playerId:trainee.id,focus:trainee.focus[0],intensity:'normal'});
  training('run');a.equal(w.calendarFlow.jobs.autumn.status,'waiting');
  a.throws(()=>engine.advance(w,{annual:'training',decision:'run'}));
- ready('winter');step({annual:'open',job:'winter'});
+ ready('winter');step({annual:'open',job:'winter'});resume('winter assignment');
  const eligible=engine.view(w).annual.training.eligible;
  if(eligible.length){training('assign',{playerId:eligible[0].id,destination:'taiwan'});}
  a.throws(()=>engine.advance(w,{annual:'training',decision:'assign',playerId:-1,destination:'taiwan'}));
@@ -266,7 +275,7 @@ globalThis.__plAnnualEntryCheck=saved=>{
  market('open',{room:'other'});const other=engine.view(w).annual.market;a.equal(other.tradeClubs.length,12);a.ok(other.tradeClubs.every(t=>new Set(t.players.map(p=>p.id)).size===t.players.length));a.ok(other.free.every(r=>Number.isFinite(r.cost)));a.throws(()=>engine.advance(w,{annual:'complete',job:'movement-market'}));
  a.throws(()=>engine.advance(w,{annual:'market',decision:'finish'}));
  a.throws(()=>engine.advance(w,{annual:'market',decision:'free',playerId:999999999,salary:1}));
- market('close');a.equal(w.calendarFlow.jobs['movement-market'].state.news,'results');
+ market('close');resume('market results pending');a.equal(w.calendarFlow.jobs['movement-market'].state.news,'results');
  market('open',{room:'news'});
  for(const r of engine.view(w).annual.market.specialResults){a.throws(()=>engine.advance(w,{annual:'market',decision:'news'}));market('special-result',{playerId:r.id});a.throws(()=>engine.advance(w,{annual:'market',decision:'special-result',playerId:r.id}));}
  market('news');
@@ -282,11 +291,11 @@ globalThis.__plAnnualEntryCheck=saved=>{
  pre('site',{group:'first',value:'miyazaki'});pre('site',{group:'farm',value:'club'});
  a.throws(()=>engine.advance(w,{annual:'preseason',decision:'site',group:'farm',value:'usa'}));
  const campCost=engine.view(w).annual.preseason.cost,beforeCamp=w.teams.find(t=>t.id===w.selectedId).cash;
- pre('confirm-sites');a.equal(w.calendarFlow.jobs.booking.status,'done');a.ok(Math.abs(beforeCamp-w.teams.find(t=>t.id===w.selectedId).cash-campCost)<.0011);
+ pre('confirm-sites');resume('camp booking paid');a.equal(w.calendarFlow.jobs.booking.status,'done');a.ok(Math.abs(beforeCamp-w.teams.find(t=>t.id===w.selectedId).cash-campCost)<.0011);
  a.throws(()=>engine.advance(w,{annual:'preseason',decision:'confirm-sites'}));
  const oldWins=w.teams.map(t=>[t.id,t.wins,t.losses,t.ties]),oldRookies=w.draft.picks.filter(x=>x.status==='signed'&&x.teamId===w.selectedId).map(x=>x.candidateId);
  for(let i=0;i<40&&w.year===year;i++)w=engine.advance(w,{annual:'day'});
- a.equal(w.year,year+1);a.equal(w.day,0);a.equal(w.calendarIndex,0);a.equal(w.games.length,0);a.equal(w.calendarFlow.mode,'pre');a.ok(w.seasonArchive.length);
+ resume('new season before rookie inbox');a.equal(w.year,year+1);a.equal(w.day,0);a.equal(w.calendarIndex,0);a.equal(w.games.length,0);a.equal(w.calendarFlow.mode,'pre');a.ok(w.seasonArchive.length);
  for(const id of oldRookies)a.ok(w.players.some(p=>p.id===id&&p.teamId===w.selectedId&&p.rookieSeason===year+1));
  a.throws(()=>engine.advance(w,{step:1}));
  const ack=cmd=>{w=engine.advance(w,cmd);};
@@ -305,22 +314,23 @@ globalThis.__plAnnualEntryCheck=saved=>{
  until('self');a.throws(()=>engine.advance(w,{annual:'preseason',decision:'finish'}));
  const trainee2=engine.view(w).annual.preseason.players.find(p=>!p.injured);a.ok(trainee2);
  w=engine.advance(w,{annual:'training',decision:'menu',playerId:trainee2.id,focus:'balanced',intensity:'rest'});
- pre('run');a.equal(engine.view(w).annual.preseason.support,true);
+ pre('run');resume('self training support decision');a.equal(engine.view(w).annual.preseason.support,true);
  pre('self-back');a.equal(engine.view(w).annual.preseason.support,false);a.throws(()=>engine.advance(w,{annual:'preseason',decision:'self-back'}));pre('run');
  if(engine.view(w).annual.preseason.supportOptions.find(o=>o.key==='drinks').eligible){pre('support',{value:'drinks'});a.throws(()=>engine.advance(w,{annual:'preseason',decision:'support',value:'drinks'}));}
  pre('run');until('self');a.ok(engine.view(w).annual.preseason.report);pre('finish');
  if(w.calendarFlow.jobs['winter-return'].status!=='done'){until('winter-return');a.ok(engine.view(w).annual.preseason.report);pre('finish');}
  until('camp');a.equal(engine.view(w).annual.preseason.step,1);a.equal(engine.view(w).annual.preseason.paid,true);
  a.throws(()=>engine.advance(w,{annual:'preseason',decision:'confirm-sites'}));pre('kickoff');until('camp');
- a.equal(engine.view(w).annual.preseason.step,2);pre('visit',{value:'rest'});a.throws(()=>engine.advance(w,{annual:'preseason',decision:'visit',value:'rest'}));pre('visit-finish');until('camp');
+ a.equal(engine.view(w).annual.preseason.step,2);pre('visit',{value:'rest'});resume('camp visit rest committed');a.throws(()=>engine.advance(w,{annual:'preseason',decision:'visit',value:'rest'}));pre('visit-finish');until('camp');
  a.equal(engine.view(w).annual.preseason.step,3);pre('run');until('camp');a.ok(engine.view(w).annual.preseason.report);pre('finish');
  until('exhibition');pre('policy',{value:'youth'});pre('run');a.equal(engine.view(w).annual.preseason.meeting,true);pre('run');until('exhibition');
- const exhibition=engine.view(w).annual.preseason.report;a.equal(exhibition.leagueGames,36);a.equal(exhibition.games.length,6);a.equal(w.games.length,0);a.ok(w.teams.every(t=>t.wins===0&&t.losses===0&&t.ties===0));a.equal(exhibition.clubs.length,12);a.ok(exhibition.rows.every(r=>r.teamId===w.selectedId));a.throws(()=>engine.advance(w,{annual:'preseason',decision:'finish'}));pre('digest');a.equal(engine.view(w).annual.preseason.digestSeen,true);a.throws(()=>engine.advance(w,{annual:'preseason',decision:'digest'}));pre('finish');
+ const exhibition=engine.view(w).annual.preseason.report;a.equal(exhibition.leagueGames,36);a.equal(exhibition.games.length,6);a.equal(w.games.length,0);a.ok(w.teams.every(t=>t.wins===0&&t.losses===0&&t.ties===0));a.equal(exhibition.clubs.length,12);a.ok(exhibition.rows.every(r=>r.teamId===w.selectedId));a.throws(()=>engine.advance(w,{annual:'preseason',decision:'finish'}));pre('digest');resume('exhibition digest confirmed');a.equal(engine.view(w).annual.preseason.digestSeen,true);a.throws(()=>engine.advance(w,{annual:'preseason',decision:'digest'}));pre('finish');
  until('opening-promo');const promote=(decision,extra={})=>{w=engine.advance(w,{annual:'commerce',decision,...extra});};
  promote('start');promote('plan',{value:0});promote('confirm');promote('park');until('opening-promo');promote('opening');promote('finish');
- until('offdesk-opening');a.equal(w.calendarFlow,null);a.equal(w.pendingCeremonyIntro,'opening');a.throws(()=>engine.advance(w,{step:1}));ack({acknowledge:'opening'});
+ until('offdesk-opening');resume('opening ceremony pending');a.equal(w.calendarFlow,null);a.equal(w.pendingCeremonyIntro,'opening');a.throws(()=>engine.advance(w,{step:1}));ack({acknowledge:'opening'});
  for(let i=0;i<10&&w.day===0;i++){drain();w=engine.advance(w,{step:1});}
- a.equal(w.day,1);a.equal(w.games.length,6);
+ a.equal(w.day,1);a.equal(w.games.length,6);resume('first official game day');
+ a.equal(restoredCheckpoints.length,13);console.log('PASS annual journey serialized resume at 13 checkpoints '+JSON.stringify(restoredCheckpoints));
  checked=true;console.log('PASS actual season, rollover, rookie registration, prepaid camp, preseason and next regular season opener',JSON.stringify({year:w.year,oldWins,rookies:oldRookies.length,exhibitionGames:exhibition.leagueGames,officialGames:w.games.length}));
 };
 let source=fs.readFileSync('scripts/long-run.cjs','utf8');
