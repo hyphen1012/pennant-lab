@@ -1,7 +1,7 @@
 'use strict';
 // Staging-only offline rehearsal. No live backup, no public endpoint, no overwrite.
 // Operator must externally stop/drain all writers; sidecar checks are not a lock.
-const fs=require('node:fs'),path=require('node:path'),{createHash}=require('node:crypto'),{DatabaseSync}=require('node:sqlite');
+const fs=require('node:fs'),path=require('node:path'),{createHash,createHmac,timingSafeEqual}=require('node:crypto'),{DatabaseSync}=require('node:sqlite');
 const FILES=Object.freeze(['account.sqlite','ad-proofs.sqlite','deletion.sqlite','purchases.sqlite','saves.sqlite']);
 const MANIFEST='manifest.json',VERSION=1;
 function privateDir(p){
@@ -51,32 +51,41 @@ function copyDb(source,dest,name){
  syncFile(to);return {name,...after};
 }
 function confirm(o){if(o?.environment!=='staging'||o.confirmedOffline!==true)throw Error('explicit stopped staging service confirmation required');}
+function authOptions(o){
+ if(o.authentication===undefined)return null;
+ const a=o.authentication;if(!a||!Buffer.isBuffer(a.key)||a.key.length!==32||typeof a.backupId!=='string'||! /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(a.backupId))throw Error('invalid backup authentication options');
+ return a;
+}
+function signedBody(id,files){return {version:2,backupId:id,files:files.map(({name,bytes,sha256})=>({name,bytes,sha256}))};}
+function mac(body,key){return createHmac('sha256',key).update('PENNANT-LAB-STAGING-BACKUP-v2\x00').update(JSON.stringify(body)).digest('hex');}
+function manifestFor(files,auth){if(!auth)return {version:VERSION,files};const b=signedBody(auth.backupId,files);return {...b,mac:mac(b,auth.key)};}
 function backupOffline(o){
- confirm(o);const source=privateDir(o.source),before=inventory(source),dest=createDestination(source,o.destination);
+ confirm(o);const auth=authOptions(o);const source=privateDir(o.source),before=inventory(source),dest=createDestination(source,o.destination);
  try{
   const files=FILES.map(n=>copyDb(source,dest,n));
   if(!same(before,inventory(source)))throw Error('source changed during backup');
   inventory(dest);
-  const manifest={version:VERSION,files};
+  const manifest=manifestFor(files,auth);
   const out=path.join(dest,MANIFEST);fs.writeFileSync(out,JSON.stringify(manifest,null,2)+'\n',{flag:'wx',mode:0o600});syncFile(out);
   inventory(dest,true);return manifest;
  }catch(e){fs.rmSync(dest,{recursive:true,force:true});throw e;}
 }
-function readManifest(source){
+function readManifest(source,auth){
  inventory(source,true);const file=path.join(source,MANIFEST),s=regular(file);
  if(s.size>65536n)throw Error('oversized manifest');
  const m=JSON.parse(fs.readFileSync(file,'utf8'));
- if(!m||Object.keys(m).sort().join(',')!=='files,version'||m.version!==VERSION||!Array.isArray(m.files)||m.files.length!==FILES.length||!m.files.every((x,i)=>x&&Object.keys(x).sort().join(',')==='bytes,name,sha256'&&x.name===FILES[i]&&Number.isSafeInteger(x.bytes)&&x.bytes>0&&typeof x.sha256==='string'&&/^[a-f0-9]{64}$/.test(x.sha256)))throw Error('invalid backup manifest');
+ if(!m||Object.keys(m).sort().join(',')!==(auth?'backupId,files,mac,version':'files,version')||m.version!==(auth?2:VERSION)||!Array.isArray(m.files)||m.files.length!==FILES.length||!m.files.every((x,i)=>x&&Object.keys(x).sort().join(',')==='bytes,name,sha256'&&x.name===FILES[i]&&Number.isSafeInteger(x.bytes)&&x.bytes>0&&typeof x.sha256==='string'&&/^[a-f0-9]{64}$/.test(x.sha256)))throw Error('invalid backup manifest');
+ if(auth){if(m.backupId!==auth.backupId||typeof m.mac!=='string'||! /^[a-f0-9]{64}$/.test(m.mac))throw Error('invalid authenticated backup manifest');const expected=mac(signedBody(m.backupId,m.files),auth.key);if(!timingSafeEqual(Buffer.from(m.mac,'hex'),Buffer.from(expected,'hex')))throw Error('backup authentication failed');}
  return m;
 }
 function restoreOffline(o){
- confirm(o);const source=privateDir(o.source),before=inventory(source,true),m=readManifest(source);
+ confirm(o);const auth=authOptions(o),source=privateDir(o.source),before=inventory(source,true),m=readManifest(source,auth);
  for(const {name,bytes,sha256} of m.files)if(!same({bytes,sha256},digest(path.join(source,name))))throw Error('backup hash mismatch');
  const dest=createDestination(source,o.destination);
  try{
   const files=FILES.map(n=>copyDb(source,dest,n));
-  if(!same(files,m.files)||!same(before,inventory(source,true))||!same(m,readManifest(source)))throw Error('backup changed during restore');
-  inventory(dest);return {version:VERSION,files};
+  if(!same(files,m.files)||!same(before,inventory(source,true))||!same(m,readManifest(source,auth)))throw Error('backup changed during restore');
+  inventory(dest);return manifestFor(files,auth);
  }catch(e){fs.rmSync(dest,{recursive:true,force:true});throw e;}
 }
 module.exports={backupOffline,restoreOffline,FILES};
