@@ -19,7 +19,7 @@ v=go('begin',{playerId:c.id});a.equal(v.negotiation.status,'talk');
  const rareFixture=clone(w),rareCandidate=rareFixture.foreignMarket.candidates.find(x=>x.id===c.id);
  Object.assign(rareCandidate.player,{originCategory:'RINNE',specialCategory:'輪廻転生',pastLifeAppearance:{seed:99521,baseCategory:'IMMORTAL',privateFixture:'never export'}});
  const secret=engine.view(rareFixture).foreign.negotiation;
- a.equal(secret.interest,null);a.equal(secret.candidate.hidden,true);a.equal(secret.candidate.pastLifeAppearance,null);a.equal(secret.candidate.appearanceSeed,null);
+ a.equal(secret.interest,null);a.equal(secret.candidate.hidden,true);a.equal(secret.candidate.pastLifeAppearance,null);a.equal(secret.candidate.appearanceSeed,null);for(const k of ['category','specialCategory','originCategory'])a.equal(secret.candidate[k],null,k);
 a.equal(v.negotiation.candidate.id,c.id);a.throws(()=>engine.advance(w,{foreign:'submit'}));
 const interpreterCash=club().cash;v=go('interpreter');a.ok(Math.abs(interpreterCash-club().cash-.02)<.001);a.throws(()=>engine.advance(w,{foreign:'interpreter'}));
 for(let i=0;i<3;i++){a.ok(v.negotiation.question);a.throws(()=>engine.advance(w,{foreign:'reply',key:'INVALID'}));v=go('reply',{key:v.negotiation.question.options[0].key});}
@@ -48,8 +48,8 @@ a.throws(()=>engine.advance(w,{foreign:'finish'}));a.throws(()=>engine.advance(w
  const rareSigned=clone(w),rareSignedCandidate=rareSigned.foreignMarket.candidates.find(x=>x.id===c.id);
  Object.assign(rareSignedCandidate.player,{originCategory:'RINNE',specialCategory:'輪廻転生',pastLifeAppearance:{seed:99521,baseCategory:'IMMORTAL',privateFixture:'never export'}});
  const r0=engine.view(rareSigned).foreign.negotiation;a.equal(r0.candidate.hidden,true);a.equal(r0.candidate.pastLifeAppearance,null);a.equal(r0.interest,null);
- const r1=engine.advance(rareSigned,{foreign:'reveal'}),p1=engine.view(r1).foreign.negotiation;a.equal(p1.stage,1);a.equal(p1.candidate.pastLifeAppearance,null);a.equal(p1.candidate.appearanceSeed,null);
- const r2=engine.advance(r1,{foreign:'reveal'}),p2=engine.view(r2).foreign.negotiation;a.equal(p2.stage,2);a.equal(p2.candidate.hidden,false);a.deepEqual(p2.candidate.pastLifeAppearance,{seed:99521,baseCategory:'IMMORTAL'});
+ const r1=engine.advance(rareSigned,{foreign:'reveal'}),p1=engine.view(r1).foreign.negotiation;a.equal(p1.stage,1);a.equal(p1.candidate.pastLifeAppearance,null);a.equal(p1.candidate.appearanceSeed,null);for(const k of ['category','specialCategory','originCategory'])a.equal(p1.candidate[k],null,k);
+ const r2=engine.advance(r1,{foreign:'reveal'}),p2=engine.view(r2).foreign.negotiation;a.equal(p2.stage,2);a.equal(p2.candidate.hidden,false);a.equal(p2.candidate.specialCategory,'輪廻転生');a.equal(p2.candidate.originCategory,'RINNE');a.deepEqual(p2.candidate.pastLifeAppearance,{seed:99521,baseCategory:'IMMORTAL'});
  v=go('reveal');a.equal(v.negotiation.stage,1);v=go('reveal');a.equal(v.negotiation.stage,2);a.ok(Object.values(v.negotiation.candidate.abilities).every(x=>Number.isFinite(x.value)));
 a.throws(()=>engine.advance(w,{foreign:'reveal'}));v=go('finish');a.equal(v.negotiation,null);a.equal(v.responsePending,false);
 a.equal(w.players.filter(p=>p.id===c.id).length,1);
