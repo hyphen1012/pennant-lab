@@ -5,6 +5,7 @@ on:
       - 'server/offline-backup-trial.cjs'
       - 'server/encrypted-backup-trial.cjs'
       - 'scripts/canonical-offline-backup-check.cjs'
+      - 'scripts/canonical-recovery-rights-check.cjs'
       - 'server/service-runtime.cjs'
       - '.github/workflows/canonical-offline-backup.yml'
   workflow_dispatch:
@@ -20,3 +21,5 @@ jobs:
         with:
           node-version: '22'
       - run: node scripts/canonical-offline-backup-check.cjs
+
+      - run: node scripts/canonical-recovery-rights-check.cjs
