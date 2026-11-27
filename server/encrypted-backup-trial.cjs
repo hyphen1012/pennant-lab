@@ -3,7 +3,7 @@
 // supply an external key and independently trusted backup generation ID.
 // Temporary plaintext requires a trusted private scratch filesystem.
 const fs=require('node:fs'),path=require('node:path');
-const {randomBytes,hkdfSync,createCipheriv,createDecipheriv}=require('node:crypto');
+const {randomBytes,hkdfSync,createCipheriv,createDecipheriv,createHash}=require('node:crypto');
 const {backupOffline,restoreOffline,FILES}=require('./offline-backup-trial.cjs');
 const names=[...FILES,'manifest.json'],magic=Buffer.from('PLBK3'),headerSize=5+12,tagSize=16;
 const chunkSize=1024*1024,limit=64*1024**3; // GCM per-message bound is below 64 GiB.
@@ -20,6 +20,7 @@ function config(o){
  const source=privateDir(o.source);
  if(typeof o.destination!=='string'||!path.isAbsolute(o.destination))throw Error('absolute destination required');
  const parent=privateDir(path.dirname(o.destination)),destination=path.join(parent,path.basename(o.destination));
+ if(path.basename(destination).startsWith('.pl-publish-'))throw Error('reserved publication name');
  if(overlaps(source,destination)||overlaps(source,parent)&&source===parent)throw Error('overlapping directories');
  try{fs.lstatSync(destination);throw Error('destination already exists');}catch(e){if(e.code!=='ENOENT')throw e;}
  // The caller must designate an independently trusted private scratch root.
@@ -73,25 +74,49 @@ function exactEncrypted(dir){
 // Metadata flush is supported on POSIX filesystems; a successful flush is
 // not a guarantee against power loss, filesystem or storage-controller faults.
 function syncDirectory(p){if(process.platform==='win32')return;const fd=fs.openSync(p,fs.constants.O_RDONLY|(fs.constants.O_DIRECTORY||0));try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}}
+// Per-destination cooperative lock. The trusted parent must not be modified
+// by uncooperative writers. An orphan lock requires offline operator review.
+function absent(p){try{fs.lstatSync(p);throw Error('destination already exists');}catch(e){if(e.code!=='ENOENT')throw e;}}
 function run(o,decrypt){
  const c=config(o),encryption=derive(c,'encryption'),authKey=derive(c,'manifest');
- let scratch,created=false;
+ const lock=path.join(c.parent,'.pl-publish-lock-'+createHash('sha256').update(c.destination).digest('hex'));
+ let scratch,stage,locked=false,published=false;
  const opts={environment:'staging',confirmedOffline:true,authentication:{key:authKey,backupId:c.backupId}};
  try{
+  fs.mkdirSync(lock,{mode:0o700});locked=true;
+  syncDirectory(c.parent);absent(c.destination);
   scratch=fs.mkdtempSync(path.join(c.scratchRoot,'.pl-backup-'));fs.chmodSync(scratch,0o700);
-  const plain=path.join(scratch,'plain');
+  // Same filesystem as the destination: publication is one directory rename.
+  stage=fs.mkdtempSync(path.join(c.parent,'.pl-publish-stage-'));fs.chmodSync(stage,0o700);
+  const candidate=path.join(stage,'complete'),plain=path.join(scratch,'plain');
+  let result;
   if(decrypt){
    exactEncrypted(c.source);fs.mkdirSync(plain,{mode:0o700});
    for(const name of names)transform(c,encryption,name,path.join(c.source,name+'.enc'),path.join(plain,name),true);
    exactEncrypted(c.source);
-   const restored=restoreOffline({...opts,source:plain,destination:c.destination});created=true;syncDirectory(c.destination);syncDirectory(c.parent);return restored;
+   result=restoreOffline({...opts,source:plain,destination:candidate});
+  }else{
+   const manifest=backupOffline({...opts,source:c.source,destination:plain});
+   fs.mkdirSync(candidate,{mode:0o700});
+   for(const name of names)transform(c,encryption,name,path.join(plain,name),path.join(candidate,name+'.enc'),false);
+   exactEncrypted(candidate);result={version:3,backupId:c.backupId,files:manifest.files.length};
   }
-  const manifest=backupOffline({...opts,source:c.source,destination:plain});
-  fs.mkdirSync(c.destination,{mode:0o700});created=true;
-  for(const name of names)transform(c,encryption,name,path.join(plain,name),path.join(c.destination,name+'.enc'),false);
-  exactEncrypted(c.destination);syncDirectory(c.destination);syncDirectory(c.parent);
-  return {version:3,backupId:c.backupId,files:manifest.files.length};
- }catch(e){if(created)fs.rmSync(c.destination,{recursive:true,force:true});throw e;}
- finally{encryption.fill(0);authKey.fill(0);if(scratch)fs.rmSync(scratch,{recursive:true,force:true});}
+  syncDirectory(candidate);syncDirectory(stage);
+  absent(c.destination);
+  fs.renameSync(candidate,c.destination);published=true;
+  // Never remove a complete destination if a post-rename flush fails.
+  syncDirectory(stage);syncDirectory(c.parent);
+  return result;
+ }catch(e){
+  if(published)throw new Error('publication complete but durability confirmation failed; inspect destination offline',{cause:e});
+  throw e;
+ }finally{
+  encryption.fill(0);authKey.fill(0);
+  // Locks are only removed by the process that acquired them. Forced process
+  // termination may leave private plaintext and a lock; do not auto-reclaim.
+  try{if(scratch)fs.rmSync(scratch,{recursive:true,force:true});}
+  finally{try{if(stage)fs.rmSync(stage,{recursive:true,force:true});}
+  finally{if(locked){fs.rmdirSync(lock);syncDirectory(c.parent);}}}
+ }
 }
 module.exports={encryptOffline:o=>run(o,false),decryptOffline:o=>run(o,true)};

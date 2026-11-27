@@ -46,7 +46,23 @@ async function post(base,route,body){const res=await fetch(base+'/v1/game/'+rout
   const enc=path.join(root,'encrypted'),dec=path.join(root,'decrypted'),key=randomBytes(32),backupId=randomUUID(),scratchRoot=path.join(root,'private-scratch'),eo={...opts,key,backupId,scratchRoot};fs.mkdirSync(scratchRoot,{mode:0o700});
   for(const bad of [{scratchRoot:undefined},{scratchRoot:source},{scratchRoot:root},{scratchRoot:enc}]){a.throws(()=>encryptOffline({...eo,source,destination:enc,...bad}));a.equal(fs.existsSync(enc),false);}
   const loose=path.join(root,'loose-scratch');fs.mkdirSync(loose,{mode:0o755});if(process.platform!=='win32')a.throws(()=>encryptOffline({...eo,source,destination:enc,scratchRoot:loose}),/private directory/);
-  const envelope=encryptOffline({...eo,source,destination:enc});a.deepEqual(envelope,{version:3,backupId,files:5});
+  const lockFor=p=>path.join(root,'.pl-publish-lock-'+createHash('sha256').update(p).digest('hex'));
+  const noStage=()=>a.equal(fs.readdirSync(root).filter(n=>n.startsWith('.pl-publish-')).length,0);
+  // Existing cooperative lock must not be removed or bypassed.
+  const lock=lockFor(enc);fs.mkdirSync(lock,{mode:0o700});
+  a.throws(()=>encryptOffline({...eo,source,destination:enc}),/EEXIST/);
+  a.equal(fs.existsSync(lock),true);a.equal(fs.existsSync(enc),false);
+  fs.rmdirSync(lock);noStage();
+  // Inject failure at publication: all encrypted files exist in the private
+  // candidate, but no incomplete final destination has become visible.
+  const rename=fs.renameSync;let sawCandidate=false;
+  fs.renameSync=(from,to)=>{if(to===enc){a.equal(fs.existsSync(enc),false);a.deepEqual(fs.readdirSync(from).sort(),[...FILES,'manifest.json'].map(n=>n+'.enc').sort());sawCandidate=true;throw Error('fixture publication failure');}return rename(from,to);};
+  try{a.throws(()=>encryptOffline({...eo,source,destination:enc}),/fixture publication failure/);}finally{fs.renameSync=rename;}
+  a.equal(sawCandidate,true);a.equal(fs.existsSync(enc),false);a.equal(fs.readdirSync(scratchRoot).length,0);noStage();a.deepEqual(hashes(source),originals);
+  let publishedCandidate=false;
+  fs.renameSync=(from,to)=>{if(to===enc){a.equal(fs.existsSync(enc),false);publishedCandidate=true;}return rename(from,to);};
+  let envelope;try{envelope=encryptOffline({...eo,source,destination:enc});}finally{fs.renameSync=rename;}
+  a.equal(publishedCandidate,true);noStage();a.deepEqual(envelope,{version:3,backupId,files:5});
   a.deepEqual(fs.readdirSync(enc).sort(),[...FILES,'manifest.json'].map(n=>n+'.enc').sort());a.deepEqual(hashes(source),originals);
   for(const name of fs.readdirSync(enc)){const b=fs.readFileSync(path.join(enc,name));a.equal(b.subarray(0,5).toString(),'PLBK3');if(name.endsWith('.sqlite.enc'))a.notEqual(b.subarray(17,33).toString(),'SQLite format 3\0');}
   const clean=()=>{a.equal(fs.existsSync(dec),false);a.equal(fs.readdirSync(scratchRoot).length,0);};
@@ -56,9 +72,13 @@ async function post(base,route,body){const res=await fetch(base+'/v1/game/'+rout
   const swapped=path.join(enc,'deletion.sqlite.enc'),other=fs.readFileSync(swapped);fs.writeFileSync(efile,other);fs.writeFileSync(swapped,original);a.throws(()=>decryptOffline({...eo,source:enc,destination:dec}));clean();fs.writeFileSync(efile,original);fs.writeFileSync(swapped,other);
   fs.writeFileSync(path.join(enc,'unexpected'),'fixture');a.throws(()=>decryptOffline({...eo,source:enc,destination:dec}),/inventory/);clean();fs.unlinkSync(path.join(enc,'unexpected'));
   a.throws(()=>encryptOffline({...eo,source,destination:enc}));a.throws(()=>decryptOffline({...eo,source:enc,destination:source}));a.deepEqual(hashes(source),originals);
-  const dm=decryptOffline({...eo,source:enc,destination:dec});a.equal(dm.version,2);a.deepEqual(hashes(dec),originals);a.equal(fs.readdirSync(scratchRoot).length!==0,false);
+  let restoreCandidate=false;
+  fs.renameSync=(from,to)=>{if(to===dec){a.equal(fs.existsSync(dec),false);a.deepEqual(hashes(from),originals);restoreCandidate=true;}return rename(from,to);};
+  let dm;try{dm=decryptOffline({...eo,source:enc,destination:dec});}finally{fs.renameSync=rename;}
+  a.equal(restoreCandidate,true);noStage();a.equal(dm.version,2);a.deepEqual(hashes(dec),originals);a.equal(fs.readdirSync(scratchRoot).length!==0,false);
   base=await open(dec);a.deepEqual(await post(base,'slots',{}),slots);a.deepEqual(await post(base,'read',{slot:1}),before);a.deepEqual(await post(base,'read',{slot:2}),before2);await close();
   a.deepEqual(hashes(source),originals);key.fill(0);
+  console.log('PASS staged publication, cooperative lock, pre-rename failure cleanup and complete restored candidate');
   console.log('PASS encrypted backup AES-GCM, generation/key/tamper/truncation/swap/inventory refusal, scratch cleanup, actual HTTP recovery');
   auth.key.fill(0);
   console.log('PASS authenticated backup manifest, wrong key/identity, downgrade, recomputed hash tamper refusal, real HTTP recovery');
