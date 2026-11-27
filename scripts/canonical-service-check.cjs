@@ -19,17 +19,17 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{rosterTre
  try{
   await start(cfg);assert.equal((await req('/v1/game/read',{slot:1}))[0],503);await runtime.close();runtime=null;
   const fixtureLedger=require('../server/account-ledger.cjs').openLedger(path.join(dir,'account.sqlite'));
-  try{fixtureLedger.transact(a,s=>{s.points=135;});}finally{fixtureLedger.close();}
+  try{fixtureLedger.transact(a,s=>{s.points=235;});}finally{fixtureLedger.close();}
   await start({...cfg,canonicalEngine:engine});
-  const beforeCatalog=(await req('/v1/wallet',{}))[1];assert.equal(beforeCatalog.points,135);
-  for(const key of ['anniversary']){const x=(await req('/v1/exchange',{key}))[1];assert.equal(x.ok,false);assert.deepEqual(x.wallet,beforeCatalog);}
-  const exchanged=(await req('/v1/exchange',{key:'ticket'}))[1];assert.equal(exchanged.ok,true);assert.equal(exchanged.wallet.points,134);assert.equal(exchanged.wallet.tickets,1);
+  const beforeCatalog=(await req('/v1/wallet',{}))[1];assert.equal(beforeCatalog.points,235);
+  for(const key of ['not-a-catalog-item']){const x=(await req('/v1/exchange',{key}))[1];assert.equal(x.ok,false);assert.deepEqual(x.wallet,beforeCatalog);}
+  const exchanged=(await req('/v1/exchange',{key:'ticket'}))[1];assert.equal(exchanged.ok,true);assert.equal(exchanged.wallet.points,234);assert.equal(exchanged.wallet.tickets,1);
   const [first,secondFrame]=await Promise.all([req('/v1/exchange',{key:'frame'}),req('/v1/exchange',{key:'frame'})]);assert.equal([first[1],secondFrame[1]].filter(x=>x.ok).length,1);
-  const frameWallet=(await req('/v1/wallet',{}))[1];assert.equal(frameWallet.points,131);assert.deepEqual(frameWallet.owned,['frame']);
+  const frameWallet=(await req('/v1/wallet',{}))[1];assert.equal(frameWallet.points,231);assert.deepEqual(frameWallet.owned,['frame']);
   const profiles=await Promise.all([req('/v1/exchange',{key:'profile'}),req('/v1/exchange',{key:'profile'})]);assert.equal(profiles.filter(x=>x[1].ok).length,1);
-  const profileWallet=(await req('/v1/wallet',{}))[1];assert.equal(profileWallet.points,126);assert.deepEqual(profileWallet.owned,['frame','profile']);
+  const profileWallet=(await req('/v1/wallet',{}))[1];assert.equal(profileWallet.points,226);assert.deepEqual(profileWallet.owned,['frame','profile']);
   const otherProfile=(await req('/v1/exchange',{key:'profile'},'b'))[1];assert.equal(otherProfile.ok,false);assert.deepEqual(otherProfile.wallet.owned,[]);
-  for(const [key,cost] of [['hq',15],['museum',20],['uniform',10],['emblem',30],['deluxeCard',50]]){const prior=(await req('/v1/wallet',{}))[1],pair=await Promise.all([req('/v1/exchange',{key}),req('/v1/exchange',{key})]);assert.equal(pair.filter(x=>x[1].ok).length,1);const after=(await req('/v1/wallet',{}))[1];assert.equal(after.points,prior.points-cost);assert.ok(after.owned.includes(key));const other=(await req('/v1/exchange',{key},'b'))[1];assert.equal(other.ok,false);assert.deepEqual(other.wallet.owned,[]);}
+  for(const [key,cost] of [['hq',15],['museum',20],['uniform',10],['emblem',30],['deluxeCard',50],['anniversary',100]]){const prior=(await req('/v1/wallet',{}))[1],pair=await Promise.all([req('/v1/exchange',{key}),req('/v1/exchange',{key})]);assert.equal(pair.filter(x=>x[1].ok).length,1);const after=(await req('/v1/wallet',{}))[1];assert.equal(after.points,prior.points-cost);assert.ok(after.owned.includes(key));const other=(await req('/v1/exchange',{key},'b'))[1];assert.equal(other.ok,false);assert.deepEqual(other.wallet.owned,[]);}
   assert.equal((await req('/v1/wallet',{}))[1].points,1);
   const otherFrame=(await req('/v1/exchange',{key:'frame'},'b'))[1];assert.equal(otherFrame.ok,false);assert.deepEqual(otherFrame.wallet.owned,[]);
   // Separate catalog fixture from later gameplay to respect the actual 40 requests/minute token gate.

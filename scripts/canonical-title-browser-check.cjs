@@ -313,6 +313,14 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   const standardExtra=await art.getAttribute('src');await page.locator('[data-action="canonical-achievements-frame"][data-frame="deluxe"]').click();const deluxe=await art.getAttribute('src');a.notEqual(deluxe,standardExtra);a.notEqual(deluxe,foil);
   await page.locator('[data-action="canonical-achievements-share"]').click();await page.waitForFunction(()=>window.fixtureShares.length===3);a.equal(await page.evaluate(()=>window.fixtureShares[2].data),deluxe.slice('data:image/png;base64,'.length));
   await page.locator('[data-action="canonical-achievements-back"]').click();await page.locator('[data-action="canonical-rewards-back"]').waitFor();
+  const anniversaryLedger=require('../server/account-ledger.cjs').openLedger(path.join(dir,'account.sqlite'));
+  try{anniversaryLedger.transact(owner,s=>{s.points=100;});}finally{anniversaryLedger.close();}
+  clockOffset+=61000;await page.locator('[data-action="canonical-rewards-refresh"]').click();
+  const anniversaryButton=page.locator('[data-action="canonical-decor-exchange"][data-key="anniversary"]:enabled');await anniversaryButton.waitFor();
+  a.equal(await page.locator('[data-canonical-anniversary]').count(),0);
+  page.once('dialog',d=>d.accept());await anniversaryButton.click();await page.getByText('装飾品への交換を確認しました。').waitFor();const anniversaryPreview=page.locator('[data-canonical-anniversary="preview"]');await anniversaryPreview.waitFor();a.ok((await anniversaryPreview.innerText()).includes('実績を獲得した表示ではありません'));
+  const anniversary=await post('read',{slot:3});a.equal(anniversary.wallet.points,0);a.ok(anniversary.wallet.owned.includes('anniversary'));a.equal(anniversary.revision,extra.revision);a.deepEqual(anniversary.game,extra.game);
+  await page.locator('[data-action="canonical-achievements-open"]').click();await artButton.waitFor();a.equal(await page.locator('[data-canonical-anniversary="record"]').count(),0);await page.locator('[data-action="canonical-achievements-back"]').click();await page.locator('[data-canonical-anniversary="preview"]').waitFor();
   // Return to the multiverse; deletion is hidden until an intentional gesture.
   await page.locator('[data-action="canonical-rewards-back"]').click();
   await page.locator('[data-action="canonical-events-back"]').click();
