@@ -63,6 +63,8 @@ const {createServiceRuntime}=require('../server/service-runtime.cjs'),{createHea
   await page.evaluate(()=>window.dispatchEvent(new Event('pl-native-ready')));
   await page.waitForFunction(()=>window.PennantAudio.inspect().active);
   console.log('PASS audio remains suspended through focus until explicit native readiness');
+  // Native suspension intentionally invalidates the previous slots snapshot.
+  await page.locator('[data-action="canonical-retry"]').click();await slot(2).waitFor();a.equal(await slot(2).getAttribute('data-action'),'continue-slot');
   const soundPanel=page.locator('[data-pl-audio]');await soundPanel.locator('summary').click();
   await soundPanel.locator('[data-pl-audio-enabled]').uncheck();
   a.equal(await page.evaluate(()=>window.PennantAudio.inspect().prefs.enabled),false);
