@@ -24,7 +24,7 @@ function applyTrialAH(html){
     while(d.paid<d.rows.length&&d.opened+d.paid+1<=now){
       const r=d.rows[d.paid];
       if(ahMoney(t.cash)<r.payment){d.arrears=true;return;}
-      t.cash=r2(t.cash-r.payment/100);d.paid++;d.principalPaid+=r.principal;d.interestPaid+=r.interest;d.arrears=false;
+      t.cash=r2(t.cash-r.payment/100);d.paid++;d.principalPaid+=r.principal;d.interestPaid+=r.interest;t.ahParentPaid=(t.ahParentPaid||0)+r.principal;t.ahParentInterest=(t.ahParentInterest||0)+r.interest;d.arrears=false;
     }
   }
   function ahAnnualDue(t){
@@ -62,7 +62,7 @@ function applyTrialAH(html){
   processCalendarDay=function(){const e=ahDayBase();if(e?.date)for(const t of game.teams)ahPay(t,e.date);return e;};
   const ahCommerceBase=cpuCommercialCalendar;
   cpuCommercialCalendar=function(f){const r=ahCommerceBase(f);if(f?.date)for(const t of game.teams)ahPay(t,f.date);return r;};
-  function ahReport(t){const d=ahDebt(t);return {id:t.id,draws:t.ahParentHistory||[],remaining:d?d.principal-d.principalPaid:0,paid:d?.principalPaid||0,interestPaid:d?.interestPaid||0,arrears:d?.arrears||false,cash:t.cash};}
+  function ahReport(t){const d=ahDebt(t);return {id:t.id,draws:t.ahParentHistory||[],remaining:d?d.principal-d.principalPaid:0,paid:t.ahParentPaid||0,interestPaid:t.ahParentInterest||0,arrears:d?.arrears||false,cash:t.cash};}
   const ahArchiveBase=archiveSeason;
   archiveSeason=function(){ahArchiveBase();const a=game.seasonArchive?.find(r=>r.year===game.year);if(a)a.ahParent=game.teams.map(ahReport);};
 `;
