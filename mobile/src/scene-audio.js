@@ -38,10 +38,17 @@ function sceneFor({page,launchTitle,annual,inbox,foreign,foreignCandidate,replay
  if(page==='canonical-hq'&&['watch','final'].includes(replay))return 'match';
  if(page==='canonical-events'){
   if(inbox?.finance)return 'crisis';
-  if(inbox?.rare)return rareScene(inbox.rare.category,inbox.rare.hidden!==false);
+  if(inbox?.rare){
+   const r=inbox.rare,p=r.player,hidden=r.hidden!==false||p?.hidden===true||p?.scoutingHidden===true||p?.abilitiesHidden===true;
+   const rank=p?.pastLifeAppearance?.baseCategory==='IMMORTAL'&&(p?.specialCategory==='輪廻転生'||p?.originCategory==='RINNE')?'IMMORTAL輪廻転生':p?.specialCategory||r.category;
+   return rareScene(rank,hidden);
+  }
+  // Match canonicalEventRender's primary inbox ordering; never play a
+  // lower-priority secret or ceremonial theme underneath a blocking report.
+  if(inbox?.injury)return 'crisis';
   if(inbox?.career)return 'farewell';
   if(inbox?.rookie){const shown=inbox.rookie.entries?.find(x=>x.stage===2&&x.hidden!==true&&x.specialCategory);return shown?rareScene(shown.pastLifeAppearance?.baseCategory==='IMMORTAL'&&(shown.specialCategory==='輪廻転生'||shown.originCategory==='RINNE')?'IMMORTAL輪廻転生':shown.specialCategory,false):'draft';}
-  if(inbox?.injury)return 'crisis';
+  if(inbox?.decade!=null)return 'archive';
   if(foreign){const p=foreignCandidate;return p?.hidden===false&&p.category?rareScene(p.pastLifeAppearance?.baseCategory==='IMMORTAL'&&p.category==='輪廻転生'?'IMMORTAL輪廻転生':p.category,false):'foreign';}
   if(annual==='draft')return 'draft';
   if(['movement-declarations','movement-market','renewal1','renewal2','roster-cut'].includes(annual))return 'negotiation';
@@ -50,7 +57,7 @@ function sceneFor({page,launchTitle,annual,inbox,foreign,foreignCandidate,replay
   if(['fan-fest','tv'].includes(annual))return 'festival';
   if(annual==='awards-all')return 'awards';
   if(['settlement','sponsor','broadcast','naming','fanclub'].includes(annual)||inbox?.monthly)return 'finance';
-  if(inbox?.decade!=null||inbox?.milestones?.length)return 'archive';
+  if(inbox?.milestones?.length)return 'archive';
  }
  if(['canonical-reports','canonical-achievements'].includes(page))return 'archive';
  if(page==='canonical-manager')return 'manager';
