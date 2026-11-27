@@ -4,7 +4,7 @@
 function repaymentTrial({principal,months,kind,earlyMonth=null}) {
   if(!Number.isSafeInteger(principal)||principal<=0||principal>1e12)throw new RangeError('principal must be positive integer <= 1e12 trial units');
   if(![12,24].includes(months))throw new RangeError('trial term must be 12 or 24');
-  const rates={bank:[1n,10n],parentMonthly:[1n,20n],parentAnnual:[1n,240n]};
+  const rates={bank:[1n,10n],parentMonthly:[1n,20n],parentAnnual:[1n,240n],cpuParentAnnual:[1n,1200n]};
   if(!Object.hasOwn(rates,kind))throw new RangeError('unknown trial rate');
   if(earlyMonth!==null&&(!Number.isSafeInteger(earlyMonth)||earlyMonth<1||earlyMonth>months))throw new RangeError('invalid early settlement month');
   const [num,den]=rates[kind], base=Math.floor(principal/months),rows=[];
