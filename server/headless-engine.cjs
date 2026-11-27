@@ -821,11 +821,15 @@ function createHeadlessEngine(){
  }
  if(op==='achievements'){
   const entries=new Map();
+  const compositeLabel=v=>typeof v==='string'&&/IMMORTAL/i.test(v)&&/輪廻転生|RINNE|REINCARNATION/i.test(v);
+  const privatePlayer=p=>!!p&&(!rareCinemaKnown(p)||p.pastLifeAppearance?.baseCategory==='IMMORTAL'&&playerTitleTheme(p)?.name==='輪廻転生');
+  const protect=(key,title,hidden=false)=>{const row=entries.get(key);if(row&&(hidden||compositeLabel(title)))row.shareAllowed=false;};
   const win=(year,day)=>{if(Number.isSafeInteger(year)&&year>=2027&&Number.isSafeInteger(day)&&day>=1&&day<=143){const key='win:'+year+':'+day;entries.set(key,{key,label:'試合勝利 '+year+' / '+day,eligible:true,art:{year,kind:'win'}});}};
   for(const g of game.games)if((g.home===team.id&&g.homeScore>g.awayScore)||(g.away===team.id&&g.awayScore>g.homeScore))win(g.year,g.day);
   // Existing memorial album is generated from actual game records. Only
   // own-club entries with a supported source and explicit team ID qualify.
-  for(const e of memorialEntries()){
+  const album=memorialEntries();
+  for(const e of album){
    if(e.teamId!==team.id||typeof e.id!=='string'||typeof e.title!=='string'||e.id.length>512||!e.title)continue;
    if(e.kind==='win'){
     const m=/^win:(\\d{4,}):(\\d+):(\\d+)$/.exec(e.id);
@@ -838,34 +842,43 @@ function createHeadlessEngine(){
    const key='memorial:'+e.id;
    if(!entries.has(key))entries.set(key,{key,label:e.title.slice(0,160),eligible:true,art:{year:e.year,kind:e.anniversary?'anniversary':['facility','championship','league-championship','award','retirement','farewell','club-record'].includes(e.kind)?e.kind:'record'}});
   }
+   // Protect directly identified private lineage and explicit composite labels without
+   // changing achievement identity, eligibility, or the in-game title.
+   for(const e of album){
+    if(e.teamId!==team.id||typeof e.id!=='string')continue;
+    const match=e.id.match(/^(?:award|retirement):\\d+:(\\d+)(?::|$)/);
+    const p=getPlayer(e.playerId??(match?Number(match[1]):null));
+    protect('memorial:'+e.id,e.title,privatePlayer(p));
+   }
   // Special news and the ordinary record edition sometimes describe the
   // same achievement. Reuse the ordinary key rather than granting twice.
   const careerNews=new Set((game.milestoneNews||[]).filter(e=>e.teamId===team.id&&e.careerKey).map(e=>e.playerId+':'+e.careerKey));
-  const addRare=(key,title)=>{key='memorial:'+key;if(!entries.has(key))entries.set(key,{key,label:title.slice(0,160),eligible:true});};
+  const addRare=(key,title,hidden=false)=>{key='memorial:'+key;if(!entries.has(key))entries.set(key,{key,label:title.slice(0,160),eligible:true});protect(key,title,hidden);};
   for(const e of game.rareNews||[]){
    if(typeof e.id!=='string'||e.id.length>480||typeof e.title!=='string'||!e.title||!e.category||!Number.isSafeInteger(e.year)||!e.id.startsWith(e.year+':'))continue;
+   const p=getPlayer(e.playerId),hidden=!p||privatePlayer(p)||e.kind==='foreign-discovery'||compositeLabel(e.category);
    if(e.kind==='foreign-discovery'){
     // Own scout discovery is a genuine server event; only its public title.
-    if(e.scoutTeamId===team.id&&e.id===e.year+':foreign-discovery:'+e.playerId)addRare('rare:'+e.id,e.title);
+    if(e.scoutTeamId===team.id&&e.id===e.year+':foreign-discovery:'+e.playerId)addRare('rare:'+e.id,e.title,hidden);
     continue;
    }
    if(e.teamId!==team.id||!Number.isSafeInteger(e.playerId))continue;
    const k=e.id.slice(String(e.year).length+1);
    if(k.startsWith('awards:'))continue; // actual annual title entries already qualify
-   if(k.startsWith('feat:')){addRare('news:'+e.id,e.title);continue;}
+   if(k.startsWith('feat:')){addRare('news:'+e.id,e.title,hidden);continue;}
    if(k.startsWith('record:'))continue; // use original official record-update evidence only
    if(k.startsWith('career:')){
     const c=k.slice(('career:'+e.playerId+':').length);
-    if(careerNews.has(e.playerId+':'+c))continue;
-    addRare('news:'+e.id,e.title);continue;
+    if(careerNews.has(e.playerId+':'+c)){if(hidden)for(const m of game.milestoneNews||[])if(m.teamId===team.id&&m.playerId===e.playerId&&m.careerKey===c)protect('memorial:news:'+m.id,m.title,true);continue;}
+    addRare('news:'+e.id,e.title,hidden);continue;
    }
    const stat=k.match(/^stat:(\\d+):([a-z]+):(\\d+)$/);
    if(stat&&Number(stat[1])===e.playerId){
     const equivalent={'w:20':'season20w','k:200':'season200k','h:200':'season200h'}[stat[2]+':'+stat[3]];
-    if(equivalent){addRare('news:'+e.year+':season-feat:'+e.playerId+':'+equivalent,e.title);continue;}
-    addRare('rare:'+e.id,e.title);continue;
+    if(equivalent){addRare('news:'+e.year+':season-feat:'+e.playerId+':'+equivalent,e.title,hidden);continue;}
+    addRare('rare:'+e.id,e.title,hidden);continue;
    }
-   if(k==='debut:'+e.playerId||k==='awakening:'+e.playerId||k.startsWith('lineage:'+e.playerId+':'))addRare('rare:'+e.id,e.title);
+   if(k==='debut:'+e.playerId||k==='awakening:'+e.playerId||k.startsWith('lineage:'+e.playerId+':'))addRare('rare:'+e.id,e.title,hidden);
   }
   return JSON.stringify([...entries.values()]);
  }

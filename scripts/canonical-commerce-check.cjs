@@ -212,6 +212,9 @@ globalThis.__plAnnualEntryCheck=saved=>{
   for(const k of base)a.ok(keys.has(k),'prior achievement identity retained');
   for(const id of ['news:'+ordinary,'news:'+feat,'rare:'+rare,'rare:'+scout])a.ok(keys.has(key(id)),'missing '+id);
   a.ok(!keys.has(key('rare:'+rival)));a.equal(keys.size,entries.length);
+  a.equal(entries.find(e=>e.key===key('rare:'+scout)).shareAllowed,false);
+  const protectedFixture=JSON.parse(JSON.stringify(fixture)),pp=protectedFixture.players.find(x=>x.id===p.id);pp.originCategory='RINNE';pp.specialCategory='輪廻転生';pp.pastLifeAppearance={seed:99521,baseCategory:'IMMORTAL'};
+  const protectedRows=engine.achievements(protectedFixture);a.equal(protectedRows.find(e=>e.key===key('rare:'+rare)).shareAllowed,false);a.equal(protectedRows.find(e=>e.key===key('news:'+ordinary)).shareAllowed,false);a.equal(protectedRows.find(e=>e.key===key('news:'+feat)).shareAllowed,false);a.deepEqual(protectedRows.map(e=>e.key).sort(),entries.map(e=>e.key).sort());
   a.equal(JSON.stringify(fixture),snapshot,'achievement projection must not mutate world');
   console.log('PASS canonical achievement identity, ordinary and rare coverage, own-club scope and nonmutation');
  }
