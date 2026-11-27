@@ -12,13 +12,16 @@ function createHeadlessEngine(){
  if(source.split(seedAnchor).length!==2||!source.includes('(() => {'))throw Error('game seed/closure anchor changed');
  source=source.replace(seedAnchor,'SERVER_SEED');
  const hash=createHash('sha256').update(source).digest('hex');
- const pre=`const document={querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){},body:{appendChild(){},insertAdjacentHTML(){}}};
+ const pre=`// Internal serialized projection input; each VM owns its parsed state.
+ const serializedWorld=typeof SERVER_STATE==='string'?JSON.parse(SERVER_STATE):null;
+ const SERVER_SEED=typeof SERVER_STATE==='string'?(()=>{const s=serializedWorld;if(!s||typeof s!=='object'||s.started!==true||!Array.isArray(s.teams)||!Array.isArray(s.players)||!Array.isArray(s.games)||!Number.isSafeInteger(s.seed)||s.seed<0||s.seed>0xffffffff)throw Error('invalid serialized server world');return s.seed||1;})():SERVER_SEED_VALUE;
+ const document={querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){},body:{appendChild(){},insertAdjacentHTML(){}}};
  const window={addEventListener(){},scrollTo(){}},localStorage={getItem:()=>null,setItem(){},removeItem(){}};
  const setTimeout=()=>0,clearTimeout=()=>{};
  `;
  const tail=`
  save=()=>true;render=()=>{};showToast=()=>{};ui.page='game';ui.tab='business';ui.businessSub='care';
- const input=JSON.parse(SERVER_INPUT),op=input.op;
+ const input=JSON.parse(SERVER_INPUT),op=input.op;if(typeof SERVER_STATE==='string')input.state=serializedWorld;
  if(op==='new'){
   buildFresh();game.started=true;game.clubLogoSeed=SERVER_SEED;
   // buildFresh consumes the PRNG; preserve the post-generation cursor.
@@ -890,8 +893,8 @@ function createHeadlessEngine(){
   if(!state||typeof state!=='object'||state.started!==true||!Array.isArray(state.teams)||!Array.isArray(state.players)||!Array.isArray(state.games))throw Error('invalid server world');
   const seed=state.seed;if(!Number.isSafeInteger(seed)||seed<0||seed>0xffffffff)throw Error('invalid server seed');return seed;
  }
- function execute(seed,input){
-  const context={SERVER_SEED:seed||1,SERVER_INPUT:input};
+ function execute(seed,input,stateText=null){
+  const context={SERVER_SEED_VALUE:seed||1,SERVER_INPUT:input,SERVER_STATE:stateText};
   const result=compiled.runInNewContext(context,{timeout:10000,microtaskMode:'afterEvaluate',contextCodeGeneration:{strings:false,wasm:false}});
   if(typeof result!=='string')throw Error('engine did not return a state');
   return JSON.parse(result);
@@ -906,6 +909,12 @@ function createHeadlessEngine(){
   const seed=validateWorld(state),encoded=JSON.stringify(state);
   return {game:execute(seed,'{"op":"view","state":'+encoded+'}'),actions:execute(seed,'{"op":"actions","state":'+encoded+'}')};
  }
+ // Read-only alternative: verified JSON enters the isolated VM directly.
+ // Do not construct a second giant wrapper string or parse/stringify in host.
+ function readProjectionText(stateText){
+  if(typeof stateText!=='string'||Buffer.byteLength(stateText)>256*1024*1024)throw Error('invalid serialized projection input');
+  return {game:execute(1,'{"op":"view"}',stateText),actions:execute(1,'{"op":"actions"}',stateText)};
+ }
  const exact=(v,k)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===k.length&&k.every(x=>Object.hasOwn(v,x));
  // Accept only the original editor's fields and enumerated designs; no HTML,
  // image uploads, CSS, client state, random seed or additional game attributes.
@@ -914,7 +923,7 @@ function createHeadlessEngine(){
  const validIdentity=v=>exact(v,identityKeys)&&boundedText(v.gmName,22)&&boundedText(v.name,30)&&boundedText(v.short,8)&&boundedText(v.letter,3)&&[v.color,v.accent].every(c=>typeof c==='string'&&/^#[0-9a-f]{6}$/i.test(c))&&['circle','square','shield','diamond','hex'].includes(v.shape)&&['solid','split','stripe','rim'].includes(v.pattern)&&['bold','serif','italic','mono'].includes(v.font)&&['letter','star','vortex','wing','comet','swan','mountain','gear','moon','spark','wave','crest','bolt'].includes(v.motif);
  const validTrade=(v)=>Number.isSafeInteger(v.clubId)&&v.clubId>=0&&v.clubId<12&&[v.out,v.in].every(ids=>Array.isArray(ids)&&ids.length<=3&&ids.every(id=>Number.isSafeInteger(id)&&id>0))&&v.out.length+v.in.length>0&&new Set([...v.out,...v.in]).size===v.out.length+v.in.length&&Number.isFinite(v.fee)&&Math.abs(v.fee)<=30&&Math.round(v.fee*100)/100===v.fee;
  return Object.freeze({
-  sourceHash:hash,readProjection,
+  sourceHash:hash,readProjection,readProjectionText,
   newWorld(command){
    if(exact(command,[]))return run('new',null);
    if((!exact(command,['team'])&&!(exact(command,['team','identity'])&&validIdentity(command.identity)))||!Number.isSafeInteger(command.team)||command.team<0||command.team>11)throw Error('invalid pilot team or identity');
