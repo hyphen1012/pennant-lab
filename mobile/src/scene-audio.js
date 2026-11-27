@@ -17,6 +17,9 @@ const tracks={
  negotiation:track(76,[[45,52,55,60],[50,57,60,65],[43,50,53,58],[40,47,52,56]],[64,0,60,0,67,0,0,0,65,0,60,0,69,0,0,0,62,0,58,0,65,0,0,0,64,0,56,0,59,0,0,0]),
  foreign:track(96,[[50,57,62,65],[48,55,60,64],[43,50,55,58],[45,52,57,60]],[74,0,77,79,0,77,72,0,72,0,76,79,0,76,67,0,70,0,74,77,0,74,67,0,69,0,72,76,0,72,69,0],'triangle'),
  awards:track(104,[[48,55,60,64],[53,60,65,69],[45,52,57,60],[43,50,55,59]],[72,76,79,0,84,0,79,76,77,81,84,0,81,0,77,0,76,72,69,0,76,79,0,0,74,71,67,0,74,79,0,0],'triangle'),
+ festival:track(116,[[48,55,60,64],[53,60,65,69],[43,50,55,59],[48,55,60,64]],[72,76,79,0,84,79,76,0,77,81,84,0,89,84,81,0,74,77,79,0,83,79,77,0,76,79,84,0,88,84,79,0],'triangle'),
+ archive:track(68,[[48,55,60,64],[45,52,57,60],[50,57,60,65],[43,50,55,62]],[76,0,0,72,0,67,0,0,72,0,0,69,0,64,0,0,74,0,0,69,0,65,0,0,71,0,0,67,0,60,0,0]),
+ opening:track(124,[[48,55,60,64],[53,60,65,69],[45,52,57,60],[43,50,55,62]],[60,67,72,0,76,79,84,0,65,72,77,0,81,84,89,0,69,72,76,0,81,84,88,0,67,74,79,0,83,86,79,0],'triangle'),
  farewell:track(64,[[48,55,59,64],[45,52,57,60],[41,48,53,57],[43,50,55,62]],[76,0,0,74,72,0,0,0,72,0,0,69,67,0,0,0,69,0,0,72,77,0,0,0,74,0,0,71,72,0,0,0]),
  crisis:track(56,[[41,48,53,56],[40,47,52,55],[42,49,54,57],[40,47,52,56]],[56,0,0,0,60,0,0,0,55,0,0,0,59,0,0,0,57,0,0,0,61,0,0,0,56,0,0,0,59,0,0,0]),
  mystery:track(58,[[45,52,58,64],[44,51,57,63],[41,48,54,60],[40,47,53,59]],[76,0,0,0,70,0,0,0,75,0,0,0,69,0,0,0,72,0,0,0,66,0,0,0,71,0,0,0,65,0,0,0]),
@@ -42,10 +45,14 @@ function sceneFor({page,launchTitle,annual,inbox,foreign,foreignCandidate,replay
   if(foreign){const p=foreignCandidate;return p?.hidden===false&&p.category?rareScene(p.pastLifeAppearance?.baseCategory==='IMMORTAL'&&p.category==='輪廻転生'?'IMMORTAL輪廻転生':p.category,false):'foreign';}
   if(annual==='draft')return 'draft';
   if(['movement-declarations','movement-market','renewal1','renewal2','roster-cut'].includes(annual))return 'negotiation';
-  if(['autumn','winter','self','booking','winter-return','camp','exhibition','opening-promo','offdesk-opening'].includes(annual))return 'training';
+  if(['autumn','winter','self','booking','winter-return','camp','exhibition'].includes(annual))return 'training';
+  if(['opening-promo','offdesk-opening'].includes(annual)||inbox?.opening===true)return 'opening';
+  if(['fan-fest','tv'].includes(annual))return 'festival';
   if(annual==='awards-all')return 'awards';
-  if(['settlement','sponsor','broadcast','naming','fanclub'].includes(annual))return 'finance';
+  if(['settlement','sponsor','broadcast','naming','fanclub'].includes(annual)||inbox?.monthly)return 'finance';
+  if(inbox?.decade!=null||inbox?.milestones?.length)return 'archive';
  }
+ if(['canonical-reports','canonical-achievements'].includes(page))return 'archive';
  if(page==='canonical-manager')return 'manager';
  if(page==='canonical-facilities')return 'finance';
  if(page==='canonical-trade'||page==='canonical-free')return 'negotiation';
@@ -55,12 +62,18 @@ function sceneFor({page,launchTitle,annual,inbox,foreign,foreignCandidate,replay
 function createAudio({host}){
  const key='pl-scene-audio-v1',clamp=v=>Math.min(1,Math.max(0,v)),defaults={enabled:true,bgm:.45,sfx:.35};
  let prefs={...defaults};try{const p=JSON.parse(host.localStorage?.getItem(key)||'null');if(p&&typeof p.enabled==='boolean'&&Number.isFinite(p.bgm)&&Number.isFinite(p.sfx))prefs={enabled:p.enabled,bgm:clamp(p.bgm),sfx:clamp(p.sfx)};}catch{}
- let ctx=null,bgm=null,sfx=null,scene=null,timer=null,step=0,lifecycle=null,requestSerial=0,visible=!host.document?.hidden,unlocked=false,voices=new Set();
- const stop=()=>{if(timer!==null){host.clearInterval(timer);timer=null;}for(const n of voices){try{n.stop();}catch{}}voices.clear();};
+ let ctx=null,bgm=null,sfx=null,scene=null,timer=null,step=0,lifecycle=null,requestSerial=0,visible=!host.document?.hidden,unlocked=false,voices=new Map(),currentBus=null,fadingBus=null,fadeTimer=null;
+ const ordinary=new Set(['title','worlds','hq','roster','manager','finance','training','match','draft','negotiation','foreign','awards','farewell','festival','archive','opening']);
+ function stopVoices(bus){for(const [o,dest] of voices)if(!bus||dest===bus){try{o.stop();}catch{}voices.delete(o);}}
+ function dropBus(bus){if(!bus)return;stopVoices(bus);try{bus.disconnect();}catch{}}
+ function clearFade(){if(fadeTimer!==null){host.clearTimeout(fadeTimer);fadeTimer=null;}dropBus(fadingBus);fadingBus=null;}
+ function clearLoop(){if(timer!==null){host.clearInterval(timer);timer=null;}}
+ const stop=()=>{clearLoop();clearFade();dropBus(currentBus);currentBus=null;stopVoices();};
+ function makeBus(fade){const b=ctx.createGain(),now=ctx.currentTime;b.gain.setValueAtTime(fade?.0001:1,now);if(fade)b.gain.setTargetAtTime(1,now,.09);b.connect(bgm);return b;}
  function volume(){if(!ctx)return;for(const [node,value] of [[bgm,prefs.bgm],[sfx,prefs.sfx]]){const now=ctx.currentTime;node.gain.cancelScheduledValues(now);node.gain.setTargetAtTime(prefs.enabled&&visible?value:0,now,.06);}}
- function note(m,when,len,amp,wave,bus){if(!m||!ctx||ctx.state!=='running'||voices.size>=32)return;const o=ctx.createOscillator(),g=ctx.createGain();o.type=wave;o.frequency.value=440*Math.pow(2,(m-69)/12);g.gain.setValueAtTime(.0001,when);g.gain.exponentialRampToValueAtTime(Math.max(.0002,amp),when+.025);g.gain.exponentialRampToValueAtTime(.0001,when+len);o.connect(g);g.connect(bus);voices.add(o);o.onended=()=>{voices.delete(o);o.disconnect();g.disconnect();};o.start(when);o.stop(when+len+.02);}
- function tick(){if(!prefs.enabled||!visible||!scene||!ctx||ctx.state!=='running')return;const t=tracks[scene],d=30/t.bpm,now=ctx.currentTime+.025,i=step%32,ch=t.chords[Math.floor(i/8)];if(i%8===0){note(ch[0]-12,now,d*6,.055,'sine',bgm);for(const m of ch.slice(1))note(m,now,d*6,.026,'sine',bgm);}if(i%2===0)note(ch[(i/2)%ch.length|0],now,d*1.4,.035,'triangle',bgm);note(t.melody[i],now,d*1.8,.06,t.wave,bgm);step++;}
- function start(){if(timer!==null||!scene||!prefs.enabled||!visible||!unlocked||ctx?.state!=='running')return;tick();timer=host.setInterval(tick,30000/tracks[scene].bpm);}
+ function note(m,when,len,amp,wave,bus){if(!m||!ctx||ctx.state!=='running'||voices.size>=32)return;const o=ctx.createOscillator(),g=ctx.createGain();o.type=wave;o.frequency.value=440*Math.pow(2,(m-69)/12);g.gain.setValueAtTime(.0001,when);g.gain.exponentialRampToValueAtTime(Math.max(.0002,amp),when+.025);g.gain.exponentialRampToValueAtTime(.0001,when+len);o.connect(g);g.connect(bus);voices.set(o,bus);o.onended=()=>{voices.delete(o);o.disconnect();g.disconnect();};o.start(when);o.stop(when+len+.02);}
+ function tick(){if(!prefs.enabled||!visible||!scene||!ctx||ctx.state!=='running')return;const bus=currentBus;if(!bus)return;const t=tracks[scene],d=30/t.bpm,now=ctx.currentTime+.025,i=step%32,ch=t.chords[Math.floor(i/8)];if(i%8===0){note(ch[0]-12,now,d*6,.055,'sine',bus);for(const m of ch.slice(1))note(m,now,d*6,.026,'sine',bus);}if(i%2===0)note(ch[(i/2)%ch.length|0],now,d*1.4,.035,'triangle',bus);note(t.melody[i],now,d*1.8,.06,t.wave,bus);step++;}
+ function start(){if(timer!==null||!scene||!prefs.enabled||!visible||!unlocked||ctx?.state!=='running')return;if(!currentBus)currentBus=makeBus(false);tick();timer=host.setInterval(tick,30000/tracks[scene].bpm);}
  // Serialize resume/suspend; re-check intent after each async transition.
  function reconcile(){
   if(!ctx)return Promise.resolve(false);
@@ -84,12 +97,23 @@ function createAudio({host}){
   return lifecycle;
  }
  async function unlock(){if(!prefs.enabled||!visible||!scene)return false;try{if(!ctx){const C=host.AudioContext||host.webkitAudioContext;if(!C)return false;ctx=new C();bgm=ctx.createGain();sfx=ctx.createGain();bgm.connect(ctx.destination);sfx.connect(ctx.destination);volume();}return await reconcile();}catch{return false;}}
- function setScene(next){if(next!==null&&!Object.hasOwn(tracks,next))next=null;if(next===scene)return;stop();scene=next;step=0;start();}
+ function setScene(next){
+  if(next!==null&&!Object.hasOwn(tracks,next))next=null;if(next===scene)return;
+  const fade=ordinary.has(scene)&&ordinary.has(next)&&timer!==null&&currentBus&&prefs.enabled&&visible&&ctx?.state==='running'&&typeof host.setTimeout==='function'&&typeof host.clearTimeout==='function';
+  if(fade){
+   clearLoop();clearFade();stopVoices(sfx);
+   fadingBus=currentBus;const old=fadingBus,now=ctx.currentTime;
+   old.gain.cancelScheduledValues(now);old.gain.setTargetAtTime(.0001,now,.07);
+   currentBus=makeBus(true);
+   fadeTimer=host.setTimeout(()=>{if(fadingBus===old){dropBus(old);fadingBus=null;fadeTimer=null;}},400);
+  }else stop();
+  scene=next;step=0;start();
+ }
  const cues={tap:[72],open:[67,72],alert:[52,49],parallel:[71,76,79],star:[72,79,84],rare:[76,83,88],immortal:[45,46,69],rebirth:[84,76,72],transcendent:[36,42,81,90],awards:[72,76,79,84],homer:[55,67,79,84],strike:[48,60,72],win:[60,67,72,76,84],loss:[67,63,60],draw:[64,67,64]};
  function cue(kind){if(!prefs.enabled||!visible||!unlocked||!scene||!ctx||ctx.state!=='running'||!Object.hasOwn(cues,kind))return;const now=ctx.currentTime+.01;cues[kind].forEach((m,i)=>note(m,now+i*.13,kind==='tap'?.075:.38,kind==='tap'?.05:.09,'sine',sfx));}
  function settings(next){prefs={enabled:typeof next.enabled==='boolean'?next.enabled:prefs.enabled,bgm:Number.isFinite(next.bgm)?clamp(next.bgm):prefs.bgm,sfx:Number.isFinite(next.sfx)?clamp(next.sfx):prefs.sfx};try{host.localStorage?.setItem(key,JSON.stringify(prefs));}catch{}volume();if(!prefs.enabled){stop();if(ctx)void reconcile();}else if(unlocked)void reconcile();return {...prefs};}
  function visibility(v){visible=!!v;volume();if(!visible){stop();if(ctx)void reconcile();}else if(unlocked&&prefs.enabled)void reconcile();}
- return {unlock,setScene,cue,settings,visibility,inspect:()=>({scene,prefs:{...prefs},unlocked,active:timer!==null,voices:voices.size})};
+ return {unlock,setScene,cue,settings,visibility,inspect:()=>({scene,prefs:{...prefs},unlocked,active:timer!==null,voices:voices.size,fading:fadingBus!==null})};
 }
 // Only already presented replay frames may emit sound. No cue from future frames.
 function replayCue(replay,teamId){

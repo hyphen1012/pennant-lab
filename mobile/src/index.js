@@ -28,7 +28,8 @@ if(native){
   function interfaceReady(){return usable()||(accountEnabled&&!authStarted&&!accountInitialized&&gate.ready());}
   function paint(online){
     if(!online)window.dispatchEvent(new Event('pl-native-suspend'));
-    const root=document.querySelector('#app');if(root)root.inert=!online;
+    const root=document.querySelector('#app'),wasBlocked=root?.inert===true;if(root)root.inert=!online;
+    if(online&&wasBlocked)window.dispatchEvent(new Event('pl-native-ready'));
     if(!overlay){
       overlay=document.createElement('section');
       overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','通信状態');

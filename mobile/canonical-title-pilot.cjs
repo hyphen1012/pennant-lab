@@ -1161,11 +1161,15 @@ const pilotCode = `
       if(b?.disabled)return;
       void sceneAudio.unlock().then(ok=>{if(ok&&b&&!slotOpening&&audioScene)sceneAudio.cue('tap');});
     },true);
-    document.addEventListener('visibilitychange',()=>sceneAudio.visibility(!document.hidden));
-    window.addEventListener('pl-native-suspend',()=>sceneAudio.visibility(false));
-    window.addEventListener('focus',()=>{if(!document.hidden)sceneAudio.visibility(true);});
+    let audioNativeBlocked=document.querySelector('#app')?.inert===true;
+    const audioVisible=()=>!document.hidden&&!audioNativeBlocked&&document.querySelector('#app')?.inert!==true;
+    document.addEventListener('visibilitychange',()=>sceneAudio.visibility(audioVisible()));
+    window.addEventListener('pl-native-suspend',()=>{audioNativeBlocked=true;sceneAudio.visibility(false);});
+    window.addEventListener('pl-native-ready',()=>{audioNativeBlocked=false;sceneAudio.visibility(audioVisible());});
+    window.addEventListener('focus',()=>sceneAudio.visibility(audioVisible()));
     window.addEventListener('pagehide',()=>sceneAudio.visibility(false));
-    window.addEventListener('pageshow',()=>sceneAudio.visibility(!document.hidden));
+    window.addEventListener('pageshow',()=>sceneAudio.visibility(audioVisible()));
+    sceneAudio.visibility(audioVisible());
   }
 `;
 module.exports={canonicalTitlePilot};
