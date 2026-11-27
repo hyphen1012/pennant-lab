@@ -58,3 +58,22 @@ Startup video, title, world slots/portal/delete, setup, replay match/digest/news
 ## Existing partial evidence (not closed)
 
 PR176 HQ confirmed score browser; PR178 archive retry browser; PR181 roster return browser; PR173 mystery presentation browser; PR168 awards audio regression. Prior user-reported camp rest image, size mismatch, facility overlay and lineup color require actual device recheck. Do not mark any of these as newly verified by this inventory.
+
+
+## H022 journey gate audit — Q1-MKT-001
+
+External context: SEGA official notice 2025-02-07, https://www.sega.co.jp/release/250207_1.html : FM25 cancellation after UI/graphics renewal and quality work took longer than planned. This is a single case, not evidence of causal effect or quantitative risk for our game. Adopt only the missing journey-level evidence requirement; do not duplicate existing screen/RC gates.
+
+Evidence inspected at PR184 ad25867012e170576b27d58c6e45624c07584823: scripts/canonical-title-browser-check.cjs (run 45965226250 success), scripts/canonical-trade-browser-check.cjs (45965226240 success). Real HTTP to test service with simulated native bridge; fixture paths and conditional branches do not certify all variants.
+
+| Journey | Existing observed browser test code | Missing release evidence |
+|---|---|---|
+| Launch → world choice → setup → HQ → reopen | title/portal/create/reopen, offline and lost response, long-press delete/cancel | official media on devices, actual auth/OS lifecycle, cold start and audio |
+| HQ → calendar/match → score/reports → HQ | step, lost response/re-read, weekly/normal/replay conditional, search and read retry, decade reread | full monthly/normal/fast/skip and off-season parallel flow; motion, audio, accessibility |
+| Roster → edit → save → player history → return | swap/undo/refresh, long list scroll, focus/memo, rotation/farm actions | touch drag and manager auto, color/field/list, all positions, accessibility, physical device |
+| Recruitment → compare → commit → continue | free agent search/paging/conditional sign; separate trade quote/invalidation/cancel/lost commit | FA/foreign/draft/renewal/cut full consecutive journeys, budget/rights, actual UI |
+| Club → facility/price/travel/manager → continue | medical up/down, conditional price, travel, manager entry/order | all facility levels, overlays, camp illustrations, GM transfer/termination, physical devices |
+| Annual business → report → continue | no-current-job, fixture rookie/foreign reveal, decade read; existing isolated annual regression not full journey | uninterrupted year through 23 jobs/market, ordinary report nonblocking, special priority/secret state, off-season concurrent operations |
+| Achievements/rewards → exchange/use → refresh | real HTTP memorial claim, ticket/treatment, decor, preview/share via fixture, lost settlement | actual store/SSV, native share, rights revocation, offline/reconnect and all device variants |
+
+Adopt under existing UL-PENNANT/T009: before/after evidence at same deterministic save and candidate SHA for each touched journey; preserve game state, navigation, action order, authoritative revision, error/retry, normal and interrupted flow. Record tested viewport/device/OS, input mode, audio/motion preferences, actual screenshot/video and known limitations. No mandatory cosmetic rewrite where adequate; retain with evidence. No quality signoff based only on CI or screenshots. Require a full sequential annual journey in addition to isolated jobs, and actual device walkthroughs. All physical device and release gates remain OPEN; no new independent task IDs and no release/expense/authority changes.
