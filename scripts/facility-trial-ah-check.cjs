@@ -30,10 +30,38 @@ const tail=`save=()=>true;render=()=>{};showToast=()=>{};buildFresh();game.start
  a(t.ahParentHistory.length===2&&historic.draws.length===1,'historic draw snapshot');
  a(JSON.stringify(historic)===frozen,'no historical mutation after future loan');
  a(ahReport(t).draws.reduce((n,r)=>n+r.principal,0)===ahReport(t).paid+ahReport(t).remaining,'cumulative debt conservation');
- // Restore snapshot of the current loan, not the obsolete completed loan.
- const saved=JSON.parse(JSON.stringify(game));a(saved.teams.find(r=>r.id===t.id).ahParentDebt.principalPaid===d.principal,'JSON roundtrip');
- return {principal:d.principal,interest:d.interestPaid,remaining:report.remaining};`;
+ // The current (second) loan is not the obsolete, fully repaid first loan.
+ const current=ahDebt(t);
+ a(current!==d&&current.principal>0,'current loan must be a new positive loan');
+ a(current.paid===0&&current.principalPaid===0&&current.interestPaid===0,'new loan has no repayments');
+ a(d.principalPaid===d.principal&&d.paid===24,'first loan remains fully repaid');
+ const loanState=team=>({debt:ahDebt(team),history:team.ahParentHistory,report:ahReport(team),cash:team.cash,usedYear:team.ahParentUsedYear,paid:team.ahParentPaid,interest:team.ahParentInterest});
+ const before=JSON.parse(JSON.stringify(loanState(t)));
+ const saved=JSON.parse(JSON.stringify(game)),restored=saved.teams.find(r=>r.id===t.id);
+ assertStrict.deepEqual(loanState(restored),before,'current debt, history, totals and cash survive JSON roundtrip');
+ a(ahDebt(restored)!==current&&restored.ahParentHistory!==t.ahParentHistory,'restored state must not alias live state');
+ // Compare continued real repayment on uninterrupted and restored engine states.
+ const dates=['2030-04-30','2030-05-01','2031-02-01','2032-04-01'];
+ const expected=dates.map(date=>{ahPay(t,date);return JSON.parse(JSON.stringify(loanState(t)));});
+ game=saved;
+ a(myTeam().id===p.id,'selected team survives restoration');
+ assertStrict.deepEqual(loanState(restored),before,'uninterrupted payments must not mutate restored state');
+ dates.forEach((date,i)=>{
+   ahPay(restored,date);
+   assertStrict.deepEqual(loanState(restored),expected[i],'restored repayment matches uninterrupted state at '+date);
+   const once=JSON.parse(JSON.stringify(loanState(restored)));
+   ahPay(restored,date);
+   assertStrict.deepEqual(loanState(restored),once,'same-date repayment is idempotent after restore at '+date);
+   const r=ahReport(restored);
+   a(r.draws.reduce((n,row)=>n+row.principal,0)===r.paid+r.remaining,'cumulative principal conservation after restore');
+ });
+ const final=ahReport(restored),debt=ahDebt(restored);
+ a(debt.paid===24&&debt.principalPaid===debt.principal&&final.remaining===0&&!debt.arrears,'second loan fully repaid after restore');
+ a(final.paid===d.principal+debt.principal,'cumulative repayments include both loans exactly once');
+ a(ahMoney(restored.cash)===ahMoney(before.cash)-debt.principalPaid-debt.interestPaid,'restored cash conservation');
+ a(JSON.stringify(historic)===frozen,'historical snapshot remains unchanged through restored repayments');
+ return {principal:d.principal,interest:d.interestPaid,remaining:report.remaining,restoredRemaining:final.remaining,restoredPaid:final.paid,continuationDates:dates.length};`;
 const code=inline.slice(0,end).replace('((Date.now()^0x53e719f1)>>>0)||1937','1937').replace('(() => {','return (() => {')+tail+'})();';
 const doc={querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){},body:{appendChild(){},insertAdjacentHTML(){}}},win={addEventListener(){},scrollTo(){}},ls={getItem:()=>null,setItem(){},removeItem(){}};
-const result=new Function('document','window','localStorage','setTimeout','clearTimeout',code)(doc,win,ls,()=>0,()=>{});
-console.log('PASS AH actual game park investment, title/role/coverage, debt repayment and JSON roundtrip',result);
+const result=new Function('document','window','localStorage','setTimeout','clearTimeout','assertStrict',code)(doc,win,ls,()=>0,()=>{},a);
+console.log('PASS AH actual game park investment, title/role/coverage, debt repayment, full JSON roundtrip and restored continuation',result);
