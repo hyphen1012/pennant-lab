@@ -50,7 +50,7 @@ function createHeadlessEngine(){
   if(!e)return null;
   const p=getPlayer(e.playerId),prospect=['foreign-discovery','tournament'].includes(e.kind)||String(e.id).includes(':tournament:')||String(e.id).includes(':university:');
   const known=!!p&&!prospect&&!game.pendingDraftReveal&&!flowForeignResponse()&&rareCinemaKnown(p);
-  return {eventKey:e.id,year:e.year,date:e.date,category:e.category,hidden:!known,title:known?e.title:null,body:known?e.body:null,player:known?{id:p.id,name:p.name,pos:p.pos,age:p.age,teamId:p.teamId,specialCategory:p.specialCategory||null,originCategory:p.originCategory||null,appearanceSeed:p.appearanceSeed??null,pastLifeAppearance:p.pastLifeAppearance||null}:null};
+  return {eventKey:e.id,year:e.year,date:e.date,category:known?e.category:null,hidden:!known,title:known?e.title:null,body:known?e.body:null,player:known?{id:p.id,name:p.name,pos:p.pos,age:p.age,teamId:p.teamId,specialCategory:p.specialCategory||null,originCategory:p.originCategory||null,appearanceSeed:p.appearanceSeed??null,pastLifeAppearance:p.pastLifeAppearance?{seed:p.pastLifeAppearance.seed,baseCategory:p.pastLifeAppearance.baseCategory}:null}:null};
  };
  const inbox=()=>{
   const injury=injuryNotice(),rare=pendingRareNews()[0],career=careerNotice();
@@ -59,7 +59,7 @@ function createHeadlessEngine(){
   return {monthly:monthly?{month:monthly.month,date:monthly.date,wins:monthly.wins,losses:monthly.losses,ties:monthly.ties,cash:monthly.cashAtClose,finance:monthly.actualFinance?{revenue:monthly.actualFinance.revenue,payroll:monthly.actualFinance.payroll,net:monthly.actualFinance.net}:null,matches:(monthly.matches||[]).map(m=>({date:m.date,opponent:m.opponent,rs:m.rs,ra:m.ra}))}:null,milestones:milestones.slice(0,80).map(m=>({title:m.title,date:m.date})),milestoneCount:milestones.length,review:g?{gameId:String(g.id),date:g.date,home:g.home,away:g.away,homeScore:g.homeScore,awayScore:g.awayScore}:null,
    finance:crisis&&crisis.teamId===team.id?{year:crisis.year,date:crisis.date,shortfall:crisis.shortfall,status:crisis.status,loanAvailable:false}:null,injury:injury?{eventKey:String(injury.playerId)+':'+injury.date,playerId:injury.playerId,date:injury.date,days:injury.days}:null,
    rare:rareInbox(rare),
-   rookie:game.pendingDraftReveal?{year:game.pendingDraftReveal.year,entries:game.pendingDraftReveal.entries.map(r=>{const p=getPlayer(r.id),stage=r.revealed?2:r.revealStage||0;const hidden=!!p&&secretProspect(p)&&stage!==2;return {id:r.id,name:hidden?'????':p?.name,pos:p?.pos,stage,hidden,specialCategory:p?.specialCategory||null,originCategory:p?.originCategory||null,appearanceSeed:stage===2?p?.appearanceSeed:null,age:stage===2?p?.age:null,pastLifeAppearance:stage===2?p?.pastLifeAppearance||null:null,abilities:stage===2&&p?Object.fromEntries(seasonSkillKeys(p).map(k=>[k,p[k]])):null};})}:null,
+   rookie:game.pendingDraftReveal?{year:game.pendingDraftReveal.year,entries:game.pendingDraftReveal.entries.map(r=>{const p=getPlayer(r.id),stage=r.revealed?2:r.revealStage||0;const hidden=!!p&&secretProspect(p)&&stage!==2;return {id:r.id,name:hidden?'????':p?.name,pos:p?.pos,stage,hidden,specialCategory:hidden?null:p?.specialCategory||null,originCategory:hidden?null:p?.originCategory||null,appearanceSeed:stage===2?p?.appearanceSeed:null,age:stage===2?p?.age:null,pastLifeAppearance:stage===2&&p?.pastLifeAppearance?{seed:p.pastLifeAppearance.seed,baseCategory:p.pastLifeAppearance.baseCategory}:null,abilities:stage===2&&p?Object.fromEntries(seasonSkillKeys(p).map(k=>[k,p[k]])):null};})}:null,
    decade:game.pendingDecade??null,opening:game.pendingCeremonyIntro==='opening',
    career:career?{playerId:career.p.id,stage:career.e.type,options:['consult','plan'].includes(career.e.type)?farewellChoices(career.p).map(([key,label,cost])=>({key,label,cost})):[]}:null};
  };
@@ -202,7 +202,7 @@ function createHeadlessEngine(){
   const conv=m.negotiations[team.id];
   const project=(c,stage=0)=>{
    const p=c.player,hidden=secretProspect(p)&&stage!==2,r=foreignReport(m,team,c),tasks=foreignTasks(m,team,c);
-   return {id:c.id,name:hidden?'????':p.name,pos:p.pos,age:hidden?null:p.age,country:c.country,category:playerTitleTheme(p)?.name||null,specialCategory:p.specialCategory||null,originCategory:p.originCategory||null,hidden,appearanceSeed:hidden?null:p.appearanceSeed,pastLifeAppearance:stage===2&&p.pastLifeAppearance?{seed:p.pastLifeAppearance.seed,baseCategory:p.pastLifeAppearance.baseCategory}:null,kind:c.kind,status:c.status,tasks,canBegin:c.status==='available'&&foreignRoom(team,c),confidence:r.confidence,estimate:hidden?null:{low:r.low,high:r.high},abilities:Object.fromEntries(Object.entries(r.values).map(([k,v],i)=>[k,stage===2||stage===1&&i<2?{value:p[k]}:hidden?null:{low:v.low,high:v.high,estimate:v.estimate}])),stats:hidden?null:foreignStats(m,c)};
+   return {id:c.id,name:hidden?'????':p.name,pos:p.pos,age:hidden?null:p.age,country:c.country,category:hidden?null:playerTitleTheme(p)?.name||null,specialCategory:hidden?null:p.specialCategory||null,originCategory:hidden?null:p.originCategory||null,hidden,appearanceSeed:hidden?null:p.appearanceSeed,pastLifeAppearance:stage===2&&p.pastLifeAppearance?{seed:p.pastLifeAppearance.seed,baseCategory:p.pastLifeAppearance.baseCategory}:null,kind:c.kind,status:c.status,tasks,canBegin:c.status==='available'&&foreignRoom(team,c),confidence:r.confidence,estimate:hidden?null:{low:r.low,high:r.high},abilities:Object.fromEntries(Object.entries(r.values).map(([k,v],i)=>[k,stage===2||stage===1&&i<2?{value:p[k]}:hidden?null:{low:v.low,high:v.high,estimate:v.estimate}])),stats:hidden?null:foreignStats(m,c)};
   };
   const c=conv&&m.candidates.find(x=>x.id===conv.candidateId),q=conv?.status==='talk'?FOREIGN_QUESTIONS[conv.answers?.length||0]:null;
   const opened=conv?.resultOpened===true,stage=opened&&conv.status==='signed'?conv.revealStage||0:0;
@@ -216,7 +216,7 @@ function createHeadlessEngine(){
  const draftPending=d=>d.picks.find(x=>x.teamId===team.id&&(x.recoveryPending||x.recoveryCelebration));
  const draftOwnRow=d=>d.picks.find(x=>x.teamId===team.id&&x.status==='rights');
  const candidateView=(c,d,detail=false)=>{
-  const p=c.player,hidden=secretProspect(p),base={id:c.id,name:hidden?'????':p.name,pos:p.pos,type:c.type,category:playerTitleTheme(p)?.name||null,specialCategory:p.specialCategory||null,originCategory:p.originCategory||null,hidden};
+  const p=c.player,hidden=secretProspect(p),base={id:c.id,name:hidden?'????':p.name,pos:p.pos,type:c.type,category:hidden?null:playerTitleTheme(p)?.name||null,specialCategory:hidden?null:p.specialCategory||null,originCategory:hidden?null:p.originCategory||null,hidden};
   if(!detail)return base;
   const r=hidden?null:draftReport(d,team,c),tasks=scoutTasks(d,team,c);
   return {...base,school:hidden?null:c.school,age:hidden?null:p.age,appearanceSeed:hidden?null:p.appearanceSeed,report:r?{low:r.low,high:r.high,confidence:r.confidence,values:r.values,preference:r.preference,abroad:r.abroad}:null,tasks,hints:hidden?[]:draftInterviewHints(d,team,c),canResearch:c.status==='available'&&scoutVisible(c)&&draftResearchUsed(d,team)<draftScoutBudget(team)&&draftResearchLevel(d,team,c)<3};
