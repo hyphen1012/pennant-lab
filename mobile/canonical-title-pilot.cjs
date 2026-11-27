@@ -79,7 +79,7 @@ const pilotCode = `
     }catch{return false;}
   }
   function canonicalReset(){
-    canonicalDeleteClear();canonicalDeleteSuppressed=null;canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalForeignOpen=false;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';canonicalReplay=null;canonicalReplaySkip=false;canonicalArchive=null;canonicalManagerEntry=true;canonicalTrade=null;canonicalTradeQuote=null;canonicalTradeClub=null;canonicalAchievementPage=null;canonicalAchievementNote='';canonicalMemorial=null;canonicalMemorialBusy=false;canonicalRewardNote='';canonicalRights=null;canonicalRightsBusy=false;
+    canonicalDeleteClear();canonicalDeleteSuppressed=null;canonicalTvClear();document.querySelector('.canonical-tv-detail')?.close();canonicalTvSuppressed=null;canonicalEpoch++;canonicalSlots=null;canonicalSnapshot=null;canonicalSlot=null;canonicalRoster=null;canonicalHqWorld=null;canonicalTarget=null;canonicalRunning=false;canonicalStop=false;canonicalPlayback='normal';canonicalPlayerId=null;canonicalLeague=null;canonicalHistory=null;canonicalPlayersScroll=0;canonicalAwardFilter='all';canonicalCampGroup='first';canonicalWinterPlace='taiwan';canonicalDigestCut=0;canonicalForeignOpen=false;canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalOpsNote='';canonicalReplay=null;canonicalReplaySkip=false;canonicalArchive=null;canonicalManagerEntry=true;canonicalTrade=null;canonicalTradeQuote=null;canonicalTradeClub=null;canonicalAchievementPage=null;canonicalAchievementNote='';canonicalMemorial=null;canonicalMemorialBusy=false;canonicalRewardNote='';canonicalRights=null;canonicalRightsBusy=false;
     canonicalPilot.suspend();ui.clubDraft=null;ui.portalSlot=null;ui.portalOrigin=null;slotOpening=false;
     ui.page='title';ui.launchTitle=false;
   }
@@ -140,7 +140,7 @@ const pilotCode = `
     ui.page='canonical-roster';render();window.scrollTo(0,0);
   }
   const canonicalPlayerModel=(p,g)=>({...p,...p.abilities,teamId:g.team.id,farmTier:p.tier,injury:p.injured?{daysLeft:p.injuryDays||1}:null,stats:{...p.batStats}});
-  let canonicalPlayerId=null,canonicalLeague=null,canonicalHistory=null;
+  let canonicalPlayerId=null,canonicalLeague=null,canonicalHistory=null,canonicalPlayersScroll=0;
   function canonicalHistoryMarkup(p,blocked){
     const d=canonicalHistory;
     if(!d||d.playerId!==p.id)return '<section class="panel"><h3>年度別・通算成績と能力推移</h3><button class="btn outline full" data-action="canonical-history-open" '+(slotOpening?'disabled':'')+'>'+(slotOpening?'取得中…':'成績・能力推移・GMメモを表示')+'</button></section>';
@@ -1116,10 +1116,10 @@ const pilotCode = `
     else if(ui.page==='canonical-events'){canonicalArchive=null;canonicalEventClick(b);}
     else if(ui.page==='canonical-hq'&&act==='canonical-ops-open'&&['rotation','farm','free','facilities','manager','trade'].includes(b.dataset.kind)&&canonicalSnapshot?.game?.club&&accountCurrent()){canonicalOpsNote='';canonicalFreePage=null;canonicalFreeQuery='';canonicalRotationSlot=null;canonicalTrade=null;canonicalTradeQuote=null;canonicalTradeClub=null;canonicalManagerEntry=true;ui.page='canonical-'+b.dataset.kind;render();draftJump(0);if(b.dataset.kind==='free')void canonicalLoadFree(0,'');}
     else if(canonicalOpsPages.includes(ui.page))canonicalOpsClick(b);
-    else if(ui.page==='canonical-hq'&&act==='canonical-players'&&canonicalSnapshot?.game?.club&&accountCurrent()){ui.page='canonical-players';render();draftJump(0);}
+    else if(ui.page==='canonical-hq'&&act==='canonical-players'&&canonicalSnapshot?.game?.club&&accountCurrent()){canonicalPlayersScroll=0;ui.page='canonical-players';render();draftJump(0);}
     else if(ui.page==='canonical-hq'&&act==='canonical-standings'&&canonicalSnapshot?.game?.headquarters&&accountCurrent()){canonicalLeague=canonicalSnapshot.game.team.league;ui.page='canonical-standings';render();draftJump(0);}
     else if(ui.page==='canonical-standings'&&act==='canonical-league'&&['E','W'].includes(b.dataset.league)){canonicalLeague=b.dataset.league;render();}
-    else if(ui.page==='canonical-players'&&act==='player-detail'&&canonicalSnapshot?.game?.club?.roster.some(p=>p.id===Number(b.dataset.id))&&accountCurrent()){canonicalPlayerId=Number(b.dataset.id);canonicalHistory=null;ui.page='canonical-player';render();draftJump(0);}
+    else if(ui.page==='canonical-players'&&act==='player-detail'&&canonicalSnapshot?.game?.club?.roster.some(p=>p.id===Number(b.dataset.id))&&accountCurrent()){canonicalPlayersScroll=draftScrollY();canonicalPlayerId=Number(b.dataset.id);canonicalHistory=null;ui.page='canonical-player';render();draftJump(0);}
     else if(ui.page==='canonical-player'&&act==='canonical-history-open')void canonicalLoadHistory(0);
     else if(ui.page==='canonical-player'&&act==='canonical-history-prev'&&canonicalHistory?.offset>0)void canonicalLoadHistory(Math.max(0,canonicalHistory.offset-10));
     else if(ui.page==='canonical-player'&&act==='canonical-history-next'&&Number.isSafeInteger(canonicalHistory?.nextOffset))void canonicalLoadHistory(canonicalHistory.nextOffset);
@@ -1129,7 +1129,7 @@ const pilotCode = `
     }
     else if(ui.page==='canonical-player'&&act==='canonical-focus'){const c=canonicalSnapshot?.game?.club,p=c?.roster.find(p=>p.id===canonicalPlayerId),k=b.dataset.key;if(p&&c.canManage&&!canonicalSnapshot.pending?.length&&['balanced',...Object.keys(p.abilities)].includes(k)&&p.focus!==k)void canonicalOpsRequest({club:'focus',playerId:p.id,key:k});}
     else if(['canonical-players','canonical-player','canonical-standings'].includes(ui.page)&&act==='canonical-info-refresh')void canonicalOpsRequest(null);
-    else if(['canonical-players','canonical-player','canonical-standings'].includes(ui.page)&&act==='canonical-info-back'){ui.page=ui.page==='canonical-player'?'canonical-players':'canonical-hq';canonicalPlayerId=null;canonicalHistory=null;canonicalOpsNote='';render();draftJump(0);}
+    else if(['canonical-players','canonical-player','canonical-standings'].includes(ui.page)&&act==='canonical-info-back'){const returning=ui.page==='canonical-player',scroll=returning?canonicalPlayersScroll:0;ui.page=returning?'canonical-players':'canonical-hq';canonicalPlayerId=null;canonicalHistory=null;canonicalOpsNote='';if(!returning)canonicalPlayersScroll=0;render();draftJump(scroll);}
     else if(['canonical-ready','canonical-hq'].includes(ui.page)&&act==='canonical-roster-open')canonicalRosterOpen();
     else if(ui.page==='canonical-roster'&&act==='canonical-roster-refresh')void canonicalRosterRequest(null);
     else if(ui.page==='canonical-roster'&&act==='canonical-roster-back'){if(!canonicalSnapshot)void canonicalReturn();else{const dest=canonicalRoster?.returnPage||'canonical-ready';canonicalRoster=null;ui.page=dest;render();window.scrollTo(0,0);}}
