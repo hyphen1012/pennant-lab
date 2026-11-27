@@ -136,7 +136,8 @@ function awardCue({player,open,scene,visible}={}){
  const category=player.specialCategory;
  const composite=category==='IMMORTAL輪廻転生'||player.pastLifeAppearance?.baseCategory==='IMMORTAL'&&(category==='輪廻転生'||player.originCategory==='RINNE');
  const rank=composite?'IMMORTAL輪廻転生':category;
- return ({PARALLEL:'parallel',STAR:'star',LEGEND:'rare',IMMORTAL:'immortal','輪廻転生':'rebirth','IMMORTAL輪廻転生':'transcendent'})[rank]??null;
+ const cues={PARALLEL:'parallel',STAR:'star',LEGEND:'rare',IMMORTAL:'immortal','輪廻転生':'rebirth','IMMORTAL輪廻転生':'transcendent'};
+ return typeof rank==='string'&&Object.hasOwn(cues,rank)?cues[rank]:null;
 }
 return {createAudio,sceneFor,replayCue,awardCue,tracks};
 });
