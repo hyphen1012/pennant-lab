@@ -55,7 +55,7 @@ function sceneFor({page,launchTitle,annual,inbox,foreign,foreignCandidate,replay
 function createAudio({host}){
  const key='pl-scene-audio-v1',clamp=v=>Math.min(1,Math.max(0,v)),defaults={enabled:true,bgm:.45,sfx:.35};
  let prefs={...defaults};try{const p=JSON.parse(host.localStorage?.getItem(key)||'null');if(p&&typeof p.enabled==='boolean'&&Number.isFinite(p.bgm)&&Number.isFinite(p.sfx))prefs={enabled:p.enabled,bgm:clamp(p.bgm),sfx:clamp(p.sfx)};}catch{}
- let ctx=null,bgm=null,sfx=null,scene=null,timer=null,step=0,lifecycle=null,visible=!host.document?.hidden,unlocked=false,voices=new Set();
+ let ctx=null,bgm=null,sfx=null,scene=null,timer=null,step=0,lifecycle=null,requestSerial=0,visible=!host.document?.hidden,unlocked=false,voices=new Set();
  const stop=()=>{if(timer!==null){host.clearInterval(timer);timer=null;}for(const n of voices){try{n.stop();}catch{}}voices.clear();};
  function volume(){if(!ctx)return;for(const [node,value] of [[bgm,prefs.bgm],[sfx,prefs.sfx]]){const now=ctx.currentTime;node.gain.cancelScheduledValues(now);node.gain.setTargetAtTime(prefs.enabled&&visible?value:0,now,.06);}}
  function note(m,when,len,amp,wave,bus){if(!m||!ctx||ctx.state!=='running'||voices.size>=32)return;const o=ctx.createOscillator(),g=ctx.createGain();o.type=wave;o.frequency.value=440*Math.pow(2,(m-69)/12);g.gain.setValueAtTime(.0001,when);g.gain.exponentialRampToValueAtTime(Math.max(.0002,amp),when+.025);g.gain.exponentialRampToValueAtTime(.0001,when+len);o.connect(g);g.connect(bus);voices.add(o);o.onended=()=>{voices.delete(o);o.disconnect();g.disconnect();};o.start(when);o.stop(when+len+.02);}
@@ -64,10 +64,13 @@ function createAudio({host}){
  // Serialize resume/suspend; re-check intent after each async transition.
  function reconcile(){
   if(!ctx)return Promise.resolve(false);
+  requestSerial++;
   if(lifecycle)return lifecycle;
+  let seen=0;
   const run=async()=>{
    try{
     for(;;){
+     seen=requestSerial;
      const wanted=prefs.enabled&&visible;
      if(!wanted){stop();if(ctx.state==='running')await ctx.suspend();if(prefs.enabled&&visible)continue;return false;}
      if(ctx.state!=='running')await ctx.resume();
@@ -77,7 +80,7 @@ function createAudio({host}){
     }
    }catch{return false;}
   };
-  lifecycle=run().finally(()=>{lifecycle=null;});
+  lifecycle=run().finally(()=>{lifecycle=null;if(seen!==requestSerial)void reconcile();});
   return lifecycle;
  }
  async function unlock(){if(!prefs.enabled||!visible||!scene)return false;try{if(!ctx){const C=host.AudioContext||host.webkitAudioContext;if(!C)return false;ctx=new C();bgm=ctx.createGain();sfx=ctx.createGain();bgm.connect(ctx.destination);sfx.connect(ctx.destination);volume();}return await reconcile();}catch{return false;}}
@@ -94,7 +97,7 @@ function replayCue(replay,teamId){
  const r=replay.report;if(!Number.isSafeInteger(teamId)||![r.home?.id,r.away?.id].includes(teamId))return null;
  if(replay.phase==='watch'&&Number.isSafeInteger(replay.step)&&replay.step>0&&replay.step<=r.replay?.length){
   const v=r.replay[replay.step-1],kind=v?.phase!=='end'&&v?.play?.kind;
-  return ['hr','strikeout10'].includes(kind)?{key:r.year+':'+r.day+':'+replay.step,kind:kind==='hr'?'homer':'strike'}:null;
+  return kind==='hr'||v?.phase==='strike'&&v.play?{key:r.year+':'+r.day+':'+replay.step,kind:kind==='hr'?'homer':'strike'}:null;
  }
  if(replay.phase==='final'&&Number.isFinite(r.homeScore)&&Number.isFinite(r.awayScore)){
   const diff=(r.homeScore-r.awayScore)*(r.home.id===teamId?1:-1);
