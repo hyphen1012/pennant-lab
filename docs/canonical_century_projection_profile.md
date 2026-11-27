@@ -1,0 +1,2 @@
+# 実ゲーム世界のWorker計測
+2年・100年のlong-run実世界を別プロセス生成、同期readProjectionとWorkerを別プロセス実行し世界SHA・エンジンSHA・出力SHAを比較。rawサイズ、load時間、projection時間、イベントループtick、RSS/peak RSS、失敗段階を測定。初回は既存Worker既定上限(1GiB old generation, 30秒)を評価し不足なら失敗として残す。生成側は保存耐久目的の補填ありで経営50+5の証拠には使用しない。生世界は一時フォルダのみ、CI成果物は計測値・ハッシュのみ。HTTP同時負荷、永続worker、総RSS admission、復元運用は別途。
